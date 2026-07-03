@@ -216,6 +216,10 @@ HTML_TEMPLATE = """
             100% { fill: currentColor; }
         }
 
+        .user-msg-anchor {
+            scroll-margin-top: 2px;
+        }
+
         .magic-btn {
             position: relative;
             background-image: radial-gradient(circle var(--glow-size, 0px) at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(0,0,0,0.1) 0%, transparent 100%);
@@ -384,7 +388,27 @@ HTML_TEMPLATE = """
         .markdown-body strong { font-weight: 700; color: #111827; }
         .markdown-body em { font-style: italic; }
         .markdown-body code { font-family: monospace; background-color: #f3f4f6; padding: 0.1rem 0.3rem; border-radius: 0.25rem; font-size: 0.9em; }
-    </style>
+        .markdown-body pre {
+            background-color: #f3f4f6;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow-wrap: anywhere;
+            margin-top: 0.5rem;
+            margin-bottom: 0.75rem;
+            font-size: 0.85em;
+        }
+
+        .markdown-body pre code {
+            background-color: transparent;
+            padding: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow-wrap: anywhere;
+        }
+            </style>
 </head>
 <body class="bg-white text-gray-900 font-sans antialiased selection:bg-gray-300">
 
@@ -531,6 +555,7 @@ HTML_TEMPLATE = """
         function openChat(docId, docName) {
             currentChatDocId = docId; // On sauvegarde l'ID
             chatHistory = [];         // On vide l'historique
+            document.querySelectorAll('.chat-spacer').forEach(el => el.remove());
             document.getElementById('chat-messages').innerHTML = `
                 <div class="flex flex-col items-start gap-3 mb-8">
                     <div class="text-sm text-gray-800 leading-relaxed w-full markdown-body">
@@ -582,50 +607,64 @@ HTML_TEMPLATE = """
             </svg>
         `;
 
+        function scrollToBottomIfNeeded(container) {
+            // if (autoScrollEnabled) {
+                // const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+                // if (distanceFromBottom > 2) {
+                    // container.scrollTop = container.scrollHeight;
+                // }
+            // }
+        }
+
         function handleChatSubmit() {
             const input = document.getElementById('ai-chat-input');
             const messagesContainer = document.getElementById('chat-messages');
             const text = input.value.trim();
             if (!text || !currentChatDocId) return;
 
-            // On fait disparaître proprement l'ancienne étincelle (et son espace)
             document.querySelectorAll('.sparkle-container').forEach(container => {
                 container.classList.remove('trigger-magic');
                 container.style.transition = 'opacity 0.3s ease, height 0.3s ease, margin 0.3s ease';
                 container.style.opacity = '0';
-                setTimeout(() => {
-                    container.style.display = 'none';
-                }, 300);
+                setTimeout(() => { container.style.display = 'none'; }, 300);
             });
 
-            // 1. Message Utilisateur (inchangé)
+            // 1. Message Utilisateur
             messagesContainer.insertAdjacentHTML('beforeend', `
-                <div class="flex items-end justify-end mb-8">
+                <div class="flex items-end justify-end mb-8 user-msg-anchor">
                     <div class="bg-gray-50 border border-gray-100 text-gray-900 px-5 py-3.5 rounded-[1.5rem] text-sm max-w-[80%] leading-relaxed">
                         ${text}
                     </div>
                 </div>
             `);
+            const userMsgEl = messagesContainer.lastElementChild;
             input.value = '';
-            autoScrollEnabled = true;
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
-            // 2. Préparation du conteneur IA (inchangé)
+            // 2. Préparation du conteneur IA + indicateur "Réflexion..."
             const loadingId = 'loading-' + Date.now();
             messagesContainer.insertAdjacentHTML('beforeend', `
                 <div id="${loadingId}" class="flex flex-col items-start gap-3 mb-8">
                     <div class="text-sm text-gray-800 leading-relaxed w-full markdown-body message-content"></div>
-                    <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic">
-                        ${magicSvgTemplate}
+                    <div class="flex items-center gap-2">
+                        <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic">
+                            ${magicSvgTemplate}
+                        </div>
+                        <span class="thinking-label text-xs font-bold tracking-widest uppercase text-gray-400" style="animation: textPulse 1.5s ease-in-out infinite;">Réflexion...</span>
                     </div>
                 </div>
             `);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+            requestAnimationFrame(() => {
+                const loadingEl = document.getElementById(loadingId);
+                const remaining = Math.max(0, messagesContainer.clientHeight - loadingEl.offsetHeight - 20);
+                messagesContainer.style.paddingBottom = remaining + 'px';
+                userMsgEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
 
             const messageContent = document.querySelector(`#${loadingId} .message-content`);
             const loadingAvatar = document.querySelector(`#${loadingId} .ai-avatar-wrapper`);
+            const thinkingLabel = document.querySelector(`#${loadingId} .thinking-label`);
 
-            // 3. Boucle d'animation (inchangé)
             loadingAnimInterval = setInterval(() => {
                 if (loadingAvatar) {
                     loadingAvatar.classList.remove('trigger-magic');
@@ -634,10 +673,28 @@ HTML_TEMPLATE = """
                 }
             }, 1200);
 
-            // 4. Vrai appel au LLM via /api/chat/stream (remplace le fakeResponse)
             const userText = text;
             const historySnapshot = chatHistory.slice();
             let fullResponse = '';
+            let displayedText = '';
+            let streamBuffer = '';
+            let firstChunkReceived = false;
+
+            const typewriterInterval = setInterval(() => {
+                if (streamBuffer.length > 0) {
+                    const chunkSize = Math.min(1 + Math.floor(Math.random() * 4), streamBuffer.length);
+                    displayedText += streamBuffer.slice(0, chunkSize);
+                    streamBuffer = streamBuffer.slice(chunkSize);
+                    messageContent.innerHTML = marked.parse(displayedText);
+                    scrollToBottomIfNeeded(messagesContainer);
+
+                    const loadingEl = document.getElementById(loadingId);
+                    if (loadingEl) {
+                        const remaining = Math.max(0, messagesContainer.clientHeight - loadingEl.offsetHeight - 20);
+                        messagesContainer.style.paddingBottom = remaining + 'px';
+                    }
+                }
+            }, 20);
 
             fetch('api/chat/stream', {
                 method: 'POST',
@@ -659,24 +716,58 @@ HTML_TEMPLATE = """
                     if (done) break;
                     const chunkText = decoder.decode(value, { stream: true });
                     if (chunkText) {
-                        fullResponse += chunkText;
-                        messageContent.innerHTML = marked.parse(fullResponse);
-                        if (autoScrollEnabled) {
-                            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                        if (!firstChunkReceived) {
+                            firstChunkReceived = true;
+                            if (thinkingLabel) thinkingLabel.remove();
                         }
+                        fullResponse += chunkText;
+                        streamBuffer += chunkText;
                     }
                 }
 
+                await new Promise(resolve => {
+                    const checkDrain = setInterval(() => {
+                        if (streamBuffer.length === 0) {
+                            clearInterval(checkDrain);
+                            resolve();
+                        }
+                    }, 30);
+                });
+
+                clearInterval(typewriterInterval);
                 chatHistory.push({ role: 'user', content: userText });
                 chatHistory.push({ role: 'assistant', content: fullResponse });
                 clearInterval(loadingAnimInterval);
 
+                requestAnimationFrame(() => {
+                    const loadingEl = document.getElementById(loadingId);
+                    const remaining = Math.max(0, messagesContainer.clientHeight - loadingEl.offsetHeight - 20);
+                    messagesContainer.style.paddingBottom = remaining + 'px';
+
+                    requestAnimationFrame(() => {
+                        userMsgEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    });
+                });
+
             }).catch((error) => {
                 console.error('Erreur chat stream:', error);
+                clearInterval(typewriterInterval);
+                if (thinkingLabel) thinkingLabel.remove();
                 messageContent.innerHTML += `<br><em>Erreur : ${error.message}</em>`;
                 clearInterval(loadingAnimInterval);
+
+                requestAnimationFrame(() => {
+                    const loadingEl = document.getElementById(loadingId);
+                    const remaining = Math.max(0, messagesContainer.clientHeight - loadingEl.offsetHeight - 20);
+                    messagesContainer.style.paddingBottom = remaining + 'px';
+
+                    requestAnimationFrame(() => {
+                        userMsgEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    });
+                });
             });
         }
+
         const executeSearch = async (form) => {
             try {
                 const formData = new FormData(form);
