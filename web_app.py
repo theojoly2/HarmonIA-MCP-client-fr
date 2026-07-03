@@ -506,7 +506,19 @@ HTML_TEMPLATE = """
         }
 
         document.getElementById('chat-messages').addEventListener('scroll', function() {
+            const wasEnabled = autoScrollEnabled;
             autoScrollEnabled = isNearBottom(this);
+
+            if (autoScrollEnabled && !wasEnabled) {
+                const activeLoadingEl = this.querySelector('[id^="loading-"]:last-child');
+                if (activeLoadingEl) {
+                    const visibleBlockHeight = (loadingEl.offsetTop + loadingEl.offsetHeight) - userMsgEl.offsetTop;
+                    const remaining = Math.max(0, messagesContainer.clientHeight - visibleBlockHeight - 20);
+                    this.style.paddingBottom = remaining + 'px';
+                } else {
+                    this.style.paddingBottom = '0px';
+                }
+            }
         });
 
         (function() {
@@ -656,9 +668,13 @@ HTML_TEMPLATE = """
 
             requestAnimationFrame(() => {
                 const loadingEl = document.getElementById(loadingId);
-                const remaining = Math.max(0, messagesContainer.clientHeight - loadingEl.offsetHeight - 20);
+                const visibleBlockHeight = (loadingEl.offsetTop + loadingEl.offsetHeight) - userMsgEl.offsetTop;
+                const remaining = Math.max(0, messagesContainer.clientHeight - visibleBlockHeight - 20);
                 messagesContainer.style.paddingBottom = remaining + 'px';
-                userMsgEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+                requestAnimationFrame(() => {
+                    userMsgEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                });
             });
 
             const messageContent = document.querySelector(`#${loadingId} .message-content`);
@@ -689,8 +705,9 @@ HTML_TEMPLATE = """
                     scrollToBottomIfNeeded(messagesContainer);
 
                     const loadingEl = document.getElementById(loadingId);
-                    if (loadingEl) {
-                        const remaining = Math.max(0, messagesContainer.clientHeight - loadingEl.offsetHeight - 20);
+                    if (loadingEl && autoScrollEnabled) {
+                        const visibleBlockHeight = (loadingEl.offsetTop + loadingEl.offsetHeight) - userMsgEl.offsetTop;
+                        const remaining = Math.max(0, messagesContainer.clientHeight - visibleBlockHeight - 20);
                         messagesContainer.style.paddingBottom = remaining + 'px';
                     }
                 }
@@ -741,12 +758,11 @@ HTML_TEMPLATE = """
 
                 requestAnimationFrame(() => {
                     const loadingEl = document.getElementById(loadingId);
-                    const remaining = Math.max(0, messagesContainer.clientHeight - loadingEl.offsetHeight - 20);
-                    messagesContainer.style.paddingBottom = remaining + 'px';
-
-                    requestAnimationFrame(() => {
-                        userMsgEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    });
+                    if (loadingEl && autoScrollEnabled) {
+                        const visibleBlockHeight = (loadingEl.offsetTop + loadingEl.offsetHeight) - userMsgEl.offsetTop;
+                        const remaining = Math.max(0, messagesContainer.clientHeight - visibleBlockHeight - 20);
+                        messagesContainer.style.paddingBottom = remaining + 'px';
+                    }
                 });
 
             }).catch((error) => {
@@ -758,12 +774,11 @@ HTML_TEMPLATE = """
 
                 requestAnimationFrame(() => {
                     const loadingEl = document.getElementById(loadingId);
-                    const remaining = Math.max(0, messagesContainer.clientHeight - loadingEl.offsetHeight - 20);
-                    messagesContainer.style.paddingBottom = remaining + 'px';
-
-                    requestAnimationFrame(() => {
-                        userMsgEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    });
+                    if (loadingEl && autoScrollEnabled) {
+                        const visibleBlockHeight = (loadingEl.offsetTop + loadingEl.offsetHeight) - userMsgEl.offsetTop;
+                        const remaining = Math.max(0, messagesContainer.clientHeight - visibleBlockHeight - 20);
+                        messagesContainer.style.paddingBottom = remaining + 'px';
+                    }
                 });
             });
         }
