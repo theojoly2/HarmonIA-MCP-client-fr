@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 load_dotenv()
 
 # Configuration LLM
-_LLM_API_KEY = os.getenv("LLM_API_KEY", "")
+_LLM_API_KEY = os.getenv("LLM_API_KEY", "not-needed")
 _URL_API = os.getenv("URL_LLM_API", "")
 _LLM_MODEL = os.getenv("LLM_MODEL", "")
 
@@ -158,6 +158,83 @@ async def fetch_document_file_from_mcp(chunk0_id: str):
         return HTMLResponse(f"<h3>Erreur serveur lors du téléchargement : {e}</h3>", status_code=500)
 
 
+# ==========================================
+# ROUTE RAG - STREAMING LLM
+# ==========================================
+@app.post("/api/chat/stream")
+async def stream_chat_response(request: ChatMessageRequest):
+    async def rag_stream_generator():
+        try:
+            # 1. Construire la requête de recherche
+            search_query = request.user_message
+            if request.history:
+                recent_context = " ".join([msg["content"] for msg in request.history[-2:]])
+                search_query = f"Contexte récent: {recent_context} | Question: {request.user_message}"
+
+            # 2. Demander le contexte au serveur MCP
+            print(f"[Chat] Demande de contexte au MCP pour le doc: {request.document_id}...")
+            async with Client(MCP_SERVER_URL) as mcp_client:
+                res = await asyncio.wait_for(
+                    mcp_client.call_tool("retrieve_document_context", {
+                        "document_id": request.document_id,
+                        "query": search_query
+                    }),
+                    timeout=30.0
+                )
+
+                context_text = ""
+                if isinstance(res.structured_content, dict) and "result" in res.structured_content:
+                    context_text = res.structured_content["result"]
+                else:
+                    context_text = str(res.structured_content)
+            
+            # 3. Préparer le prompt
+            system_instruction = (
+                "Tu es un assistant sémantique expert.\n"
+                "Analyse les extraits de documents fournis ci-dessous pour répondre à la question.\n"
+                "Consignes impératives :\n"
+                "- Appuie-toi uniquement sur les faits explicités dans les extraits.\n"
+                "- Si les extraits ne contiennent pas la réponse, dis-le clairement sans inventer.\n"
+                "- Rédige tes réponses de manière claire en utilisant le format Markdown.\n\n"
+                f"--- EXTRAITS PERTINENTS DU DOCUMENT ---\n{context_text}\n----------------------------------------"
+            )
+
+            messages = [{"role": "system", "content": system_instruction}]
+            for msg in request.history:
+                messages.append({"role": msg["role"], "content": msg["content"]})
+            messages.append({"role": "user", "content": request.user_message})
+
+            # 4. Appeler l'API du LLM en streaming
+            print("[Chat] Contexte reçu, début du streaming LLM...")
+            response_stream = await llm_client.chat.completions.create(
+                model=_LLM_MODEL,
+                messages=messages,
+                temperature=0.2,
+                stream=True
+            )
+
+            # 5. Renvoyer les mots
+            async for chunk in response_stream:
+                if len(chunk.choices) > 0:
+                    token = chunk.choices[0].delta.content
+                    if token:
+                        yield token
+
+        except Exception as e:
+            print(f"[!] Erreur Chat Stream: {e}")
+            yield f"\n\n*[Erreur de génération : {str(e)}]*"
+
+    return StreamingResponse(
+        rag_stream_generator(),
+        media_type="text/plain",
+        headers={
+            "X-Accel-Buffering": "no",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
+
+
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="fr">
@@ -169,7 +246,7 @@ HTML_TEMPLATE = """
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
-        html, body { height: 100%; scrollbar-gutter: stable; }
+        html, body { height: 100%; scrollbar-gutter: stable; overflow: hidden; }
 
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -216,9 +293,7 @@ HTML_TEMPLATE = """
             100% { fill: currentColor; }
         }
 
-        .user-msg-anchor {
-            scroll-margin-top: 2px;
-        }
+        .user-msg-anchor { scroll-margin-top: 2px; }
 
         .magic-btn {
             position: relative;
@@ -227,31 +302,18 @@ HTML_TEMPLATE = """
         }
         .magic-btn:active { transform: scale(0.95); }
 
-        .sparkle-main {
-            transform-origin: center;
-            transform-box: fill-box;
-            fill: currentColor;
-        }
+        .sparkle-main { transform-origin: center; transform-box: fill-box; fill: currentColor; }
+        .sparkle-orbit-path { transform-origin: 12px 12px; transform-box: view-box; fill: currentColor; }
 
-        .sparkle-orbit-path {
-            transform-origin: 12px 12px;
-            transform-box: view-box;
-            fill: currentColor;
-        }
-
-        .magic-btn:hover .sparkle-main,
-        .trigger-magic .sparkle-main {
+        .magic-btn:hover .sparkle-main, .trigger-magic .sparkle-main {
             animation: sparkleCenterPulse 0.8s ease-in-out forwards, magicColor 0.8s linear forwards;
         }
         
-        .magic-btn:hover .sparkle-orbit-path,
-        .trigger-magic .sparkle-orbit-path {
+        .magic-btn:hover .sparkle-orbit-path, .trigger-magic .sparkle-orbit-path {
             animation: sparkleOrbit 0.8s ease-in-out forwards, magicColor 0.8s linear forwards;
         }
 
-        .magic-svg {
-            overflow: visible;
-        }
+        .magic-svg { overflow: visible; }
 
         #submit-btn .btn-label { display: inline-block; animation: btnIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         #submit-btn .btn-label.leaving { animation: btnOut 0.15s ease-in forwards; }
@@ -272,9 +334,7 @@ HTML_TEMPLATE = """
             transition: --glow-size 0.3s ease;
         }
 
-        .chat-send-btn {
-            background-image: radial-gradient(circle var(--glow-size, 0px) at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255,255,255,0.5) 0%, transparent 100%);
-        }
+        .chat-send-btn { background-image: radial-gradient(circle var(--glow-size, 0px) at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255,255,255,0.5) 0%, transparent 100%); }
 
         #search-input {
             font-size: clamp(0.875rem, 1.3vw, 1.125rem);
@@ -347,12 +407,7 @@ HTML_TEMPLATE = """
             animation: textPulse 3s ease-in-out infinite;
         }
 
-        #elapsed-timer {
-            font-family: monospace;
-            font-size: 0.8rem;
-            color: #9ca3af;
-            min-width: 2.5ch;
-        }
+        #elapsed-timer { font-family: monospace; font-size: 0.8rem; color: #9ca3af; min-width: 2.5ch; }
 
         .tag-label span {
             font-size: clamp(0.7rem, 1vw, 0.875rem);
@@ -389,66 +444,76 @@ HTML_TEMPLATE = """
         .markdown-body em { font-style: italic; }
         .markdown-body code { font-family: monospace; background-color: #f3f4f6; padding: 0.1rem 0.3rem; border-radius: 0.25rem; font-size: 0.9em; }
         .markdown-body pre {
-            background-color: #f3f4f6;
-            padding: 0.75rem 1rem;
-            border-radius: 0.5rem;
-            overflow-x: auto;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            overflow-wrap: anywhere;
-            margin-top: 0.5rem;
-            margin-bottom: 0.75rem;
-            font-size: 0.85em;
+            background-color: #f3f4f6; padding: 0.75rem 1rem; border-radius: 0.5rem;
+            overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;
+            overflow-wrap: anywhere; margin-top: 0.5rem; margin-bottom: 0.75rem; font-size: 0.85em;
         }
-
-        .markdown-body pre code {
-            background-color: transparent;
-            padding: 0;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            overflow-wrap: anywhere;
-        }
-            </style>
+        .markdown-body pre code { background-color: transparent; padding: 0; white-space: pre-wrap; word-wrap: break-word; overflow-wrap: anywhere; }
+    </style>
 </head>
 <body class="bg-white text-gray-900 font-sans antialiased selection:bg-gray-300">
 
-    <div class="px-4 sm:px-6" id="page-wrapper">
+    <!-- SPLIT LAYOUT WRAPPER -->
+    <div class="flex w-full h-full overflow-hidden bg-white">
+        
+        <!-- Left Pane: Search & Results -->
+        <div id="left-pane" class="flex-1 h-full overflow-y-auto relative transition-[min-width,flex-basis] duration-700 ease-out min-w-[400px]">
+            <div class="px-4 sm:px-6" id="page-wrapper">
+                <h1 class="font-bold tracking-tight text-center text-black mb-5 sm:mb-8">
+                    <a href="?" class="interactive-title">
+                        <span class="title-glow">Recherche Sémantique</span>
+                    </a>
+                </h1>
 
-        <h1 class="font-bold tracking-tight text-center text-black mb-5 sm:mb-8">
-            <a href="?" class="interactive-title">
-                <span class="title-glow">Recherche Sémantique</span>
-            </a>
-        </h1>
+                <form method="POST" action="?" class="mb-4" id="search-form">
+                    <div id="search-container">
+                        <div class="search-wrapper" id="search-wrapper">
+                            <input type="text" name="q" value="{{query_value}}" placeholder="Entrez votre recherche..." required
+                                class="w-full rounded-full border-2 border-gray-300 focus:outline-none focus:border-black font-medium transition-colors placeholder-gray-500"
+                                id="search-input">
+                            <button type="submit" id="submit-btn"
+                                class="absolute right-2 top-2 bottom-2 text-white rounded-full font-bold disabled:bg-gray-400 whitespace-nowrap overflow-hidden">
+                                Chercher
+                            </button>
+                        </div>
+                        <div id="tags-container" class="mt-5 flex flex-wrap gap-2 justify-center">
+                            {{tags_html}}
+                        </div>
+                    </div>
+                </form>
 
-        <form method="POST" action="?" class="mb-4" id="search-form">
-            <div id="search-container">
-                <div class="search-wrapper" id="search-wrapper">
-                    <input type="text" name="q" value="{{query_value}}" placeholder="Entrez votre recherche..." required
-                        class="w-full rounded-full border-2 border-gray-300 focus:outline-none focus:border-black font-medium transition-colors placeholder-gray-500"
-                        id="search-input">
-                    <button type="submit" id="submit-btn"
-                        class="absolute right-2 top-2 bottom-2 text-white rounded-full font-bold disabled:bg-gray-400 whitespace-nowrap overflow-hidden">
-                        Chercher
-                    </button>
+                <div id="loading-indicator" class="text-center mt-2 mb-6">
+                    <span class="text-xs font-bold tracking-widest uppercase text-gray-400">Recherche en cours</span>
+                    <span id="elapsed-timer"></span>
                 </div>
 
-                <div id="tags-container" class="mt-5 flex flex-wrap gap-2 justify-center">
-                    {{tags_html}}
+                <div id="results-container" class="mt-4 pb-12">
+                    {{results_html}}
                 </div>
             </div>
-        </form>
-
-        <div id="loading-indicator" class="text-center mt-2 mb-6">
-            <span class="text-xs font-bold tracking-widest uppercase text-gray-400">Recherche en cours</span>
-            <span id="elapsed-timer"></span>
         </div>
 
-        <div id="results-container" class="mt-4">
-            {{results_html}}
+        <!-- Draggable Resizer -->
+        <div id="split-resizer" class="hidden w-1.5 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 cursor-col-resize z-20 flex-shrink-0 transition-colors"></div>
+
+        <!-- Right Pane: Split View Content -->
+        <div id="right-pane" style="width: 0px;" class="h-full bg-gray-50 border-l border-gray-200 overflow-hidden flex-shrink-0 flex flex-col transition-[width] duration-700 ease-out">
+            <div class="px-6 py-4 border-b border-gray-200 bg-white flex justify-between items-center flex-shrink-0">
+                <h2 class="text-lg font-bold text-gray-900 truncate" id="right-pane-title">Aperçu</h2>
+                <button onclick="closeSplitView()" class="magic-btn p-2 text-gray-400 hover:text-black rounded-full hover:bg-gray-100 transition-colors focus:outline-none">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="flex-1 p-6 overflow-y-auto" id="right-pane-content">
+                <div class="text-center mt-10 text-gray-500">
+                    <p class="text-sm font-medium">Contenu de l'aperçu à venir...</p>
+                </div>
+            </div>
         </div>
 
     </div>
 
+    <!-- Chat Modal -->
     <div id="chat-modal" class="fixed inset-0 z-50 hidden bg-white/40 backdrop-blur-md flex items-center justify-center opacity-0 transition-opacity duration-300 p-4 sm:p-8">
         <div class="bg-white border border-gray-100 w-full max-w-3xl h-[85vh] sm:h-[80vh] rounded-[2.5rem] shadow-2xl flex flex-col transform scale-95 transition-transform duration-300" id="chat-modal-content">
 
@@ -464,12 +529,10 @@ HTML_TEMPLATE = """
 
             <!-- Zone de messages -->
             <div class="flex-1 overflow-y-auto p-8" id="chat-messages">
-                <!-- Message IA de bienvenue -->
                 <div class="flex flex-col items-start gap-3 mb-8">
                     <div class="text-sm text-gray-800 leading-relaxed w-full markdown-body">
                         <p>Je prépare l'analyse de ce document. Quelle est votre question spécifique ?</p>
                     </div>
-                    <!-- L'étincelle en dessous, à gauche -->
                     <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container">
                         <svg class="w-5 h-5 overflow-visible ai-sparkle-icon" viewBox="0 0 24 24">
                             <path class="sparkle-main" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
@@ -496,9 +559,74 @@ HTML_TEMPLATE = """
         const wrapper = document.getElementById('page-wrapper');
         let IS_CENTERED = {{is_centered}};
 
+        // --- SPLIT VIEW LOGIC ---
+        let isResizing = false;
+        const resizer = document.getElementById('split-resizer');
+        const rightPane = document.getElementById('right-pane');
+        const leftPane = document.getElementById('left-pane');
+
+        function openSplitView(chunk0Id, docName) {
+            document.getElementById('right-pane-title').textContent = decodeURIComponent(docName);
+            // Use buttery smooth transition to avoid violent text crushing
+            rightPane.style.transition = 'width 0.7s cubic-bezier(0.23, 1, 0.32, 1)';
+            resizer.classList.remove('hidden');
+            rightPane.style.width = '45vw'; // Ouvre à environ la moitié
+            
+            const contentContainer = document.getElementById('right-pane-content');
+            contentContainer.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full text-gray-500 py-20">
+                    <svg class="animate-spin h-8 w-8 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <p class="text-sm font-medium">Chargement du document...</p>
+                </div>
+            `;
+            
+            setTimeout(() => {
+                contentContainer.innerHTML = `
+                    <iframe src="?download=${chunk0Id}" class="w-full h-full border-0 rounded-lg bg-white shadow-sm" style="height: calc(100vh - 120px);"></iframe>
+                `;
+            }, 300);
+        }
+
+        function closeSplitView() {
+            rightPane.style.transition = 'width 0.7s cubic-bezier(0.23, 1, 0.32, 1)';
+            rightPane.style.width = '0px';
+            setTimeout(() => { resizer.classList.add('hidden'); }, 700);
+        }
+
+        resizer.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            document.body.style.cursor = 'col-resize';
+            // Disable transitions during drag to follow mouse instantly
+            rightPane.style.transition = 'none'; 
+            e.preventDefault(); 
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+            const totalWidth = window.innerWidth;
+            let newWidth = totalWidth - e.clientX;
+            // Boundaries
+            if (newWidth < 300) newWidth = 300; 
+            if (totalWidth - newWidth < 400) newWidth = totalWidth - 400; 
+            rightPane.style.width = newWidth + 'px';
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false;
+                document.body.style.cursor = '';
+                // Restore transition for close animation
+                rightPane.style.transition = 'width 0.7s cubic-bezier(0.23, 1, 0.32, 1)';
+            }
+        });
+
+
+        // --- CHAT LOGIC ---
         let currentChatDocId = null;
         let chatHistory = [];
-
         let autoScrollEnabled = true;
 
         function isNearBottom(container, threshold = 60) {
@@ -511,9 +639,10 @@ HTML_TEMPLATE = """
 
             if (autoScrollEnabled && !wasEnabled) {
                 const activeLoadingEl = this.querySelector('[id^="loading-"]:last-child');
-                if (activeLoadingEl) {
-                    const visibleBlockHeight = (loadingEl.offsetTop + loadingEl.offsetHeight) - userMsgEl.offsetTop;
-                    const remaining = Math.max(0, messagesContainer.clientHeight - visibleBlockHeight - 20);
+                const userMsgEl = this.querySelector('.user-msg-anchor:last-of-type');
+                if (activeLoadingEl && userMsgEl) {
+                    const visibleBlockHeight = (activeLoadingEl.offsetTop + activeLoadingEl.offsetHeight) - userMsgEl.offsetTop;
+                    const remaining = Math.max(0, this.clientHeight - visibleBlockHeight - 20);
                     this.style.paddingBottom = remaining + 'px';
                 } else {
                     this.style.paddingBottom = '0px';
@@ -530,10 +659,8 @@ HTML_TEMPLATE = """
             if (!IS_CENTERED) {
                 wrapper.style.paddingTop = '2rem';
                 wrapper.style.paddingBottom = '2rem';
-                document.body.style.overflow = '';
                 return;
             }
-            document.body.style.overflow = 'hidden';
             const pad = Math.max(48, (window.innerHeight - wrapper.offsetHeight) / 2 - 60);
             wrapper.style.paddingTop = pad + 'px';
             wrapper.style.paddingBottom = pad + 'px';
@@ -547,7 +674,6 @@ HTML_TEMPLATE = """
             });
         });
 
-        // ── Compteur global ──
         let _timerInterval = null;
         function startTimer() {
             const el = document.getElementById('elapsed-timer');
@@ -563,10 +689,9 @@ HTML_TEMPLATE = """
             if (el) el.textContent = '';
         }
 
-        // ── Fonctions Fenêtre Modale (Chat) ──
         function openChat(docId, docName) {
-            currentChatDocId = docId; // On sauvegarde l'ID
-            chatHistory = [];         // On vide l'historique
+            currentChatDocId = docId; 
+            chatHistory = [];         
             document.querySelectorAll('.chat-spacer').forEach(el => el.remove());
             document.getElementById('chat-messages').innerHTML = `
                 <div class="flex flex-col items-start gap-3 mb-8">
@@ -574,41 +699,36 @@ HTML_TEMPLATE = """
                         <p>Je prépare l'analyse de ce document. Quelle est votre question spécifique ?</p>
                     </div>
                     <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container">
-                        ${magicSvgTemplate}
+                        <svg class="w-5 h-5 overflow-visible ai-sparkle-icon" viewBox="0 0 24 24">
+                            <path class="sparkle-main" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
+                            <path class="sparkle-orbit-path" d="M5.5 2.5L6.34 5.16L9 6L6.34 6.84L5.5 9.5L4.66 6.84L2 6L4.66 5.16L5.5 2.5Z"></path>
+                            <path class="sparkle-orbit-path" d="M19.5 15.5L20.34 18.16L23 19L20.34 19.84L19.5 22.5L18.66 19.84L16 19L18.66 18.16L19.5 15.5Z"></path>
+                        </svg>
                     </div>
                 </div>`;
 
             const modal = document.getElementById('chat-modal');
             const content = document.getElementById('chat-modal-content');
-
             const decodedName = decodeURIComponent(docName);
             document.getElementById('chat-modal-filename').textContent = decodedName;
-
             modal.classList.remove('hidden');
             void modal.offsetWidth; 
             modal.classList.remove('opacity-0');
             content.classList.remove('scale-95');
-            document.body.style.overflow = 'hidden';
         }
 
         function closeChat() {
             const modal = document.getElementById('chat-modal');
             const content = document.getElementById('chat-modal-content');
-
             modal.classList.add('opacity-0');
             content.classList.add('scale-95');
-
-            setTimeout(() => {
-                modal.classList.add('hidden');
-                document.body.style.overflow = '';
-            }, 300);
+            setTimeout(() => { modal.classList.add('hidden'); }, 300);
         }
 
         document.getElementById('chat-modal').addEventListener('click', function(e) {
             if (e.target === this) closeChat();
         });
 
-        // ── Logique du Chatbot (Envoi & Animation Stream avec Étincelle en bas) ──
         let loadingAnimInterval = null;
 
         const magicSvgTemplate = `
@@ -620,12 +740,7 @@ HTML_TEMPLATE = """
         `;
 
         function scrollToBottomIfNeeded(container) {
-            // if (autoScrollEnabled) {
-                // const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-                // if (distanceFromBottom > 2) {
-                    // container.scrollTop = container.scrollHeight;
-                // }
-            // }
+            // Handled natively by our padding trick now
         }
 
         function handleChatSubmit() {
@@ -641,7 +756,6 @@ HTML_TEMPLATE = """
                 setTimeout(() => { container.style.display = 'none'; }, 300);
             });
 
-            // 1. Message Utilisateur
             messagesContainer.insertAdjacentHTML('beforeend', `
                 <div class="flex items-end justify-end mb-8 user-msg-anchor">
                     <div class="bg-gray-50 border border-gray-100 text-gray-900 px-5 py-3.5 rounded-[1.5rem] text-sm max-w-[80%] leading-relaxed">
@@ -652,7 +766,6 @@ HTML_TEMPLATE = """
             const userMsgEl = messagesContainer.lastElementChild;
             input.value = '';
 
-            // 2. Préparation du conteneur IA + indicateur "Réflexion..."
             const loadingId = 'loading-' + Date.now();
             messagesContainer.insertAdjacentHTML('beforeend', `
                 <div id="${loadingId}" class="flex flex-col items-start gap-3 mb-8">
@@ -702,7 +815,6 @@ HTML_TEMPLATE = """
                     displayedText += streamBuffer.slice(0, chunkSize);
                     streamBuffer = streamBuffer.slice(chunkSize);
                     messageContent.innerHTML = marked.parse(displayedText);
-                    scrollToBottomIfNeeded(messagesContainer);
 
                     const loadingEl = document.getElementById(loadingId);
                     if (loadingEl && autoScrollEnabled) {
@@ -771,15 +883,6 @@ HTML_TEMPLATE = """
                 if (thinkingLabel) thinkingLabel.remove();
                 messageContent.innerHTML += `<br><em>Erreur : ${error.message}</em>`;
                 clearInterval(loadingAnimInterval);
-
-                requestAnimationFrame(() => {
-                    const loadingEl = document.getElementById(loadingId);
-                    if (loadingEl && autoScrollEnabled) {
-                        const visibleBlockHeight = (loadingEl.offsetTop + loadingEl.offsetHeight) - userMsgEl.offsetTop;
-                        const remaining = Math.max(0, messagesContainer.clientHeight - visibleBlockHeight - 20);
-                        messagesContainer.style.paddingBottom = remaining + 'px';
-                    }
-                });
             });
         }
 
@@ -837,13 +940,6 @@ HTML_TEMPLATE = """
                 btn.disabled = false;
                 btn.style.width = 'auto';
                 btn.innerHTML = `<span class="btn-label">Chercher</span>`;
-
-                const resultsContainer = document.getElementById('results-container');
-                if (resultsContainer) {
-                    resultsContainer.classList.remove('results-hiding');
-                    resultsContainer.style.display = '';
-                    resultsContainer.style.visibility = '';
-                }
             }
         };
 
@@ -988,81 +1084,6 @@ HTML_TEMPLATE = """
 """
 
 
-@app.post("/api/chat/stream")
-async def stream_chat_response(request: ChatMessageRequest):
-    async def rag_stream_generator():
-        try:
-            # 1. Construire la requête de recherche avec un peu de contexte
-            search_query = request.user_message
-            if request.history:
-                recent_context = " ".join([msg["content"] for msg in request.history[-2:]])
-                search_query = f"Contexte récent: {recent_context} | Question: {request.user_message}"
-
-            # 2. Demander le contexte au serveur MCP !
-            print(f"[Chat] Demande de contexte au MCP pour le doc: {request.document_id}...")
-            async with Client(MCP_SERVER_URL) as mcp_client:
-                res = await asyncio.wait_for(
-                    mcp_client.call_tool("retrieve_document_context", {
-                        "document_id": request.document_id,
-                        "query": search_query
-                    }),
-                    timeout=30.0
-                )
-
-                # Selon comment ton MCP renvoie le texte, on le récupère ici :
-                context_text = ""
-                if isinstance(res.structured_content, dict) and "result" in res.structured_content:
-                    context_text = res.structured_content["result"]
-                else:
-                    context_text = str(res.structured_content)
-            # 3. Préparer le prompt pour le LLM
-            system_instruction = (
-                "Tu es un assistant sémantique expert.\n"
-                "Analyse les extraits de documents fournis ci-dessous pour répondre à la question.\n"
-                "Consignes impératives :\n"
-                "- Appuie-toi uniquement sur les faits explicités dans les extraits.\n"
-                "- Si les extraits ne contiennent pas la réponse, dis-le clairement sans inventer.\n"
-                "- Rédige tes réponses de manière claire en utilisant le format Markdown.\n\n"
-                f"--- EXTRAITS PERTINENTS DU DOCUMENT ---\n{context_text}\n----------------------------------------"
-            )
-
-            messages = [{"role": "system", "content": system_instruction}]
-            for msg in request.history:
-                messages.append({"role": msg["role"], "content": msg["content"]})
-            messages.append({"role": "user", "content": request.user_message})
-
-            # 4. Appeler l'API du LLM en streaming
-            print("[Chat] Contexte reçu, début du streaming LLM...")
-            response_stream = await llm_client.chat.completions.create(
-                model=_LLM_MODEL,
-                messages=messages,
-                temperature=0.2,
-                stream=True
-            )
-
-            # 5. Renvoyer les mots un par un à la page Web
-            async for chunk in response_stream:
-                if len(chunk.choices) > 0:
-                    token = chunk.choices[0].delta.content
-                    if token:
-                        yield token
-
-        except Exception as e:
-            print(f"[!] Erreur Chat Stream: {e}")
-            yield f"\n\n*[Erreur de génération : {str(e)}]*"
-
-    # Retourne une réponse qui reste ouverte (Server-Sent Events allégé)
-    return StreamingResponse(
-        rag_stream_generator(),
-        media_type="text/plain",
-        headers={
-            "X-Accel-Buffering": "no",
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-        }
-    )
-
-
 @app.api_route("/{path:path}", methods=["GET", "POST"])
 async def serve_page(request: Request):
 
@@ -1165,13 +1186,21 @@ async def serve_page(request: Request):
                         <span class="font-mono text-xs mt-0.5" title="{document_id}">ID: {str(document_id)[:8]}...</span>
                     </div>
 
-                    <button onclick="openChat('{document_id}', '{safe_filename}')" class="magic-btn flex items-center justify-center p-1.5 rounded-full bg-gray-100 hover:bg-white text-gray-400 hover:text-black focus:outline-none" title="Analyser avec l'IA">
-                        <svg class="magic-svg w-5 h-5" viewBox="0 0 24 24">
-                            <path class="sparkle-main" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
-                            <path class="sparkle-orbit-path" d="M5.5 2.5L6.34 5.16L9 6L6.34 6.84L5.5 9.5L4.66 6.84L2 6L4.66 5.16L5.5 2.5Z"></path>
-                            <path class="sparkle-orbit-path" d="M19.5 15.5L20.34 18.16L23 19L20.34 19.84L19.5 22.5L18.66 19.84L16 19L18.66 18.16L19.5 15.5Z"></path>
-                        </svg>
-                    </button>
+                    <div class="flex gap-2">
+                        <!-- Split View Button (Eye Icon) -->
+                        <button onclick="openSplitView('{chunk0_id}', '{safe_filename}')" class="magic-btn flex items-center justify-center p-1.5 rounded-full bg-gray-100 hover:bg-white text-gray-500 hover:text-black focus:outline-none transition-colors" title="Aperçu rapide">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                        </button>
+
+                        <!-- Chat Button (Sparkle Icon) -->
+                        <button onclick="openChat('{document_id}', '{safe_filename}')" class="magic-btn flex items-center justify-center p-1.5 rounded-full bg-gray-100 hover:bg-white text-gray-400 hover:text-black focus:outline-none" title="Analyser avec l'IA">
+                            <svg class="magic-svg w-5 h-5" viewBox="0 0 24 24">
+                                <path class="sparkle-main" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
+                                <path class="sparkle-orbit-path" d="M5.5 2.5L6.34 5.16L9 6L6.34 6.84L5.5 9.5L4.66 6.84L2 6L4.66 5.16L5.5 2.5Z"></path>
+                                <path class="sparkle-orbit-path" d="M19.5 15.5L20.34 18.16L23 19L20.34 19.84L19.5 22.5L18.66 19.84L16 19L18.66 18.16L19.5 15.5Z"></path>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
             """
