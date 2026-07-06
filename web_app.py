@@ -565,7 +565,7 @@ HTML_TEMPLATE = """
         const rightPane = document.getElementById('right-pane');
         const leftPane = document.getElementById('left-pane');
 
-        function openSplitView(chunk0Id, docName) {
+        function openSplitView(docId, docName) {
             document.getElementById('right-pane-title').textContent = decodeURIComponent(docName);
             // Use buttery smooth transition to avoid violent text crushing
             rightPane.style.transition = 'width 0.7s cubic-bezier(0.23, 1, 0.32, 1)';
@@ -579,13 +579,15 @@ HTML_TEMPLATE = """
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    <p class="text-sm font-medium">Chargement du document...</p>
+                    <p class="text-sm font-medium">Génération de la modélisation...</p>
                 </div>
             `;
             
             setTimeout(() => {
                 contentContainer.innerHTML = `
-                    <iframe src="?download=${chunk0Id}" class="w-full h-full border-0 rounded-lg bg-white shadow-sm" style="height: calc(100vh - 120px);"></iframe>
+                    <div class="w-full h-full flex items-center justify-center overflow-auto bg-white rounded-lg shadow-sm border border-gray-100 p-2">
+                        <img src="?visualize=${docId}" alt="Modélisation SVG" class="max-w-full max-h-full object-contain">
+                    </div>
                 `;
             }, 300);
         }
@@ -1090,6 +1092,36 @@ async def serve_page(request: Request):
     download_id = request.query_params.get("download")
     if download_id:
         return await fetch_document_file_from_mcp(download_id)
+
+    visualize_id = request.query_params.get("visualize")
+    if visualize_id:
+        doc_response = await fetch_document_file_from_mcp(visualize_id)
+        if not isinstance(doc_response, Response) or doc_response.status_code != 200:
+            return doc_response
+
+        try:
+            file_bytes = doc_response.body
+            filename = urllib.parse.unquote(doc_response.headers.get("Content-Disposition", ""))
+            
+            from data_model_utils import _detect_file_type, generate_visualisation, xml_to_json, ttl_to_json
+            from io import BytesIO
+
+            kind = _detect_file_type(file_bytes, filename)
+            if kind in {"xml", "xmi"}:
+                json_data = xml_to_json(BytesIO(file_bytes))
+            elif kind == "ttl":
+                json_data = ttl_to_json(BytesIO(file_bytes))
+            else:
+                return HTMLResponse("<h3>Format non supporté pour la modélisation.</h3>", status_code=400)
+
+            svg_result = generate_visualisation(json_data)
+            
+            svg_bytes = svg_result.getvalue() if hasattr(svg_result, "getvalue") else svg_result
+            return Response(content=svg_bytes, media_type="image/svg+xml")
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return HTMLResponse(f"<h3>Erreur de visualisation : {e}</h3>", status_code=500)
 
     query = ""
     selected_tags = []

@@ -8,7 +8,6 @@ import asyncio
 import logging
 
 # Local application imports
-from clients import MCPClient
 from .import_ttl import ttl_to_json
 from .import_xml import xml_to_json
 from .export_xml import json_to_xml

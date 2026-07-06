@@ -4,3 +4,4 @@ pydantic
 fastmcp
 markdown
 openai
+plantuml
