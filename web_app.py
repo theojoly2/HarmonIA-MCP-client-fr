@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import re
 import urllib.parse
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -55,11 +56,35 @@ LATEX_TO_UNICODE = {
 }
 
 
+def _extract_filename_from_disposition(header: str) -> str:
+    """Parse Content-Disposition header and extract filename (preferring filename*)."""
+    if not header:
+        return ""
+    # filename*=utf-8''name.ext
+    match = re.search(r"filename\*=([^'\"]*)''([^;]+)", header, re.IGNORECASE)
+    if match:
+        return urllib.parse.unquote(match.group(2).strip('"'))
+    # filename="name.ext" or filename=name.ext
+    match = re.search(r'filename=["\']?([^";]+)', header, re.IGNORECASE)
+    if match:
+        return match.group(1).strip('"')
+    return ""
+
+
+def _safe_text(value) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _escape_xml_attr(value: str) -> str:
+    return value.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 def normalize_latex(text: str) -> str:
     for latex, uni in LATEX_TO_UNICODE.items():
         text = text.replace(f'${latex}$', uni)
         text = text.replace(latex, uni)
-    import re
     text = re.sub(r'\$([^$]{1,60})\$', r'\1', text)
     return text
 
@@ -315,17 +340,130 @@ HTML_TEMPLATE = """
 
         .magic-svg { overflow: visible; }
 
+        /* SVG Interactive Viewer */
+        .svg-viewer {
+            width: 100%;
+            height: 100%;
+            background: #ffffff;
+            position: relative;
+            overflow: hidden;
+            cursor: grab;
+        }
+        .svg-viewer:active {
+            cursor: grabbing;
+        }
+        .svg-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform-origin: 0 0;
+            will-change: transform;
+        }
+        .svg-canvas .svg-diagram {
+            display: block;
+            max-width: none;
+            max-height: none;
+        }
+
+        /* Split pane transitions */
+        #split-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        #left-pane, #right-pane {
+            will-change: transform, width;
+            transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+                        width 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #split-resizer {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            transition: opacity 0.3s ease, left 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 20;
+        }
+        #left-pane.hidden, #right-pane.hidden {
+            width: 0 !important;
+            min-width: 0 !important;
+        }
+
+        .svg-controls {
+            position: absolute;
+            bottom: 1rem;
+            right: 1rem;
+            display: flex;
+            gap: 0.5rem;
+            z-index: 40;
+        }
+        .svg-ctrl-btn {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 9999px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #e5e7eb;
+            color: #374151;
+            font-size: 1.1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            transition: all 0.15s ease;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .svg-ctrl-btn:hover {
+            background: #f9fafb;
+            border-color: #d1d5db;
+            transform: translateY(-1px);
+        }
+        .svg-ctrl-btn:active {
+            transform: translateY(0);
+        }
+
+        /* Navigation tabs */
+        .nav-tab {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #6b7280;
+            background: transparent;
+            border: 1px solid transparent;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        .nav-tab:hover { color: #111827; background: #f3f4f6; }
+        .nav-tab.active { color: #111827; background: #111827; color: white; }
+
+        /* Drop zone */
+        .drop-zone {
+            border: 2px dashed #d1d5db;
+            border-radius: 1.5rem;
+            background: #f9fafb;
+            transition: all 0.2s ease;
+        }
+        .drop-zone.drag-over {
+            border-color: #111827;
+            background: #f3f4f6;
+        }
+
         #submit-btn .btn-label { display: inline-block; animation: btnIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         #submit-btn .btn-label.leaving { animation: btnOut 0.15s ease-in forwards; }
 
-        h1 a { font-size: clamp(1.25rem, 2.5vw, 2.25rem); }
+        h1 a, h1 .title-glow { font-size: clamp(1.25rem, 2.5vw, 2.25rem); }
 
         .interactive-title { display: inline-block; position: relative; text-decoration: none; cursor: pointer; }
 
         .title-glow {
             display: inline-block;
             background-color: #111827;
-            background-image: radial-gradient(circle var(--glow-size) at var(--mouse-x) var(--mouse-y), rgba(255,255,255,0.85) 0%, rgba(255,255,255,0) 100%);
+            background-image: radial-gradient(circle var(--glow-size, 0px) at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255,255,255,0.85) 0%, rgba(255,255,255,0) 100%);
             background-repeat: no-repeat;
             -webkit-background-clip: text;
             background-clip: text;
@@ -454,12 +592,27 @@ HTML_TEMPLATE = """
 <body class="bg-white text-gray-900 font-sans antialiased selection:bg-gray-300">
 
     <!-- SPLIT LAYOUT WRAPPER -->
-    <div class="flex w-full h-full overflow-hidden bg-white">
-        
+    <div id="split-wrapper" class="flex w-full h-full overflow-hidden bg-white">
+
         <!-- Left Pane: Search & Results -->
-        <div id="left-pane" class="flex-1 h-full overflow-y-auto relative transition-[min-width,flex-basis] duration-700 ease-out min-w-[400px]">
+        <div id="left-pane" class="overflow-y-auto" style="position: absolute; left: 0; top: 0; bottom: 0; width: 100%; transform: translateX(0);">
+            <div id="left-header" class="sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-200 px-4 sm:px-6 py-3 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <button id="tab-search" class="nav-tab active" onclick="showPane('split')">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        Recherche
+                    </button>
+                    <button id="tab-vision" class="nav-tab" onclick="showPane('split')">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                        Vision
+                    </button>
+                </div>
+                <button id="close-search-pane" onclick="closeSearchPane()" class="hidden magic-btn p-2 text-gray-400 hover:text-black rounded-full hover:bg-gray-100 transition-colors focus:outline-none" title="Fermer Recherche">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
             <div class="px-4 sm:px-6" id="page-wrapper">
-                <h1 class="font-bold tracking-tight text-center text-black mb-5 sm:mb-8">
+                <h1 class="font-bold tracking-tight text-center text-black mb-5 sm:mb-8 mt-6">
                     <a href="?" class="interactive-title">
                         <span class="title-glow">Recherche Sémantique</span>
                     </a>
@@ -496,18 +649,40 @@ HTML_TEMPLATE = """
         <!-- Draggable Resizer -->
         <div id="split-resizer" class="hidden w-1.5 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 cursor-col-resize z-20 flex-shrink-0 transition-colors"></div>
 
-        <!-- Right Pane: Split View Content -->
-        <div id="right-pane" style="width: 0px;" class="h-full bg-gray-50 border-l border-gray-200 overflow-hidden flex-shrink-0 flex flex-col transition-[width] duration-700 ease-out">
-            <div class="px-6 py-4 border-b border-gray-200 bg-white flex justify-between items-center flex-shrink-0">
-                <h2 class="text-lg font-bold text-gray-900 truncate" id="right-pane-title">Aperçu</h2>
-                <button onclick="closeSplitView()" class="magic-btn p-2 text-gray-400 hover:text-black rounded-full hover:bg-gray-100 transition-colors focus:outline-none">
+            <!-- Right Pane: Vision / Split View Content -->
+        <div id="right-pane" class="bg-white border-l border-gray-200 overflow-hidden flex flex-col" style="position: absolute; left: 100%; top: 0; bottom: 0; width: 0; transform: translateX(0);">
+            <div id="right-header" class="sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-200 px-4 sm:px-6 py-3 flex items-center justify-between flex-shrink-0">
+                <div class="flex items-center gap-2 vision-nav">
+                    <button id="tab-search-right" class="nav-tab" onclick="showPane('split')">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        Recherche
+                    </button>
+                    <button id="tab-vision-right" class="nav-tab active" onclick="showPane('split')">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                        Vision
+                    </button>
+                </div>
+                <button id="close-vision-pane" onclick="closeVisionPane()" class="magic-btn p-2 text-gray-400 hover:text-black rounded-full hover:bg-gray-100 transition-colors focus:outline-none" title="Fermer Vision">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
-            <div class="flex-1 p-6 overflow-y-auto" id="right-pane-content">
-                <div class="text-center mt-10 text-gray-500">
-                    <p class="text-sm font-medium">Contenu de l'aperçu à venir...</p>
+            <div class="flex-1 relative overflow-hidden" id="right-pane-content">
+                <template id="vision-empty-template">
+                    <div id="vision-empty" class="h-full flex flex-col items-center justify-center p-8 text-gray-500">
+                    <h1 class="font-bold tracking-tight text-center text-black mb-5 sm:mb-8">
+                        <a href="?" class="interactive-title" onclick="event.preventDefault(); showPane('vision');">
+                            <span class="title-glow">Vision Sémantique</span>
+                        </a>
+                    </h1>
+                    <p class="text-base font-medium mb-6 text-center max-w-md">Importez un fichier (TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML) pour le visualiser sous forme de diagramme.</p>
+                    <label id="vision-drop-zone" class="drop-zone flex flex-col items-center justify-center w-full max-w-md py-10 px-6 cursor-pointer hover:border-gray-400">
+                        <svg class="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                        <span class="text-sm font-semibold text-gray-700">Glissez-déposez un fichier ici</span>
+                        <span class="text-xs text-gray-400 mt-1">ou cliquez pour parcourir</span>
+                        <input type="file" id="vision-file-input" class="hidden" accept=".ttl,.xml,.xmi,.json,.jsonld,.sql,.txt,.html,.htm,.csv">
+                    </label>
                 </div>
+                </template>
             </div>
         </div>
 
@@ -565,46 +740,541 @@ HTML_TEMPLATE = """
         const rightPane = document.getElementById('right-pane');
         const leftPane = document.getElementById('left-pane');
 
+        let activePane = 'search'; // 'search' | 'vision' | 'split'
+
         function openSplitView(docId, docName) {
-            document.getElementById('right-pane-title').textContent = decodeURIComponent(docName);
-            // Use buttery smooth transition to avoid violent text crushing
-            rightPane.style.transition = 'width 0.7s cubic-bezier(0.23, 1, 0.32, 1)';
-            resizer.classList.remove('hidden');
-            rightPane.style.width = '45vw'; // Ouvre à environ la moitié
-            
+            showPane('split');
+            renderSvgViewer(docName);
+            loadSvgViewer(`?visualize=${docId}`);
+        }
+
+        function renderSvgViewer(docName) {
             const contentContainer = document.getElementById('right-pane-content');
+            const titleEl = document.getElementById('right-pane-title');
+            if (titleEl && docName) titleEl.textContent = decodeURIComponent(docName);
             contentContainer.innerHTML = `
-                <div class="flex flex-col items-center justify-center h-full text-gray-500 py-20">
-                    <svg class="animate-spin h-8 w-8 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <p class="text-sm font-medium">Génération de la modélisation...</p>
+                <div id="svg-viewer" class="svg-viewer">
+                    <div id="svg-loading" class="absolute inset-0 flex items-center justify-center text-gray-500 z-10">
+                        <svg class="animate-spin h-8 w-8 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span class="text-sm font-medium ml-3">Génération de la modélisation...</span>
+                    </div>
+                    <div class="svg-canvas"></div>
+                    <div class="svg-controls">
+                        <button class="svg-ctrl-btn" onclick="svgZoomIn()" title="Zoom avant">+</button>
+                        <button class="svg-ctrl-btn" onclick="svgZoomOut()" title="Zoom arrière">−</button>
+                        <button class="svg-ctrl-btn" onclick="svgResetZoom()" title="Réinitialiser">⟲</button>
+                    </div>
                 </div>
             `;
-            
+        }
+
+        function showPane(pane) {
+            activePane = pane;
+            const wrapper = document.getElementById('split-wrapper');
+            const leftPane = document.getElementById('left-pane');
+            const rightPane = document.getElementById('right-pane');
+            const resizer = document.getElementById('split-resizer');
+            const closeSearch = document.getElementById('close-search-pane');
+            const closeVision = document.getElementById('close-vision-pane');
+            const tabSearchLeft = document.getElementById('tab-search');
+            const tabVisionLeft = document.getElementById('tab-vision');
+            const tabSearchRight = document.getElementById('tab-search-right');
+            const tabVisionRight = document.getElementById('tab-vision-right');
+            const visionNav = rightPane.querySelector('.vision-nav');
+
+            function setVisible(element, visible) {
+                if (!element) return;
+                if (visible) {
+                    element.classList.remove('hidden');
+                } else {
+                    element.classList.add('hidden');
+                }
+            }
+
+            function updateResizer(leftWidth) {
+                if (!resizer || !wrapper) return;
+                if (leftWidth > 0 && leftWidth < 100) {
+                    resizer.classList.remove('hidden');
+                    resizer.style.left = `calc(${leftWidth}% - ${resizer.offsetWidth / 2}px)`;
+                } else {
+                    resizer.classList.add('hidden');
+                }
+            }
+
+            // Read current positions before animating
+            const leftW = parseFloat(leftPane.style.width) || 100;
+
+            if (pane === 'search') {
+                // Full search: left visible full width, right hidden off-screen to the right
+                leftPane.classList.remove('hidden');
+                leftPane.style.width = '100%';
+                leftPane.style.transform = 'translateX(0)';
+                rightPane.classList.add('hidden');
+                rightPane.style.width = '0%';
+                rightPane.style.transform = 'translateX(0)';
+                setVisible(closeSearch, false);
+                setVisible(closeVision, false);
+                tabSearchLeft.classList.add('active');
+                tabVisionLeft.classList.remove('active');
+                if (tabSearchRight) tabSearchRight.classList.remove('active');
+                if (tabVisionRight) tabVisionRight.classList.add('active');
+                if (visionNav) visionNav.style.display = 'none';
+                updateResizer(100);
+            } else if (pane === 'vision') {
+                // Full vision: left hidden off-screen to the left, right visible full width
+                leftPane.classList.add('hidden');
+                leftPane.style.width = '0%';
+                leftPane.style.transform = 'translateX(-100%)';
+                rightPane.classList.remove('hidden');
+                rightPane.style.width = '100%';
+                rightPane.style.transform = 'translateX(-100%)';
+                setVisible(closeSearch, false);
+                setVisible(closeVision, false);
+                tabSearchLeft.classList.remove('active');
+                tabVisionLeft.classList.add('active');
+                if (tabSearchRight) tabSearchRight.classList.add('active');
+                if (tabVisionRight) tabVisionRight.classList.remove('active');
+                if (visionNav) visionNav.style.display = 'flex';
+                if (!document.getElementById('svg-viewer')) {
+                    ensureVisionContent();
+                }
+                updateResizer(0);
+            } else if (pane === 'split') {
+                // Split: both panes visible, each takes half.
+                // When coming from search, the right pane slides in from the right while the left
+                // shrinks. When coming from vision, the left pane slides in from the left while the
+                // right shrinks.
+                leftPane.classList.remove('hidden');
+                rightPane.classList.remove('hidden');
+                leftPane.style.width = '50%';
+                rightPane.style.width = '50%';
+                if (leftW >= 100) {
+                    // Search -> split: left already in place, right enters from the right
+                    leftPane.style.transform = 'translateX(0)';
+                    rightPane.style.transform = 'translateX(-100%)';
+                } else {
+                    // Vision -> split: right already full, left enters from the left
+                    leftPane.style.transform = 'translateX(0)';
+                    rightPane.style.transform = 'translateX(-50%)';
+                }
+                setVisible(closeSearch, true);
+                setVisible(closeVision, true);
+                tabSearchLeft.classList.add('active');
+                tabVisionLeft.classList.remove('active');
+                if (tabSearchRight) tabSearchRight.classList.remove('active');
+                if (tabVisionRight) tabVisionRight.classList.add('active');
+                if (visionNav) visionNav.style.display = 'none';
+                if (!document.getElementById('svg-viewer')) {
+                    ensureVisionContent();
+                }
+                updateResizer(50);
+            }
+
             setTimeout(() => {
-                contentContainer.innerHTML = `
-                    <div class="w-full h-full flex items-center justify-center overflow-auto bg-white rounded-lg shadow-sm border border-gray-100 p-2">
-                        <img src="?visualize=${docId}" alt="Modélisation SVG" class="max-w-full max-h-full object-contain">
-                    </div>
-                `;
-            }, 300);
+                svgClampPan();
+                svgApplyTransform();
+            }, 500);
+        }
+
+        function ensureVisionContent() {
+            const content = document.getElementById('right-pane-content');
+            if (!content.querySelector('#svg-viewer') && !content.querySelector('#vision-empty')) {
+                content.innerHTML = document.getElementById('vision-empty-template').innerHTML;
+                bindTitleGlow();
+                bindTagEvents();
+                initVisionImport();
+            }
+        }
+
+        function closeSearchPane() {
+            showPane('vision');
+        }
+
+        function closeVisionPane() {
+            showPane('search');
+        }
+
+        // Backwards compatibility: openSplitView from search results opens split.
+        function toggleSearchPane() {
+            if (activePane === 'split') showPane('vision');
+            else showPane('split');
         }
 
         function closeSplitView() {
-            rightPane.style.transition = 'width 0.7s cubic-bezier(0.23, 1, 0.32, 1)';
-            rightPane.style.width = '0px';
-            setTimeout(() => { resizer.classList.add('hidden'); }, 700);
+            showPane('search');
+        }
+
+        // --- SVG INTERACTIVE VIEWER ---
+        let svgViewerState = { scale: 1, x: 0, y: 0, isDragging: false, lastX: 0, lastY: 0 };
+        const SVG_MIN_ZOOM = 0.2;
+        const SVG_MAX_ZOOM = 4;
+        const SVG_DEFAULT_ZOOM = 0.95;
+
+        function loadSvgViewer(url) {
+            const canvas = document.querySelector('#svg-viewer .svg-canvas');
+            const loading = document.getElementById('svg-loading');
+            if (!canvas) return;
+
+            // Reset viewer state for each new diagram
+            svgViewerState = { scale: 1, x: 0, y: 0, isDragging: false, lastX: 0, lastY: 0 };
+
+            fetch(url)
+                .then(r => r.text())
+                .then(svgText => {
+                    // Parse main class name from injected data attribute before stripping it
+                    const mainClassMatch = svgText.match(/data-main-class="([^"]*)"/);
+                    const mainClassName = mainClassMatch ? mainClassMatch[1] : '';
+
+                    // Force white background: replace black background with white if present
+                    svgText = svgText.replace(/style="background:#000000;"/g, 'style="background:#ffffff;"');
+                    svgText = svgText.replace(/background:#000000/g, 'background:#ffffff');
+                    // Ensure SVG fills the canvas at natural size
+                    svgText = svgText.replace(/<svg/, '<svg class="svg-diagram"');
+
+                    // Clean up loading state: hide spinner and ensure canvas is a neutral container
+                    if (loading) loading.classList.add('hidden');
+                    canvas.classList.remove('flex', 'items-center', 'justify-center', 'h-full', 'text-gray-500');
+                    canvas.innerHTML = svgText;
+
+                    // Center after the SVG has rendered
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => svgCenterDiagram(mainClassName));
+                    });
+                })
+                .catch(err => {
+                    canvas.innerHTML = `<div class="text-red-500 text-sm p-4">Erreur de chargement du diagramme.</div>`;
+                    console.error(err);
+                });
+        }
+
+        function svgApplyTransform() {
+            const canvas = document.querySelector('#svg-viewer .svg-canvas');
+            if (!canvas) return;
+            svgClampPan();
+            canvas.style.transform = `translate(${svgViewerState.x}px, ${svgViewerState.y}px) scale(${svgViewerState.scale})`;
+        }
+
+        function svgGetDiagramBounds() {
+            const svg = document.querySelector('#svg-viewer .svg-canvas svg.svg-diagram');
+            if (!svg) return null;
+            try {
+                const bbox = svg.getBBox();
+                return {
+                    x: bbox.x,
+                    y: bbox.y,
+                    width: bbox.width,
+                    height: bbox.height
+                };
+            } catch (e) {
+                const width = parseFloat(svg.getAttribute('width')) || 0;
+                const height = parseFloat(svg.getAttribute('height')) || 0;
+                return { x: 0, y: 0, width: width, height: height };
+            }
+        }
+
+        function svgClampPan() {
+            const viewer = document.getElementById('svg-viewer');
+            const svg = document.querySelector('#svg-viewer .svg-canvas svg.svg-diagram');
+            if (!viewer || !svg) return;
+
+            const viewerRect = viewer.getBoundingClientRect();
+            const bounds = svgGetDiagramBounds();
+            if (!bounds || !bounds.width || !bounds.height) return;
+
+            // The canvas transform moves the whole SVG. We clamp the screen-space position of
+            // the SVG's top-left corner so the user can never lose the diagram entirely.
+            //
+            //   screenLeft = x + bounds.x * scale
+            //   screenTop  = y + bounds.y * scale
+            //
+            // We allow each edge to go maxOverflow pixels off-screen. For a diagram larger than
+            // the viewer this still lets the user pan to the top/bottom/left/right edges.
+            const maxOverflow = 60;
+
+            const scaledWidth = bounds.width * svgViewerState.scale;
+            const scaledHeight = bounds.height * svgViewerState.scale;
+
+            // screenLeft must be such that the right edge is at least maxOverflow in
+            // (screenLeft + scaledWidth >= maxOverflow) and the left edge is at most maxOverflow
+            // past the right side (screenLeft <= viewerRect.width - maxOverflow).
+            const minScreenLeft = maxOverflow - scaledWidth;
+            const maxScreenLeft = viewerRect.width - maxOverflow;
+
+            // Same vertically.
+            const minScreenTop = maxOverflow - scaledHeight;
+            const maxScreenTop = viewerRect.height - maxOverflow;
+
+            const currentScreenLeft = svgViewerState.x + bounds.x * svgViewerState.scale;
+            const currentScreenTop = svgViewerState.y + bounds.y * svgViewerState.scale;
+
+            const clampedScreenLeft = Math.max(minScreenLeft, Math.min(maxScreenLeft, currentScreenLeft));
+            const clampedScreenTop = Math.max(minScreenTop, Math.min(maxScreenTop, currentScreenTop));
+
+            svgViewerState.x = clampedScreenLeft - bounds.x * svgViewerState.scale;
+            svgViewerState.y = clampedScreenTop - bounds.y * svgViewerState.scale;
+        }
+
+        function svgZoomIn() {
+            svgZoomAt(viewerCenterPoint(), 1.2);
+        }
+
+        function svgZoomOut() {
+            svgZoomAt(viewerCenterPoint(), 1 / 1.2);
+        }
+
+        function viewerCenterPoint() {
+            const viewer = document.getElementById('svg-viewer');
+            if (!viewer) return { x: 0, y: 0 };
+            const rect = viewer.getBoundingClientRect();
+            return { x: rect.width / 2, y: rect.height / 2 };
+        }
+
+        function svgZoomAt(point, factor) {
+            const newScale = Math.min(SVG_MAX_ZOOM, Math.max(SVG_MIN_ZOOM, svgViewerState.scale * factor));
+            // Keep the point under the cursor / center stable
+            svgViewerState.x = point.x - (point.x - svgViewerState.x) * (newScale / svgViewerState.scale);
+            svgViewerState.y = point.y - (point.y - svgViewerState.y) * (newScale / svgViewerState.scale);
+            svgViewerState.scale = newScale;
+            svgClampPan();
+            svgApplyTransform();
+        }
+
+        function svgResetZoom() {
+            svgViewerState.scale = SVG_DEFAULT_ZOOM;
+            svgCenterDiagram();
+        }
+
+        function svgCenterDiagram(mainClassName = '') {
+            const viewer = document.getElementById('svg-viewer');
+            const canvas = document.querySelector('#svg-viewer .svg-canvas');
+            const svg = canvas ? canvas.querySelector('svg.svg-diagram') : null;
+            if (!viewer || !canvas || !svg) return;
+
+            // Ensure the SVG has rendered so getBBox is meaningful
+            const forceRender = svg.getBBox ? svg.getBBox() : null;
+
+            const viewerRect = viewer.getBoundingClientRect();
+            let targetX = 0, targetY = 0, targetWidth = 0, targetHeight = 0;
+
+            // Try to find the main class entity if requested
+            let foundMain = false;
+            if (mainClassName) {
+                // PlantUML native SVG uses g elements with id containing the alias/class name
+                // Our fallback SVG uses rect/text with no id; match the bold title text.
+                const allGroups = svg.querySelectorAll('g');
+                for (const ent of allGroups) {
+                    const textEls = ent.querySelectorAll('text');
+                    for (const textEl of textEls) {
+                        if (textEl.textContent.trim() === mainClassName) {
+                            try {
+                                const bbox = ent.getBBox();
+                                targetX = bbox.x;
+                                targetY = bbox.y;
+                                targetWidth = bbox.width;
+                                targetHeight = bbox.height;
+                                foundMain = true;
+                                break;
+                            } catch (e) { /* ignore */ }
+                        }
+                    }
+                    if (foundMain) break;
+                }
+
+                // Fallback: match any bold text in the whole SVG
+                if (!foundMain) {
+                    const texts = svg.querySelectorAll('text');
+                    for (const textEl of texts) {
+                        if (textEl.textContent.trim() === mainClassName) {
+                            try {
+                                // Use the parent group if available, else text bbox
+                                const parent = textEl.closest('g') || textEl;
+                                const bbox = parent.getBBox();
+                                targetX = bbox.x;
+                                targetY = bbox.y;
+                                targetWidth = bbox.width;
+                                targetHeight = bbox.height;
+                                foundMain = true;
+                                break;
+                            } catch (e) { /* ignore */ }
+                        }
+                    }
+                }
+            }
+
+            if (!foundMain) {
+                // Fall back to centering the whole diagram
+                try {
+                    const bbox = svg.getBBox();
+                    targetX = bbox.x;
+                    targetY = bbox.y;
+                    targetWidth = bbox.width;
+                    targetHeight = bbox.height;
+                } catch (e) {
+                    targetWidth = parseFloat(svg.getAttribute('width')) || viewerRect.width;
+                    targetHeight = parseFloat(svg.getAttribute('height')) || viewerRect.height;
+                }
+            }
+
+            // Center the target bounding box in the viewer. Because the SVG may have a non-zero
+            // origin (bounds.x / bounds.y), we account for it when computing the translation.
+            svgViewerState.x = (viewerRect.width / 2) - (targetX + targetWidth / 2) * svgViewerState.scale;
+            svgViewerState.y = (viewerRect.height / 2) - (targetY + targetHeight / 2) * svgViewerState.scale;
+            svgApplyTransform();
+        }
+
+        function initSvgViewerEvents() {
+            const viewer = document.getElementById('right-pane-content');
+            if (!viewer) return;
+
+            viewer.addEventListener('wheel', function(e) {
+                const canvas = document.querySelector('#svg-viewer .svg-canvas');
+                if (!canvas) return;
+                e.preventDefault();
+                const factor = e.deltaY > 0 ? 0.9 : 1.1;
+                const point = { x: e.clientX - viewer.getBoundingClientRect().left, y: e.clientY - viewer.getBoundingClientRect().top };
+                svgZoomAt(point, factor);
+            }, { passive: false });
+
+            viewer.addEventListener('mousedown', function(e) {
+                if (e.target.closest('.svg-controls')) return;
+                svgViewerState.isDragging = true;
+                svgViewerState.lastX = e.clientX;
+                svgViewerState.lastY = e.clientY;
+                viewer.style.cursor = 'grabbing';
+            });
+
+            window.addEventListener('mousemove', function(e) {
+                if (!svgViewerState.isDragging) return;
+                const dx = e.clientX - svgViewerState.lastX;
+                const dy = e.clientY - svgViewerState.lastY;
+                svgViewerState.lastX = e.clientX;
+                svgViewerState.lastY = e.clientY;
+                svgViewerState.x += dx;
+                svgViewerState.y += dy;
+                svgClampPan();
+                svgApplyTransform();
+            });
+
+            window.addEventListener('mouseup', function() {
+                if (svgViewerState.isDragging) {
+                    svgViewerState.isDragging = false;
+                    viewer.style.cursor = '';
+                    svgClampPan();
+                    svgApplyTransform();
+                }
+            });
+        }
+
+        function toggleSearchPane() {
+            if (activePane === 'split') showPane('vision');
+            else showPane('split');
+        }
+
+        function closeSplitView() {
+            showPane('search');
         }
 
         resizer.addEventListener('mousedown', (e) => {
             isResizing = true;
             document.body.style.cursor = 'col-resize';
             // Disable transitions during drag to follow mouse instantly
-            rightPane.style.transition = 'none'; 
-            e.preventDefault(); 
+            rightPane.style.transition = 'none';
+            e.preventDefault();
         });
+
+        // Initialize SVG viewer drag / wheel events once
+        initSvgViewerEvents();
+
+        // --- VISION IMPORT ---
+        function initVisionImport() {
+            const dropZone = document.getElementById('vision-drop-zone');
+            const fileInput = document.getElementById('vision-file-input');
+            if (!dropZone || !fileInput) return;
+
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, () => dropZone.classList.add('drag-over'), false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, () => dropZone.classList.remove('drag-over'), false);
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                if (files.length) handleVisionFile(files[0]);
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length) handleVisionFile(e.target.files[0]);
+            });
+        }
+
+        function handleVisionFile(file) {
+            // Render the viewer first, then switch to vision so the SVG has a place to land.
+            renderSvgViewer(file.name);
+            showPane('vision');
+
+            // Reset viewer state for each new diagram
+            svgViewerState = { scale: 1, x: 0, y: 0, isDragging: false, lastX: 0, lastY: 0 };
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch('?import=1', { method: 'POST', body: formData })
+                .then(r => {
+                    if (!r.ok) throw new Error(`Import failed (${r.status})`);
+                    return r.text();
+                })
+                .then(svgText => {
+                    const mainClassMatch = svgText.match(/data-main-class="([^"]*)"/);
+                    const mainClassName = mainClassMatch ? mainClassMatch[1] : '';
+                    svgText = svgText.replace(/style="background:#000000;"/g, 'style="background:#ffffff;"');
+                    svgText = svgText.replace(/background:#000000/g, 'background:#ffffff');
+                    svgText = svgText.replace(/<svg/, '<svg class="svg-diagram"');
+
+                    // Ensure the viewer still exists after showPane('vision')
+                    let canvas = document.querySelector('#svg-viewer .svg-canvas');
+                    let loading = document.getElementById('svg-loading');
+                    if (!canvas) {
+                        // If showPane reset the content, re-render the viewer skeleton.
+                        renderSvgViewer(file.name);
+                        canvas = document.querySelector('#svg-viewer .svg-canvas');
+                        loading = document.getElementById('svg-loading');
+                    }
+                    if (canvas) {
+                        if (loading) loading.classList.add('hidden');
+                        canvas.classList.remove('flex', 'items-center', 'justify-center', 'h-full', 'text-gray-500');
+                        canvas.innerHTML = svgText;
+                        requestAnimationFrame(() => {
+                            requestAnimationFrame(() => svgCenterDiagram(mainClassName));
+                        });
+                    }
+                })
+                .catch(err => {
+                    let canvas = document.querySelector('#svg-viewer .svg-canvas');
+                    if (!canvas) {
+                        renderSvgViewer(file.name);
+                        canvas = document.querySelector('#svg-viewer .svg-canvas');
+                    }
+                    if (canvas) canvas.innerHTML = `<div class="text-red-500 text-sm p-4 flex items-center justify-center h-full">Erreur d'import : ${err.message}</div>`;
+                    console.error(err);
+                });
+        }
+
+        initVisionImport();
 
         document.addEventListener('mousemove', (e) => {
             if (!isResizing) return;
@@ -1023,19 +1693,22 @@ HTML_TEMPLATE = """
             }
         });
 
-        const interactiveTitle = document.querySelector('.interactive-title');
-        const titleGlow = document.querySelector('.title-glow');
-        const submitBtn = document.getElementById('submit-btn');
-
-        if (interactiveTitle && titleGlow) {
-            interactiveTitle.addEventListener('mousemove', (e) => {
-                const rect = interactiveTitle.getBoundingClientRect();
-                titleGlow.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`);
-                titleGlow.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`);
+        function bindTitleGlow() {
+            document.querySelectorAll('.interactive-title').forEach(title => {
+                const glow = title.querySelector('.title-glow');
+                if (!glow) return;
+                title.addEventListener('mousemove', (e) => {
+                    const rect = title.getBoundingClientRect();
+                    glow.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`);
+                    glow.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`);
+                });
+                title.addEventListener('mouseenter', () => { glow.style.setProperty('--glow-size', '55px'); });
+                title.addEventListener('mouseleave', () => { glow.style.setProperty('--glow-size', '0px'); });
             });
-            interactiveTitle.addEventListener('mouseenter', () => { titleGlow.style.setProperty('--glow-size', '55px'); });
-            interactiveTitle.addEventListener('mouseleave', () => { titleGlow.style.setProperty('--glow-size', '0px'); });
         }
+        bindTitleGlow();
+
+        const submitBtn = document.getElementById('submit-btn');
 
         if (submitBtn) {
             submitBtn.addEventListener('mousemove', (e) => {
@@ -1101,27 +1774,173 @@ async def serve_page(request: Request):
 
         try:
             file_bytes = doc_response.body
-            filename = urllib.parse.unquote(doc_response.headers.get("Content-Disposition", ""))
-            
-            from data_model_utils import _detect_file_type, generate_visualisation, xml_to_json, ttl_to_json
+            disposition = doc_response.headers.get("Content-Disposition", "")
+            filename = _extract_filename_from_disposition(disposition)
+
+            from data_model_utils import (
+                _detect_file_type,
+                generate_visualisation,
+                xml_to_json,
+                ttl_to_json,
+                json_file_to_model,
+                sql_to_model,
+                text_to_model,
+            )
             from io import BytesIO
 
             kind = _detect_file_type(file_bytes, filename)
+            if not kind and filename:
+                # Fallback: try to detect from filename suffix even if disposition parsing failed
+                import os
+                _, ext = os.path.splitext(filename.lower())
+                if ext == ".ttl":
+                    kind = "ttl"
+                elif ext in (".xml", ".xmi"):
+                    kind = "xml"
+                elif ext in (".json", ".jsonld"):
+                    kind = "json"
+                elif ext == ".sql":
+                    kind = "sql"
+                elif ext in (".txt", ".html", ".htm", ".csv"):
+                    kind = "text"
+
             if kind in {"xml", "xmi"}:
                 json_data = xml_to_json(BytesIO(file_bytes))
             elif kind == "ttl":
                 json_data = ttl_to_json(BytesIO(file_bytes))
+                if isinstance(json_data.get("xmi"), dict):
+                    json_data = json_data["xmi"]
+            elif kind == "json":
+                json_data = json_file_to_model(BytesIO(file_bytes), filename=filename)
+                if isinstance(json_data.get("xmi"), dict):
+                    json_data = json_data["xmi"]
+            elif kind == "sql":
+                json_data = sql_to_model(BytesIO(file_bytes), filename=filename)
+                if isinstance(json_data.get("xmi"), dict):
+                    json_data = json_data["xmi"]
+            elif kind == "text":
+                json_data = text_to_model(BytesIO(file_bytes), filename=filename)
+                if isinstance(json_data.get("xmi"), dict):
+                    json_data = json_data["xmi"]
             else:
                 return HTMLResponse("<h3>Format non supporté pour la modélisation.</h3>", status_code=400)
 
             svg_result = generate_visualisation(json_data)
-            
+
             svg_bytes = svg_result.getvalue() if hasattr(svg_result, "getvalue") else svg_result
-            return Response(content=svg_bytes, media_type="image/svg+xml")
+            svg_text = svg_bytes.decode("utf-8", errors="replace")
+            # Normalize background to white for the interactive viewer ( PlantUML sometimes emits #000000 or #FFFFFF )
+            svg_text = re.sub(r'style="([^"]*)background:#000000([^"]*)"', r'style="\1background:#ffffff\2"', svg_text, flags=re.IGNORECASE)
+            svg_text = re.sub(r"style='([^']*)background:#000000([^']*)'", r"style='\1background:#ffffff\2'", svg_text, flags=re.IGNORECASE)
+            svg_text = re.sub(r'style="([^"]*)background:#FFFFFF([^"]*)"', r'style="\1background:#ffffff\2"', svg_text, flags=re.IGNORECASE)
+            # Ensure a white background even if no style is present
+            if "<svg" in svg_text and "background:" not in svg_text:
+                svg_text = svg_text.replace("<svg", '<svg style="background:#ffffff;"', 1)
+
+            # Determine the "root" class to center on: first uml:Class whose package is the root package
+            main_class_name = ""
+            root_pkg_id = ""
+            for elem in json_data.get("elements", []):
+                if _safe_text(elem.get("type")) == "uml:Package" and not root_pkg_id:
+                    root_pkg_id = _safe_text(elem.get("ID"))
+            for elem in json_data.get("elements", []):
+                if _safe_text(elem.get("type")) == "uml:Class" and _safe_text(elem.get("package")) == root_pkg_id:
+                    main_class_name = _safe_text(elem.get("name"))
+                    break
+            if main_class_name and "<svg" in svg_text:
+                # Inject a data attribute on the root SVG so the frontend can center on this class name
+                svg_text = svg_text.replace("<svg", f'<svg data-main-class="{_escape_xml_attr(main_class_name)}"', 1)
+
+            return Response(content=svg_text.encode("utf-8"), media_type="image/svg+xml")
         except Exception as e:
             import traceback
             traceback.print_exc()
             return HTMLResponse(f"<h3>Erreur de visualisation : {e}</h3>", status_code=500)
+
+    # --- Vision import endpoint (no MCP upload, just visualize) ---
+    import_id = request.query_params.get("import")
+    if import_id is not None and request.method == "POST":
+        try:
+            form = await request.form()
+            uploaded = form.get("file")
+            if not uploaded or not hasattr(uploaded, "filename"):
+                return HTMLResponse("Aucun fichier fourni.", status_code=400)
+
+            file_bytes = await uploaded.read()
+            filename = uploaded.filename or "document.txt"
+
+            from data_model_utils import (
+                _detect_file_type,
+                generate_visualisation,
+                xml_to_json,
+                ttl_to_json,
+                json_file_to_model,
+                sql_to_model,
+                text_to_model,
+            )
+            from io import BytesIO
+
+            kind = _detect_file_type(file_bytes, filename)
+            if not kind and filename:
+                _, ext = os.path.splitext(filename.lower())
+                if ext == ".ttl":
+                    kind = "ttl"
+                elif ext in (".xml", ".xmi"):
+                    kind = "xml"
+                elif ext in (".json", ".jsonld"):
+                    kind = "json"
+                elif ext == ".sql":
+                    kind = "sql"
+                elif ext in (".txt", ".html", ".htm", ".csv"):
+                    kind = "text"
+
+            if kind in {"xml", "xmi"}:
+                json_data = xml_to_json(BytesIO(file_bytes))
+            elif kind == "ttl":
+                json_data = ttl_to_json(BytesIO(file_bytes))
+                if isinstance(json_data.get("xmi"), dict):
+                    json_data = json_data["xmi"]
+            elif kind == "json":
+                json_data = json_file_to_model(BytesIO(file_bytes), filename=filename)
+                if isinstance(json_data.get("xmi"), dict):
+                    json_data = json_data["xmi"]
+            elif kind == "sql":
+                json_data = sql_to_model(BytesIO(file_bytes), filename=filename)
+                if isinstance(json_data.get("xmi"), dict):
+                    json_data = json_data["xmi"]
+            elif kind == "text":
+                json_data = text_to_model(BytesIO(file_bytes), filename=filename)
+                if isinstance(json_data.get("xmi"), dict):
+                    json_data = json_data["xmi"]
+            else:
+                return HTMLResponse("<h3>Format non supporté pour la modélisation.</h3>", status_code=400)
+
+            svg_result = generate_visualisation(json_data)
+            svg_bytes = svg_result.getvalue() if hasattr(svg_result, "getvalue") else svg_result
+            svg_text = svg_bytes.decode("utf-8", errors="replace")
+            svg_text = re.sub(r'style="([^"]*)background:#000000([^"]*)"', r'style="\1background:#ffffff\2"', svg_text, flags=re.IGNORECASE)
+            svg_text = re.sub(r"style='([^']*)background:#000000([^']*)'", r"style='\1background:#ffffff\2'", svg_text, flags=re.IGNORECASE)
+            svg_text = re.sub(r'style="([^"]*)background:#FFFFFF([^"]*)"', r'style="\1background:#ffffff\2"', svg_text, flags=re.IGNORECASE)
+            if "<svg" in svg_text and "background:" not in svg_text:
+                svg_text = svg_text.replace("<svg", '<svg style="background:#ffffff;"', 1)
+
+            main_class_name = ""
+            root_pkg_id = ""
+            for elem in json_data.get("elements", []):
+                if _safe_text(elem.get("type")) == "uml:Package" and not root_pkg_id:
+                    root_pkg_id = _safe_text(elem.get("ID"))
+            for elem in json_data.get("elements", []):
+                if _safe_text(elem.get("type")) == "uml:Class" and _safe_text(elem.get("package")) == root_pkg_id:
+                    main_class_name = _safe_text(elem.get("name"))
+                    break
+            if main_class_name and "<svg" in svg_text:
+                svg_text = svg_text.replace("<svg", f'<svg data-main-class="{_escape_xml_attr(main_class_name)}"', 1)
+
+            return Response(content=svg_text.encode("utf-8"), media_type="image/svg+xml")
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return HTMLResponse(f"<h3>Erreur d'import : {e}</h3>", status_code=500)
 
     query = ""
     selected_tags = []

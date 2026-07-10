@@ -254,6 +254,8 @@ def _comment_tags(elem: Optional[Element]) -> list[dict[str, str]]:
     for comment in comments:
         body = _child(comment, "body")
         body_text = (body.text if body is not None else "") or ""
+        if not body_text:
+            body_text = _attr(comment, "body") or ""
         for tag in _parse_semantic_body(body_text):
             key = (tag["name"], tag["value"])
             if key in seen:
@@ -456,7 +458,39 @@ def _get_standard_elements(root: Element) -> list[dict[str, Any]]:
         elif "Enumeration" in elem_type:
             elements.append(_extract_uml_enumeration(elem))
 
+    _resolve_annotated_comments(model, elements)
     return elements
+
+
+def _resolve_annotated_comments(model: Element, elements: list[dict[str, Any]]) -> None:
+    element_by_id = {e.get("ID", ""): e for e in elements if e.get("ID")}
+
+    for elem in _get_packaged_elements(model):
+        for comment in _children(elem, "ownedComment"):
+            body = _child(comment, "body")
+            body_text = (body.text if body is not None else "") or ""
+            if not body_text:
+                body_text = _attr(comment, "body") or ""
+            if not body_text.strip():
+                continue
+
+            parsed_tags = _parse_semantic_body(body_text)
+            if not parsed_tags:
+                continue
+
+            for annotated in _children(comment, "annotatedElement"):
+                target_id = _attr(annotated, f"{NS_XMI}idref") or annotated.get("idref") or ""
+                if not target_id:
+                    continue
+                target = element_by_id.get(target_id)
+                if target is None:
+                    continue
+                existing_tags = target.setdefault("tags", [])
+                existing_names = {(t.get("name") or "").lower() for t in existing_tags}
+                for pt in parsed_tags:
+                    if (pt["name"] or "").lower() not in existing_names:
+                        existing_tags.append(pt)
+                        existing_names.add((pt["name"] or "").lower())
 
 
 def _get_standard_connectors(
@@ -483,6 +517,10 @@ def _get_standard_connectors(
 
     connectors.extend(
         _get_standard_generalization_connectors(model, element_by_id, elements_by_name)
+    )
+
+    connectors.extend(
+        _get_standard_dependency_connectors(model, element_by_id, elements_by_name)
     )
 
     return _dedupe_connectors(connectors)
@@ -699,6 +737,66 @@ def _get_standard_generalization_connectors(
                 "tags_source": [],
                 "tags_target": [],
             })
+    return connectors
+
+
+def _get_standard_dependency_connectors(
+    model: Optional[Element],
+    element_by_id: dict[str, dict[str, Any]],
+    elements_by_name: dict[str, list[dict[str, Any]]],
+) -> list[dict[str, Any]]:
+    if model is None:
+        return []
+
+    connectors: list[dict[str, Any]] = []
+    for elem in _get_packaged_elements(model):
+        elem_type = _get_xmi_type(elem)
+        if not elem_type or "Dependency" not in elem_type:
+            continue
+
+        supplier_id = _attr(elem, "supplier") or ""
+        client_id = _attr(elem, "client") or ""
+
+        if not supplier_id or not client_id:
+            continue
+
+        source_id, source_name = _resolve_endpoint(
+            ref_id=client_id,
+            ref_name="",
+            element_by_id=element_by_id,
+            elements_by_name=elements_by_name,
+        )
+        target_id, target_name = _resolve_endpoint(
+            ref_id=supplier_id,
+            ref_name="",
+            element_by_id=element_by_id,
+            elements_by_name=elements_by_name,
+        )
+
+        if not source_id or not target_id:
+            continue
+
+        dep_tags = _comment_tags(elem)
+        connector_id = _get_xmi_id(elem)
+        relation_name = _tag_value(dep_tags, "label-en") or _attr(elem, "name") or ""
+
+        connectors.append({
+            "connector_id": connector_id,
+            "source_id": source_id,
+            "target_id": target_id,
+            "source_name": source_name,
+            "target_name": target_name,
+            "relationship": "Dependency",
+            "name": relation_name,
+            "uri": _tag_value(dep_tags, "uri") or None,
+            "lb": "",
+            "lt": "",
+            "rb": "",
+            "rt": "",
+            "tags": dep_tags,
+            "tags_source": [],
+            "tags_target": [],
+        })
     return connectors
 
 
@@ -969,24 +1067,91 @@ def _ea_get_elements_direct(root: Element) -> list[dict[str, Any]]:
 #  MAIN ENTRYPOINT — AUTO-ROUTING MULTI-FORMAT PARSER
 # =====================================================================
 
+def _decode_xml_bytes(raw_bytes: bytes) -> str:
+    """
+    Decode XML bytes robustly.
+
+    Uses the encoding declared in the XML prolog if present and valid.
+    Falls back to UTF-8 and replaces any invalid byte sequence so that
+    slightly corrupted exports (e.g. Enterprise Architect with bogus
+    windows-1252 bytes) can still be parsed.
+    """
+    encoding_match = re.search(
+        rb"<\?xml\s+[^?]*encoding=['\"]([^'\"]+)['\"]",
+        raw_bytes[:512],
+        re.IGNORECASE,
+    )
+    declared = encoding_match.group(1).decode("ascii", errors="ignore") if encoding_match else "utf-8"
+
+    text = raw_bytes.decode(declared, errors="replace")
+    replacement_marker = "\ufffd"
+
+    # Remove the replacement marker from attribute values so the XML parser
+    # does not fail on ill-formed character references. We strip the marker
+    # and any surrounding control bytes within attribute quotes.
+    text = re.sub(
+        r'="([^"]*' + re.escape(replacement_marker) + r'[^"]*)"',
+        lambda m: '="' + re.sub(r"[\ufffd\x00-\x08\x0b-\x0c\x0e-\x1f]", "", m.group(1)) + '"',
+        text,
+    )
+    text = re.sub(
+        r"='([^']*" + re.escape(replacement_marker) + r"[^']*)'",
+        lambda m: "='" + re.sub(r"[\ufffd\x00-\x08\x0b-\x0c\x0e-\x1f]", "", m.group(1)) + "'",
+        text,
+    )
+
+    # Strip any remaining isolated replacement characters outside attributes
+    text = text.replace(replacement_marker, "")
+
+    # Some EA exports declare a legacy encoding (e.g. windows-1252) but contain
+    # bytes that are invalid in that encoding. After decoding with 'replace',
+    # the resulting non-ASCII characters can still be rejected by expat.
+    # Sanitize attribute values by keeping only the printable ASCII subset;
+    # the actual UML semantics are carried by IDs and structure, not by status
+    # notes containing arbitrary binary-like data.
+    text = re.sub(
+        r'="([^"]*)"',
+        lambda m: '="' + re.sub(r'[^\x20-\x7e]', '', m.group(1)) + '"',
+        text,
+    )
+    text = re.sub(
+        r"='([^']*)'",
+        lambda m: "='" + re.sub(r'[^\x20-\x7e]', '', m.group(1)) + "'",
+        text,
+    )
+
+    return text
+
+
 def xml_to_json(bytes_data) -> dict[str, Any]:
     """
     Convert any XML/XMI/UML2 file into a JSON-compatible model.
-    Robustly handles Standard XMI (Papyrus/Cameo) AND EA Proprietary exports.
+    Robustly handles Standard XMI (Papyrus/Cameo) AND EA Proprietary exports,
+    including files with invalid declared encodings.
     """
     global NS_XMI, NS_UML
 
-    source = bytes_data
-    if isinstance(bytes_data, (bytes, bytearray)):
-        source = io.BytesIO(bytes_data)
+    raw = bytes_data
+    if hasattr(bytes_data, "read"):
+        raw = bytes_data.read()
+
+    if not isinstance(raw, (bytes, bytearray)):
+        raise TypeError("xml_to_json expects bytes or a file-like object yielding bytes.")
 
     try:
+        xml_text = _decode_xml_bytes(raw)
+
+        # Some EA exports declare an encoding (e.g. windows-1252) but contain bytes
+        # that are invalid in that encoding. Python's expat rejects the decoded
+        # characters even when we used errors="replace". Re-encode the cleaned text
+        # back to UTF-8 and parse that; expat accepts UTF-8 replacement chars.
+        source = io.BytesIO(xml_text.encode("utf-8", errors="replace"))
+
         namespaces = detect_namespaces(source)
         NS_XMI = namespaces["xmi"]
         NS_UML = namespaces["uml"]
 
-        if hasattr(source, "seek"):
-            source.seek(0)
+        source.seek(0)
 
         tree = parse(source)
         root = tree.getroot()
