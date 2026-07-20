@@ -838,6 +838,20 @@ HTML_TEMPLATE = """
         let activePane = 'search'; // 'search' | 'vision' | 'split'
 
         // --- FLOATING WINDOWS SETUP ---
+        function clampWindowPosition(win) {
+            const rect = win.getBoundingClientRect();
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+            const minVisible = 60; // at least 60px of each edge must stay visible
+            let left = rect.left;
+            let top = rect.top;
+            left = Math.max(minVisible - rect.width, Math.min(vw - minVisible, left));
+            top = Math.max(0, Math.min(vh - minVisible, top));
+            win.style.left = left + 'px';
+            win.style.top = top + 'px';
+            win.style.transform = 'none';
+        }
+
         function makeDraggable(headerId, windowId) {
             const header = document.getElementById(headerId);
             const win = document.getElementById(windowId);
@@ -863,13 +877,17 @@ HTML_TEMPLATE = """
                 if (!isDragging) return;
                 const dx = e.clientX - startX;
                 const dy = e.clientY - startY;
-                win.style.left = (initialLeft + dx) + 'px';
-                win.style.top = (initialTop + dy) + 'px';
+                let left = initialLeft + dx;
+                let top = initialTop + dy;
+                win.style.left = left + 'px';
+                win.style.top = top + 'px';
                 win.style.transform = 'none';
             });
 
             window.addEventListener('mouseup', () => {
+                if (!isDragging) return;
                 isDragging = false;
+                clampWindowPosition(win);
             });
         }
 
@@ -906,6 +924,7 @@ HTML_TEMPLATE = """
             window.addEventListener('mouseup', () => {
                 if (isResizing) {
                     isResizing = false;
+                    clampWindowPosition(win);
                     if (onResizeCallback) onResizeCallback('end');
                 }
             });
@@ -955,11 +974,12 @@ HTML_TEMPLATE = """
             const vw = window.innerWidth;
             const vh = window.innerHeight;
             const rect = win.getBoundingClientRect();
-            const left = (vw - rect.width) / 2 + offsetX;
-            const top = (vh - rect.height) / 2 + offsetY;
-            win.style.left = Math.max(10, left) + 'px';
-            win.style.top = Math.max(10, top) + 'px';
+            let left = (vw - rect.width) / 2 + offsetX;
+            let top = (vh - rect.height) / 2 + offsetY;
+            win.style.left = left + 'px';
+            win.style.top = top + 'px';
             win.style.transform = 'none';
+            clampWindowPosition(win);
         }
 
         // --- PREVIEW WINDOW ---
