@@ -560,6 +560,29 @@ HTML_TEMPLATE = """
             transition: padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 0.55s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
+        #vision-page-wrapper {
+            transition: padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.45s ease;
+            justify-content: center;
+            padding-top: 0;
+            padding-bottom: 0;
+        }
+        #vision-page-wrapper.vision-top {
+            justify-content: flex-start;
+            padding-top: 0;
+            padding-bottom: 0;
+        }
+        #vision-import-container {
+            transition: opacity 0.45s ease, transform 0.45s ease, max-height 0.45s ease;
+            overflow: hidden;
+        }
+        #vision-import-container.vision-import-hidden {
+            opacity: 0;
+            transform: translateY(-20px);
+            max-height: 0;
+            margin-bottom: 0;
+            pointer-events: none;
+        }
+
         #search-container { width: 100%; }
 
         .search-wrapper { position: relative; border-radius: 9999px; isolation: isolate; width: 100%; }
@@ -704,22 +727,23 @@ HTML_TEMPLATE = """
 
             <!-- Right Pane: Vision / Split View Content -->
         <div id="right-pane" class="hidden h-full bg-white border-l border-gray-200 overflow-hidden flex-shrink-0 flex flex-col" style="width: 0;">
-            <div class="px-4 sm:px-6 pt-6 pb-2 text-center flex-shrink-0 z-10">
-                <h1 class="font-bold tracking-tight text-center text-black mb-0">
-                    <button type="button" class="interactive-title bg-transparent border-0 p-0" onclick="showVisionHome();" title="Retour à l'accueil Vision">
-                        <span class="title-glow">Vision Sémantique</span>
-                    </button>
-                </h1>
-            </div>
-            <div class="flex-1 relative overflow-hidden" id="right-pane-content">
-                <div id="vision-empty" class="h-full flex flex-col items-center justify-start p-8 pt-2 text-gray-500">
-                    <p class="text-base font-medium mb-6 text-center max-w-md">Importez un fichier (TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML) pour le visualiser sous forme de diagramme.</p>
-                    <label id="vision-drop-zone" class="drop-zone flex flex-col items-center justify-center w-full max-w-md py-10 px-6 cursor-pointer hover:border-gray-400">
-                        <svg class="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-                        <span class="text-sm font-semibold text-gray-700">Glissez-déposez un fichier ici</span>
-                        <span class="text-xs text-gray-400 mt-1">ou cliquez pour parcourir</span>
-                        <input type="file" id="vision-file-input" class="hidden" accept=".ttl,.xml,.xmi,.json,.jsonld,.sql,.txt,.html,.htm,.csv">
-                    </label>
+            <div class="flex-1 relative overflow-hidden flex flex-col" id="right-pane-content">
+                <div id="vision-page-wrapper" class="px-4 sm:px-6 flex flex-col items-center text-center flex-shrink-0 z-20 bg-white transition-all duration-500 ease-out">
+                    <h1 class="font-bold tracking-tight text-center text-black mb-2 mt-2">
+                        <button type="button" class="interactive-title bg-transparent border-0 p-0" onclick="showVisionHome();" title="Retour à l'accueil Vision">
+                            <span class="title-glow">Vision Sémantique</span>
+                        </button>
+                    </h1>
+
+                    <div id="vision-import-container" class="w-full max-w-md">
+                        <p class="text-base font-medium mb-6 text-center max-w-md mx-auto text-gray-500">Importez un fichier (TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML) pour le visualiser sous forme de diagramme.</p>
+                        <label id="vision-drop-zone" class="drop-zone flex flex-col items-center justify-center w-full max-w-md mx-auto py-10 px-6 cursor-pointer hover:border-gray-400">
+                            <svg class="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                            <span class="text-sm font-semibold text-gray-700">Glissez-déposez un fichier ici</span>
+                            <span class="text-xs text-gray-400 mt-1">ou cliquez pour parcourir</span>
+                            <input type="file" id="vision-file-input" class="hidden" accept=".ttl,.xml,.xmi,.json,.jsonld,.sql,.txt,.html,.htm,.csv">
+                        </label>
+                    </div>
                 </div>
                 <template id="vision-viewer-template">
                     <div id="svg-viewer" class="svg-viewer">
@@ -1216,18 +1240,43 @@ HTML_TEMPLATE = """
         function showVisionHome() {
             const content = document.getElementById('right-pane-content');
             content.innerHTML = `
-                <div id="vision-empty" class="h-full flex flex-col items-center justify-start p-8 pt-2 text-gray-500">
-                    <p class="text-base font-medium mb-6 text-center max-w-md">Importez un fichier (TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML) pour le visualiser sous forme de diagramme.</p>
-                    <label id="vision-drop-zone" class="drop-zone flex flex-col items-center justify-center w-full max-w-md py-10 px-6 cursor-pointer hover:border-gray-400">
-                        <svg class="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-                        <span class="text-sm font-semibold text-gray-700">Glissez-déposez un fichier ici</span>
-                        <span class="text-xs text-gray-400 mt-1">ou cliquez pour parcourir</span>
-                        <input type="file" id="vision-file-input" class="hidden" accept=".ttl,.xml,.xmi,.json,.jsonld,.sql,.txt,.html,.htm,.csv">
-                    </label>
-                </div>`;
+                <div id="vision-page-wrapper" class="px-4 sm:px-6 flex flex-col items-center text-center flex-shrink-0 z-20 bg-white transition-all duration-500 ease-out">
+                    <h1 class="font-bold tracking-tight text-center text-black mb-2 mt-2">
+                        <button type="button" class="interactive-title bg-transparent border-0 p-0" onclick="showVisionHome();" title="Retour à l'accueil Vision">
+                            <span class="title-glow">Vision Sémantique</span>
+                        </button>
+                    </h1>
+                    <div id="vision-import-container" class="w-full max-w-md">
+                        <p class="text-base font-medium mb-6 text-center max-w-md mx-auto text-gray-500">Importez un fichier (TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML) pour le visualiser sous forme de diagramme.</p>
+                        <label id="vision-drop-zone" class="drop-zone flex flex-col items-center justify-center w-full max-w-md mx-auto py-10 px-6 cursor-pointer hover:border-gray-400">
+                            <svg class="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                            <span class="text-sm font-semibold text-gray-700">Glissez-déposez un fichier ici</span>
+                            <span class="text-xs text-gray-400 mt-1">ou cliquez pour parcourir</span>
+                            <input type="file" id="vision-file-input" class="hidden" accept=".ttl,.xml,.xmi,.json,.jsonld,.sql,.txt,.html,.htm,.csv">
+                        </label>
+                    </div>
+                </div>
+                <template id="vision-viewer-template">
+                    <div id="svg-viewer" class="svg-viewer">
+                        <div id="svg-loading" class="absolute inset-0 flex items-center justify-center text-gray-500 z-10">
+                            <svg class="animate-spin h-8 w-8 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span class="text-sm font-medium ml-3">Génération de la modélisation...</span>
+                        </div>
+                        <div class="svg-canvas" id="vision-svg-canvas"></div>
+                        <div class="svg-controls">
+                            <button class="svg-ctrl-btn" onclick="svgZoomIn()" title="Zoom avant">+</button>
+                            <button class="svg-ctrl-btn" onclick="svgZoomOut()" title="Zoom arrière">−</button>
+                            <button class="svg-ctrl-btn" onclick="svgResetZoom()" title="Réinitialiser">⟲</button>
+                        </div>
+                    </div>
+                </template>`;
             bindTitleGlow();
             bindTagEvents();
             initVisionImport();
+            applyVisionCentering();
             showPane('vision');
         }
 
@@ -1290,9 +1339,10 @@ HTML_TEMPLATE = """
                 setActive(tabSearch, false);
                 setActive(tabVision, true);
                 // Always ensure the Vision panel shows something: empty import state if nothing else.
-                if (!content.querySelector('#vision-empty') && !content.querySelector('#svg-viewer')) {
+                if (!content.querySelector('#vision-page-wrapper') && !content.querySelector('#svg-viewer')) {
                     ensureVisionContent();
                 }
+                applyVisionCentering();
             } else if (pane === 'split') {
                 // Split mode is no longer used for search preview, kept for compatibility
                 leftPane.classList.remove('hidden');
@@ -1305,7 +1355,7 @@ HTML_TEMPLATE = """
                 updateResizer(true);
                 setActive(tabSearch, true);
                 setActive(tabVision, false);
-                if (!content.querySelector('#vision-empty')) {
+                if (!content.querySelector('#vision-page-wrapper') && !content.querySelector('#svg-viewer')) {
                     ensureVisionContent();
                 }
             }
@@ -1331,20 +1381,28 @@ HTML_TEMPLATE = """
 
         function ensureVisionContent() {
             const content = document.getElementById('right-pane-content');
-            if (!content.querySelector('#vision-empty') && !content.querySelector('#svg-viewer')) {
+            if (!content.querySelector('#vision-page-wrapper') && !content.querySelector('#svg-viewer')) {
                 content.innerHTML = `
-                    <div id="vision-empty" class="h-full flex flex-col items-center justify-start p-8 pt-2 text-gray-500">
-                        <p class="text-base font-medium mb-6 text-center max-w-md">Importez un fichier (TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML) pour le visualiser sous forme de diagramme.</p>
-                        <label id="vision-drop-zone" class="drop-zone flex flex-col items-center justify-center w-full max-w-md py-10 px-6 cursor-pointer hover:border-gray-400">
-                            <svg class="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-                            <span class="text-sm font-semibold text-gray-700">Glissez-déposez un fichier ici</span>
-                            <span class="text-xs text-gray-400 mt-1">ou cliquez pour parcourir</span>
-                            <input type="file" id="vision-file-input" class="hidden" accept=".ttl,.xml,.xmi,.json,.jsonld,.sql,.txt,.html,.htm,.csv">
-                        </label>
+                    <div id="vision-page-wrapper" class="px-4 sm:px-6 flex-1 flex flex-col items-center justify-center text-center overflow-y-auto">
+                        <h1 class="font-bold tracking-tight text-center text-black mb-5 sm:mb-8 mt-6">
+                            <button type="button" class="interactive-title bg-transparent border-0 p-0" onclick="showVisionHome();" title="Retour à l'accueil Vision">
+                                <span class="title-glow">Vision Sémantique</span>
+                            </button>
+                        </h1>
+                <div id="vision-import-container" class="w-full max-w-md mb-8 transition-all duration-500 ease-out">
+                            <p class="text-base font-medium mb-6 text-center max-w-md mx-auto text-gray-500">Importez un fichier (TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML) pour le visualiser sous forme de diagramme.</p>
+                            <label id="vision-drop-zone" class="drop-zone flex flex-col items-center justify-center w-full max-w-md mx-auto py-10 px-6 cursor-pointer hover:border-gray-400">
+                                <svg class="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                                <span class="text-sm font-semibold text-gray-700">Glissez-déposez un fichier ici</span>
+                                <span class="text-xs text-gray-400 mt-1">ou cliquez pour parcourir</span>
+                                <input type="file" id="vision-file-input" class="hidden" accept=".ttl,.xml,.xmi,.json,.jsonld,.sql,.txt,.html,.htm,.csv">
+                            </label>
+                        </div>
                     </div>`;
                 bindTitleGlow();
                 bindTagEvents();
                 initVisionImport();
+                applyVisionCentering();
             } else {
                 // If the empty state is present but no listener has been attached, hook it up.
                 const dropZone = document.getElementById('vision-drop-zone');
@@ -1626,15 +1684,27 @@ HTML_TEMPLATE = """
         }
 
         function handleVisionFile(file) {
-            // Render the SVG viewer directly inside the Vision panel (right-pane-content).
+            // Move the Vision page wrapper to the top (like search) before showing the viewer.
+            const visionWrapper = document.getElementById('vision-page-wrapper');
+            if (visionWrapper) {
+                visionWrapper.classList.remove('vision-centered');
+                visionWrapper.classList.add('vision-top');
+                visionWrapper.style.justifyContent = 'flex-start';
+            }
+            const importContainer = document.getElementById('vision-import-container');
+            if (importContainer) importContainer.classList.add('vision-import-hidden');
+
+            // Remove any previously injected SVG viewer before adding a new one.
             const content = document.getElementById('right-pane-content');
+            const existingViewer = content.querySelector('#svg-viewer');
+            if (existingViewer) existingViewer.remove();
+
             const tmpl = document.getElementById('vision-viewer-template');
-            console.log('[Vision import] template element=', tmpl, 'content children before=', content.children.length);
+            console.log('[Vision import] template element=', tmpl, 'content=', content ? content.tagName : null);
             if (tmpl) {
-                content.innerHTML = '';
-                const clone = tmpl.content.cloneNode(true);
-                content.appendChild(clone);
-                console.log('[Vision import] injected viewer template, content children after=', content.children.length);
+                const viewerDiv = tmpl.content.cloneNode(true);
+                content.appendChild(viewerDiv);
+                console.log('[Vision import] injected viewer template');
             } else {
                 console.error('[Vision import] vision-viewer-template not found');
                 // Fallback: build the viewer markup directly
@@ -1772,6 +1842,25 @@ HTML_TEMPLATE = """
             const pad = Math.max(48, (window.innerHeight - wrapper.offsetHeight) / 2 - 60);
             wrapper.style.paddingTop = pad + 'px';
             wrapper.style.paddingBottom = pad + 'px';
+        }
+
+        function applyVisionCentering() {
+            const visionWrapper = document.getElementById('vision-page-wrapper');
+            if (!visionWrapper) return;
+            const content = document.getElementById('right-pane-content');
+            const importContainer = document.getElementById('vision-import-container');
+            if (visionWrapper.classList.contains('vision-top')) {
+                visionWrapper.style.paddingTop = '0';
+                visionWrapper.style.paddingBottom = '0';
+                if (importContainer) importContainer.classList.add('vision-import-hidden');
+            } else {
+                visionWrapper.classList.remove('vision-top');
+                if (importContainer) importContainer.classList.remove('vision-import-hidden');
+                // Center the wrapper vertically in the available space
+                const pad = Math.max(48, (content.clientHeight - visionWrapper.offsetHeight) / 2 - 60);
+                visionWrapper.style.paddingTop = pad + 'px';
+                visionWrapper.style.paddingBottom = pad + 'px';
+            }
         }
 
         wrapper.style.transition = 'none';
