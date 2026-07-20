@@ -277,6 +277,56 @@ HTML_TEMPLATE = """
         #global-header { flex-shrink: 0; }
         #split-wrapper { flex: 1 1 0%; min-height: 0; }
 
+        /* --- Floating Windows --- */
+        .floating-window {
+            position: fixed;
+            display: flex;
+            flex-direction: column;
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 1.25rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            overflow: hidden;
+            z-index: 60;
+            transform: translate(-50%, -50%);
+        }
+        .floating-window.active {
+            z-index: 70;
+        }
+
+        .window-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #f3f4f6;
+            background: #ffffff;
+            cursor: move;
+            user-select: none;
+            flex-shrink: 0;
+        }
+
+        .resize-handle {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 16px;
+            height: 16px;
+            cursor: se-resize;
+            z-index: 10;
+        }
+        .resize-handle::after {
+            content: '';
+            position: absolute;
+            bottom: 4px;
+            right: 4px;
+            width: 8px;
+            height: 8px;
+            border-right: 2px solid #d1d5db;
+            border-bottom: 2px solid #d1d5db;
+            border-radius: 0 0 2px 0;
+        }
+
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
@@ -662,15 +712,30 @@ HTML_TEMPLATE = """
                 </h1>
             </div>
             <div class="flex-1 relative overflow-hidden" id="right-pane-content">
-                <template id="vision-empty-template">
-                    <div id="vision-empty" class="h-full flex flex-col items-center justify-start p-8 pt-2 text-gray-500">
-                        <p class="text-base font-medium mb-6 text-center max-w-md">Importez un fichier (TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML) pour le visualiser sous forme de diagramme.</p>
-                        <label id="vision-drop-zone" class="drop-zone flex flex-col items-center justify-center w-full max-w-md py-10 px-6 cursor-pointer hover:border-gray-400">
-                            <svg class="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-                            <span class="text-sm font-semibold text-gray-700">Glissez-déposez un fichier ici</span>
-                            <span class="text-xs text-gray-400 mt-1">ou cliquez pour parcourir</span>
-                            <input type="file" id="vision-file-input" class="hidden" accept=".ttl,.xml,.xmi,.json,.jsonld,.sql,.txt,.html,.htm,.csv">
-                        </label>
+                <div id="vision-empty" class="h-full flex flex-col items-center justify-start p-8 pt-2 text-gray-500">
+                    <p class="text-base font-medium mb-6 text-center max-w-md">Importez un fichier (TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML) pour le visualiser sous forme de diagramme.</p>
+                    <label id="vision-drop-zone" class="drop-zone flex flex-col items-center justify-center w-full max-w-md py-10 px-6 cursor-pointer hover:border-gray-400">
+                        <svg class="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                        <span class="text-sm font-semibold text-gray-700">Glissez-déposez un fichier ici</span>
+                        <span class="text-xs text-gray-400 mt-1">ou cliquez pour parcourir</span>
+                        <input type="file" id="vision-file-input" class="hidden" accept=".ttl,.xml,.xmi,.json,.jsonld,.sql,.txt,.html,.htm,.csv">
+                    </label>
+                </div>
+                <template id="vision-viewer-template">
+                    <div id="svg-viewer" class="svg-viewer">
+                        <div id="svg-loading" class="absolute inset-0 flex items-center justify-center text-gray-500 z-10">
+                            <svg class="animate-spin h-8 w-8 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span class="text-sm font-medium ml-3">Génération de la modélisation...</span>
+                        </div>
+                        <div class="svg-canvas" id="vision-svg-canvas"></div>
+                        <div class="svg-controls">
+                            <button class="svg-ctrl-btn" onclick="svgZoomIn()" title="Zoom avant">+</button>
+                            <button class="svg-ctrl-btn" onclick="svgZoomOut()" title="Zoom arrière">−</button>
+                            <button class="svg-ctrl-btn" onclick="svgResetZoom()" title="Réinitialiser">⟲</button>
+                        </div>
                     </div>
                 </template>
             </div>
@@ -678,46 +743,86 @@ HTML_TEMPLATE = """
 
     </div>
 
-    <!-- Chat Modal -->
-    <div id="chat-modal" class="fixed inset-0 z-50 hidden bg-white/40 backdrop-blur-md flex items-center justify-center opacity-0 transition-opacity duration-300 p-4 sm:p-8">
-        <div class="bg-white border border-gray-100 w-full max-w-3xl h-[85vh] sm:h-[80vh] rounded-[2.5rem] shadow-2xl flex flex-col transform scale-95 transition-transform duration-300" id="chat-modal-content">
-
-            <div class="px-8 py-5 border-b border-gray-50 flex items-center justify-between">
-                <div>
-                    <h3 class="font-bold text-gray-900 leading-tight">Assistant Sémantique</h3>
-                    <p class="text-xs text-gray-400 font-medium truncate max-w-[200px] sm:max-w-sm" id="chat-modal-filename">Chargement...</p>
-                </div>
-                <button onclick="closeChat()" class="magic-btn text-gray-300 hover:text-black hover:bg-gray-50 p-2.5 rounded-full transition-colors focus:outline-none">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                </button>
-            </div>
-
-            <!-- Zone de messages -->
-            <div class="flex-1 overflow-y-auto p-8" id="chat-messages">
-                <div class="flex flex-col items-start gap-3 mb-8">
-                    <div class="text-sm text-gray-800 leading-relaxed w-full markdown-body">
-                        <p>Je prépare l'analyse de ce document. Quelle est votre question spécifique ?</p>
-                    </div>
-                    <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container">
-                        <svg class="w-5 h-5 overflow-visible ai-sparkle-icon" viewBox="0 0 24 24">
-                            <path class="sparkle-main" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
-                            <path class="sparkle-orbit-path" d="M5.5 2.5L6.34 5.16L9 6L6.34 6.84L5.5 9.5L4.66 6.84L2 6L4.66 5.16L5.5 2.5Z"></path>
-                            <path class="sparkle-orbit-path" d="M19.5 15.5L20.34 18.16L23 19L20.34 19.84L19.5 22.5L18.66 19.84L16 19L18.66 18.16L19.5 15.5Z"></path>
-                        </svg>
-                    </div>
+    <!-- Floating Preview Window -->
+    <div id="preview-window" class="floating-window hidden" style="width: 800px; height: 600px; top: 50%; left: 50%;">
+        <div class="window-header" id="preview-header">
+            <div class="flex items-center gap-2 min-w-0">
+                <svg class="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                <div class="min-w-0">
+                    <h3 class="font-bold text-gray-900 text-sm leading-tight">Aperçu du document</h3>
+                    <p class="text-xs text-gray-400 truncate" id="preview-filename">Chargement...</p>
                 </div>
             </div>
-
-            <div class="p-6 pt-2">
-                <form id="ai-chat-form" onsubmit="event.preventDefault(); handleChatSubmit();" class="relative flex items-center">
-                    <input type="text" id="ai-chat-input" placeholder="Interrogez le modèle..." 
-                        class="w-full bg-gray-50 border border-gray-100 rounded-[2rem] pl-6 pr-14 py-4 text-sm font-medium focus:outline-none focus:bg-white focus:border-gray-300 focus:shadow-sm transition-all" autocomplete="off">
-                    <button type="submit" class="magic-btn chat-send-btn absolute right-2 text-white bg-black hover:bg-gray-800 rounded-full w-10 h-10 flex items-center justify-center transition-colors">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19V5M5 12l7-7 7 7"></path></svg>
-                    </button>
-                </form>
+            <button onclick="closePreviewWindow()" class="magic-btn text-gray-400 hover:text-black p-1.5 rounded-full transition-colors focus:outline-none flex-shrink-0" title="Fermer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <div class="flex-1 relative overflow-hidden" id="preview-body">
+            <div id="preview-svg-viewer" class="svg-viewer">
+                <div id="preview-svg-loading" class="absolute inset-0 flex items-center justify-center text-gray-500 z-10">
+                    <svg class="animate-spin h-8 w-8 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span class="text-sm font-medium ml-3">Génération de la modélisation...</span>
+                </div>
+                <div class="svg-canvas"></div>
+                <div class="svg-controls">
+                    <button class="svg-ctrl-btn" onclick="previewSvgZoomIn()" title="Zoom avant">+</button>
+                    <button class="svg-ctrl-btn" onclick="previewSvgZoomOut()" title="Zoom arrière">−</button>
+                    <button class="svg-ctrl-btn" onclick="previewSvgResetZoom()" title="Réinitialiser">⟲</button>
+                </div>
             </div>
         </div>
+        <div class="resize-handle" data-target="preview-window"></div>
+    </div>
+
+    <!-- Floating Chat Window -->
+    <div id="chat-window" class="floating-window hidden" style="width: 500px; height: 600px; top: 50%; left: 50%;">
+        <div class="window-header" id="chat-header">
+            <div class="flex items-center gap-2 min-w-0">
+                <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container">
+                    <svg class="w-5 h-5 overflow-visible ai-sparkle-icon" viewBox="0 0 24 24">
+                        <path class="sparkle-main" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
+                        <path class="sparkle-orbit-path" d="M5.5 2.5L6.34 5.16L9 6L6.34 6.84L5.5 9.5L4.66 6.84L2 6L4.66 5.16L5.5 2.5Z"></path>
+                        <path class="sparkle-orbit-path" d="M19.5 15.5L20.34 18.16L23 19L20.34 19.84L19.5 22.5L18.66 19.84L16 19L18.66 18.16L19.5 15.5Z"></path>
+                    </svg>
+                </div>
+                <div class="min-w-0">
+                    <h3 class="font-bold text-gray-900 text-sm leading-tight">Assistant Sémantique</h3>
+                    <p class="text-xs text-gray-400 truncate" id="chat-filename">Chargement...</p>
+                </div>
+            </div>
+            <button onclick="closeChatWindow()" class="magic-btn text-gray-400 hover:text-black p-1.5 rounded-full transition-colors focus:outline-none flex-shrink-0" title="Fermer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-4" id="chat-messages">
+            <div class="flex flex-col items-start gap-3 mb-8">
+                <div class="text-sm text-gray-800 leading-relaxed w-full markdown-body">
+                    <p>Je prépare l'analyse de ce document. Quelle est votre question spécifique ?</p>
+                </div>
+                <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container">
+                    <svg class="w-5 h-5 overflow-visible ai-sparkle-icon" viewBox="0 0 24 24">
+                        <path class="sparkle-main" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
+                        <path class="sparkle-orbit-path" d="M5.5 2.5L6.34 5.16L9 6L6.34 6.84L5.5 9.5L4.66 6.84L2 6L4.66 5.16L5.5 2.5Z"></path>
+                        <path class="sparkle-orbit-path" d="M19.5 15.5L20.34 18.16L23 19L20.34 19.84L19.5 22.5L18.66 19.84L16 19L18.66 18.16L19.5 15.5Z"></path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-3 border-t border-gray-100">
+            <form id="ai-chat-form" onsubmit="event.preventDefault(); handleChatSubmit();" class="relative flex items-center">
+                <input type="text" id="ai-chat-input" placeholder="Interrogez le modèle..." 
+                    class="w-full bg-gray-50 border border-gray-100 rounded-[2rem] pl-4 pr-12 py-3 text-sm font-medium focus:outline-none focus:bg-white focus:border-gray-300 focus:shadow-sm transition-all" autocomplete="off">
+                <button type="submit" class="magic-btn chat-send-btn absolute right-2 text-white bg-black hover:bg-gray-800 rounded-full w-9 h-9 flex items-center justify-center transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19V5M5 12l7-7 7 7"></path></svg>
+                </button>
+            </form>
+        </div>
+        <div class="resize-handle" data-target="chat-window"></div>
     </div>
 
     <script>
@@ -732,17 +837,482 @@ HTML_TEMPLATE = """
 
         let activePane = 'search'; // 'search' | 'vision' | 'split'
 
-        function openSplitView(docId, docName) {
-            showPane('split');
-            renderSvgViewer(docName);
-            loadSvgViewer(`?visualize=${docId}`);
+        // --- FLOATING WINDOWS SETUP ---
+        function makeDraggable(headerId, windowId) {
+            const header = document.getElementById(headerId);
+            const win = document.getElementById(windowId);
+            if (!header || !win) return;
+
+            let isDragging = false;
+            let startX = 0, startY = 0;
+            let initialLeft = 0, initialTop = 0;
+
+            header.addEventListener('mousedown', (e) => {
+                if (e.target.closest('button')) return;
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                const rect = win.getBoundingClientRect();
+                initialLeft = rect.left;
+                initialTop = rect.top;
+                bringToFront(windowId);
+                e.preventDefault();
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                win.style.left = (initialLeft + dx) + 'px';
+                win.style.top = (initialTop + dy) + 'px';
+                win.style.transform = 'none';
+            });
+
+            window.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
         }
+
+        function makeResizable(windowId, onResizeCallback) {
+            const win = document.getElementById(windowId);
+            const handle = win.querySelector('.resize-handle');
+            if (!win || !handle) return;
+
+            let isResizing = false;
+            let startX = 0, startY = 0;
+            let initialW = 0, initialH = 0;
+
+            handle.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                const rect = win.getBoundingClientRect();
+                initialW = rect.width;
+                initialH = rect.height;
+                bringToFront(windowId);
+                if (onResizeCallback) onResizeCallback('start');
+                e.preventDefault();
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isResizing) return;
+                const dw = e.clientX - startX;
+                const dh = e.clientY - startY;
+                win.style.width = Math.max(320, initialW + dw) + 'px';
+                win.style.height = Math.max(200, initialH + dh) + 'px';
+                if (onResizeCallback) onResizeCallback('resize');
+            });
+
+            window.addEventListener('mouseup', () => {
+                if (isResizing) {
+                    isResizing = false;
+                    if (onResizeCallback) onResizeCallback('end');
+                }
+            });
+        }
+
+        function bringToFront(windowId) {
+            document.querySelectorAll('.floating-window').forEach(w => w.classList.remove('active'));
+            const win = document.getElementById(windowId);
+            if (win) win.classList.add('active');
+        }
+
+        document.querySelectorAll('.floating-window').forEach(win => {
+            win.addEventListener('mousedown', () => bringToFront(win.id));
+        });
+
+        makeDraggable('preview-header', 'preview-window');
+        makeResizable('preview-window', (phase) => {
+            if (phase === 'start') {
+                const viewer = document.getElementById('preview-svg-viewer');
+                const svg = document.querySelector('#preview-svg-viewer .svg-canvas svg.svg-diagram');
+                if (!viewer || !svg) return;
+                const rect = viewer.getBoundingClientRect();
+                // Store the world coordinate currently at the center of the viewer
+                previewSvgState._resizeAnchorX = (rect.width / 2 - previewSvgState.x) / previewSvgState.scale;
+                previewSvgState._resizeAnchorY = (rect.height / 2 - previewSvgState.y) / previewSvgState.scale;
+            } else if (phase === 'resize' || phase === 'end') {
+                const viewer = document.getElementById('preview-svg-viewer');
+                const svg = document.querySelector('#preview-svg-viewer .svg-canvas svg.svg-diagram');
+                if (!viewer || !svg) return;
+                const rect = viewer.getBoundingClientRect();
+                const ax = previewSvgState._resizeAnchorX;
+                const ay = previewSvgState._resizeAnchorY;
+                if (ax !== undefined && ay !== undefined) {
+                    previewSvgState.x = (rect.width / 2) - ax * previewSvgState.scale;
+                    previewSvgState.y = (rect.height / 2) - ay * previewSvgState.scale;
+                }
+                previewSvgClampPan();
+                previewSvgApplyTransform();
+            }
+        });
+        makeDraggable('chat-header', 'chat-window');
+        makeResizable('chat-window');
+
+        function centerWindow(windowId, offsetX = 0, offsetY = 0) {
+            const win = document.getElementById(windowId);
+            if (!win) return;
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+            const rect = win.getBoundingClientRect();
+            const left = (vw - rect.width) / 2 + offsetX;
+            const top = (vh - rect.height) / 2 + offsetY;
+            win.style.left = Math.max(10, left) + 'px';
+            win.style.top = Math.max(10, top) + 'px';
+            win.style.transform = 'none';
+        }
+
+        // --- PREVIEW WINDOW ---
+        let currentPreviewDocId = null;
+        let currentPreviewDocumentId = null;
+        let previewSvgState = { scale: 1, x: 0, y: 0, isDragging: false, lastX: 0, lastY: 0 };
+
+        function openPreviewWindow(docId, documentId, docName) {
+            const win = document.getElementById('preview-window');
+            const filenameEl = document.getElementById('preview-filename');
+            const wasHidden = win.classList.contains('hidden');
+
+            currentPreviewDocId = docId;
+            currentPreviewDocumentId = documentId;
+            if (filenameEl) filenameEl.textContent = decodeURIComponent(docName);
+
+            win.classList.remove('hidden');
+            if (wasHidden) {
+                const chatWin = document.getElementById('chat-window');
+                if (chatWin && !chatWin.classList.contains('hidden')) {
+                    centerWindow('preview-window', 0, 0);
+                } else {
+                    centerWindow('preview-window', 0, 0);
+                }
+            }
+            bringToFront('preview-window');
+
+            // Reset loader
+            const loading = document.getElementById('preview-svg-loading');
+            const canvas = document.querySelector('#preview-svg-viewer .svg-canvas');
+            if (loading) loading.classList.remove('hidden');
+            if (canvas) {
+                canvas.innerHTML = '';
+                canvas.classList.remove('flex', 'items-center', 'justify-center', 'h-full', 'text-gray-500');
+            }
+            previewSvgState = { scale: 1, x: 0, y: 0, isDragging: false, lastX: 0, lastY: 0 };
+            loadPreviewSvg(`?visualize=${docId}`);
+        }
+
+        function closePreviewWindow() {
+            const win = document.getElementById('preview-window');
+            if (win) win.classList.add('hidden');
+        }
+
+        function loadPreviewSvg(url) {
+            const canvas = document.querySelector('#preview-svg-viewer .svg-canvas');
+            const loading = document.getElementById('preview-svg-loading');
+            if (!canvas) return;
+
+            fetch(url)
+                .then(r => r.text())
+                .then(svgText => {
+                    const mainClassMatch = svgText.match(/data-main-class="([^"]*)"/);
+                    const mainClassName = mainClassMatch ? mainClassMatch[1] : '';
+                    svgText = svgText.replace(/style="background:#000000;"/g, 'style="background:#ffffff;"');
+                    svgText = svgText.replace(/background:#000000/g, 'background:#ffffff');
+                    svgText = svgText.replace(/<svg/, '<svg class="svg-diagram"');
+                    if (loading) loading.classList.add('hidden');
+                    canvas.innerHTML = svgText;
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => previewSvgCenterDiagram(mainClassName));
+                    });
+                })
+                .catch(err => {
+                    canvas.innerHTML = `<div class="text-red-500 text-sm p-4 flex items-center justify-center h-full">Erreur de chargement du diagramme.</div>`;
+                    if (loading) loading.classList.add('hidden');
+                    console.error(err);
+                });
+        }
+
+        function previewSvgApplyTransform() {
+            const canvas = document.querySelector('#preview-svg-viewer .svg-canvas');
+            if (!canvas) return;
+            previewSvgClampPan();
+            canvas.style.transform = `translate(${previewSvgState.x}px, ${previewSvgState.y}px) scale(${previewSvgState.scale})`;
+        }
+
+        function previewSvgClampPan() {
+            const viewer = document.getElementById('preview-svg-viewer');
+            const svg = document.querySelector('#preview-svg-viewer .svg-canvas svg.svg-diagram');
+            if (!viewer || !svg) return;
+
+            const viewerRect = viewer.getBoundingClientRect();
+            let bounds;
+            try { bounds = svg.getBBox(); } catch (e) {
+                bounds = { x: 0, y: 0, width: parseFloat(svg.getAttribute('width')) || viewerRect.width, height: parseFloat(svg.getAttribute('height')) || viewerRect.height };
+            }
+            if (!bounds || !bounds.width || !bounds.height) return;
+
+            const maxOverflow = 60;
+            const scaledWidth = bounds.width * previewSvgState.scale;
+            const scaledHeight = bounds.height * previewSvgState.scale;
+            const minScreenLeft = maxOverflow - scaledWidth;
+            const maxScreenLeft = viewerRect.width - maxOverflow;
+            const minScreenTop = maxOverflow - scaledHeight;
+            const maxScreenTop = viewerRect.height - maxOverflow;
+
+            const currentScreenLeft = previewSvgState.x + bounds.x * previewSvgState.scale;
+            const currentScreenTop = previewSvgState.y + bounds.y * previewSvgState.scale;
+
+            const clampedScreenLeft = Math.max(minScreenLeft, Math.min(maxScreenLeft, currentScreenLeft));
+            const clampedScreenTop = Math.max(minScreenTop, Math.min(maxScreenTop, currentScreenTop));
+
+            previewSvgState.x = clampedScreenLeft - bounds.x * previewSvgState.scale;
+            previewSvgState.y = clampedScreenTop - bounds.y * previewSvgState.scale;
+        }
+
+        function previewSvgCenterDiagram(mainClassName = '') {
+            const viewer = document.getElementById('preview-svg-viewer');
+            const canvas = document.querySelector('#preview-svg-viewer .svg-canvas');
+            const svg = canvas ? canvas.querySelector('svg.svg-diagram') : null;
+            if (!viewer || !canvas || !svg) return;
+
+            try { svg.getBBox(); } catch (e) {}
+            const viewerRect = viewer.getBoundingClientRect();
+            let targetX = 0, targetY = 0, targetWidth = 0, targetHeight = 0, foundMain = false;
+
+            if (mainClassName) {
+                const allGroups = svg.querySelectorAll('g');
+                for (const ent of allGroups) {
+                    const textEls = ent.querySelectorAll('text');
+                    for (const textEl of textEls) {
+                        if (textEl.textContent.trim() === mainClassName) {
+                            try {
+                                const bbox = ent.getBBox();
+                                targetX = bbox.x; targetY = bbox.y; targetWidth = bbox.width; targetHeight = bbox.height;
+                                foundMain = true;
+                                break;
+                            } catch (e) {}
+                        }
+                    }
+                    if (foundMain) break;
+                }
+                if (!foundMain) {
+                    const texts = svg.querySelectorAll('text');
+                    for (const textEl of texts) {
+                        if (textEl.textContent.trim() === mainClassName) {
+                            try {
+                                const parent = textEl.closest('g') || textEl;
+                                const bbox = parent.getBBox();
+                                targetX = bbox.x; targetY = bbox.y; targetWidth = bbox.width; targetHeight = bbox.height;
+                                foundMain = true;
+                                break;
+                            } catch (e) {}
+                        }
+                    }
+                }
+            }
+
+            if (!foundMain) {
+                try {
+                    const bbox = svg.getBBox();
+                    targetX = bbox.x; targetY = bbox.y; targetWidth = bbox.width; targetHeight = bbox.height;
+                } catch (e) {
+                    targetWidth = parseFloat(svg.getAttribute('width')) || viewerRect.width;
+                    targetHeight = parseFloat(svg.getAttribute('height')) || viewerRect.height;
+                }
+            }
+
+            previewSvgState.x = (viewerRect.width / 2) - (targetX + targetWidth / 2) * previewSvgState.scale;
+            previewSvgState.y = (viewerRect.height / 2) - (targetY + targetHeight / 2) * previewSvgState.scale;
+            previewSvgApplyTransform();
+        }
+
+        function previewSvgZoomIn() { previewSvgZoomAt(previewViewerCenterPoint(), 1.2); }
+        function previewSvgZoomOut() { previewSvgZoomAt(previewViewerCenterPoint(), 1 / 1.2); }
+
+        function previewViewerCenterPoint() {
+            const viewer = document.getElementById('preview-svg-viewer');
+            if (!viewer) return { x: 0, y: 0 };
+            const rect = viewer.getBoundingClientRect();
+            return { x: rect.width / 2, y: rect.height / 2 };
+        }
+
+        function previewSvgZoomAt(point, factor) {
+            const newScale = Math.min(4, Math.max(0.2, previewSvgState.scale * factor));
+            previewSvgState.x = point.x - (point.x - previewSvgState.x) * (newScale / previewSvgState.scale);
+            previewSvgState.y = point.y - (point.y - previewSvgState.y) * (newScale / previewSvgState.scale);
+            previewSvgState.scale = newScale;
+            previewSvgClampPan();
+            previewSvgApplyTransform();
+        }
+
+        function previewSvgResetZoom() {
+            previewSvgState.scale = 0.95;
+            previewSvgCenterDiagram();
+        }
+
+        function initPreviewSvgEvents() {
+            const viewer = document.getElementById('preview-svg-viewer');
+            if (!viewer) return;
+
+            viewer.addEventListener('wheel', (e) => {
+                const canvas = document.querySelector('#preview-svg-viewer .svg-canvas');
+                if (!canvas) return;
+                e.preventDefault();
+                const factor = e.deltaY > 0 ? 0.9 : 1.1;
+                const rect = viewer.getBoundingClientRect();
+                previewSvgZoomAt({ x: e.clientX - rect.left, y: e.clientY - rect.top }, factor);
+            }, { passive: false });
+
+            viewer.addEventListener('mousedown', (e) => {
+                if (e.target.closest('.svg-controls')) return;
+                previewSvgState.isDragging = true;
+                previewSvgState.lastX = e.clientX;
+                previewSvgState.lastY = e.clientY;
+                viewer.style.cursor = 'grabbing';
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!previewSvgState.isDragging) return;
+                const dx = e.clientX - previewSvgState.lastX;
+                const dy = e.clientY - previewSvgState.lastY;
+                previewSvgState.lastX = e.clientX;
+                previewSvgState.lastY = e.clientY;
+                previewSvgState.x += dx;
+                previewSvgState.y += dy;
+                previewSvgClampPan();
+                previewSvgApplyTransform();
+            });
+
+            window.addEventListener('mouseup', () => {
+                if (previewSvgState.isDragging) {
+                    previewSvgState.isDragging = false;
+                    viewer.style.cursor = '';
+                    previewSvgClampPan();
+                    previewSvgApplyTransform();
+                }
+            });
+        }
+
+        initPreviewSvgEvents();
 
         function showVisionHome() {
             const content = document.getElementById('right-pane-content');
-            // Reset everything: clear current SVG/home and recreate the empty template in the DOM
             content.innerHTML = `
-                <template id="vision-empty-template">
+                <div id="vision-empty" class="h-full flex flex-col items-center justify-start p-8 pt-2 text-gray-500">
+                    <p class="text-base font-medium mb-6 text-center max-w-md">Importez un fichier (TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML) pour le visualiser sous forme de diagramme.</p>
+                    <label id="vision-drop-zone" class="drop-zone flex flex-col items-center justify-center w-full max-w-md py-10 px-6 cursor-pointer hover:border-gray-400">
+                        <svg class="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                        <span class="text-sm font-semibold text-gray-700">Glissez-déposez un fichier ici</span>
+                        <span class="text-xs text-gray-400 mt-1">ou cliquez pour parcourir</span>
+                        <input type="file" id="vision-file-input" class="hidden" accept=".ttl,.xml,.xmi,.json,.jsonld,.sql,.txt,.html,.htm,.csv">
+                    </label>
+                </div>`;
+            bindTitleGlow();
+            bindTagEvents();
+            initVisionImport();
+            showPane('vision');
+        }
+
+        function showPane(pane) {
+            activePane = pane;
+            const leftPane = document.getElementById('left-pane');
+            const rightPane = document.getElementById('right-pane');
+            const content = document.getElementById('right-pane-content');
+            const resizer = document.getElementById('split-resizer');
+            const closeVision = document.getElementById('close-vision-pane');
+            const tabSearch = document.getElementById('tab-search');
+            const tabVision = document.getElementById('tab-vision');
+
+            function setVisible(element, visible) {
+                if (!element) return;
+                if (visible) element.classList.remove('hidden');
+                else element.classList.add('hidden');
+            }
+
+            function setActive(element, active) {
+                if (!element) return;
+                if (active) element.classList.add('active');
+                else element.classList.remove('active');
+            }
+
+            function updateResizer(show) {
+                if (!resizer) return;
+                if (show) {
+                    resizer.classList.remove('hidden');
+                    resizer.classList.add('visible');
+                } else {
+                    resizer.classList.remove('visible');
+                    resizer.classList.add('hidden');
+                }
+            }
+
+            if (rightPane) rightPane.style.transition = 'none';
+            if (leftPane) leftPane.style.transition = 'none';
+
+            if (pane === 'search') {
+                leftPane.classList.remove('hidden');
+                leftPane.style.width = '100%';
+                leftPane.style.flex = '1 1 100%';
+                rightPane.classList.add('hidden');
+                rightPane.style.width = '0%';
+                rightPane.style.flex = '0 0 0%';
+                setVisible(closeVision, false);
+                updateResizer(false);
+                setActive(tabSearch, true);
+                setActive(tabVision, false);
+            } else if (pane === 'vision') {
+                leftPane.classList.add('hidden');
+                leftPane.style.width = '0%';
+                leftPane.style.flex = '0 0 0%';
+                rightPane.classList.remove('hidden');
+                rightPane.style.width = '100%';
+                rightPane.style.flex = '1 1 100%';
+                setVisible(closeVision, false);
+                updateResizer(false);
+                setActive(tabSearch, false);
+                setActive(tabVision, true);
+                // Always ensure the Vision panel shows something: empty import state if nothing else.
+                if (!content.querySelector('#vision-empty') && !content.querySelector('#svg-viewer')) {
+                    ensureVisionContent();
+                }
+            } else if (pane === 'split') {
+                // Split mode is no longer used for search preview, kept for compatibility
+                leftPane.classList.remove('hidden');
+                leftPane.style.width = '50%';
+                leftPane.style.flex = '0 0 50%';
+                rightPane.classList.remove('hidden');
+                rightPane.style.width = '50%';
+                rightPane.style.flex = '0 0 50%';
+                setVisible(closeVision, true);
+                updateResizer(true);
+                setActive(tabSearch, true);
+                setActive(tabVision, false);
+                if (!content.querySelector('#vision-empty')) {
+                    ensureVisionContent();
+                }
+            }
+
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    if (rightPane) rightPane.style.transition = '';
+                    if (leftPane) leftPane.style.transition = '';
+                });
+            });
+
+            setTimeout(() => {
+                const svgViewer = document.getElementById('svg-viewer');
+                if (svgViewer) {
+                    svgClampPan();
+                    svgApplyTransform();
+                } else {
+                    previewSvgClampPan();
+                    previewSvgApplyTransform();
+                }
+            }, 500);
+        }
+
+        function ensureVisionContent() {
+            const content = document.getElementById('right-pane-content');
+            if (!content.querySelector('#vision-empty') && !content.querySelector('#svg-viewer')) {
+                content.innerHTML = `
                     <div id="vision-empty" class="h-full flex flex-col items-center justify-start p-8 pt-2 text-gray-500">
                         <p class="text-base font-medium mb-6 text-center max-w-md">Importez un fichier (TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML) pour le visualiser sous forme de diagramme.</p>
                         <label id="vision-drop-zone" class="drop-zone flex flex-col items-center justify-center w-full max-w-md py-10 px-6 cursor-pointer hover:border-gray-400">
@@ -751,236 +1321,14 @@ HTML_TEMPLATE = """
                             <span class="text-xs text-gray-400 mt-1">ou cliquez pour parcourir</span>
                             <input type="file" id="vision-file-input" class="hidden" accept=".ttl,.xml,.xmi,.json,.jsonld,.sql,.txt,.html,.htm,.csv">
                         </label>
-                    </div>
-                </template>
-            `;
-            // Render the empty state into the visible content area first
-            const tmpl = document.getElementById('vision-empty-template');
-            if (tmpl) {
-                content.appendChild(tmpl.content.cloneNode(true));
-            }
-            // Then wire events on the freshly created elements
-            bindTitleGlow();
-            bindTagEvents();
-            initVisionImport();
-            _applyPane('vision', true);
-        }
-
-        function _applyPane(pane, skipEnsure) {
-            activePane = pane;
-            const leftPane = document.getElementById('left-pane');
-            const rightPane = document.getElementById('right-pane');
-            const resizer = document.getElementById('split-resizer');
-            const closeVision = document.getElementById('close-vision-pane');
-            const tabSearch = document.getElementById('tab-search');
-            const tabVision = document.getElementById('tab-vision');
-
-            function setVisible(element, visible) {
-                if (!element) return;
-                if (visible) element.classList.remove('hidden');
-                else element.classList.add('hidden');
-            }
-
-            function setActive(element, active) {
-                if (!element) return;
-                if (active) element.classList.add('active');
-                else element.classList.remove('active');
-            }
-
-            function updateResizer(show) {
-                if (!resizer) return;
-                if (show) {
-                    resizer.classList.remove('hidden');
-                    resizer.classList.add('visible');
-                } else {
-                    resizer.classList.remove('visible');
-                    resizer.classList.add('hidden');
-                }
-            }
-
-            if (rightPane) rightPane.style.transition = 'none';
-            if (leftPane) leftPane.style.transition = 'none';
-
-            if (pane === 'search') {
-                leftPane.classList.remove('hidden');
-                leftPane.style.width = '100%';
-                leftPane.style.flex = '1 1 100%';
-                rightPane.classList.add('hidden');
-                rightPane.style.width = '0%';
-                rightPane.style.flex = '0 0 0%';
-                setVisible(closeVision, false);
-                updateResizer(false);
-                setActive(tabSearch, true);
-                setActive(tabVision, false);
-            } else if (pane === 'vision') {
-                leftPane.classList.add('hidden');
-                leftPane.style.width = '0%';
-                leftPane.style.flex = '0 0 0%';
-                rightPane.classList.remove('hidden');
-                rightPane.style.width = '100%';
-                rightPane.style.flex = '1 1 100%';
-                setVisible(closeVision, false);
-                updateResizer(false);
-                setActive(tabSearch, false);
-                setActive(tabVision, true);
-                if (!skipEnsure && !document.getElementById('svg-viewer')) {
-                    ensureVisionContent();
-                }
-            } else if (pane === 'split') {
-                leftPane.classList.remove('hidden');
-                leftPane.style.width = '50%';
-                leftPane.style.flex = '0 0 50%';
-                rightPane.classList.remove('hidden');
-                rightPane.style.width = '50%';
-                rightPane.style.flex = '0 0 50%';
-                setVisible(closeVision, true);
-                updateResizer(true);
-                setActive(tabSearch, true);
-                setActive(tabVision, false);
-                if (!skipEnsure && !document.getElementById('svg-viewer')) {
-                    ensureVisionContent();
-                }
-            }
-
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    if (rightPane) rightPane.style.transition = '';
-                    if (leftPane) leftPane.style.transition = '';
-                });
-            });
-
-            setTimeout(() => {
-                svgClampPan();
-                svgApplyTransform();
-            }, 500);
-        }
-
-        function renderSvgViewer(docName) {
-            const contentContainer = document.getElementById('right-pane-content');
-            contentContainer.innerHTML = `
-                <div id="svg-viewer" class="svg-viewer">
-                    <div id="svg-loading" class="absolute inset-0 flex items-center justify-center text-gray-500 z-10">
-                        <svg class="animate-spin h-8 w-8 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <span class="text-sm font-medium ml-3">Génération de la modélisation...</span>
-                    </div>
-                    <div class="svg-canvas"></div>
-                    <div class="svg-controls">
-                        <button class="svg-ctrl-btn" onclick="svgZoomIn()" title="Zoom avant">+</button>
-                        <button class="svg-ctrl-btn" onclick="svgZoomOut()" title="Zoom arrière">−</button>
-                        <button class="svg-ctrl-btn" onclick="svgResetZoom()" title="Réinitialiser">⟲</button>
-                    </div>
-                </div>
-            `;
-            // Make sure the title is still interactive after replacing content
-            bindTitleGlow();
-        }
-
-        function showPane(pane) {
-            _applyPane(pane, false);
-        }
-
-        function _applyPane(pane, skipEnsure) {
-            activePane = pane;
-            const leftPane = document.getElementById('left-pane');
-            const rightPane = document.getElementById('right-pane');
-            const resizer = document.getElementById('split-resizer');
-            const closeVision = document.getElementById('close-vision-pane');
-            const tabSearch = document.getElementById('tab-search');
-            const tabVision = document.getElementById('tab-vision');
-
-            function setVisible(element, visible) {
-                if (!element) return;
-                if (visible) element.classList.remove('hidden');
-                else element.classList.add('hidden');
-            }
-
-            function setActive(element, active) {
-                if (!element) return;
-                if (active) element.classList.add('active');
-                else element.classList.remove('active');
-            }
-
-            function updateResizer(show) {
-                if (!resizer) return;
-                if (show) {
-                    resizer.classList.remove('hidden');
-                    resizer.classList.add('visible');
-                } else {
-                    resizer.classList.remove('visible');
-                    resizer.classList.add('hidden');
-                }
-            }
-
-            if (rightPane) rightPane.style.transition = 'none';
-            if (leftPane) leftPane.style.transition = 'none';
-
-            if (pane === 'search') {
-                leftPane.classList.remove('hidden');
-                leftPane.style.width = '100%';
-                leftPane.style.flex = '1 1 100%';
-                rightPane.classList.add('hidden');
-                rightPane.style.width = '0%';
-                rightPane.style.flex = '0 0 0%';
-                setVisible(closeVision, false);
-                updateResizer(false);
-                setActive(tabSearch, true);
-                setActive(tabVision, false);
-            } else if (pane === 'vision') {
-                leftPane.classList.add('hidden');
-                leftPane.style.width = '0%';
-                leftPane.style.flex = '0 0 0%';
-                rightPane.classList.remove('hidden');
-                rightPane.style.width = '100%';
-                rightPane.style.flex = '1 1 100%';
-                setVisible(closeVision, false);
-                updateResizer(false);
-                setActive(tabSearch, false);
-                setActive(tabVision, true);
-                if (!skipEnsure && !document.getElementById('svg-viewer')) {
-                    ensureVisionContent();
-                }
-            } else if (pane === 'split') {
-                leftPane.classList.remove('hidden');
-                leftPane.style.width = '50%';
-                leftPane.style.flex = '0 0 50%';
-                rightPane.classList.remove('hidden');
-                rightPane.style.width = '50%';
-                rightPane.style.flex = '0 0 50%';
-                setVisible(closeVision, true);
-                updateResizer(true);
-                setActive(tabSearch, true);
-                setActive(tabVision, false);
-                if (!skipEnsure && !document.getElementById('svg-viewer')) {
-                    ensureVisionContent();
-                }
-            }
-
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    if (rightPane) rightPane.style.transition = '';
-                    if (leftPane) leftPane.style.transition = '';
-                });
-            });
-
-            setTimeout(() => {
-                svgClampPan();
-                svgApplyTransform();
-            }, 500);
-        }
-
-        function ensureVisionContent() {
-            const content = document.getElementById('right-pane-content');
-            if (!content.querySelector('#svg-viewer') && !content.querySelector('#vision-empty')) {
-                const tmpl = document.getElementById('vision-empty-template');
-                if (tmpl) {
-                    content.replaceChildren(tmpl.content.cloneNode(true));
-                }
+                    </div>`;
                 bindTitleGlow();
                 bindTagEvents();
                 initVisionImport();
+            } else {
+                // If the empty state is present but no listener has been attached, hook it up.
+                const dropZone = document.getElementById('vision-drop-zone');
+                if (dropZone) initVisionImport();
             }
         }
 
@@ -998,48 +1346,21 @@ HTML_TEMPLATE = """
             showPane('search');
         }
 
-        // --- SVG INTERACTIVE VIEWER ---
+        resizer.addEventListener('mousedown', (e) => {
+            if (!rightPane) return;
+            isResizing = true;
+            document.body.style.cursor = 'col-resize';
+            // Disable transitions during drag to follow mouse instantly
+            rightPane.style.transition = 'none';
+            leftPane.style.transition = 'none';
+            e.preventDefault();
+        });
+
+        // --- SVG INTERACTIVE VIEWER (VISION PANEL) ---
         let svgViewerState = { scale: 1, x: 0, y: 0, isDragging: false, lastX: 0, lastY: 0 };
         const SVG_MIN_ZOOM = 0.2;
         const SVG_MAX_ZOOM = 4;
-        const SVG_DEFAULT_ZOOM = 0.95;
-
-        function loadSvgViewer(url) {
-            const canvas = document.querySelector('#svg-viewer .svg-canvas');
-            const loading = document.getElementById('svg-loading');
-            if (!canvas) return;
-
-            // Reset viewer state for each new diagram
-            svgViewerState = { scale: 1, x: 0, y: 0, isDragging: false, lastX: 0, lastY: 0 };
-
-            fetch(url)
-                .then(r => r.text())
-                .then(svgText => {
-                    // Parse main class name from injected data attribute before stripping it
-                    const mainClassMatch = svgText.match(/data-main-class="([^"]*)"/);
-                    const mainClassName = mainClassMatch ? mainClassMatch[1] : '';
-
-                    // Force white background: replace black background with white if present
-                    svgText = svgText.replace(/style="background:#000000;"/g, 'style="background:#ffffff;"');
-                    svgText = svgText.replace(/background:#000000/g, 'background:#ffffff');
-                    // Ensure SVG fills the canvas at natural size
-                    svgText = svgText.replace(/<svg/, '<svg class="svg-diagram"');
-
-                    // Clean up loading state: hide spinner and ensure canvas is a neutral container
-                    if (loading) loading.classList.add('hidden');
-                    canvas.classList.remove('flex', 'items-center', 'justify-center', 'h-full', 'text-gray-500');
-                    canvas.innerHTML = svgText;
-
-                    // Center after the SVG has rendered
-                    requestAnimationFrame(() => {
-                        requestAnimationFrame(() => svgCenterDiagram(mainClassName));
-                    });
-                })
-                .catch(err => {
-                    canvas.innerHTML = `<div class="text-red-500 text-sm p-4">Erreur de chargement du diagramme.</div>`;
-                    console.error(err);
-                });
-        }
+        const SVG_DEFAULT_ZOOM = 1;
 
         function svgApplyTransform() {
             const canvas = document.querySelector('#svg-viewer .svg-canvas');
@@ -1075,26 +1396,11 @@ HTML_TEMPLATE = """
             const bounds = svgGetDiagramBounds();
             if (!bounds || !bounds.width || !bounds.height) return;
 
-            // The canvas transform moves the whole SVG. We clamp the screen-space position of
-            // the SVG's top-left corner so the user can never lose the diagram entirely.
-            //
-            //   screenLeft = x + bounds.x * scale
-            //   screenTop  = y + bounds.y * scale
-            //
-            // We allow each edge to go maxOverflow pixels off-screen. For a diagram larger than
-            // the viewer this still lets the user pan to the top/bottom/left/right edges.
             const maxOverflow = 60;
-
             const scaledWidth = bounds.width * svgViewerState.scale;
             const scaledHeight = bounds.height * svgViewerState.scale;
-
-            // screenLeft must be such that the right edge is at least maxOverflow in
-            // (screenLeft + scaledWidth >= maxOverflow) and the left edge is at most maxOverflow
-            // past the right side (screenLeft <= viewerRect.width - maxOverflow).
             const minScreenLeft = maxOverflow - scaledWidth;
             const maxScreenLeft = viewerRect.width - maxOverflow;
-
-            // Same vertically.
             const minScreenTop = maxOverflow - scaledHeight;
             const maxScreenTop = viewerRect.height - maxOverflow;
 
@@ -1125,7 +1431,6 @@ HTML_TEMPLATE = """
 
         function svgZoomAt(point, factor) {
             const newScale = Math.min(SVG_MAX_ZOOM, Math.max(SVG_MIN_ZOOM, svgViewerState.scale * factor));
-            // Keep the point under the cursor / center stable
             svgViewerState.x = point.x - (point.x - svgViewerState.x) * (newScale / svgViewerState.scale);
             svgViewerState.y = point.y - (point.y - svgViewerState.y) * (newScale / svgViewerState.scale);
             svgViewerState.scale = newScale;
@@ -1144,17 +1449,13 @@ HTML_TEMPLATE = """
             const svg = canvas ? canvas.querySelector('svg.svg-diagram') : null;
             if (!viewer || !canvas || !svg) return;
 
-            // Ensure the SVG has rendered so getBBox is meaningful
             const forceRender = svg.getBBox ? svg.getBBox() : null;
 
             const viewerRect = viewer.getBoundingClientRect();
             let targetX = 0, targetY = 0, targetWidth = 0, targetHeight = 0;
 
-            // Try to find the main class entity if requested
             let foundMain = false;
             if (mainClassName) {
-                // PlantUML native SVG uses g elements with id containing the alias/class name
-                // Our fallback SVG uses rect/text with no id; match the bold title text.
                 const allGroups = svg.querySelectorAll('g');
                 for (const ent of allGroups) {
                     const textEls = ent.querySelectorAll('text');
@@ -1174,13 +1475,11 @@ HTML_TEMPLATE = """
                     if (foundMain) break;
                 }
 
-                // Fallback: match any bold text in the whole SVG
                 if (!foundMain) {
                     const texts = svg.querySelectorAll('text');
                     for (const textEl of texts) {
                         if (textEl.textContent.trim() === mainClassName) {
                             try {
-                                // Use the parent group if available, else text bbox
                                 const parent = textEl.closest('g') || textEl;
                                 const bbox = parent.getBBox();
                                 targetX = bbox.x;
@@ -1196,7 +1495,6 @@ HTML_TEMPLATE = """
             }
 
             if (!foundMain) {
-                // Fall back to centering the whole diagram
                 try {
                     const bbox = svg.getBBox();
                     targetX = bbox.x;
@@ -1209,15 +1507,23 @@ HTML_TEMPLATE = """
                 }
             }
 
-            // Center the target bounding box in the viewer. Because the SVG may have a non-zero
-            // origin (bounds.x / bounds.y), we account for it when computing the translation.
+            if (targetWidth <= 0 || targetHeight <= 0) return;
+
+            const padding = 40;
+            const scaleX = (viewerRect.width - padding * 2) / targetWidth;
+            const scaleY = (viewerRect.height - padding * 2) / targetHeight;
+            // Use the smaller fit-to-screen scale so the whole diagram is visible,
+            // regardless of the default zoom cap. This preserves the previous behavior
+            // where all classes render at a consistent size.
+            svgViewerState.scale = Math.min(SVG_MAX_ZOOM, Math.max(SVG_MIN_ZOOM, Math.min(scaleX, scaleY)));
+
             svgViewerState.x = (viewerRect.width / 2) - (targetX + targetWidth / 2) * svgViewerState.scale;
             svgViewerState.y = (viewerRect.height / 2) - (targetY + targetHeight / 2) * svgViewerState.scale;
             svgApplyTransform();
         }
 
         function initSvgViewerEvents() {
-            const viewer = document.getElementById('right-pane-content');
+            const viewer = document.getElementById('svg-viewer');
             if (!viewer) return;
 
             viewer.addEventListener('wheel', function(e) {
@@ -1259,26 +1565,7 @@ HTML_TEMPLATE = """
             });
         }
 
-        function toggleSearchPane() {
-            if (activePane === 'split') showPane('vision');
-            else showPane('split');
-        }
-
-        function closeSplitView() {
-            showPane('search');
-        }
-
-        resizer.addEventListener('mousedown', (e) => {
-            if (!rightPane) return;
-            isResizing = true;
-            document.body.style.cursor = 'col-resize';
-            // Disable transitions during drag to follow mouse instantly
-            rightPane.style.transition = 'none';
-            leftPane.style.transition = 'none';
-            e.preventDefault();
-        });
-
-        // Initialize SVG viewer drag / wheel events once
+        // Initialize SVG viewer drag / wheel events once, using event delegation for dynamically created viewer
         initSvgViewerEvents();
 
         // --- VISION IMPORT ---
@@ -1287,40 +1574,90 @@ HTML_TEMPLATE = """
             const fileInput = document.getElementById('vision-file-input');
             if (!dropZone || !fileInput) return;
 
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                dropZone.addEventListener(eventName, preventDefaults, false);
-            });
-
             function preventDefaults(e) {
                 e.preventDefault();
                 e.stopPropagation();
             }
 
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.removeEventListener(eventName, preventDefaults, false);
+                dropZone.addEventListener(eventName, preventDefaults, false);
+            });
+
             ['dragenter', 'dragover'].forEach(eventName => {
-                dropZone.addEventListener(eventName, () => dropZone.classList.add('drag-over'), false);
+                dropZone.removeEventListener(eventName, dropZone._addHover, false);
+                dropZone.removeEventListener(eventName, dropZone._removeHover, false);
+            });
+
+            dropZone._addHover = () => dropZone.classList.add('drag-over');
+            dropZone._removeHover = () => dropZone.classList.remove('drag-over');
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, dropZone._addHover, false);
             });
 
             ['dragleave', 'drop'].forEach(eventName => {
-                dropZone.addEventListener(eventName, () => dropZone.classList.remove('drag-over'), false);
+                dropZone.addEventListener(eventName, dropZone._removeHover, false);
             });
 
-            dropZone.addEventListener('drop', (e) => {
+            dropZone.removeEventListener('drop', dropZone._handleDrop, false);
+            dropZone._handleDrop = (e) => {
                 const dt = e.dataTransfer;
                 const files = dt.files;
                 if (files.length) handleVisionFile(files[0]);
-            });
+            };
+            dropZone.addEventListener('drop', dropZone._handleDrop, false);
 
-            fileInput.addEventListener('change', (e) => {
+            // Replace input element to guarantee a fresh change listener after re-render
+            const freshInput = fileInput.cloneNode(true);
+            fileInput.parentNode.replaceChild(freshInput, fileInput);
+            freshInput.addEventListener('change', (e) => {
                 if (e.target.files.length) handleVisionFile(e.target.files[0]);
             });
         }
 
         function handleVisionFile(file) {
-            // Render the viewer first, then switch to vision so the SVG has a place to land.
-            renderSvgViewer(file.name);
+            // Render the SVG viewer directly inside the Vision panel (right-pane-content).
+            const content = document.getElementById('right-pane-content');
+            const tmpl = document.getElementById('vision-viewer-template');
+            console.log('[Vision import] template element=', tmpl, 'content children before=', content.children.length);
+            if (tmpl) {
+                content.innerHTML = '';
+                const clone = tmpl.content.cloneNode(true);
+                content.appendChild(clone);
+                console.log('[Vision import] injected viewer template, content children after=', content.children.length);
+            } else {
+                console.error('[Vision import] vision-viewer-template not found');
+                // Fallback: build the viewer markup directly
+                content.innerHTML = `
+                    <div id="svg-viewer" class="svg-viewer">
+                        <div id="svg-loading" class="absolute inset-0 flex items-center justify-center text-gray-500 z-10">
+                            <svg class="animate-spin h-8 w-8 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span class="text-sm font-medium ml-3">Génération de la modélisation...</span>
+                        </div>
+                        <div class="svg-canvas" id="vision-svg-canvas"></div>
+                        <div class="svg-controls">
+                            <button class="svg-ctrl-btn" onclick="svgZoomIn()" title="Zoom avant">+</button>
+                            <button class="svg-ctrl-btn" onclick="svgZoomOut()" title="Zoom arrière">−</button>
+                            <button class="svg-ctrl-btn" onclick="svgResetZoom()" title="Réinitialiser">⟲</button>
+                        </div>
+                    </div>`;
+            }
             showPane('vision');
 
-            // Reset viewer state for each new diagram
+            let canvas = document.getElementById('vision-svg-canvas');
+            let loading = document.getElementById('svg-loading');
+
+            console.log('[Vision import] after showPane, canvas=', canvas, 'loading=', loading);
+
+            if (loading) loading.classList.remove('hidden');
+            if (canvas) {
+                canvas.innerHTML = '';
+                canvas.classList.remove('flex', 'items-center', 'justify-center', 'h-full', 'text-gray-500');
+            }
             svgViewerState = { scale: 1, x: 0, y: 0, isDragging: false, lastX: 0, lastY: 0 };
 
             const formData = new FormData();
@@ -1328,42 +1665,35 @@ HTML_TEMPLATE = """
 
             fetch('?import=1', { method: 'POST', body: formData })
                 .then(r => {
+                    console.log('[Vision import] response status', r.status);
                     if (!r.ok) throw new Error(`Import failed (${r.status})`);
                     return r.text();
                 })
                 .then(svgText => {
+                    console.log('[Vision import] received SVG length', svgText.length);
                     const mainClassMatch = svgText.match(/data-main-class="([^"]*)"/);
                     const mainClassName = mainClassMatch ? mainClassMatch[1] : '';
                     svgText = svgText.replace(/style="background:#000000;"/g, 'style="background:#ffffff;"');
                     svgText = svgText.replace(/background:#000000/g, 'background:#ffffff');
                     svgText = svgText.replace(/<svg/, '<svg class="svg-diagram"');
 
-                    // Ensure the viewer still exists after showPane('vision')
-                    let canvas = document.querySelector('#svg-viewer .svg-canvas');
-                    let loading = document.getElementById('svg-loading');
-                    if (!canvas) {
-                        // If showPane reset the content, re-render the viewer skeleton.
-                        renderSvgViewer(file.name);
-                        canvas = document.querySelector('#svg-viewer .svg-canvas');
-                        loading = document.getElementById('svg-loading');
-                    }
+                    if (loading) loading.classList.add('hidden');
                     if (canvas) {
-                        if (loading) loading.classList.add('hidden');
-                        canvas.classList.remove('flex', 'items-center', 'justify-center', 'h-full', 'text-gray-500');
                         canvas.innerHTML = svgText;
+                        console.log('[Vision import] SVG injected into canvas');
                         requestAnimationFrame(() => {
                             requestAnimationFrame(() => svgCenterDiagram(mainClassName));
                         });
+                    } else {
+                        console.error('[Vision import] canvas not found after fetch');
                     }
                 })
                 .catch(err => {
-                    let canvas = document.querySelector('#svg-viewer .svg-canvas');
-                    if (!canvas) {
-                        renderSvgViewer(file.name);
-                        canvas = document.querySelector('#svg-viewer .svg-canvas');
-                    }
+                    console.error('[Vision import] error', err);
+                    canvas = document.getElementById('vision-svg-canvas');
+                    loading = document.getElementById('svg-loading');
+                    if (loading) loading.classList.add('hidden');
                     if (canvas) canvas.innerHTML = `<div class="text-red-500 text-sm p-4 flex items-center justify-center h-full">Erreur d'import : ${err.message}</div>`;
-                    console.error(err);
                 });
         }
 
@@ -1460,43 +1790,28 @@ HTML_TEMPLATE = """
 
         function openChat(docId, docName) {
             currentChatDocId = docId; 
-            chatHistory = [];         
-            document.querySelectorAll('.chat-spacer').forEach(el => el.remove());
-            document.getElementById('chat-messages').innerHTML = `
-                <div class="flex flex-col items-start gap-3 mb-8">
-                    <div class="text-sm text-gray-800 leading-relaxed w-full markdown-body">
-                        <p>Je prépare l'analyse de ce document. Quelle est votre question spécifique ?</p>
-                    </div>
-                    <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container">
-                        <svg class="w-5 h-5 overflow-visible ai-sparkle-icon" viewBox="0 0 24 24">
-                            <path class="sparkle-main" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
-                            <path class="sparkle-orbit-path" d="M5.5 2.5L6.34 5.16L9 6L6.34 6.84L5.5 9.5L4.66 6.84L2 6L4.66 5.16L5.5 2.5Z"></path>
-                            <path class="sparkle-orbit-path" d="M19.5 15.5L20.34 18.16L23 19L20.34 19.84L19.5 22.5L18.66 19.84L16 19L18.66 18.16L19.5 15.5Z"></path>
-                        </svg>
-                    </div>
-                </div>`;
-
-            const modal = document.getElementById('chat-modal');
-            const content = document.getElementById('chat-modal-content');
+            const win = document.getElementById('chat-window');
+            const filenameEl = document.getElementById('chat-filename');
+            const wasHidden = win.classList.contains('hidden');
             const decodedName = decodeURIComponent(docName);
-            document.getElementById('chat-modal-filename').textContent = decodedName;
-            modal.classList.remove('hidden');
-            void modal.offsetWidth; 
-            modal.classList.remove('opacity-0');
-            content.classList.remove('scale-95');
+            if (filenameEl) filenameEl.textContent = decodedName;
+
+            win.classList.remove('hidden');
+            if (wasHidden) {
+                const previewWin = document.getElementById('preview-window');
+                if (previewWin && !previewWin.classList.contains('hidden')) {
+                    centerWindow('chat-window', 30, -30);
+                } else {
+                    centerWindow('chat-window', 0, 0);
+                }
+            }
+            bringToFront('chat-window');
         }
 
-        function closeChat() {
-            const modal = document.getElementById('chat-modal');
-            const content = document.getElementById('chat-modal-content');
-            modal.classList.add('opacity-0');
-            content.classList.add('scale-95');
-            setTimeout(() => { modal.classList.add('hidden'); }, 300);
+        function closeChatWindow() {
+            const win = document.getElementById('chat-window');
+            if (win) win.classList.add('hidden');
         }
-
-        document.getElementById('chat-modal').addEventListener('click', function(e) {
-            if (e.target === this) closeChat();
-        });
 
         let loadingAnimInterval = null;
 
@@ -2135,8 +2450,8 @@ async def serve_page(request: Request):
                     </div>
 
                     <div class="flex gap-2">
-                        <!-- Split View Button (Eye Icon) -->
-                        <button onclick="openSplitView('{chunk0_id}', '{safe_filename}')" class="magic-btn flex items-center justify-center p-1.5 rounded-full bg-gray-100 hover:bg-white text-gray-500 hover:text-black focus:outline-none transition-colors" title="Aperçu rapide">
+                        <!-- Preview Button (Eye Icon) -->
+                        <button onclick="openPreviewWindow('{chunk0_id}', '{document_id}', '{safe_filename}')" class="magic-btn flex items-center justify-center p-1.5 rounded-full bg-gray-100 hover:bg-white text-gray-500 hover:text-black focus:outline-none transition-colors" title="Aperçu rapide">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
                         </button>
 
