@@ -272,6 +272,10 @@ HTML_TEMPLATE = """
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         html, body { height: 100%; scrollbar-gutter: stable; overflow: hidden; }
+        body { display: flex; flex-direction: column; }
+
+        #global-header { flex-shrink: 0; }
+        #split-wrapper { flex: 1 1 0%; min-height: 0; }
 
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -367,26 +371,23 @@ HTML_TEMPLATE = """
 
         /* Split pane transitions */
         #split-wrapper {
-            position: relative;
+            display: flex;
+            flex-direction: row;
             width: 100%;
             height: 100%;
             overflow: hidden;
         }
         #left-pane, #right-pane {
-            will-change: transform, width;
-            transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1),
-                        width 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+                        flex 0.45s cubic-bezier(0.4, 0, 0.2, 1);
         }
         #split-resizer {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            transition: opacity 0.3s ease, left 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+            opacity: 0;
+            transition: opacity 0.25s ease;
             z-index: 20;
         }
-        #left-pane.hidden, #right-pane.hidden {
-            width: 0 !important;
-            min-width: 0 !important;
+        #split-resizer.visible {
+            opacity: 1;
         }
 
         .svg-controls {
@@ -591,26 +592,28 @@ HTML_TEMPLATE = """
 </head>
 <body class="bg-white text-gray-900 font-sans antialiased selection:bg-gray-300">
 
+    <!-- Global top bar -->
+    <div id="global-header" class="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200 px-4 sm:px-6 py-3 flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-2">
+            <button id="tab-search" class="nav-tab active" onclick="showPane('search')">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                Recherche
+            </button>
+            <button id="tab-vision" class="nav-tab" onclick="showPane('vision')">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                Vision
+            </button>
+        </div>
+        <button id="close-vision-pane" onclick="closeVisionPane()" class="hidden magic-btn p-2 text-gray-400 hover:text-black rounded-full hover:bg-gray-100 transition-colors focus:outline-none" title="Fermer Vision">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+    </div>
+
     <!-- SPLIT LAYOUT WRAPPER -->
     <div id="split-wrapper" class="flex w-full h-full overflow-hidden bg-white">
 
         <!-- Left Pane: Search & Results -->
-        <div id="left-pane" class="overflow-y-auto" style="position: absolute; left: 0; top: 0; bottom: 0; width: 100%; transform: translateX(0);">
-            <div id="left-header" class="sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-200 px-4 sm:px-6 py-3 flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                    <button id="tab-search" class="nav-tab active" onclick="showPane('split')">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                        Recherche
-                    </button>
-                    <button id="tab-vision" class="nav-tab" onclick="showPane('split')">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                        Vision
-                    </button>
-                </div>
-                <button id="close-search-pane" onclick="closeSearchPane()" class="hidden magic-btn p-2 text-gray-400 hover:text-black rounded-full hover:bg-gray-100 transition-colors focus:outline-none" title="Fermer Recherche">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                </button>
-            </div>
+        <div id="left-pane" class="h-full overflow-y-auto flex-shrink-0" style="width: 100%;">
             <div class="px-4 sm:px-6" id="page-wrapper">
                 <h1 class="font-bold tracking-tight text-center text-black mb-5 sm:mb-8 mt-6">
                     <a href="?" class="interactive-title">
@@ -650,38 +653,25 @@ HTML_TEMPLATE = """
         <div id="split-resizer" class="hidden w-1.5 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 cursor-col-resize z-20 flex-shrink-0 transition-colors"></div>
 
             <!-- Right Pane: Vision / Split View Content -->
-        <div id="right-pane" class="bg-white border-l border-gray-200 overflow-hidden flex flex-col" style="position: absolute; left: 100%; top: 0; bottom: 0; width: 0; transform: translateX(0);">
-            <div id="right-header" class="sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-200 px-4 sm:px-6 py-3 flex items-center justify-between flex-shrink-0">
-                <div class="flex items-center gap-2 vision-nav">
-                    <button id="tab-search-right" class="nav-tab" onclick="showPane('split')">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                        Recherche
+        <div id="right-pane" class="hidden h-full bg-white border-l border-gray-200 overflow-hidden flex-shrink-0 flex flex-col" style="width: 0;">
+            <div class="px-4 sm:px-6 pt-6 pb-2 text-center flex-shrink-0 z-10">
+                <h1 class="font-bold tracking-tight text-center text-black mb-0">
+                    <button type="button" class="interactive-title bg-transparent border-0 p-0" onclick="showVisionHome();" title="Retour à l'accueil Vision">
+                        <span class="title-glow">Vision Sémantique</span>
                     </button>
-                    <button id="tab-vision-right" class="nav-tab active" onclick="showPane('split')">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                        Vision
-                    </button>
-                </div>
-                <button id="close-vision-pane" onclick="closeVisionPane()" class="magic-btn p-2 text-gray-400 hover:text-black rounded-full hover:bg-gray-100 transition-colors focus:outline-none" title="Fermer Vision">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                </button>
+                </h1>
             </div>
             <div class="flex-1 relative overflow-hidden" id="right-pane-content">
                 <template id="vision-empty-template">
-                    <div id="vision-empty" class="h-full flex flex-col items-center justify-center p-8 text-gray-500">
-                    <h1 class="font-bold tracking-tight text-center text-black mb-5 sm:mb-8">
-                        <a href="?" class="interactive-title" onclick="event.preventDefault(); showPane('vision');">
-                            <span class="title-glow">Vision Sémantique</span>
-                        </a>
-                    </h1>
-                    <p class="text-base font-medium mb-6 text-center max-w-md">Importez un fichier (TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML) pour le visualiser sous forme de diagramme.</p>
-                    <label id="vision-drop-zone" class="drop-zone flex flex-col items-center justify-center w-full max-w-md py-10 px-6 cursor-pointer hover:border-gray-400">
-                        <svg class="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-                        <span class="text-sm font-semibold text-gray-700">Glissez-déposez un fichier ici</span>
-                        <span class="text-xs text-gray-400 mt-1">ou cliquez pour parcourir</span>
-                        <input type="file" id="vision-file-input" class="hidden" accept=".ttl,.xml,.xmi,.json,.jsonld,.sql,.txt,.html,.htm,.csv">
-                    </label>
-                </div>
+                    <div id="vision-empty" class="h-full flex flex-col items-center justify-start p-8 pt-2 text-gray-500">
+                        <p class="text-base font-medium mb-6 text-center max-w-md">Importez un fichier (TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML) pour le visualiser sous forme de diagramme.</p>
+                        <label id="vision-drop-zone" class="drop-zone flex flex-col items-center justify-center w-full max-w-md py-10 px-6 cursor-pointer hover:border-gray-400">
+                            <svg class="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                            <span class="text-sm font-semibold text-gray-700">Glissez-déposez un fichier ici</span>
+                            <span class="text-xs text-gray-400 mt-1">ou cliquez pour parcourir</span>
+                            <input type="file" id="vision-file-input" class="hidden" accept=".ttl,.xml,.xmi,.json,.jsonld,.sql,.txt,.html,.htm,.csv">
+                        </label>
+                    </div>
                 </template>
             </div>
         </div>
@@ -748,10 +738,125 @@ HTML_TEMPLATE = """
             loadSvgViewer(`?visualize=${docId}`);
         }
 
+        function showVisionHome() {
+            const content = document.getElementById('right-pane-content');
+            // Reset everything: clear current SVG/home and recreate the empty template in the DOM
+            content.innerHTML = `
+                <template id="vision-empty-template">
+                    <div id="vision-empty" class="h-full flex flex-col items-center justify-start p-8 pt-2 text-gray-500">
+                        <p class="text-base font-medium mb-6 text-center max-w-md">Importez un fichier (TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML) pour le visualiser sous forme de diagramme.</p>
+                        <label id="vision-drop-zone" class="drop-zone flex flex-col items-center justify-center w-full max-w-md py-10 px-6 cursor-pointer hover:border-gray-400">
+                            <svg class="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                            <span class="text-sm font-semibold text-gray-700">Glissez-déposez un fichier ici</span>
+                            <span class="text-xs text-gray-400 mt-1">ou cliquez pour parcourir</span>
+                            <input type="file" id="vision-file-input" class="hidden" accept=".ttl,.xml,.xmi,.json,.jsonld,.sql,.txt,.html,.htm,.csv">
+                        </label>
+                    </div>
+                </template>
+            `;
+            // Render the empty state into the visible content area first
+            const tmpl = document.getElementById('vision-empty-template');
+            if (tmpl) {
+                content.appendChild(tmpl.content.cloneNode(true));
+            }
+            // Then wire events on the freshly created elements
+            bindTitleGlow();
+            bindTagEvents();
+            initVisionImport();
+            _applyPane('vision', true);
+        }
+
+        function _applyPane(pane, skipEnsure) {
+            activePane = pane;
+            const leftPane = document.getElementById('left-pane');
+            const rightPane = document.getElementById('right-pane');
+            const resizer = document.getElementById('split-resizer');
+            const closeVision = document.getElementById('close-vision-pane');
+            const tabSearch = document.getElementById('tab-search');
+            const tabVision = document.getElementById('tab-vision');
+
+            function setVisible(element, visible) {
+                if (!element) return;
+                if (visible) element.classList.remove('hidden');
+                else element.classList.add('hidden');
+            }
+
+            function setActive(element, active) {
+                if (!element) return;
+                if (active) element.classList.add('active');
+                else element.classList.remove('active');
+            }
+
+            function updateResizer(show) {
+                if (!resizer) return;
+                if (show) {
+                    resizer.classList.remove('hidden');
+                    resizer.classList.add('visible');
+                } else {
+                    resizer.classList.remove('visible');
+                    resizer.classList.add('hidden');
+                }
+            }
+
+            if (rightPane) rightPane.style.transition = 'none';
+            if (leftPane) leftPane.style.transition = 'none';
+
+            if (pane === 'search') {
+                leftPane.classList.remove('hidden');
+                leftPane.style.width = '100%';
+                leftPane.style.flex = '1 1 100%';
+                rightPane.classList.add('hidden');
+                rightPane.style.width = '0%';
+                rightPane.style.flex = '0 0 0%';
+                setVisible(closeVision, false);
+                updateResizer(false);
+                setActive(tabSearch, true);
+                setActive(tabVision, false);
+            } else if (pane === 'vision') {
+                leftPane.classList.add('hidden');
+                leftPane.style.width = '0%';
+                leftPane.style.flex = '0 0 0%';
+                rightPane.classList.remove('hidden');
+                rightPane.style.width = '100%';
+                rightPane.style.flex = '1 1 100%';
+                setVisible(closeVision, false);
+                updateResizer(false);
+                setActive(tabSearch, false);
+                setActive(tabVision, true);
+                if (!skipEnsure && !document.getElementById('svg-viewer')) {
+                    ensureVisionContent();
+                }
+            } else if (pane === 'split') {
+                leftPane.classList.remove('hidden');
+                leftPane.style.width = '50%';
+                leftPane.style.flex = '0 0 50%';
+                rightPane.classList.remove('hidden');
+                rightPane.style.width = '50%';
+                rightPane.style.flex = '0 0 50%';
+                setVisible(closeVision, true);
+                updateResizer(true);
+                setActive(tabSearch, true);
+                setActive(tabVision, false);
+                if (!skipEnsure && !document.getElementById('svg-viewer')) {
+                    ensureVisionContent();
+                }
+            }
+
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    if (rightPane) rightPane.style.transition = '';
+                    if (leftPane) leftPane.style.transition = '';
+                });
+            });
+
+            setTimeout(() => {
+                svgClampPan();
+                svgApplyTransform();
+            }, 500);
+        }
+
         function renderSvgViewer(docName) {
             const contentContainer = document.getElementById('right-pane-content');
-            const titleEl = document.getElementById('right-pane-title');
-            if (titleEl && docName) titleEl.textContent = decodeURIComponent(docName);
             contentContainer.innerHTML = `
                 <div id="svg-viewer" class="svg-viewer">
                     <div id="svg-loading" class="absolute inset-0 flex items-center justify-center text-gray-500 z-10">
@@ -769,109 +874,96 @@ HTML_TEMPLATE = """
                     </div>
                 </div>
             `;
+            // Make sure the title is still interactive after replacing content
+            bindTitleGlow();
         }
 
         function showPane(pane) {
+            _applyPane(pane, false);
+        }
+
+        function _applyPane(pane, skipEnsure) {
             activePane = pane;
-            const wrapper = document.getElementById('split-wrapper');
             const leftPane = document.getElementById('left-pane');
             const rightPane = document.getElementById('right-pane');
             const resizer = document.getElementById('split-resizer');
-            const closeSearch = document.getElementById('close-search-pane');
             const closeVision = document.getElementById('close-vision-pane');
-            const tabSearchLeft = document.getElementById('tab-search');
-            const tabVisionLeft = document.getElementById('tab-vision');
-            const tabSearchRight = document.getElementById('tab-search-right');
-            const tabVisionRight = document.getElementById('tab-vision-right');
-            const visionNav = rightPane.querySelector('.vision-nav');
+            const tabSearch = document.getElementById('tab-search');
+            const tabVision = document.getElementById('tab-vision');
 
             function setVisible(element, visible) {
                 if (!element) return;
-                if (visible) {
-                    element.classList.remove('hidden');
-                } else {
-                    element.classList.add('hidden');
-                }
+                if (visible) element.classList.remove('hidden');
+                else element.classList.add('hidden');
             }
 
-            function updateResizer(leftWidth) {
-                if (!resizer || !wrapper) return;
-                if (leftWidth > 0 && leftWidth < 100) {
+            function setActive(element, active) {
+                if (!element) return;
+                if (active) element.classList.add('active');
+                else element.classList.remove('active');
+            }
+
+            function updateResizer(show) {
+                if (!resizer) return;
+                if (show) {
                     resizer.classList.remove('hidden');
-                    resizer.style.left = `calc(${leftWidth}% - ${resizer.offsetWidth / 2}px)`;
+                    resizer.classList.add('visible');
                 } else {
+                    resizer.classList.remove('visible');
                     resizer.classList.add('hidden');
                 }
             }
 
-            // Read current positions before animating
-            const leftW = parseFloat(leftPane.style.width) || 100;
+            if (rightPane) rightPane.style.transition = 'none';
+            if (leftPane) leftPane.style.transition = 'none';
 
             if (pane === 'search') {
-                // Full search: left visible full width, right hidden off-screen to the right
                 leftPane.classList.remove('hidden');
                 leftPane.style.width = '100%';
-                leftPane.style.transform = 'translateX(0)';
+                leftPane.style.flex = '1 1 100%';
                 rightPane.classList.add('hidden');
                 rightPane.style.width = '0%';
-                rightPane.style.transform = 'translateX(0)';
-                setVisible(closeSearch, false);
+                rightPane.style.flex = '0 0 0%';
                 setVisible(closeVision, false);
-                tabSearchLeft.classList.add('active');
-                tabVisionLeft.classList.remove('active');
-                if (tabSearchRight) tabSearchRight.classList.remove('active');
-                if (tabVisionRight) tabVisionRight.classList.add('active');
-                if (visionNav) visionNav.style.display = 'none';
-                updateResizer(100);
+                updateResizer(false);
+                setActive(tabSearch, true);
+                setActive(tabVision, false);
             } else if (pane === 'vision') {
-                // Full vision: left hidden off-screen to the left, right visible full width
                 leftPane.classList.add('hidden');
                 leftPane.style.width = '0%';
-                leftPane.style.transform = 'translateX(-100%)';
+                leftPane.style.flex = '0 0 0%';
                 rightPane.classList.remove('hidden');
                 rightPane.style.width = '100%';
-                rightPane.style.transform = 'translateX(-100%)';
-                setVisible(closeSearch, false);
+                rightPane.style.flex = '1 1 100%';
                 setVisible(closeVision, false);
-                tabSearchLeft.classList.remove('active');
-                tabVisionLeft.classList.add('active');
-                if (tabSearchRight) tabSearchRight.classList.add('active');
-                if (tabVisionRight) tabVisionRight.classList.remove('active');
-                if (visionNav) visionNav.style.display = 'flex';
-                if (!document.getElementById('svg-viewer')) {
+                updateResizer(false);
+                setActive(tabSearch, false);
+                setActive(tabVision, true);
+                if (!skipEnsure && !document.getElementById('svg-viewer')) {
                     ensureVisionContent();
                 }
-                updateResizer(0);
             } else if (pane === 'split') {
-                // Split: both panes visible, each takes half.
-                // When coming from search, the right pane slides in from the right while the left
-                // shrinks. When coming from vision, the left pane slides in from the left while the
-                // right shrinks.
                 leftPane.classList.remove('hidden');
-                rightPane.classList.remove('hidden');
                 leftPane.style.width = '50%';
+                leftPane.style.flex = '0 0 50%';
+                rightPane.classList.remove('hidden');
                 rightPane.style.width = '50%';
-                if (leftW >= 100) {
-                    // Search -> split: left already in place, right enters from the right
-                    leftPane.style.transform = 'translateX(0)';
-                    rightPane.style.transform = 'translateX(-100%)';
-                } else {
-                    // Vision -> split: right already full, left enters from the left
-                    leftPane.style.transform = 'translateX(0)';
-                    rightPane.style.transform = 'translateX(-50%)';
-                }
-                setVisible(closeSearch, true);
+                rightPane.style.flex = '0 0 50%';
                 setVisible(closeVision, true);
-                tabSearchLeft.classList.add('active');
-                tabVisionLeft.classList.remove('active');
-                if (tabSearchRight) tabSearchRight.classList.remove('active');
-                if (tabVisionRight) tabVisionRight.classList.add('active');
-                if (visionNav) visionNav.style.display = 'none';
-                if (!document.getElementById('svg-viewer')) {
+                updateResizer(true);
+                setActive(tabSearch, true);
+                setActive(tabVision, false);
+                if (!skipEnsure && !document.getElementById('svg-viewer')) {
                     ensureVisionContent();
                 }
-                updateResizer(50);
             }
+
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    if (rightPane) rightPane.style.transition = '';
+                    if (leftPane) leftPane.style.transition = '';
+                });
+            });
 
             setTimeout(() => {
                 svgClampPan();
@@ -882,22 +974,21 @@ HTML_TEMPLATE = """
         function ensureVisionContent() {
             const content = document.getElementById('right-pane-content');
             if (!content.querySelector('#svg-viewer') && !content.querySelector('#vision-empty')) {
-                content.innerHTML = document.getElementById('vision-empty-template').innerHTML;
+                const tmpl = document.getElementById('vision-empty-template');
+                if (tmpl) {
+                    content.replaceChildren(tmpl.content.cloneNode(true));
+                }
                 bindTitleGlow();
                 bindTagEvents();
                 initVisionImport();
             }
         }
 
-        function closeSearchPane() {
-            showPane('vision');
-        }
-
         function closeVisionPane() {
             showPane('search');
         }
 
-        // Backwards compatibility: openSplitView from search results opens split.
+        // Backwards compatibility
         function toggleSearchPane() {
             if (activePane === 'split') showPane('vision');
             else showPane('split');
@@ -1178,10 +1269,12 @@ HTML_TEMPLATE = """
         }
 
         resizer.addEventListener('mousedown', (e) => {
+            if (!rightPane) return;
             isResizing = true;
             document.body.style.cursor = 'col-resize';
             // Disable transitions during drag to follow mouse instantly
             rightPane.style.transition = 'none';
+            leftPane.style.transition = 'none';
             e.preventDefault();
         });
 
@@ -1277,13 +1370,16 @@ HTML_TEMPLATE = """
         initVisionImport();
 
         document.addEventListener('mousemove', (e) => {
-            if (!isResizing) return;
+            if (!isResizing || !rightPane || !leftPane) return;
             const totalWidth = window.innerWidth;
             let newWidth = totalWidth - e.clientX;
             // Boundaries
             if (newWidth < 300) newWidth = 300; 
             if (totalWidth - newWidth < 400) newWidth = totalWidth - 400; 
             rightPane.style.width = newWidth + 'px';
+            leftPane.style.width = (totalWidth - newWidth) + 'px';
+            leftPane.style.flex = '0 0 ' + (totalWidth - newWidth) + 'px';
+            rightPane.style.flex = '0 0 ' + newWidth + 'px';
         });
 
         document.addEventListener('mouseup', () => {
@@ -1291,7 +1387,8 @@ HTML_TEMPLATE = """
                 isResizing = false;
                 document.body.style.cursor = '';
                 // Restore transition for close animation
-                rightPane.style.transition = 'width 0.7s cubic-bezier(0.23, 1, 0.32, 1)';
+                rightPane.style.transition = '';
+                leftPane.style.transition = '';
             }
         });
 
