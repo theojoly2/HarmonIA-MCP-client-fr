@@ -1363,23 +1363,24 @@ HTML_TEMPLATE = """
         const SVG_DEFAULT_ZOOM = 1;
 
         function svgApplyTransform() {
-            const canvas = document.querySelector('#svg-viewer .svg-canvas');
-            if (!canvas) return;
+            const canvas = document.getElementById('vision-svg-canvas');
+            if (!canvas) {
+                const fallback = document.querySelector('#svg-viewer .svg-canvas');
+                if (!fallback) return;
+                fallback.style.transform = `translate(${svgViewerState.x}px, ${svgViewerState.y}px) scale(${svgViewerState.scale})`;
+                return;
+            }
             svgClampPan();
             canvas.style.transform = `translate(${svgViewerState.x}px, ${svgViewerState.y}px) scale(${svgViewerState.scale})`;
         }
 
         function svgGetDiagramBounds() {
-            const svg = document.querySelector('#svg-viewer .svg-canvas svg.svg-diagram');
+            const canvas = document.getElementById('vision-svg-canvas') || document.querySelector('#svg-viewer .svg-canvas');
+            const svg = canvas ? canvas.querySelector('svg.svg-diagram') : null;
             if (!svg) return null;
             try {
                 const bbox = svg.getBBox();
-                return {
-                    x: bbox.x,
-                    y: bbox.y,
-                    width: bbox.width,
-                    height: bbox.height
-                };
+                return { x: bbox.x, y: bbox.y, width: bbox.width, height: bbox.height };
             } catch (e) {
                 const width = parseFloat(svg.getAttribute('width')) || 0;
                 const height = parseFloat(svg.getAttribute('height')) || 0;
@@ -1389,11 +1390,15 @@ HTML_TEMPLATE = """
 
         function svgClampPan() {
             const viewer = document.getElementById('svg-viewer');
-            const svg = document.querySelector('#svg-viewer .svg-canvas svg.svg-diagram');
+            const canvas = document.getElementById('vision-svg-canvas') || document.querySelector('#svg-viewer .svg-canvas');
+            const svg = canvas ? canvas.querySelector('svg.svg-diagram') : null;
             if (!viewer || !svg) return;
 
             const viewerRect = viewer.getBoundingClientRect();
-            const bounds = svgGetDiagramBounds();
+            let bounds;
+            try { bounds = svg.getBBox(); } catch (e) {
+                bounds = { x: 0, y: 0, width: parseFloat(svg.getAttribute('width')) || viewerRect.width, height: parseFloat(svg.getAttribute('height')) || viewerRect.height };
+            }
             if (!bounds || !bounds.width || !bounds.height) return;
 
             const maxOverflow = 60;
@@ -1414,13 +1419,8 @@ HTML_TEMPLATE = """
             svgViewerState.y = clampedScreenTop - bounds.y * svgViewerState.scale;
         }
 
-        function svgZoomIn() {
-            svgZoomAt(viewerCenterPoint(), 1.2);
-        }
-
-        function svgZoomOut() {
-            svgZoomAt(viewerCenterPoint(), 1 / 1.2);
-        }
+        function svgZoomIn() { svgZoomAt(viewerCenterPoint(), 1.2); }
+        function svgZoomOut() { svgZoomAt(viewerCenterPoint(), 1 / 1.2); }
 
         function viewerCenterPoint() {
             const viewer = document.getElementById('svg-viewer');
@@ -1445,16 +1445,14 @@ HTML_TEMPLATE = """
 
         function svgCenterDiagram(mainClassName = '') {
             const viewer = document.getElementById('svg-viewer');
-            const canvas = document.querySelector('#svg-viewer .svg-canvas');
+            const canvas = document.getElementById('vision-svg-canvas') || document.querySelector('#svg-viewer .svg-canvas');
             const svg = canvas ? canvas.querySelector('svg.svg-diagram') : null;
             if (!viewer || !canvas || !svg) return;
 
-            const forceRender = svg.getBBox ? svg.getBBox() : null;
-
+            try { svg.getBBox(); } catch (e) {}
             const viewerRect = viewer.getBoundingClientRect();
-            let targetX = 0, targetY = 0, targetWidth = 0, targetHeight = 0;
+            let targetX = 0, targetY = 0, targetWidth = 0, targetHeight = 0, foundMain = false;
 
-            let foundMain = false;
             if (mainClassName) {
                 const allGroups = svg.querySelectorAll('g');
                 for (const ent of allGroups) {
@@ -1463,18 +1461,14 @@ HTML_TEMPLATE = """
                         if (textEl.textContent.trim() === mainClassName) {
                             try {
                                 const bbox = ent.getBBox();
-                                targetX = bbox.x;
-                                targetY = bbox.y;
-                                targetWidth = bbox.width;
-                                targetHeight = bbox.height;
+                                targetX = bbox.x; targetY = bbox.y; targetWidth = bbox.width; targetHeight = bbox.height;
                                 foundMain = true;
                                 break;
-                            } catch (e) { /* ignore */ }
+                            } catch (e) {}
                         }
                     }
                     if (foundMain) break;
                 }
-
                 if (!foundMain) {
                     const texts = svg.querySelectorAll('text');
                     for (const textEl of texts) {
@@ -1482,13 +1476,10 @@ HTML_TEMPLATE = """
                             try {
                                 const parent = textEl.closest('g') || textEl;
                                 const bbox = parent.getBBox();
-                                targetX = bbox.x;
-                                targetY = bbox.y;
-                                targetWidth = bbox.width;
-                                targetHeight = bbox.height;
+                                targetX = bbox.x; targetY = bbox.y; targetWidth = bbox.width; targetHeight = bbox.height;
                                 foundMain = true;
                                 break;
-                            } catch (e) { /* ignore */ }
+                            } catch (e) {}
                         }
                     }
                 }
@@ -1497,10 +1488,7 @@ HTML_TEMPLATE = """
             if (!foundMain) {
                 try {
                     const bbox = svg.getBBox();
-                    targetX = bbox.x;
-                    targetY = bbox.y;
-                    targetWidth = bbox.width;
-                    targetHeight = bbox.height;
+                    targetX = bbox.x; targetY = bbox.y; targetWidth = bbox.width; targetHeight = bbox.height;
                 } catch (e) {
                     targetWidth = parseFloat(svg.getAttribute('width')) || viewerRect.width;
                     targetHeight = parseFloat(svg.getAttribute('height')) || viewerRect.height;
@@ -1509,33 +1497,32 @@ HTML_TEMPLATE = """
 
             if (targetWidth <= 0 || targetHeight <= 0) return;
 
-            const padding = 40;
-            const scaleX = (viewerRect.width - padding * 2) / targetWidth;
-            const scaleY = (viewerRect.height - padding * 2) / targetHeight;
-            // Use the smaller fit-to-screen scale so the whole diagram is visible,
-            // regardless of the default zoom cap. This preserves the previous behavior
-            // where all classes render at a consistent size.
-            svgViewerState.scale = Math.min(SVG_MAX_ZOOM, Math.max(SVG_MIN_ZOOM, Math.min(scaleX, scaleY)));
-
+            // Fixed scale like the floating preview window: classes keep the same
+            // visual size regardless of diagram dimensions, and we simply center it.
+            svgViewerState.scale = SVG_DEFAULT_ZOOM;
             svgViewerState.x = (viewerRect.width / 2) - (targetX + targetWidth / 2) * svgViewerState.scale;
             svgViewerState.y = (viewerRect.height / 2) - (targetY + targetHeight / 2) * svgViewerState.scale;
             svgApplyTransform();
         }
 
+        // Attach SVG viewer events to the Vision panel (dynamically created #svg-viewer)
         function initSvgViewerEvents() {
-            const viewer = document.getElementById('svg-viewer');
-            if (!viewer) return;
+            const content = document.getElementById('right-pane-content');
+            if (!content) return;
 
-            viewer.addEventListener('wheel', function(e) {
-                const canvas = document.querySelector('#svg-viewer .svg-canvas');
-                if (!canvas) return;
+            content.addEventListener('wheel', function(e) {
+                const viewer = document.getElementById('svg-viewer');
+                const canvas = viewer ? viewer.querySelector('.svg-canvas') : null;
+                if (!viewer || !canvas) return;
                 e.preventDefault();
                 const factor = e.deltaY > 0 ? 0.9 : 1.1;
-                const point = { x: e.clientX - viewer.getBoundingClientRect().left, y: e.clientY - viewer.getBoundingClientRect().top };
-                svgZoomAt(point, factor);
+                const rect = viewer.getBoundingClientRect();
+                svgZoomAt({ x: e.clientX - rect.left, y: e.clientY - rect.top }, factor);
             }, { passive: false });
 
-            viewer.addEventListener('mousedown', function(e) {
+            content.addEventListener('mousedown', function(e) {
+                const viewer = document.getElementById('svg-viewer');
+                if (!viewer) return;
                 if (e.target.closest('.svg-controls')) return;
                 svgViewerState.isDragging = true;
                 svgViewerState.lastX = e.clientX;
@@ -1544,7 +1531,8 @@ HTML_TEMPLATE = """
             });
 
             window.addEventListener('mousemove', function(e) {
-                if (!svgViewerState.isDragging) return;
+                const viewer = document.getElementById('svg-viewer');
+                if (!svgViewerState.isDragging || !viewer) return;
                 const dx = e.clientX - svgViewerState.lastX;
                 const dy = e.clientY - svgViewerState.lastY;
                 svgViewerState.lastX = e.clientX;
@@ -1556,9 +1544,10 @@ HTML_TEMPLATE = """
             });
 
             window.addEventListener('mouseup', function() {
+                const viewer = document.getElementById('svg-viewer');
                 if (svgViewerState.isDragging) {
                     svgViewerState.isDragging = false;
-                    viewer.style.cursor = '';
+                    if (viewer) viewer.style.cursor = '';
                     svgClampPan();
                     svgApplyTransform();
                 }
