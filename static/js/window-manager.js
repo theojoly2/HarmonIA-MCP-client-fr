@@ -61,11 +61,13 @@ class WindowManager {
         this.floatingRoot.appendChild(floatWin.win);
         const body = floatWin.body;
         body.dataset.instanceId = instance.instanceId;
+        // Position and force layout so the body has its final size before mounting the app.
+        UiUtils.centerWindow(floatWin.win, offsetX, offsetY);
+        void floatWin.win.offsetHeight;
         instance.mount(body);
         requestAnimationFrame(() => {
             requestAnimationFrame(() => AppState.restoreInstanceState(instance.instanceId));
         });
-        UiUtils.centerWindow(floatWin.win, offsetX, offsetY);
         this.floatWindows.set(instance.instanceId, floatWin);
         this._bringToFront(instance.instanceId);
     }

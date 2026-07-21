@@ -58,21 +58,17 @@ class PreviewApp extends AppBase {
     async _load() {
         const loading = this.container.querySelector('#preview-loading');
         const viewerContainer = this.container.querySelector('#preview-svg-viewer');
-        console.log('[Preview] load start docId=', this.docId, 'documentId=', this.documentId);
         if (!this.docId) {
             if (loading) loading.innerHTML = `<div class="text-red-500 text-sm">Aucun document sélectionné.</div>`;
             return;
         }
         try {
             const url = ApiClient.getDocumentVisualizeUrl(this.docId);
-            console.log('[Preview] fetching', url);
             const res = await fetch(url);
             if (!res.ok) throw new Error(`Preview failed: ${res.status}`);
             this.svgText = await res.text();
-            console.log('[Preview] received', this.svgText.length, 'chars');
             const match = this.svgText.match(/data-main-class="([^"]*)"/);
             const mainClassName = match ? match[1] : '';
-            if (loading) loading.classList.add('hidden');
             if (!this.viewer) {
                 this.viewer = new SvgViewer(viewerContainer, {
                     onTransform: (state) => { this.viewerState = state; }
@@ -82,21 +78,11 @@ class PreviewApp extends AppBase {
             const isFirstOpen = !this.viewerState || (this.viewerState.scale === 1 && this.viewerState.x === 0 && this.viewerState.y === 0);
             if (isFirstOpen) {
                 this.viewer.setSvgAndRestore(this.svgText, mainClassName, null);
-                // Safety fallback: if the diagram is off-screen, reset zoom after a short delay
-                setTimeout(() => {
-                    const rect = viewerContainer.getBoundingClientRect();
-                    const svg = viewerContainer.querySelector('svg.svg-diagram');
-                    if (svg) {
-                        const bbox = svg.getBBox();
-                        const visible = bbox.width > 0 && rect.width > 0 && rect.height > 0;
-                        console.log('[Preview] safety check', { container: rect, bbox });
-                        if (!visible) this.viewer.resetZoom();
-                    }
-                }, 300);
             } else {
                 this.viewer.setSvg(this.svgText, mainClassName);
                 this.viewer.restoreState(this.viewerState);
             }
+            if (loading) loading.classList.add('hidden');
         } catch (err) {
             console.error('Preview load error', err);
             if (loading) loading.innerHTML = `<div class="text-red-500 text-sm">Erreur de chargement du diagramme.</div>`;

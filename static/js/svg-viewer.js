@@ -96,24 +96,11 @@ class SvgViewer {
         if (state) {
             this.restoreState(state);
         } else {
-            this._deferLayout(() => this.centerDiagram(mainClassName));
+            // Wait for the browser to render the SVG and the container to have a size.
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => this.centerDiagram(mainClassName));
+            });
         }
-    }
-
-    _deferLayout(fn, attempts = 0) {
-        const rect = this.container.getBoundingClientRect();
-        const hasSize = rect.width > 0 && rect.height > 0;
-        console.log('[SvgViewer] deferLayout attempt', attempts, 'container size', rect.width, rect.height);
-        if (hasSize) {
-            fn();
-            return;
-        }
-        if (attempts >= 30) {
-            // Fallback: assume a default viewport so the diagram is still centered
-            fn();
-            return;
-        }
-        requestAnimationFrame(() => this._deferLayout(fn, attempts + 1));
     }
 
     restoreState(state) {
@@ -176,13 +163,11 @@ class SvgViewer {
 
     centerDiagram(mainClassName = '') {
         if (!this.svg) return;
-        // Force a layout read so getBBox works reliably on freshly injected SVGs
+        // Force a layout read so getBBox works reliably on freshly injected SVGs.
         try { this.svg.getBBox(); } catch (e) {}
         const rect = this.container.getBoundingClientRect();
-        if (!rect.width || !rect.height) {
-            console.warn('[SvgViewer] centerDiagram skipped: container has no size');
-            return;
-        }
+        const vw = rect.width || 800;
+        const vh = rect.height || 600;
         let target = null;
         if (mainClassName) {
             const texts = this.svg.querySelectorAll('text');
@@ -203,20 +188,16 @@ class SvgViewer {
                 if (viewBox && viewBox.width && viewBox.height) {
                     target = { x: viewBox.x, y: viewBox.y, width: viewBox.width, height: viewBox.height };
                 } else {
-                    const w = parseFloat(this.svg.getAttribute('width')) || rect.width;
-                    const h = parseFloat(this.svg.getAttribute('height')) || rect.height;
+                    const w = parseFloat(this.svg.getAttribute('width')) || vw;
+                    const h = parseFloat(this.svg.getAttribute('height')) || vh;
                     target = { x: 0, y: 0, width: w, height: h };
                 }
             }
         }
-        if (!target || target.width <= 0 || target.height <= 0) {
-            console.warn('[SvgViewer] centerDiagram skipped: no target bounds');
-            return;
-        }
+        if (!target || target.width <= 0 || target.height <= 0) return;
         this.state.scale = 1;
-        this.state.x = (rect.width / 2) - (target.x + target.width / 2) * this.state.scale;
-        this.state.y = (rect.height / 2) - (target.y + target.height / 2) * this.state.scale;
-        console.log('[SvgViewer] centerDiagram', { containerW: rect.width, containerH: rect.height, target, scale: this.state.scale, x: this.state.x, y: this.state.y });
+        this.state.x = (vw / 2) - (target.x + target.width / 2) * this.state.scale;
+        this.state.y = (vh / 2) - (target.y + target.height / 2) * this.state.scale;
         this.applyTransform();
     }
 
