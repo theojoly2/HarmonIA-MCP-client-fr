@@ -40,7 +40,11 @@ class WindowManager {
         container.dataset.instanceId = instance.instanceId;
         this.shellElement.appendChild(container);
         instance.mount(container);
-        AppState.restoreInstanceState(instance.instanceId);
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                AppState.restoreInstanceState(instance.instanceId);
+            });
+        });
     }
 
     _mountFloating(instance, props) {
@@ -58,7 +62,9 @@ class WindowManager {
         const body = floatWin.body;
         body.dataset.instanceId = instance.instanceId;
         instance.mount(body);
-        AppState.restoreInstanceState(instance.instanceId);
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => AppState.restoreInstanceState(instance.instanceId));
+        });
         UiUtils.centerWindow(floatWin.win, offsetX, offsetY);
         this.floatWindows.set(instance.instanceId, floatWin);
         this._bringToFront(instance.instanceId);
@@ -87,7 +93,9 @@ class WindowManager {
         }
         this.splitManager.registerRenderer(instance.instanceId, (pane) => {
             instance.mount(pane);
-            AppState.restoreInstanceState(instance.instanceId);
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => AppState.restoreInstanceState(instance.instanceId));
+            });
         });
         this.splitManager.render();
     }

@@ -101,8 +101,9 @@ class VisionApp extends AppBase {
             this.svgText = await ApiClient.importVisionFile(file);
             const match = this.svgText.match(/data-main-class="([^"]*)"/);
             this.mainClassName = match ? match[1] : '';
+            // Let import UI collapse, then show viewer after transition
             this._updateHomeVisibility();
-            this._showViewer();
+            setTimeout(() => this._showViewer(), 450);
         } catch (err) {
             console.error('Vision import error', err);
             this._showError(err.message);
@@ -112,9 +113,6 @@ class VisionApp extends AppBase {
     }
 
     _showViewer() {
-        const home = this.container.querySelector('#vision-home');
-        const importContainer = this.container.querySelector('#vision-import-container');
-        const viewer = this.container.querySelector('#vision-viewer');
         const viewerContainer = this.container.querySelector('#vision-svg-viewer');
 
         this._updateHomeVisibility();
@@ -143,17 +141,7 @@ class VisionApp extends AppBase {
                 this.viewer.destroy();
                 this.viewer = null;
             }
-            if (home) {
-                home.classList.remove('hidden', 'vision-top');
-            }
-            if (importContainer) {
-                importContainer.classList.remove('vision-import-hidden');
-            }
-            if (viewer) {
-                viewer.classList.add('hidden');
-                viewer.style.opacity = '0';
-                viewer.style.transition = '';
-            }
+            this._updateHomeVisibility();
             this.setTitle(this.constructor.title);
         };
 
@@ -162,7 +150,7 @@ class VisionApp extends AppBase {
             return;
         }
 
-        // Reveal import container first without transition so it expands while wrapper moves down
+        // Keep viewer visible while header moves down; hide it once import UI is fully expanded
         if (importContainer) {
             importContainer.style.transition = 'none';
             importContainer.classList.remove('vision-import-hidden');
@@ -176,12 +164,12 @@ class VisionApp extends AppBase {
         home.classList.remove('vision-top');
         home.style.justifyContent = 'flex-start';
 
-        viewer.style.transition = 'opacity 0.35s ease';
+        viewer.style.transition = 'opacity 0.45s ease';
         viewer.style.opacity = '0';
 
         setTimeout(() => {
             finalizeHome();
-        }, 350);
+        }, 450);
     }
 
     _setLoading(isLoading) {
