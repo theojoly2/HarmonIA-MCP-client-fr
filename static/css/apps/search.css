@@ -1,5 +1,6 @@
 /* === SearchApp styles === */
 .search-app { background: #ffffff; }
+.search-app.home-mode { overflow: hidden; }
 #search-wrapper-inner {
     margin: 0 auto;
     transition: padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 0.55s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.55s cubic-bezier(0.4, 0, 0.2, 1);

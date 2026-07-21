@@ -55,6 +55,7 @@ class SearchApp extends AppBase {
             </div>
         `;
         this._bindEvents();
+        this._updateHomeModeClass();
         this._applyCentering();
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
@@ -66,6 +67,16 @@ class SearchApp extends AppBase {
         });
         if (this.resultsHtml) this._animateResults();
         this._loadTags();
+    }
+
+    _updateHomeModeClass() {
+        const app = this.container.querySelector('.search-app');
+        if (!app) return;
+        if (!this.query && !this.resultsHtml) {
+            app.classList.add('home-mode');
+        } else {
+            app.classList.remove('home-mode');
+        }
     }
 
     _escape(text) {
@@ -96,6 +107,7 @@ class SearchApp extends AppBase {
                         resultsContainer.style.display = '';
                         resultsContainer.style.visibility = '';
                     }
+                    this._updateHomeModeClass();
                     this._applyCentering();
                     this.container.scrollTo({ top: 0, behavior: 'smooth' });
                     this._loadTags();
@@ -119,15 +131,14 @@ class SearchApp extends AppBase {
             e.preventDefault();
             const hasResults = !!(this.resultsHtml && this.resultsHtml.trim().length > 0);
 
-                const triggerSearch = () => {
-                    this.query = input.value.trim();
-                    this.selectedTags = Array.from(tagsContainer.querySelectorAll('input[name="t"]:checked')).map(cb => cb.value);
-                    // Move content up immediately (before/p during the rainbow halo)
-                    this._applyCentering();
-                    this._runSearch();
-                };
+            const triggerSearch = () => {
+                this.query = input.value.trim();
+                this.selectedTags = Array.from(tagsContainer.querySelectorAll('input[name="t"]:checked')).map(cb => cb.value);
+                this._updateHomeModeClass();
+                this._runSearch();
+            };
 
-                const start = () => {
+            const start = () => {
                 if (!hasResults) {
                     triggerSearch();
                     return;
@@ -155,16 +166,9 @@ class SearchApp extends AppBase {
                 }, 600);
                 this.container.addEventListener('scroll', onScroll);
             } else {
-                if (!this.query) {
-                    const wrapper = this.container.querySelector('#search-wrapper-inner');
-                    const onTransition = () => {
-                        wrapper.removeEventListener('transitionend', onTransition);
-                        start();
-                    };
-                    wrapper.addEventListener('transitionend', onTransition);
-                } else {
-                    start();
-                }
+                // Immediate: move up and start search right away
+                this._applyCentering();
+                triggerSearch();
             }
         });
 
@@ -341,12 +345,9 @@ class SearchApp extends AppBase {
         wrapper.style.maxWidth = (vw <= 1440 ? Math.min(690, vw * 0.82) : 768) + 'px';
 
         if (!this.query && !this.resultsHtml) {
-            // Center within the visible content area, accounting for the global header (~56px)
-            const headerHeight = 56;
-            const availableHeight = window.innerHeight - headerHeight;
-            const pad = Math.max(48, (availableHeight - wrapper.offsetHeight) / 2);
-            wrapper.style.paddingTop = pad + 'px';
-            wrapper.style.paddingBottom = pad + 'px';
+            // Match Vision home top offset
+            wrapper.style.paddingTop = '96px';
+            wrapper.style.paddingBottom = '0px';
         } else {
             wrapper.style.paddingTop = '2rem';
             wrapper.style.paddingBottom = '2rem';
