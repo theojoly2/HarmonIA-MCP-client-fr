@@ -25,7 +25,7 @@ class SearchApp extends AppBase {
         this.container = container;
         container.innerHTML = `
             <div class="search-app h-full overflow-y-auto px-4 sm:px-6">
-                <div id="search-wrapper-inner" class="mx-auto">
+                <div id="search-wrapper-inner" class="mx-auto" style="transition: none;">
                     <h1 class="font-bold tracking-tight text-center text-black mb-5 sm:mb-8">
                         <a href="?" class="interactive-title" title="Réinitialiser la recherche">
                             <span class="title-glow">Recherche Sémantique</span>
@@ -55,7 +55,15 @@ class SearchApp extends AppBase {
             </div>
         `;
         this._bindEvents();
-        this._applyCentering(true);
+        this._applyCentering();
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                const wrapper = this.container.querySelector('#search-wrapper-inner');
+                if (wrapper) {
+                    wrapper.style.transition = 'padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 0.55s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.55s cubic-bezier(0.4, 0, 0.2, 1)';
+                }
+            });
+        });
         if (this.resultsHtml) this._animateResults();
         this._loadTags();
     }
@@ -74,14 +82,35 @@ class SearchApp extends AppBase {
         if (titleLink) {
             titleLink.addEventListener('click', (e) => {
                 e.preventDefault();
-                this.query = '';
-                this.resultsHtml = '';
-                this.selectedTags = [];
-                input.value = '';
                 const resultsContainer = this.container.querySelector('#results-container');
-                if (resultsContainer) resultsContainer.innerHTML = '';
-                this._applyCentering();
-                this._loadTags();
+                const hasResults = !!(this.resultsHtml && this.resultsHtml.trim().length > 0);
+
+                const doReset = () => {
+                    this.query = '';
+                    this.resultsHtml = '';
+                    this.selectedTags = [];
+                    input.value = '';
+                    if (resultsContainer) {
+                        resultsContainer.innerHTML = '';
+                        resultsContainer.classList.remove('results-hiding');
+                        resultsContainer.style.display = '';
+                        resultsContainer.style.visibility = '';
+                    }
+                    this._applyCentering();
+                    this._loadTags();
+                };
+
+                if (hasResults) {
+                    this.container.scrollTo({ top: 0, behavior: 'smooth' });
+                    resultsContainer.classList.add('results-hiding');
+                    resultsContainer.addEventListener('animationend', () => {
+                        resultsContainer.style.visibility = 'hidden';
+                        resultsContainer.style.display = 'none';
+                        doReset();
+                    }, { once: true });
+                } else {
+                    doReset();
+                }
             });
         }
 
@@ -300,7 +329,7 @@ class SearchApp extends AppBase {
         });
     }
 
-    _applyCentering(immediate = false) {
+    _applyCentering() {
         const wrapper = this.container.querySelector('#search-wrapper-inner');
         if (!wrapper) return;
 
@@ -309,16 +338,12 @@ class SearchApp extends AppBase {
         wrapper.style.maxWidth = (vw <= 1440 ? Math.min(690, vw * 0.82) : 768) + 'px';
 
         if (!this.query && !this.resultsHtml) {
-            const pad = Math.max(48, (this.container.clientHeight - wrapper.offsetHeight) / 2 - 60);
+            const pad = Math.max(48, (window.innerHeight - wrapper.offsetHeight) / 2 - 60);
             wrapper.style.paddingTop = pad + 'px';
             wrapper.style.paddingBottom = pad + 'px';
         } else {
             wrapper.style.paddingTop = '2rem';
             wrapper.style.paddingBottom = '2rem';
-        }
-
-        if (immediate) {
-            wrapper.style.transition = 'padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 0.55s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.55s cubic-bezier(0.4, 0, 0.2, 1)';
         }
     }
 

@@ -68,16 +68,7 @@ class VisionApp extends AppBase {
         const titleBtn = this.container.querySelector('#vision-home .interactive-title');
 
         if (titleBtn) {
-            titleBtn.addEventListener('click', () => {
-                this.svgText = '';
-                this.fileName = '';
-                this.mainClassName = '';
-                if (this.viewer) {
-                    this.viewer.destroy();
-                    this.viewer = null;
-                }
-                this.render(this.container);
-            });
+            titleBtn.addEventListener('click', () => this._showVisionHome());
         }
 
         if (!dropZone || !fileInput) return;
@@ -137,6 +128,66 @@ class VisionApp extends AppBase {
         }
         this.viewer.setSvg(this.svgText, this.mainClassName);
         this.setTitle(`Vision: ${this.fileName}`);
+    }
+
+    _showVisionHome() {
+        const home = this.container.querySelector('#vision-home');
+        const importContainer = this.container.querySelector('#vision-import-container');
+        const viewer = this.container.querySelector('#vision-viewer');
+
+        if (!home || !viewer || viewer.classList.contains('hidden')) {
+            // Already on home or no viewer: just ensure home state
+            this.svgText = '';
+            this.fileName = '';
+            this.mainClassName = '';
+            if (this.viewer) {
+                this.viewer.destroy();
+                this.viewer = null;
+            }
+            if (home) {
+                home.classList.remove('hidden', 'vision-top');
+            }
+            if (importContainer) {
+                importContainer.classList.remove('vision-import-hidden');
+            }
+            if (viewer) {
+                viewer.style.opacity = '0';
+                viewer.classList.add('hidden');
+            }
+            this.setTitle(this.constructor.title);
+            return;
+        }
+
+        // Reveal import container first without transition so it expands while wrapper moves down
+        if (importContainer) {
+            importContainer.style.transition = 'none';
+            importContainer.classList.remove('vision-import-hidden');
+            importContainer.style.maxHeight = '';
+            importContainer.style.opacity = '1';
+            importContainer.style.transform = '';
+            void importContainer.offsetHeight;
+            importContainer.style.transition = '';
+        }
+
+        home.classList.remove('vision-top');
+        home.style.justifyContent = 'flex-start';
+
+        viewer.style.transition = 'opacity 0.35s ease';
+        viewer.style.opacity = '0';
+
+        setTimeout(() => {
+            this.svgText = '';
+            this.fileName = '';
+            this.mainClassName = '';
+            if (this.viewer) {
+                this.viewer.destroy();
+                this.viewer = null;
+            }
+            viewer.classList.add('hidden');
+            viewer.style.transition = '';
+            viewer.style.opacity = '';
+            this.setTitle(this.constructor.title);
+        }, 350);
     }
 
     _setLoading(isLoading) {
