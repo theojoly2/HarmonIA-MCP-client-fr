@@ -122,14 +122,13 @@ class VisionApp extends AppBase {
                 onTransform: (state) => { this.viewerState = state; }
             });
         }
-        this.viewer.setSvg(this.svgText, this.mainClassName);
-        // Apply saved state *after* setSvg has centered the diagram and the DOM layout is settled
-        if (this.viewerState) {
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    if (this.viewer) this.viewer.restoreState(this.viewerState);
-                });
-            });
+        // First-time import: center diagram. Reopen: restore exact position/zoom.
+        const isFirstImport = !this.viewerState || (this.viewerState.scale === 1 && this.viewerState.x === 0 && this.viewerState.y === 0);
+        if (isFirstImport) {
+            this.viewer.setSvgAndRestore(this.svgText, this.mainClassName, null);
+        } else {
+            this.viewer.setSvg(this.svgText, this.mainClassName);
+            this.viewer.restoreState(this.viewerState);
         }
         this.setTitle(`Vision: ${this.fileName}`);
     }

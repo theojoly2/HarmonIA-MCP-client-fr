@@ -226,6 +226,7 @@ class SearchApp extends AppBase {
             `;
         }).join('');
         tagsContainer.innerHTML = this.tagsHtml;
+        if (window.GlowEffects) window.GlowEffects.scanAndBind();
     }
 
     async _runSearch() {
