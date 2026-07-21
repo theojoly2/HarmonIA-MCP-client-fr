@@ -64,6 +64,9 @@
         });
     });
 
+    // Initialize glow effects
+    GlowEffects.init();
+
     // Initial app: search
     windowManager.open('search', { mode: 'tab' });
 

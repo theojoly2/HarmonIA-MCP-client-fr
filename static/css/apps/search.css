@@ -24,6 +24,10 @@
     white-space: nowrap;
 }
 #submit-btn.loading { background-color: #6b7280; pointer-events: none; }
+@property --glow-size { syntax: "<length>"; initial-value: 0px; inherits: false; }
+@supports not (-webkit-background-clip: text) {
+    .title-glow { color: #111827; }
+}
 .title-glow {
     display: inline-block;
     background-color: #111827;
@@ -36,7 +40,16 @@
     transition: --glow-size 0.3s ease;
 }
 .interactive-title { display: inline-block; position: relative; text-decoration: none; cursor: pointer; }
-.tag-label input:checked ~ span { background-color: #111827; color: white; border-color: #111827; }
+#submit-btn {
+    background-image: radial-gradient(circle var(--glow-size, 0px) at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255,255,255,0.5) 0%, transparent 100%);
+    transition: --glow-size 0.3s ease;
+}
+.magic-btn {
+    position: relative;
+    overflow: hidden;
+    background-image: radial-gradient(circle var(--glow-size, 0px) at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(0,0,0,0.12) 0%, transparent 100%);
+    transition: --glow-size 0.3s ease;
+}
 .tag-label span {
     font-size: 0.875rem;
     padding: 0.5rem 1rem;
@@ -45,7 +58,9 @@
     display: inline-flex;
     align-items: center;
     transition: all 0.2s ease;
+    background-image: radial-gradient(circle var(--glow-size, 0px) at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255,255,255,0.9) 0%, transparent 100%);
 }
+.tag-label input:checked ~ span { background-color: #111827; color: white; border-color: #111827; }
 .tag-label input:not(:checked) ~ span { background-color: #ffffff; color: #374151; }
 .tag-label input:not(:checked) ~ span:hover { border-color: #d1d5db; }
 .icon-unchecked, .icon-checked { display: none; }
