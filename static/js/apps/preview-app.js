@@ -82,6 +82,17 @@ class PreviewApp extends AppBase {
             const isFirstOpen = !this.viewerState || (this.viewerState.scale === 1 && this.viewerState.x === 0 && this.viewerState.y === 0);
             if (isFirstOpen) {
                 this.viewer.setSvgAndRestore(this.svgText, mainClassName, null);
+                // Safety fallback: if the diagram is off-screen, reset zoom after a short delay
+                setTimeout(() => {
+                    const rect = viewerContainer.getBoundingClientRect();
+                    const svg = viewerContainer.querySelector('svg.svg-diagram');
+                    if (svg) {
+                        const bbox = svg.getBBox();
+                        const visible = bbox.width > 0 && rect.width > 0 && rect.height > 0;
+                        console.log('[Preview] safety check', { container: rect, bbox });
+                        if (!visible) this.viewer.resetZoom();
+                    }
+                }, 300);
             } else {
                 this.viewer.setSvg(this.svgText, mainClassName);
                 this.viewer.restoreState(this.viewerState);
