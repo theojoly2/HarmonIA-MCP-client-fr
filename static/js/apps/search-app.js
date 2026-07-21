@@ -131,24 +131,17 @@ class SearchApp extends AppBase {
             e.preventDefault();
             const hasResults = !!(this.resultsHtml && this.resultsHtml.trim().length > 0);
 
-            const triggerSearch = () => {
+            const start = () => {
                 this.query = input.value.trim();
                 this.selectedTags = Array.from(tagsContainer.querySelectorAll('input[name="t"]:checked')).map(cb => cb.value);
                 this._updateHomeModeClass();
+                this._setLoading(true);
+                this._startTimer();
+                // Trigger move-up just after halo and dots button appear (≈200ms)
+                setTimeout(() => {
+                    this._applyCentering();
+                }, 200);
                 this._runSearch();
-            };
-
-            const start = () => {
-                if (!hasResults) {
-                    triggerSearch();
-                    return;
-                }
-                resultsContainer.classList.add('results-hiding');
-                resultsContainer.addEventListener('animationend', () => {
-                    resultsContainer.style.visibility = 'hidden';
-                    resultsContainer.style.display = 'none';
-                    triggerSearch();
-                }, { once: true });
             };
 
             if (hasResults) {
@@ -166,9 +159,7 @@ class SearchApp extends AppBase {
                 }, 600);
                 this.container.addEventListener('scroll', onScroll);
             } else {
-                // Immediate: move up and start search right away
-                this._applyCentering();
-                triggerSearch();
+                start();
             }
         });
 
@@ -230,8 +221,6 @@ class SearchApp extends AppBase {
 
     async _runSearch() {
         if (!this.query) return;
-        this._setLoading(true);
-        this._startTimer();
         try {
             const data = await ApiClient.postSearch(this.query, this.selectedTags, 20);
             this.resultsHtml = data.results_html || '';
@@ -291,7 +280,7 @@ class SearchApp extends AppBase {
                 </span>`;
                 requestAnimationFrame(() => { btn.style.width = targetWidth; });
                 setTimeout(() => { btn.classList.add('loading'); }, 50);
-            }, 150);
+            }, 120);
 
             indicator.classList.add('visible');
         } else {
