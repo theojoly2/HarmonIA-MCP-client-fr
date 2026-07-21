@@ -4,8 +4,13 @@
  */
 
 const ApiClient = (() => {
+    function apiUrl(path) {
+        // Use relative URLs so the app works behind a reverse proxy / sub-path.
+        return `api/${path}`;
+    }
+
     async function postSearch(query, tags = [], limit = 20) {
-        const res = await fetch("/api/search", {
+        const res = await fetch(apiUrl("search"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ q: query, tags, limit }),
@@ -15,23 +20,23 @@ const ApiClient = (() => {
     }
 
     async function getTags() {
-        const res = await fetch("/api/search/tags");
+        const res = await fetch(apiUrl("search/tags"));
         if (!res.ok) throw new Error(`Tags failed: ${res.status}`);
         return res.json();
     }
 
     function getDocumentFileUrl(documentId) {
-        return `/api/documents/${encodeURIComponent(documentId)}/file`;
+        return apiUrl(`documents/${encodeURIComponent(documentId)}/file`);
     }
 
     function getDocumentVisualizeUrl(documentId) {
-        return `/api/documents/${encodeURIComponent(documentId)}/visualize`;
+        return apiUrl(`documents/${encodeURIComponent(documentId)}/visualize`);
     }
 
     async function importVisionFile(file) {
         const formData = new FormData();
         formData.append("file", file);
-        const res = await fetch("/api/vision/import", {
+        const res = await fetch(apiUrl("vision/import"), {
             method: "POST",
             body: formData,
         });
@@ -40,7 +45,7 @@ const ApiClient = (() => {
     }
 
     async function streamChat(documentId, userMessage, history = []) {
-        const res = await fetch("/api/chat/stream", {
+        const res = await fetch(apiUrl("chat/stream"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
