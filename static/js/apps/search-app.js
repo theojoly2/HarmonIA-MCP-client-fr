@@ -97,6 +97,7 @@ class SearchApp extends AppBase {
                         resultsContainer.style.visibility = '';
                     }
                     this._applyCentering();
+                    this.container.scrollTo({ top: 0, behavior: 'smooth' });
                     this._loadTags();
                 };
 
@@ -340,10 +341,10 @@ class SearchApp extends AppBase {
         wrapper.style.maxWidth = (vw <= 1440 ? Math.min(690, vw * 0.82) : 768) + 'px';
 
         if (!this.query && !this.resultsHtml) {
-            // Use window.innerHeight but subtract the global header height (~56px)
+            // Center within the visible content area, accounting for the global header (~56px)
             const headerHeight = 56;
             const availableHeight = window.innerHeight - headerHeight;
-            const pad = Math.max(48, (availableHeight - wrapper.offsetHeight) / 2 - 40);
+            const pad = Math.max(48, (availableHeight - wrapper.offsetHeight) / 2);
             wrapper.style.paddingTop = pad + 'px';
             wrapper.style.paddingBottom = pad + 'px';
         } else {
