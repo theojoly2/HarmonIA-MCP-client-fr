@@ -84,11 +84,14 @@ class SvgViewer {
     }
 
     setSvg(svgText, mainClassName = '') {
+        console.log('[SvgViewer.setSvg] canvas=', this.canvas, 'canvas in DOM=', this.canvas ? this.canvas.isConnected : false);
         this.canvas.innerHTML = svgText
             .replace(/style="background:#000000;"/g, 'style="background:#ffffff;"')
             .replace(/background:#000000/g, 'background:#ffffff')
-            .replace(/<svg/, '<svg class="svg-diagram"');
+            .replace(/\u003csvg/, '\u003csvg class="svg-diagram"');
+        console.log('[SvgViewer.setSvg] innerHTML length=', this.canvas.innerHTML.length, 'first svg tag=', this.canvas.innerHTML.slice(0, 200));
         this.svg = this.canvas.querySelector('svg.svg-diagram');
+        console.log('[SvgViewer.setSvg] this.svg=', this.svg);
     }
 
     setSvgAndRestore(svgText, mainClassName = '', state = null) {
