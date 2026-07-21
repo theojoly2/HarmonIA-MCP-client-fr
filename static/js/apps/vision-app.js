@@ -58,7 +58,10 @@ class VisionApp extends AppBase {
         `;
         this._bindEvents();
         if (this.svgText) {
-            this._showViewer();
+            // Defer viewer creation until container layout is settled
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => this._showViewer());
+            });
         }
     }
 
@@ -127,6 +130,9 @@ class VisionApp extends AppBase {
             });
         }
         this.viewer.setSvg(this.svgText, this.mainClassName);
+        if (this.viewerState) {
+            this.viewer.setState(this.viewerState);
+        }
         this.setTitle(`Vision: ${this.fileName}`);
     }
 
@@ -218,9 +224,6 @@ class VisionApp extends AppBase {
         this.mainClassName = state.mainClassName || '';
         this.viewerState = state.viewerState || { scale: 1, x: 0, y: 0 };
         if (this.container) this.render(this.container);
-        if (this.viewer && this.svgText) {
-            this.viewer.setState(this.viewerState);
-        }
     }
 
     unmount() {

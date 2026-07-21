@@ -33,19 +33,22 @@ class WindowManager {
     }
 
     _mountTab(instance) {
+        AppState.saveInstanceState(instance.instanceId);
         this.shellElement.innerHTML = '';
         const container = document.createElement('div');
         container.className = 'app-container h-full w-full';
         container.dataset.instanceId = instance.instanceId;
         this.shellElement.appendChild(container);
         instance.mount(container);
+        AppState.restoreInstanceState(instance.instanceId);
     }
 
     _mountFloating(instance, props) {
+        AppState.saveInstanceState(instance.instanceId);
         const { width = 800, height = 600, offsetX = 0, offsetY = 0 } = props;
         const floatWin = UiUtils.createFloatingWindow({
             title: instance.getTitle(),
-            icon: instance.constructor.icon,
+            icon: instance.constructor.iconSvg,
             width,
             height,
             onClose: () => this.close(instance.instanceId),
@@ -55,6 +58,7 @@ class WindowManager {
         const body = floatWin.body;
         body.dataset.instanceId = instance.instanceId;
         instance.mount(body);
+        AppState.restoreInstanceState(instance.instanceId);
         UiUtils.centerWindow(floatWin.win, offsetX, offsetY);
         this.floatWindows.set(instance.instanceId, floatWin);
         this._bringToFront(instance.instanceId);
@@ -136,6 +140,7 @@ class WindowManager {
         this._mountTab(instance);
         AppState.setActiveInstance(instanceId);
     }
+
 
     moveToFloat(instanceId, props = {}) {
         const instance = AppState.getInstance(instanceId);
