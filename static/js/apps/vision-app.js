@@ -101,14 +101,15 @@ class VisionApp extends AppBase {
             this.svgText = await ApiClient.importVisionFile(file);
             const match = this.svgText.match(/data-main-class="([^"]*)"/);
             this.mainClassName = match ? match[1] : '';
+            // Hide loading spinner before collapsing import UI / showing viewer
+            this._setLoading(false);
             // Let import UI collapse, then show viewer after transition
             this._updateHomeVisibility();
             setTimeout(() => this._showViewer(), 450);
         } catch (err) {
             console.error('Vision import error', err);
-            this._showError(err.message);
-        } finally {
             this._setLoading(false);
+            this._showError(err.message);
         }
     }
 
@@ -122,8 +123,13 @@ class VisionApp extends AppBase {
             });
         }
         this.viewer.setSvg(this.svgText, this.mainClassName);
+        // Apply saved state *after* setSvg has centered the diagram and the DOM layout is settled
         if (this.viewerState) {
-            this.viewer.setState(this.viewerState);
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    if (this.viewer) this.viewer.restoreState(this.viewerState);
+                });
+            });
         }
         this.setTitle(`Vision: ${this.fileName}`);
     }

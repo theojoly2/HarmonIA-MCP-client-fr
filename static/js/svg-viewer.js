@@ -89,7 +89,15 @@ class SvgViewer {
             .replace(/background:#000000/g, 'background:#ffffff')
             .replace(/<svg/, '<svg class="svg-diagram"');
         this.svg = this.canvas.querySelector('svg.svg-diagram');
+        // Defer centering so the container has its final size; caller can override via setState afterwards.
         requestAnimationFrame(() => requestAnimationFrame(() => this.centerDiagram(mainClassName)));
+    }
+
+    restoreState(state) {
+        this.state.scale = state.scale ?? 1;
+        this.state.x = state.x ?? 0;
+        this.state.y = state.y ?? 0;
+        this.applyTransform();
     }
 
     getState() {
