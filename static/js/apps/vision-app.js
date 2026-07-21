@@ -47,15 +47,15 @@ class VisionApp extends AppBase {
                         </label>
                     </div>
                 </div>
-                <div id="vision-viewer" class="hidden flex-1 min-h-0 opacity-0 transition-opacity duration-300">
+                <div id="vision-viewer" class="hidden flex-1 min-h-0 opacity-0 transition-opacity duration-300 relative">
                     <div id="vision-svg-viewer" class="h-full w-full"></div>
-                </div>
-                <div id="vision-loading" class="hidden absolute inset-0 flex items-center justify-center text-gray-500 z-30">
-                    <svg class="animate-spin h-8 w-8 text-gray-400 mr-3" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <span class="text-sm font-medium">Génération de la modélisation...</span>
+                    <div id="vision-loading" class="hidden absolute inset-0 flex items-center justify-center text-gray-500 z-10 bg-white/80 backdrop-blur-sm transition-opacity duration-300">
+                        <svg class="animate-spin h-8 w-8 text-gray-400 mr-3" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span class="text-sm font-medium">Génération de la modélisation...</span>
+                    </div>
                 </div>
             </div>
         `;
@@ -96,16 +96,13 @@ class VisionApp extends AppBase {
 
     async _handleFile(file) {
         this.fileName = file.name;
-        this._setLoading(true);
+        // Switch to viewer area and show spinner while keeping the import UI visible briefly
+        this._enterLoadingMode();
         try {
             this.svgText = await ApiClient.importVisionFile(file);
             const match = this.svgText.match(/data-main-class="([^"]*)"/);
             this.mainClassName = match ? match[1] : '';
-            // Hide loading spinner before collapsing import UI / showing viewer
-            this._setLoading(false);
-            // Let import UI collapse, then show viewer after transition
-            this._updateHomeVisibility();
-            setTimeout(() => this._showViewer(), 450);
+            this._showViewer();
         } catch (err) {
             console.error('Vision import error', err);
             this._setLoading(false);
@@ -113,10 +110,26 @@ class VisionApp extends AppBase {
         }
     }
 
+    _enterLoadingMode() {
+        const home = this.container.querySelector('#vision-home');
+        const importContainer = this.container.querySelector('#vision-import-container');
+        const viewer = this.container.querySelector('#vision-viewer');
+        if (!home || !importContainer || !viewer) return;
+
+        // Collapse import UI (text + button slide up and fade out)
+        home.classList.add('vision-top');
+        importContainer.classList.add('vision-import-hidden');
+
+        // Reveal the viewer area and show spinner inside it at the same time
+        viewer.classList.remove('hidden');
+        viewer.style.opacity = '1';
+        this._setLoading(true);
+    }
+
     _showViewer() {
         const viewerContainer = this.container.querySelector('#vision-svg-viewer');
+        const viewer = this.container.querySelector('#vision-viewer');
 
-        this._updateHomeVisibility();
         if (!this.viewer) {
             this.viewer = new SvgViewer(viewerContainer, {
                 onTransform: (state) => { this.viewerState = state; }
@@ -130,6 +143,8 @@ class VisionApp extends AppBase {
             this.viewer.setSvg(this.svgText, this.mainClassName);
             this.viewer.restoreState(this.viewerState);
         }
+        this._setLoading(false);
+        if (viewer) viewer.style.opacity = '1';
         this.setTitle(`Vision: ${this.fileName}`);
     }
 

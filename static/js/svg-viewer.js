@@ -96,8 +96,23 @@ class SvgViewer {
         if (state) {
             this.restoreState(state);
         } else {
-            requestAnimationFrame(() => requestAnimationFrame(() => this.centerDiagram(mainClassName)));
+            this._deferLayout(() => this.centerDiagram(mainClassName));
         }
+    }
+
+    _deferLayout(fn, attempts = 0) {
+        const rect = this.container.getBoundingClientRect();
+        const hasSize = rect.width > 0 && rect.height > 0;
+        if (hasSize) {
+            fn();
+            return;
+        }
+        if (attempts >= 30) {
+            // Fallback: center using a minimal safe viewport to avoid off-screen placement
+            fn();
+            return;
+        }
+        requestAnimationFrame(() => this._deferLayout(fn, attempts + 1));
     }
 
     restoreState(state) {
@@ -161,6 +176,7 @@ class SvgViewer {
     centerDiagram(mainClassName = '') {
         if (!this.svg) return;
         const rect = this.container.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
         let target = null;
         if (mainClassName) {
             const texts = this.svg.querySelectorAll('text');
@@ -176,7 +192,16 @@ class SvgViewer {
         }
         if (!target) {
             try { target = this.svg.getBBox(); }
-            catch (e) { target = { x: 0, y: 0, width: rect.width, height: rect.height }; }
+            catch (e) {
+                const viewBox = this.svg.viewBox.baseVal;
+                if (viewBox && viewBox.width && viewBox.height) {
+                    target = { x: viewBox.x, y: viewBox.y, width: viewBox.width, height: viewBox.height };
+                } else {
+                    const w = parseFloat(this.svg.getAttribute('width')) || rect.width;
+                    const h = parseFloat(this.svg.getAttribute('height')) || rect.height;
+                    target = { x: 0, y: 0, width: w, height: h };
+                }
+            }
         }
         if (!target || target.width <= 0 || target.height <= 0) return;
         this.state.scale = 1;

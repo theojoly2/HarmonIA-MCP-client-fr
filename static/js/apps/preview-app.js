@@ -51,11 +51,18 @@ class PreviewApp extends AppBase {
     async _load() {
         const loading = this.container.querySelector('#preview-loading');
         const viewerContainer = this.container.querySelector('#preview-svg-viewer');
+        console.log('[Preview] load start docId=', this.docId, 'documentId=', this.documentId);
+        if (!this.docId) {
+            if (loading) loading.innerHTML = `<div class="text-red-500 text-sm">Aucun document sélectionné.</div>`;
+            return;
+        }
         try {
             const url = ApiClient.getDocumentVisualizeUrl(this.docId);
+            console.log('[Preview] fetching', url);
             const res = await fetch(url);
             if (!res.ok) throw new Error(`Preview failed: ${res.status}`);
             this.svgText = await res.text();
+            console.log('[Preview] received', this.svgText.length, 'chars');
             const match = this.svgText.match(/data-main-class="([^"]*)"/);
             const mainClassName = match ? match[1] : '';
             if (loading) loading.classList.add('hidden');
