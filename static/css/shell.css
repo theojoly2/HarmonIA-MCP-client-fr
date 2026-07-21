@@ -203,19 +203,12 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
 
 .magic-svg { overflow: visible; }
 .ai-sparkle-icon { overflow: visible; }
-.sparkle-main, .sparkle-orbit-path { transform-box: fill-box; fill: currentColor; transform-origin: center; }
+.sparkle-main { transform-box: fill-box; fill: currentColor; transform-origin: center; }
+.sparkle-orbit-path { transform-box: view-box; fill: currentColor; transform-origin: 12px 12px; }
 
 .magic-btn:hover .sparkle-main, .trigger-magic .sparkle-main {
-    animation: sparkleCenterPulse 0.8s ease-in-out, magicColor 0.8s linear;
+    animation: sparkleCenterPulse 0.8s ease-in-out forwards, magicColor 0.8s linear forwards;
 }
 .magic-btn:hover .sparkle-orbit-path, .trigger-magic .sparkle-orbit-path {
-    animation: sparkleOrbit 0.8s ease-in-out, magicColor 0.8s linear;
-}
-
-/* Chat-specific sparkle: must loop while thinking. */
-.ai-avatar-wrapper.trigger-magic .sparkle-main {
-    animation: sparkleCenterPulse 0.8s ease-in-out infinite, magicColor 0.8s linear infinite;
-}
-.ai-avatar-wrapper.trigger-magic .sparkle-orbit-path {
-    animation: sparkleOrbit 0.8s ease-in-out infinite, magicColor 0.8s linear infinite;
+    animation: sparkleOrbit 0.8s ease-in-out forwards, magicColor 0.8s linear forwards;
 }

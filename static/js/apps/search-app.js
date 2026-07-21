@@ -25,8 +25,8 @@ class SearchApp extends AppBase {
         this.container = container;
         container.innerHTML = `
             <div class="search-app h-full overflow-y-auto px-4 sm:px-6">
-                <div id="search-wrapper-inner" class="max-w-3xl mx-auto">
-                    <h1 class="font-bold tracking-tight text-center text-black mb-5 sm:mb-8 mt-6">
+                <div id="search-wrapper-inner" class="mx-auto">
+                    <h1 class="font-bold tracking-tight text-center text-black mb-5 sm:mb-8">
                         <a href="?" class="interactive-title" title="Réinitialiser la recherche">
                             <span class="title-glow">Recherche Sémantique</span>
                         </a>
@@ -304,6 +304,10 @@ class SearchApp extends AppBase {
         const wrapper = this.container.querySelector('#search-wrapper-inner');
         if (!wrapper) return;
 
+        // Match original dynamic max-width logic
+        const vw = this.container.clientWidth;
+        wrapper.style.maxWidth = (vw <= 1440 ? Math.min(690, vw * 0.82) : 768) + 'px';
+
         if (!this.query && !this.resultsHtml) {
             const pad = Math.max(48, (this.container.clientHeight - wrapper.offsetHeight) / 2 - 60);
             wrapper.style.paddingTop = pad + 'px';
@@ -314,7 +318,7 @@ class SearchApp extends AppBase {
         }
 
         if (immediate) {
-            wrapper.style.transition = 'padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 0.55s cubic-bezier(0.4, 0, 0.2, 1)';
+            wrapper.style.transition = 'padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 0.55s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.55s cubic-bezier(0.4, 0, 0.2, 1)';
         }
     }
 
