@@ -36,6 +36,7 @@ class PreviewApp extends AppBase {
                     ${this._escape(this.docName)}
                 </div>
                 <div id="preview-svg-viewer" class="flex-1 relative"></div>
+                <div id="preview-debug" class="hidden absolute bottom-2 left-2 right-2 bg-black/80 text-white text-xs font-mono p-2 rounded z-50 whitespace-pre-wrap" style="max-height:120px;overflow:auto;"></div>
                 <div id="preview-loading" class="absolute inset-0 flex items-center justify-center text-gray-500 z-10">
                     <svg class="animate-spin h-8 w-8 text-gray-400 mr-3" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -58,32 +59,68 @@ class PreviewApp extends AppBase {
     async _load() {
         const loading = this.container.querySelector('#preview-loading');
         const viewerContainer = this.container.querySelector('#preview-svg-viewer');
+        const debug = this.container.querySelector('#preview-debug');
+        const log = (msg) => {
+            console.log(msg);
+            if (debug) {
+                debug.classList.remove('hidden');
+                debug.textContent += msg + '\n';
+            }
+        };
         if (!this.docId) {
+            log('ERR: docId manquant');
             if (loading) loading.innerHTML = `<div class="text-red-500 text-sm">Aucun document sélectionné.</div>`;
             return;
         }
         try {
+            log('docId=' + this.docId);
             const url = ApiClient.getDocumentVisualizeUrl(this.docId);
+            log('fetch ' + url);
             const res = await fetch(url);
+            log('status ' + res.status);
             if (!res.ok) throw new Error(`Preview failed: ${res.status}`);
             this.svgText = await res.text();
+            log('svg chars=' + this.svgText.length);
+            log('svg starts=' + this.svgText.slice(0, 120));
             const match = this.svgText.match(/data-main-class="([^"]*)"/);
             const mainClassName = match ? match[1] : '';
+            log('mainClass=' + mainClassName);
+            log('viewerContainer size=' + JSON.stringify(viewerContainer.getBoundingClientRect()));
             if (!this.viewer) {
                 this.viewer = new SvgViewer(viewerContainer, {
                     onTransform: (state) => { this.viewerState = state; }
                 });
+                log('viewer created');
             }
             // First-time preview: center the diagram. Reopen: keep exact position/zoom.
             const isFirstOpen = !this.viewerState || (this.viewerState.scale === 1 && this.viewerState.x === 0 && this.viewerState.y === 0);
             if (isFirstOpen) {
+                log('first open -> setSvgAndRestore');
                 this.viewer.setSvgAndRestore(this.svgText, mainClassName, null);
             } else {
+                log('restore state');
                 this.viewer.setSvg(this.svgText, mainClassName);
                 this.viewer.restoreState(this.viewerState);
             }
-            if (loading) loading.classList.add('hidden');
+            // Inspect what is actually in the DOM
+            setTimeout(() => {
+                const svg = viewerContainer.querySelector('svg.svg-diagram');
+                const canvas = viewerContainer.querySelector('.svg-canvas');
+                const crect = viewerContainer.getBoundingClientRect();
+                log('after inject svg=' + (svg ? 'oui' : 'NON'));
+                if (svg) {
+                    try {
+                        const bbox = svg.getBBox();
+                        log('svg bbox=' + JSON.stringify({ x: bbox.x, y: bbox.y, w: bbox.width, h: bbox.height }));
+                    } catch (e) { log('getBBox error: ' + e.message); }
+                    log('svg attrs w=' + svg.getAttribute('width') + ' h=' + svg.getAttribute('height') + ' viewBox=' + svg.getAttribute('viewBox'));
+                }
+                log('container rect=' + JSON.stringify(crect));
+                if (canvas) log('canvas transform=' + canvas.style.transform);
+                if (loading) loading.classList.add('hidden');
+            }, 500);
         } catch (err) {
+            log('ERR: ' + err.message);
             console.error('Preview load error', err);
             if (loading) loading.innerHTML = `<div class="text-red-500 text-sm">Erreur de chargement du diagramme.</div>`;
         }
