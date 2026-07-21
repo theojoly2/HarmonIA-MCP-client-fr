@@ -144,8 +144,7 @@ class VisionApp extends AppBase {
         const importContainer = this.container.querySelector('#vision-import-container');
         const viewer = this.container.querySelector('#vision-viewer');
 
-        if (!home || !viewer || viewer.classList.contains('hidden')) {
-            // Already on home or no viewer: just ensure home state
+        const finalizeHome = () => {
             this.svgText = '';
             this.fileName = '';
             this.mainClassName = '';
@@ -165,6 +164,10 @@ class VisionApp extends AppBase {
                 viewer.style.transition = '';
             }
             this.setTitle(this.constructor.title);
+        };
+
+        if (!home || !viewer || viewer.classList.contains('hidden')) {
+            finalizeHome();
             return;
         }
 
@@ -186,17 +189,7 @@ class VisionApp extends AppBase {
         viewer.style.opacity = '0';
 
         setTimeout(() => {
-            this.svgText = '';
-            this.fileName = '';
-            this.mainClassName = '';
-            if (this.viewer) {
-                this.viewer.destroy();
-                this.viewer = null;
-            }
-            viewer.classList.add('hidden');
-            viewer.style.transition = '';
-            viewer.style.opacity = '';
-            this.setTitle(this.constructor.title);
+            finalizeHome();
         }, 350);
     }
 

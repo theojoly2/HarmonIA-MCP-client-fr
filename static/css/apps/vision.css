@@ -36,6 +36,7 @@
     max-height: 0;
     margin-bottom: 0;
     pointer-events: none;
+    overflow: hidden;
     transition: opacity 0.45s ease, transform 0.45s ease, max-height 0.45s ease;
 }
 
