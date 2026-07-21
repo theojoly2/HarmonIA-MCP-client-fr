@@ -35,6 +35,19 @@ MCP_SERVER_URL = "http://127.0.0.1:8001/mcp"
 
 app = FastAPI(title="Recherche Sémantique")
 
+# Launch PlantUML native binary auto-installation in the background.
+# This is non-blocking: the server starts immediately and visualisations
+# will use web PlantUML servers / native SVG fallback until the binary is ready.
+try:
+    from data_model_utils.plantuml_installer import start_background_install
+
+    _plantuml_install_thread = start_background_install()
+except Exception as _plantuml_install_exc:
+    print(
+        f"[PlantUML] Could not start auto-installation: {_plantuml_install_exc}",
+        flush=True,
+    )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

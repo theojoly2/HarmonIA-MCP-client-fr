@@ -1,14 +1,31 @@
 from typing import Any
 from io import BytesIO
 import json
+import logging
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 from collections import defaultdict
 from pathlib import Path
 import plantuml
 from plantuml import PlantUML, PlantUMLConnectionError
+
+from .plantuml_installer import get_binary_path
+
+_logger = logging.getLogger(__name__)
+
+
+def _print_render_source(source: str) -> None:
+    """Print the rendering source used by PlantUML to the terminal."""
+    if os.environ.get("PLANTUML_RENDER_LOG", "true").lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    ):
+        print(f"[PlantUML] Rendering with {source}", flush=True)
 
 
 class FixedPlantUMLHTTPError(PlantUMLConnectionError):
@@ -343,17 +360,18 @@ def get_image_bytes(
         print("\nPLANTUML:")
         print(plantuml_text)
 
-    # 1. Use the bundled native PlantUML binary first (no external dependency).
+    # 1. Use the auto-downloaded native PlantUML binary if it is ready.
     # 2. Fall back to local PlantUML servers.
     # 3. Fall back to the public PlantUML server.
     # 4. Final fallback: a lightweight native SVG renderer.
     last_error = None
 
-    # Try bundled native PlantUML binary first
+    # Try auto-downloaded native PlantUML binary first
     try:
         return _render_with_native_plantuml(plantuml_text)
     except Exception as native_error:
         last_error = native_error
+        _logger.info("[PlantUML] Native renderer unavailable: %s", native_error)
 
     # Try network servers
     plantuml_servers = [
@@ -365,36 +383,45 @@ def get_image_bytes(
         try:
             server = PlantUML(url=server_url)
             image_bytes = server.processes(plantuml_text)
+            _print_render_source(f"PlantUML server: {server_url}")
             return BytesIO(image_bytes)
         except Exception as e:
             last_error = e
+            _logger.info("[PlantUML] Server %s failed: %s", server_url, e)
             continue
 
     # Final fallback native SVG renderer (works fully offline).
     try:
-        return _render_native_svg(elements, connectors)
+        svg = _render_native_svg(elements, connectors)
+        _print_render_source("native SVG fallback (offline)")
+        return svg
     except Exception as fallback_error:
         raise RuntimeError(
             f"PlantUML rendering failed: {last_error}. Native SVG fallback also failed: {fallback_error}. "
-            "Check that the native PlantUML binary is present in data_model_utils/native-plantuml-linux-amd64/ "
-            "or that a PlantUML server is reachable at http://127.0.0.1:8080/svg/ or http://www.plantuml.com/plantuml/svg/"
+            "Check that a PlantUML server is reachable at http://127.0.0.1:8080/svg/ "
+            "or http://www.plantuml.com/plantuml/svg/"
         ) from last_error
 
 
 def _render_with_native_plantuml(plantuml_text: str) -> BytesIO:
     """
-    Invoke the bundled native PlantUML binary to convert PlantUML source to SVG.
-    Requires the native-plantuml-linux-amd64 directory next to this module.
+    Invoke the auto-downloaded native PlantUML binary to convert PlantUML source to SVG.
+    The binary is downloaded in the background by ``plantuml_installer``; if it is not
+    ready yet, this function raises an exception so that the caller can fall back to
+    PlantUML servers or to the native SVG renderer.
     """
-    module_dir = Path(__file__).resolve().parent
-    binary_dir = module_dir / "native-plantuml-linux-amd64"
-    binary = binary_dir / "plantuml"
+    binary = get_binary_path()
+    if not binary:
+        raise FileNotFoundError("Native PlantUML binary is not yet installed.")
 
-    if not binary.exists():
-        raise FileNotFoundError(f"Native PlantUML binary not found: {binary}")
+    binary_path = Path(binary)
+    if not binary_path.exists():
+        raise FileNotFoundError(f"Native PlantUML binary not found: {binary_path}")
 
-    if not os.access(binary, os.X_OK):
-        binary.chmod(binary.stat().st_mode | 0o111)
+    if not os.access(binary_path, os.X_OK):
+        binary_path.chmod(binary_path.stat().st_mode | 0o111)
+
+    binary_dir = binary_path.resolve().parent
 
     with tempfile.TemporaryDirectory() as tmpdir:
         input_path = Path(tmpdir) / "input.puml"
@@ -402,10 +429,11 @@ def _render_with_native_plantuml(plantuml_text: str) -> BytesIO:
         input_path.write_text(plantuml_text, encoding="utf-8")
 
         env = os.environ.copy()
+        # GraalVM native images may need their bundled libraries next to the binary.
         env["LD_LIBRARY_PATH"] = str(binary_dir)
 
         cmd = [
-            str(binary),
+            str(binary_path),
             "-tsvg",
             "-o", str(tmpdir),
             str(input_path),
@@ -427,6 +455,7 @@ def _render_with_native_plantuml(plantuml_text: str) -> BytesIO:
         if len(svg_bytes) < 100:
             raise RuntimeError("Native PlantUML generated an empty or invalid SVG")
 
+        _print_render_source(f"native binary: {binary_path}")
         return BytesIO(svg_bytes)
 
 
