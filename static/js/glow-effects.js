@@ -17,7 +17,7 @@ const GlowEffects = (() => {
         // Tag labels: the span is the target (must come before closest checks)
         const tagLabel = element.closest('.tag-label');
         if (tagLabel) {
-            const span = tagLabel.querySelector('span');
+            const span = tagLabel.querySelector('.tag-glow');
             if (span) return span;
         }
 
@@ -42,7 +42,7 @@ const GlowEffects = (() => {
     function getGlowSize(target) {
         if (target.id === 'submit-btn') return '30px';
         if (target.classList.contains('title-glow')) return '55px';
-        if (target.closest('.tag-label')) return '30px';
+        if (target.classList.contains('tag-glow') || target.closest('.tag-label')) return '30px';
         if (target.classList.contains('chat-send-btn')) return '30px';
         return '40px';
     }

@@ -81,20 +81,28 @@ h1 .title-glow { font-size: clamp(1.25rem, 2.5vw, 2.25rem); }
     transition: all 0.2s ease;
 }
 
+.tag-label span {
+    background-image: radial-gradient(circle var(--glow-size, 0px) at var(--mouse-x, 50%) var(--mouse-y, 50%), transparent 0%, transparent 100%);
+}
+
 .tag-label input:not(:checked) ~ span {
     background-color: #ffffff;
     color: #374151;
-    background-image: radial-gradient(circle var(--glow-size, 0px) at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(0,0,0,0.15) 0%, transparent 100%);
     transition: --glow-size 0.25s ease, background-color 0.2s ease, border-color 0.2s ease;
 }
-.tag-label input:not(:checked) ~ span:hover { border-color: #d1d5db; }
+.tag-label input:not(:checked) ~ span:hover {
+    border-color: #d1d5db;
+    background-image: radial-gradient(circle var(--glow-size, 0px) at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(0,0,0,0.15) 0%, transparent 100%);
+}
 
 .tag-label input:checked ~ span {
     background-color: #111827;
     color: white;
     border-color: #111827;
-    background-image: radial-gradient(circle var(--glow-size, 0px) at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255,255,255,0.6) 0%, transparent 100%);
     transition: --glow-size 0.25s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+.tag-label input:checked ~ span:hover {
+    background-image: radial-gradient(circle var(--glow-size, 0px) at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255,255,255,0.6) 0%, transparent 100%);
 }
 
 .result-item { opacity: 0; }
