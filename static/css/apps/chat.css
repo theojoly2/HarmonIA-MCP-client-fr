@@ -1,10 +1,26 @@
 /* === ChatApp styles === */
 .chat-app { background: #ffffff; }
 .user-msg-anchor { scroll-margin-top: 2px; }
-@property --glow-size { syntax: "<length>"; initial-value: 0px; inherits: false; }
 .chat-send-btn {
     position: relative;
     overflow: hidden;
     background-image: radial-gradient(circle var(--glow-size, 0px) at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255,255,255,0.5) 0%, transparent 100%);
     transition: --glow-size 0.3s ease;
+}
+
+.sparkle-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.3s ease, height 0.3s ease, margin 0.3s ease;
+}
+.sparkle-container.hidden {
+    opacity: 0;
+    pointer-events: none;
+    height: 0;
+    margin: 0;
+}
+
+.thinking-label {
+    animation: textPulse 1.5s ease-in-out infinite;
 }

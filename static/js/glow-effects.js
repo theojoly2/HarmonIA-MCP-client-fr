@@ -1,6 +1,6 @@
 /**
  * GlowEffects
- * Réimplémentation de l'effet de glow radial qui suit la souris.
+ * Réimplémentation fidèle de l'effet de glow radial qui suit la souris.
  * Gère .title-glow, .magic-btn, #submit-btn, .chat-send-btn, et les tags.
  */
 
@@ -33,6 +33,14 @@ const GlowEffects = (() => {
         return null;
     }
 
+    function getGlowSize(target) {
+        if (target.id === 'submit-btn') return '30px';
+        if (target.classList.contains('title-glow')) return '55px';
+        if (target.closest('.tag-label')) return '30px';
+        if (target.classList.contains('chat-send-btn')) return '30px';
+        return '40px';
+    }
+
     function init() {
         if (initialized) return;
         initialized = true;
@@ -44,13 +52,7 @@ const GlowEffects = (() => {
 
         document.addEventListener('mouseenter', (e) => {
             const target = findGlowTarget(e.target);
-            if (!target) return;
-            const size = target.id === 'submit-btn' ? '30px'
-                : target.classList.contains('title-glow') ? '55px'
-                : target.closest('.tag-label') ? '30px'
-                : target.classList.contains('chat-send-btn') ? '30px'
-                : '40px';
-            target.style.setProperty('--glow-size', size);
+            if (target) target.style.setProperty('--glow-size', getGlowSize(target));
         }, true);
 
         document.addEventListener('mouseleave', (e) => {

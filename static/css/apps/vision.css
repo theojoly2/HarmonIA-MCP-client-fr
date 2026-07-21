@@ -6,7 +6,19 @@
     transition: all 0.5s ease;
     flex: 1;
 }
-.vision-home.hidden { display: none; }
+.vision-top {
+    justify-content: flex-start;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+.vision-import-hidden {
+    opacity: 0;
+    transform: translateY(-20px);
+    max-height: 0;
+    margin-bottom: 0;
+    pointer-events: none;
+    transition: opacity 0.45s ease, transform 0.45s ease, max-height 0.45s ease;
+}
 .drop-zone {
     border: 2px dashed #d1d5db;
     border-radius: 1.5rem;

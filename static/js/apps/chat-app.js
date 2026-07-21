@@ -79,6 +79,17 @@ class ChatApp extends AppBase {
     _bindEvents() {
         const form = this.container.querySelector('#ai-chat-form');
         const input = this.container.querySelector('#ai-chat-input');
+        const messagesContainer = this.container.querySelector('#chat-messages');
+        let autoScrollEnabled = true;
+
+        if (messagesContainer) {
+            messagesContainer.addEventListener('scroll', () => {
+                autoScrollEnabled = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < 60;
+            });
+        }
+
+        this._autoScrollEnabled = () => autoScrollEnabled;
+
         form.addEventListener('submit', (e) => {
             e.preventDefault();
             const text = input.value.trim();
@@ -96,12 +107,23 @@ class ChatApp extends AppBase {
         const messagesContainer = this.container.querySelector('#chat-messages');
         const historySnapshot = this.history.slice();
         let fullResponse = '';
+        let displayedText = '';
+        let streamBuffer = '';
+
+        // Hide all existing sparkle containers (original behavior)
+        this.container.querySelectorAll('.sparkle-container').forEach(container => {
+            container.classList.remove('trigger-magic');
+            container.style.transition = 'opacity 0.3s ease, height 0.3s ease, margin 0.3s ease';
+            container.style.opacity = '0';
+            setTimeout(() => { container.style.display = 'none'; }, 300);
+        });
 
         messagesContainer.insertAdjacentHTML('beforeend', `
             <div class="flex items-end justify-end mb-8 user-msg-anchor">
                 <div class="bg-gray-50 border border-gray-100 text-gray-900 px-5 py-3.5 rounded-[1.5rem] text-sm max-w-[80%] leading-relaxed">${this._escape(text)}</div>
             </div>
         `);
+        const userMsgEl = messagesContainer.lastElementChild;
 
         const loadingId = 'loading-' + Date.now();
         messagesContainer.insertAdjacentHTML('beforeend', `
@@ -116,6 +138,18 @@ class ChatApp extends AppBase {
             </div>
         `);
 
+        requestAnimationFrame(() => {
+            const loadingEl = messagesContainer.querySelector(`#${loadingId}`);
+            if (loadingEl && userMsgEl) {
+                const visibleBlockHeight = (loadingEl.offsetTop + loadingEl.offsetHeight) - userMsgEl.offsetTop;
+                const remaining = Math.max(0, messagesContainer.clientHeight - visibleBlockHeight - 20);
+                messagesContainer.style.paddingBottom = remaining + 'px';
+                requestAnimationFrame(() => {
+                    userMsgEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                });
+            }
+        });
+
         const messageContent = messagesContainer.querySelector(`#${loadingId} .message-content`);
         const thinkingLabel = messagesContainer.querySelector(`#${loadingId} .thinking-label`);
 
@@ -128,6 +162,22 @@ class ChatApp extends AppBase {
             }
         }, 1200);
 
+        const typewriterInterval = setInterval(() => {
+            if (streamBuffer.length > 0) {
+                const chunkSize = Math.min(1 + Math.floor(Math.random() * 4), streamBuffer.length);
+                displayedText += streamBuffer.slice(0, chunkSize);
+                streamBuffer = streamBuffer.slice(chunkSize);
+                if (messageContent) messageContent.innerHTML = marked.parse(displayedText);
+
+                const loadingEl = messagesContainer.querySelector(`#${loadingId}`);
+                if (loadingEl && userMsgEl && this._autoScrollEnabled && this._autoScrollEnabled()) {
+                    const visibleBlockHeight = (loadingEl.offsetTop + loadingEl.offsetHeight) - userMsgEl.offsetTop;
+                    const remaining = Math.max(0, messagesContainer.clientHeight - visibleBlockHeight - 20);
+                    messagesContainer.style.paddingBottom = remaining + 'px';
+                }
+            }
+        }, 20);
+
         try {
             const reader = await ApiClient.streamChat(this.documentId, text, historySnapshot);
             const decoder = new TextDecoder('utf-8');
@@ -138,22 +188,42 @@ class ChatApp extends AppBase {
                 const chunk = decoder.decode(value, { stream: true });
                 if (chunk) {
                     fullResponse += chunk;
+                    streamBuffer += chunk;
                     if (!first) {
                         first = true;
                         if (thinkingLabel) thinkingLabel.remove();
                     }
-                    if (messageContent) messageContent.innerHTML = marked.parse(fullResponse);
-                    this._scrollToBottom(messagesContainer);
                 }
             }
+
+            await new Promise(resolve => {
+                const checkDrain = setInterval(() => {
+                    if (streamBuffer.length === 0) {
+                        clearInterval(checkDrain);
+                        resolve();
+                    }
+                }, 30);
+            });
+
+            clearInterval(typewriterInterval);
         } catch (err) {
             console.error('Chat stream error', err);
+            clearInterval(typewriterInterval);
             if (messageContent) messageContent.innerHTML += `<br><em>Erreur : ${err.message}</em>`;
         } finally {
             if (this.loadingAnimInterval) clearInterval(this.loadingAnimInterval);
             this.history.push({ role: 'user', content: text });
             this.history.push({ role: 'assistant', content: fullResponse });
             this._syncMessagesHtml(messagesContainer.innerHTML);
+
+            requestAnimationFrame(() => {
+                const loadingEl = messagesContainer.querySelector(`#${loadingId}`);
+                if (loadingEl && userMsgEl && this._autoScrollEnabled && this._autoScrollEnabled()) {
+                    const visibleBlockHeight = (loadingEl.offsetTop + loadingEl.offsetHeight) - userMsgEl.offsetTop;
+                    const remaining = Math.max(0, messagesContainer.clientHeight - visibleBlockHeight - 20);
+                    messagesContainer.style.paddingBottom = remaining + 'px';
+                }
+            });
         }
     }
 

@@ -4,6 +4,12 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
 #app-shell { display: flex; flex-direction: column; height: 100vh; width: 100vw; }
 #shell-content { flex: 1; min-height: 0; }
 
+/* === CSS custom properties === */
+@property --angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+@property --mouse-x { syntax: "<length>"; initial-value: 0px; inherits: false; }
+@property --mouse-y { syntax: "<length>"; initial-value: 0px; inherits: false; }
+@property --glow-size { syntax: "<length>"; initial-value: 0px; inherits: false; }
+
 /* === Tabs === */
 .nav-tab {
     display: inline-flex;
@@ -122,8 +128,10 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
     box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     cursor: pointer;
     line-height: 1;
+    transition: all 0.15s ease;
 }
 .svg-ctrl-btn:hover { background: #f9fafb; border-color: #d1d5db; transform: translateY(-1px); }
+.svg-ctrl-btn:active { transform: translateY(0); }
 
 /* === Common utilities === */
 .markdown-body { color: #1f2937; }
@@ -150,36 +158,56 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
 
 /* === Animations === */
 @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-.result-item { opacity: 0; }
-.result-item.visible { animation: fadeSlideUp 0.35s ease forwards; }
-
+@keyframes fadeSlideDown { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(8px); } }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes textPulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+@keyframes btnOut { to { opacity: 0; transform: scale(0.85); } }
+@keyframes btnIn { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
+@keyframes blink { 0%, 80%, 100% { opacity: 0; } 40% { opacity: 1; } }
 @keyframes spin-halo { to { --angle: 360deg; } }
-@property --angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
-.search-wrapper.loading::before {
-    content: '';
-    position: absolute;
-    inset: -6px;
-    border-radius: 9999px;
-    filter: blur(6px);
-    z-index: -1;
-    background: conic-gradient(from var(--angle), rgba(244,114,182,0.35), rgba(129,140,248,0.35), rgba(56,189,248,0.35), rgba(52,211,153,0.35), rgba(251,191,36,0.35), rgba(244,114,182,0.35));
-    animation: spin-halo 3s linear infinite;
-    opacity: 1;
+
+/* --- Animations Magie --- */
+@keyframes sparkleCenterPulse {
+    0%   { transform: scale(1) rotate(0deg); }
+    20%  { transform: scale(0.75) rotate(10deg); }
+    50%  { transform: scale(1.35) rotate(-15deg); }
+    75%  { transform: scale(0.9) rotate(5deg); }
+    100% { transform: scale(1) rotate(0deg); }
 }
 
-.dot-btn { animation: blink 1.4s infinite both; line-height: 1; color: rgba(255,255,255,0.45); }
-.dot-btn:nth-child(2) { animation-delay: 0.2s; }
-.dot-btn:nth-child(3) { animation-delay: 0.4s; }
-@keyframes blink { 0%, 80%, 100% { opacity: 0; } 40% { opacity: 1; } }
+@keyframes sparkleOrbit {
+    0%   { transform: rotate(0deg) scale(1); }
+    15%  { transform: rotate(-25deg) scale(0.8); }
+    50%  { transform: rotate(190deg) scale(1.4); }
+    75%  { transform: rotate(165deg) scale(0.9); }
+    100% { transform: rotate(180deg) scale(1); }
+}
 
-#loading-indicator { display: none; }
-#loading-indicator.visible { display: flex; align-items: baseline; justify-content: center; gap: 0.5rem; }
+@keyframes magicColor {
+    0%   { fill: currentColor; }
+    20%  { fill: #f472b6; }
+    40%  { fill: #fbbf24; }
+    60%  { fill: #34d399; }
+    80%  { fill: #818cf8; }
+    100% { fill: currentColor; }
+}
 
-/* === Sparkle icons === */
+/* === Magic buttons global styles === */
+.magic-btn {
+    position: relative;
+    overflow: hidden;
+    background-image: radial-gradient(circle var(--glow-size, 0px) at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(0,0,0,0.1) 0%, transparent 100%);
+    transition: background-color 0.2s, transform 0.1s, --glow-size 0.25s ease;
+}
+.magic-btn:active { transform: scale(0.95); }
+
+.magic-svg { overflow: visible; }
 .ai-sparkle-icon { overflow: visible; }
 .sparkle-main, .sparkle-orbit-path { transform-box: fill-box; fill: currentColor; transform-origin: center; }
-.trigger-magic .sparkle-main { animation: sparkleCenterPulse 0.8s ease-in-out forwards, magicColor 0.8s linear forwards; }
-.trigger-magic .sparkle-orbit-path { animation: sparkleOrbit 0.8s ease-in-out forwards, magicColor 0.8s linear forwards; }
-@keyframes sparkleCenterPulse { 0% { transform: scale(1) rotate(0deg); } 20% { transform: scale(0.75) rotate(10deg); } 50% { transform: scale(1.35) rotate(-15deg); } 75% { transform: scale(0.9) rotate(5deg); } 100% { transform: scale(1) rotate(0deg); } }
-@keyframes sparkleOrbit { 0% { transform: rotate(0deg) scale(1); } 15% { transform: rotate(-25deg) scale(0.8); } 50% { transform: rotate(190deg) scale(1.4); } 75% { transform: rotate(165deg) scale(0.9); } 100% { transform: rotate(180deg) scale(1); } }
-@keyframes magicColor { 0% { fill: currentColor; } 20% { fill: #f472b6; } 40% { fill: #fbbf24; } 60% { fill: #34d399; } 80% { fill: #818cf8; } 100% { fill: currentColor; } }
+
+.magic-btn:hover .sparkle-main, .trigger-magic .sparkle-main {
+    animation: sparkleCenterPulse 0.8s ease-in-out forwards, magicColor 0.8s linear forwards;
+}
+.magic-btn:hover .sparkle-orbit-path, .trigger-magic .sparkle-orbit-path {
+    animation: sparkleOrbit 0.8s ease-in-out forwards, magicColor 0.8s linear forwards;
+}

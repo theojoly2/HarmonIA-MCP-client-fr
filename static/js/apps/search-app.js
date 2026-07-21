@@ -25,7 +25,7 @@ class SearchApp extends AppBase {
         this.container = container;
         container.innerHTML = `
             <div class="search-app h-full overflow-y-auto px-4 sm:px-6">
-                <div id="search-wrapper-inner" class="max-w-3xl mx-auto transition-all">
+                <div id="search-wrapper-inner" class="max-w-3xl mx-auto">
                     <h1 class="font-bold tracking-tight text-center text-black mb-5 sm:mb-8 mt-6">
                         <span class="title-glow interactive-title">Recherche Sémantique</span>
                     </h1>
@@ -66,12 +66,57 @@ class SearchApp extends AppBase {
         const form = this.container.querySelector('#search-form');
         const input = this.container.querySelector('#search-input');
         const tagsContainer = this.container.querySelector('#tags-container');
+        const resultsContainer = this.container.querySelector('#results-container');
 
         form.addEventListener('submit', (e) => {
             e.preventDefault();
-            this.query = input.value.trim();
-            this.selectedTags = Array.from(tagsContainer.querySelectorAll('input[name="t"]:checked')).map(cb => cb.value);
-            this._runSearch();
+            const hasResults = !!(this.resultsHtml && this.resultsHtml.trim().length > 0);
+
+            const triggerSearch = () => {
+                this.query = input.value.trim();
+                this.selectedTags = Array.from(tagsContainer.querySelectorAll('input[name="t"]:checked')).map(cb => cb.value);
+                this._runSearch();
+            };
+
+            const start = () => {
+                if (!hasResults) {
+                    triggerSearch();
+                    return;
+                }
+                resultsContainer.classList.add('results-hiding');
+                resultsContainer.addEventListener('animationend', () => {
+                    resultsContainer.style.visibility = 'hidden';
+                    resultsContainer.style.display = 'none';
+                    triggerSearch();
+                }, { once: true });
+            };
+
+            if (hasResults) {
+                this.container.scrollTo({ top: 0, behavior: 'smooth' });
+                const onScroll = () => {
+                    if (this.container.scrollTop <= 5) {
+                        this.container.removeEventListener('scroll', onScroll);
+                        clearTimeout(fallback);
+                        start();
+                    }
+                };
+                const fallback = setTimeout(() => {
+                    this.container.removeEventListener('scroll', onScroll);
+                    start();
+                }, 600);
+                this.container.addEventListener('scroll', onScroll);
+            } else {
+                if (!this.query) {
+                    const wrapper = this.container.querySelector('#search-wrapper-inner');
+                    const onTransition = () => {
+                        wrapper.removeEventListener('transitionend', onTransition);
+                        start();
+                    };
+                    wrapper.addEventListener('transitionend', onTransition);
+                } else {
+                    start();
+                }
+            }
         });
 
         tagsContainer.addEventListener('change', (e) => {
@@ -80,8 +125,8 @@ class SearchApp extends AppBase {
             }
         });
 
-        const resultsContainer = this.container.querySelector('#results-container');
-        resultsContainer.addEventListener('click', (e) => {
+        const resultsContainerClick = this.container.querySelector('#results-container');
+        resultsContainerClick.addEventListener('click', (e) => {
             const btn = e.target.closest('[data-action]');
             if (!btn) return;
             const action = btn.dataset.action;
@@ -173,13 +218,42 @@ class SearchApp extends AppBase {
         if (isLoading) {
             wrapper.classList.add('loading');
             btn.disabled = true;
-            btn.innerHTML = `<span class="btn-label"><span class="dot-btn">.</span><span class="dot-btn">.</span><span class="dot-btn">.</span></span>`;
+            btn.style.setProperty('--glow-size', '0px');
+            btn.innerHTML = '<span class="btn-label leaving">Chercher</span>';
+
+            // Measure the target width of the dots label
+            const ghost = btn.cloneNode(false);
+            ghost.style.cssText = 'position:absolute;visibility:hidden;width:auto;pointer-events:none;';
+            ghost.innerHTML = '<span class="btn-label"><span class="dot-btn">.</span><span class="dot-btn">.</span><span class="dot-btn">.</span></span>';
+            document.body.appendChild(ghost);
+            const targetWidth = ghost.offsetWidth + 'px';
+            document.body.removeChild(ghost);
+
+            btn.style.width = btn.offsetWidth + 'px';
+            setTimeout(() => {
+                btn.innerHTML = `<span class="btn-label">
+                    <span class="dot-btn">.</span>
+                    <span class="dot-btn">.</span>
+                    <span class="dot-btn">.</span>
+                </span>`;
+                requestAnimationFrame(() => { btn.style.width = targetWidth; });
+                setTimeout(() => { btn.classList.add('loading'); }, 50);
+            }, 150);
+
             indicator.classList.add('visible');
         } else {
             wrapper.classList.remove('loading');
+            btn.classList.remove('loading');
             btn.disabled = false;
+            btn.style.width = 'auto';
             btn.innerHTML = '<span class="btn-label">Chercher</span>';
             indicator.classList.remove('visible');
+            const resultsContainer = this.container.querySelector('#results-container');
+            if (resultsContainer) {
+                resultsContainer.classList.remove('results-hiding');
+                resultsContainer.style.display = '';
+                resultsContainer.style.visibility = '';
+            }
         }
     }
 
@@ -212,14 +286,20 @@ class SearchApp extends AppBase {
     _applyCentering() {
         const wrapper = this.container.querySelector('#search-wrapper-inner');
         if (!wrapper) return;
+        wrapper.style.transition = 'none';
         if (!this.query && !this.resultsHtml) {
-            const pad = Math.max(48, (window.innerHeight - wrapper.offsetHeight) / 2 - 60);
+            const pad = Math.max(48, (this.container.clientHeight - wrapper.offsetHeight) / 2 - 60);
             wrapper.style.paddingTop = pad + 'px';
             wrapper.style.paddingBottom = pad + 'px';
         } else {
             wrapper.style.paddingTop = '2rem';
             wrapper.style.paddingBottom = '2rem';
         }
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                wrapper.style.transition = 'padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 0.55s cubic-bezier(0.4, 0, 0.2, 1)';
+            });
+        });
     }
 
     getState() {

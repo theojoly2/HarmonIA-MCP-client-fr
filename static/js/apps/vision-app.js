@@ -42,7 +42,7 @@ class VisionApp extends AppBase {
                         </label>
                     </div>
                 </div>
-                <div id="vision-viewer" class="hidden absolute inset-0">
+                <div id="vision-viewer" class="hidden absolute inset-0 opacity-0 transition-opacity duration-300">
                     <div id="vision-svg-viewer" class="h-full w-full"></div>
                 </div>
                 <div id="vision-loading" class="hidden absolute inset-0 flex items-center justify-center text-gray-500 z-30">
@@ -98,17 +98,31 @@ class VisionApp extends AppBase {
 
     _showViewer() {
         const home = this.container.querySelector('#vision-home');
+        const importContainer = this.container.querySelector('#vision-import-container');
         const viewer = this.container.querySelector('#vision-viewer');
         const viewerContainer = this.container.querySelector('#vision-svg-viewer');
-        if (home) home.classList.add('hidden');
-        if (viewer) viewer.classList.remove('hidden');
-        if (!this.viewer) {
-            this.viewer = new SvgViewer(viewerContainer, {
-                onTransform: (state) => { this.viewerState = state; }
-            });
+
+        if (home) {
+            home.classList.add('vision-top');
         }
-        this.viewer.setSvg(this.svgText, this.mainClassName);
-        this.setTitle(`Vision: ${this.fileName}`);
+        if (importContainer) {
+            importContainer.classList.add('vision-import-hidden');
+        }
+
+        setTimeout(() => {
+            if (home) home.classList.add('hidden');
+            if (viewer) {
+                viewer.classList.remove('hidden');
+                requestAnimationFrame(() => { viewer.style.opacity = '1'; });
+            }
+            if (!this.viewer) {
+                this.viewer = new SvgViewer(viewerContainer, {
+                    onTransform: (state) => { this.viewerState = state; }
+                });
+            }
+            this.viewer.setSvg(this.svgText, this.mainClassName);
+            this.setTitle(`Vision: ${this.fileName}`);
+        }, 450);
     }
 
     _setLoading(isLoading) {
