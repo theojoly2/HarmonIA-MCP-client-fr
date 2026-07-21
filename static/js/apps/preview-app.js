@@ -64,8 +64,14 @@ class PreviewApp extends AppBase {
                     onTransform: (state) => { this.viewerState = state; }
                 });
             }
-            this.viewer.setSvg(this.svgText, mainClassName);
-            if (Object.keys(this.viewerState).length) this.viewer.setState(this.viewerState);
+            // First-time preview: center the diagram. Reopen: keep exact position/zoom.
+            const isFirstOpen = !this.viewerState || (this.viewerState.scale === 1 && this.viewerState.x === 0 && this.viewerState.y === 0);
+            if (isFirstOpen) {
+                this.viewer.setSvgAndRestore(this.svgText, mainClassName, null);
+            } else {
+                this.viewer.setSvg(this.svgText, mainClassName);
+                this.viewer.restoreState(this.viewerState);
+            }
         } catch (err) {
             console.error('Preview load error', err);
             if (loading) loading.innerHTML = `<div class="text-red-500 text-sm">Erreur de chargement du diagramme.</div>`;

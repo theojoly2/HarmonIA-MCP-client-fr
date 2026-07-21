@@ -119,7 +119,7 @@ const UiUtils = (() => {
             <div class="window-body flex-1 relative overflow-hidden"></div>
             <div class="resize-handle"></div>
         `;
-        document.body.appendChild(win);
+        // Caller is responsible for appending the window to the desired container.
         const header = win.querySelector('.window-header');
         const closeBtn = win.querySelector('.window-close');
         const handle = win.querySelector('.resize-handle');
