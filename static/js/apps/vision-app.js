@@ -6,7 +6,7 @@
 class VisionApp extends AppBase {
     static id = "vision";
     static title = "Vision";
-    static icon = "👁";
+    static iconSvg = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>`;
     static canFloat = true;
     static canSplit = true;
     static singleton = false;
@@ -26,7 +26,9 @@ class VisionApp extends AppBase {
             <div class="vision-app h-full flex flex-col relative">
                 <div id="vision-home" class="vision-home px-4 sm:px-6 flex flex-col items-center text-center z-20 bg-white">
                     <h1 class="font-bold tracking-tight text-center text-black mb-2 mt-2">
-                        <span class="title-glow interactive-title">Vision Sémantique</span>
+                        <button type="button" class="interactive-title bg-transparent border-0 p-0" title="Retour à l'accueil Vision">
+                            <span class="title-glow">Vision Sémantique</span>
+                        </button>
                     </h1>
                     <div id="vision-import-container" class="w-full max-w-md">
                         <p class="text-base font-medium mb-6 text-center max-w-md mx-auto text-gray-500">
@@ -42,7 +44,7 @@ class VisionApp extends AppBase {
                         </label>
                     </div>
                 </div>
-                <div id="vision-viewer" class="hidden absolute inset-0 opacity-0 transition-opacity duration-300">
+                <div id="vision-viewer" class="hidden flex-1 min-h-0 opacity-0 transition-opacity duration-300">
                     <div id="vision-svg-viewer" class="h-full w-full"></div>
                 </div>
                 <div id="vision-loading" class="hidden absolute inset-0 flex items-center justify-center text-gray-500 z-30">
@@ -63,6 +65,21 @@ class VisionApp extends AppBase {
     _bindEvents() {
         const dropZone = this.container.querySelector('#vision-drop-zone');
         const fileInput = this.container.querySelector('#vision-file-input');
+        const titleBtn = this.container.querySelector('#vision-home .interactive-title');
+
+        if (titleBtn) {
+            titleBtn.addEventListener('click', () => {
+                this.svgText = '';
+                this.fileName = '';
+                this.mainClassName = '';
+                if (this.viewer) {
+                    this.viewer.destroy();
+                    this.viewer = null;
+                }
+                this.render(this.container);
+            });
+        }
+
         if (!dropZone || !fileInput) return;
 
         const prevent = (e) => { e.preventDefault(); e.stopPropagation(); };
@@ -103,26 +120,23 @@ class VisionApp extends AppBase {
         const viewerContainer = this.container.querySelector('#vision-svg-viewer');
 
         if (home) {
+            home.classList.remove('hidden');
             home.classList.add('vision-top');
         }
         if (importContainer) {
             importContainer.classList.add('vision-import-hidden');
         }
-
-        setTimeout(() => {
-            if (home) home.classList.add('hidden');
-            if (viewer) {
-                viewer.classList.remove('hidden');
-                requestAnimationFrame(() => { viewer.style.opacity = '1'; });
-            }
-            if (!this.viewer) {
-                this.viewer = new SvgViewer(viewerContainer, {
-                    onTransform: (state) => { this.viewerState = state; }
-                });
-            }
-            this.viewer.setSvg(this.svgText, this.mainClassName);
-            this.setTitle(`Vision: ${this.fileName}`);
-        }, 450);
+        if (viewer) {
+            viewer.classList.remove('hidden');
+            requestAnimationFrame(() => { viewer.style.opacity = '1'; });
+        }
+        if (!this.viewer) {
+            this.viewer = new SvgViewer(viewerContainer, {
+                onTransform: (state) => { this.viewerState = state; }
+            });
+        }
+        this.viewer.setSvg(this.svgText, this.mainClassName);
+        this.setTitle(`Vision: ${this.fileName}`);
     }
 
     _setLoading(isLoading) {

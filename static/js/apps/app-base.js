@@ -6,7 +6,7 @@
 class AppBase {
     static id = "base";
     static title = "App";
-    static icon = "";
+    static iconSvg = "";
     static canFloat = true;
     static canSplit = true;
     static singleton = false;

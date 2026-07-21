@@ -13,17 +13,22 @@ const GlowEffects = (() => {
         element.style.setProperty('--mouse-y', `${clientY - rect.top}px`);
     }
 
-    function findGlowTarget(element) {
-        // Title glow: the glow is inside .interactive-title
+    function getGlowTarget(element) {
+        // Direct glow classes first (fast path)
+        if (element.classList.contains('magic-btn')) return element;
+        if (element.classList.contains('chat-send-btn')) return element;
+        if (element.id === 'submit-btn') return element;
+
+        // Title glow: the glow element itself
+        if (element.classList.contains('title-glow')) return element;
+
+        // If hovering inside an interactive-title but not on the glow span itself
         const interactiveTitle = element.closest('.interactive-title');
         if (interactiveTitle) {
             const glow = interactiveTitle.querySelector('.title-glow');
             if (glow) return glow;
         }
-        // Direct glow classes
-        if (element.classList.contains('magic-btn')) return element;
-        if (element.classList.contains('chat-send-btn')) return element;
-        if (element.id === 'submit-btn') return element;
+
         // Tag labels: the span is the target
         const tagLabel = element.closest('.tag-label');
         if (tagLabel) {
@@ -41,27 +46,35 @@ const GlowEffects = (() => {
         return '40px';
     }
 
+    function bindDynamicElement(el) {
+        if (el.dataset.glowBound) return;
+        el.dataset.glowBound = '1';
+        el.addEventListener('mousemove', (e) => updateGlow(el, e.clientX, e.clientY));
+        el.addEventListener('mouseenter', () => el.style.setProperty('--glow-size', getGlowSize(el)));
+        el.addEventListener('mouseleave', () => el.style.setProperty('--glow-size', '0px'));
+    }
+
+    function scanAndBind() {
+        document.querySelectorAll('.interactive-title, .title-glow, #submit-btn, .magic-btn, .chat-send-btn, .tag-label').forEach(el => {
+            bindDynamicElement(el);
+        });
+    }
+
     function init() {
         if (initialized) return;
         initialized = true;
 
-        document.addEventListener('mousemove', (e) => {
-            const target = findGlowTarget(e.target);
-            if (target) updateGlow(target, e.clientX, e.clientY);
+        // Bind existing elements immediately
+        scanAndBind();
+
+        // Watch for new elements added to the DOM (dynamic re-renders)
+        const observer = new MutationObserver(() => {
+            scanAndBind();
         });
-
-        document.addEventListener('mouseenter', (e) => {
-            const target = findGlowTarget(e.target);
-            if (target) target.style.setProperty('--glow-size', getGlowSize(target));
-        }, true);
-
-        document.addEventListener('mouseleave', (e) => {
-            const target = findGlowTarget(e.target);
-            if (target) target.style.setProperty('--glow-size', '0px');
-        }, true);
+        observer.observe(document.body, { childList: true, subtree: true });
     }
 
-    return { init };
+    return { init, scanAndBind };
 })();
 
 window.GlowEffects = GlowEffects;

@@ -6,7 +6,7 @@
 class SearchApp extends AppBase {
     static id = "search";
     static title = "Recherche";
-    static icon = "🔍";
+    static iconSvg = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>`;
     static canFloat = true;
     static canSplit = true;
     static singleton = true;
@@ -27,7 +27,9 @@ class SearchApp extends AppBase {
             <div class="search-app h-full overflow-y-auto px-4 sm:px-6">
                 <div id="search-wrapper-inner" class="max-w-3xl mx-auto">
                     <h1 class="font-bold tracking-tight text-center text-black mb-5 sm:mb-8 mt-6">
-                        <span class="title-glow interactive-title">Recherche Sémantique</span>
+                        <a href="?" class="interactive-title" title="Réinitialiser la recherche">
+                            <span class="title-glow">Recherche Sémantique</span>
+                        </a>
                     </h1>
                     <form id="search-form" class="mb-4">
                         <div class="search-wrapper" id="search-wrapper">
@@ -67,6 +69,21 @@ class SearchApp extends AppBase {
         const input = this.container.querySelector('#search-input');
         const tagsContainer = this.container.querySelector('#tags-container');
         const resultsContainer = this.container.querySelector('#results-container');
+
+        const titleLink = this.container.querySelector('h1 a.interactive-title');
+        if (titleLink) {
+            titleLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.query = '';
+                this.resultsHtml = '';
+                this.selectedTags = [];
+                input.value = '';
+                const resultsContainer = this.container.querySelector('#results-container');
+                if (resultsContainer) resultsContainer.innerHTML = '';
+                this._applyCentering();
+                this._loadTags();
+            });
+        }
 
         form.addEventListener('submit', (e) => {
             e.preventDefault();
