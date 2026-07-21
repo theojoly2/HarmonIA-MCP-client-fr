@@ -118,13 +118,15 @@ class SearchApp extends AppBase {
             e.preventDefault();
             const hasResults = !!(this.resultsHtml && this.resultsHtml.trim().length > 0);
 
-            const triggerSearch = () => {
-                this.query = input.value.trim();
-                this.selectedTags = Array.from(tagsContainer.querySelectorAll('input[name="t"]:checked')).map(cb => cb.value);
-                this._runSearch();
-            };
+                const triggerSearch = () => {
+                    this.query = input.value.trim();
+                    this.selectedTags = Array.from(tagsContainer.querySelectorAll('input[name="t"]:checked')).map(cb => cb.value);
+                    // Move content up immediately (before/p during the rainbow halo)
+                    this._applyCentering();
+                    this._runSearch();
+                };
 
-            const start = () => {
+                const start = () => {
                 if (!hasResults) {
                     triggerSearch();
                     return;
@@ -338,7 +340,10 @@ class SearchApp extends AppBase {
         wrapper.style.maxWidth = (vw <= 1440 ? Math.min(690, vw * 0.82) : 768) + 'px';
 
         if (!this.query && !this.resultsHtml) {
-            const pad = Math.max(48, (window.innerHeight - wrapper.offsetHeight) / 2 - 60);
+            // Use window.innerHeight but subtract the global header height (~56px)
+            const headerHeight = 56;
+            const availableHeight = window.innerHeight - headerHeight;
+            const pad = Math.max(48, (availableHeight - wrapper.offsetHeight) / 2 - 40);
             wrapper.style.paddingTop = pad + 'px';
             wrapper.style.paddingBottom = pad + 'px';
         } else {
