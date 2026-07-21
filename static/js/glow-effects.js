@@ -14,13 +14,6 @@ const GlowEffects = (() => {
     }
 
     function getGlowTarget(element) {
-        // Tag labels: the span is the target (must come before closest checks)
-        const tagLabel = element.closest('.tag-label');
-        if (tagLabel) {
-            const span = tagLabel.querySelector('.tag-glow');
-            if (span) return span;
-        }
-
         // Direct glow classes first
         if (element.classList.contains('magic-btn')) return element;
         if (element.classList.contains('chat-send-btn')) return element;
@@ -36,28 +29,42 @@ const GlowEffects = (() => {
             if (glow) return glow;
         }
 
+        // Tag labels: the span is the target (events are attached to the label)
+        const tagLabel = element.closest('.tag-label');
+        if (tagLabel) {
+            const span = tagLabel.querySelector('span');
+            if (span) return span;
+        }
+
         return null;
     }
 
     function getGlowSize(target) {
         if (target.id === 'submit-btn') return '30px';
         if (target.classList.contains('title-glow')) return '55px';
-        if (target.classList.contains('tag-glow') || target.closest('.tag-label')) return '30px';
+        if (target.closest('.tag-label')) return '30px';
         if (target.classList.contains('chat-send-btn')) return '30px';
         return '40px';
     }
 
-    function bindDynamicElement(el) {
+    function bindDynamicElement(el, targetOverride = null) {
         if (el.dataset.glowBound) return;
         el.dataset.glowBound = '1';
-        el.addEventListener('mousemove', (e) => updateGlow(el, e.clientX, e.clientY));
-        el.addEventListener('mouseenter', () => el.style.setProperty('--glow-size', getGlowSize(el)));
-        el.addEventListener('mouseleave', () => el.style.setProperty('--glow-size', '0px'));
+        const target = targetOverride || el;
+        el.addEventListener('mousemove', (e) => updateGlow(target, e.clientX, e.clientY));
+        el.addEventListener('mouseenter', () => target.style.setProperty('--glow-size', getGlowSize(target)));
+        el.addEventListener('mouseleave', () => target.style.setProperty('--glow-size', '0px'));
     }
 
     function scanAndBind() {
-        document.querySelectorAll('.interactive-title, .title-glow, #submit-btn, .magic-btn, .chat-send-btn, .tag-label').forEach(el => {
+        document.querySelectorAll('.interactive-title, .title-glow, #submit-btn, .magic-btn, .chat-send-btn').forEach(el => {
             bindDynamicElement(el);
+        });
+        // Tags: attach listeners to the label, but update the span's CSS variables
+        document.querySelectorAll('.tag-label').forEach(label => {
+            const span = label.querySelector('span');
+            if (!span) return;
+            bindDynamicElement(label, span);
         });
     }
 
