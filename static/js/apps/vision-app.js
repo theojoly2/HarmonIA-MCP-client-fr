@@ -101,6 +101,7 @@ class VisionApp extends AppBase {
             this.svgText = await ApiClient.importVisionFile(file);
             const match = this.svgText.match(/data-main-class="([^"]*)"/);
             this.mainClassName = match ? match[1] : '';
+            this._updateHomeVisibility();
             this._showViewer();
         } catch (err) {
             console.error('Vision import error', err);
@@ -116,17 +117,7 @@ class VisionApp extends AppBase {
         const viewer = this.container.querySelector('#vision-viewer');
         const viewerContainer = this.container.querySelector('#vision-svg-viewer');
 
-        if (home) {
-            home.classList.remove('hidden');
-            home.classList.add('vision-top');
-        }
-        if (importContainer) {
-            importContainer.classList.add('vision-import-hidden');
-        }
-        if (viewer) {
-            viewer.classList.remove('hidden');
-            requestAnimationFrame(() => { viewer.style.opacity = '1'; });
-        }
+        this._updateHomeVisibility();
         if (!this.viewer) {
             this.viewer = new SvgViewer(viewerContainer, {
                 onTransform: (state) => { this.viewerState = state; }
@@ -220,7 +211,33 @@ class VisionApp extends AppBase {
         this.svgText = state.svgText || '';
         this.mainClassName = state.mainClassName || '';
         this.viewerState = state.viewerState || { scale: 1, x: 0, y: 0 };
-        if (this.container) this.render(this.container);
+        if (this.container) {
+            this.render(this.container);
+            this._updateHomeVisibility();
+        }
+    }
+
+    _updateHomeVisibility() {
+        const home = this.container.querySelector('#vision-home');
+        const importContainer = this.container.querySelector('#vision-import-container');
+        const viewer = this.container.querySelector('#vision-viewer');
+        if (!home || !importContainer || !viewer) return;
+
+        if (this.svgText) {
+            // Viewer mode: compact header, hidden import UI
+            home.classList.add('vision-top');
+            importContainer.classList.add('vision-import-hidden');
+            viewer.classList.remove('hidden');
+            viewer.style.opacity = '1';
+            viewer.style.transition = '';
+        } else {
+            // Home mode: show import UI, hide viewer
+            home.classList.remove('vision-top');
+            importContainer.classList.remove('vision-import-hidden');
+            viewer.classList.add('hidden');
+            viewer.style.opacity = '0';
+            viewer.style.transition = '';
+        }
     }
 
     unmount() {
