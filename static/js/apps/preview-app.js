@@ -22,6 +22,13 @@ class PreviewApp extends AppBase {
     }
 
     render(container) {
+        // Any previous viewer is tied to a DOM container that will be replaced;
+        // discard the reference so a fresh viewer is created for the new container.
+        if (this.viewer) {
+            this.viewerState = this.viewer.getState();
+            this.viewer.destroy();
+            this.viewer = null;
+        }
         this.container = container;
         container.innerHTML = `
             <div class="preview-app h-full w-full flex flex-col relative bg-white">
