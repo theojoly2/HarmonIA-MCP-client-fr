@@ -55,7 +55,7 @@ class SearchApp extends AppBase {
             </div>
         `;
         this._bindEvents();
-        this._applyCentering();
+        this._applyCentering(true);
         if (this.resultsHtml) this._animateResults();
         this._loadTags();
     }
@@ -300,10 +300,10 @@ class SearchApp extends AppBase {
         });
     }
 
-    _applyCentering() {
+    _applyCentering(immediate = false) {
         const wrapper = this.container.querySelector('#search-wrapper-inner');
         if (!wrapper) return;
-        wrapper.style.transition = 'none';
+
         if (!this.query && !this.resultsHtml) {
             const pad = Math.max(48, (this.container.clientHeight - wrapper.offsetHeight) / 2 - 60);
             wrapper.style.paddingTop = pad + 'px';
@@ -312,11 +312,10 @@ class SearchApp extends AppBase {
             wrapper.style.paddingTop = '2rem';
             wrapper.style.paddingBottom = '2rem';
         }
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                wrapper.style.transition = 'padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 0.55s cubic-bezier(0.4, 0, 0.2, 1)';
-            });
-        });
+
+        if (immediate) {
+            wrapper.style.transition = 'padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 0.55s cubic-bezier(0.4, 0, 0.2, 1)';
+        }
     }
 
     getState() {
