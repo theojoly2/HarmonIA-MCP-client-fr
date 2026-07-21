@@ -135,12 +135,21 @@ class SearchApp extends AppBase {
                 this.query = input.value.trim();
                 this.selectedTags = Array.from(tagsContainer.querySelectorAll('input[name="t"]:checked')).map(cb => cb.value);
                 this._updateHomeModeClass();
+
+                // Clear previous results immediately as soon as loading starts
+                if (resultsContainer) {
+                    resultsContainer.innerHTML = '';
+                    resultsContainer.classList.remove('results-hiding');
+                    resultsContainer.style.display = '';
+                    resultsContainer.style.visibility = '';
+                }
+
                 this._setLoading(true);
                 this._startTimer();
-                // Trigger move-up just after halo and dots button appear (≈200ms)
-                setTimeout(() => {
-                    this._applyCentering();
-                }, 200);
+                // Start move up while halo appears, so both run together (60ms frame)
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => this._applyCentering());
+                });
                 this._runSearch();
             };
 
@@ -206,9 +215,9 @@ class SearchApp extends AppBase {
             const tagName = (typeof t === 'object' ? t.tag : t) || '';
             const isChecked = this.selectedTags.includes(tagName) ? 'checked' : '';
             return `
-                <label class="cursor-pointer select-none tag-label">
+                <label class="cursor-pointer select-none tag-label" title="${tagName}">
                     <input type="checkbox" name="t" value="${tagName}" class="peer hidden" ${isChecked}>
-                    <span class="inline-flex items-center rounded-full font-bold border-2 border-gray-200 text-gray-700 peer-checked:bg-black peer-checked:text-white peer-checked:border-black hover:border-gray-400 transition-colors">
+                    <span class="inline-flex items-center rounded-full font-bold border-2 border-gray-200 text-gray-700 peer-checked:bg-black peer-checked:text-white peer-checked:border-black hover:border-gray-400 transition-colors overflow-hidden relative">
                         <svg class="icon-unchecked w-3.5 h-3.5 mr-1.5 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4"></path></svg>
                         <svg class="icon-checked w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M5 13l4 4L19 7"></path></svg>
                         ${tagName}
@@ -279,8 +288,8 @@ class SearchApp extends AppBase {
                     <span class="dot-btn">.</span>
                 </span>`;
                 requestAnimationFrame(() => { btn.style.width = targetWidth; });
-                setTimeout(() => { btn.classList.add('loading'); }, 50);
-            }, 120);
+                setTimeout(() => { btn.classList.add('loading'); }, 30);
+            }, 80);
 
             indicator.classList.add('visible');
         } else {

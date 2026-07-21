@@ -14,7 +14,14 @@ const GlowEffects = (() => {
     }
 
     function getGlowTarget(element) {
-        // Direct glow classes first (fast path)
+        // Tag labels: the span is the target (must come before closest checks)
+        const tagLabel = element.closest('.tag-label');
+        if (tagLabel) {
+            const span = tagLabel.querySelector('span');
+            if (span) return span;
+        }
+
+        // Direct glow classes first
         if (element.classList.contains('magic-btn')) return element;
         if (element.classList.contains('chat-send-btn')) return element;
         if (element.id === 'submit-btn') return element;
@@ -29,12 +36,6 @@ const GlowEffects = (() => {
             if (glow) return glow;
         }
 
-        // Tag labels: the span is the target
-        const tagLabel = element.closest('.tag-label');
-        if (tagLabel) {
-            const span = tagLabel.querySelector('span');
-            if (span) return span;
-        }
         return null;
     }
 
