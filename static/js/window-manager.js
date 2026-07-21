@@ -65,12 +65,14 @@ class WindowManager {
     }
 
     _mountSplit(instance, props) {
+        AppState.saveInstanceState(instance.instanceId);
         const { targetInstanceId, direction = 'horizontal' } = props;
         let tree = this.splitManager.tree;
         if (!tree) {
             tree = { type: 'pane', instanceId: instance.instanceId };
             this.splitManager.setTree(tree);
             this.splitManager.registerRenderer(instance.instanceId, (pane) => instance.mount(pane));
+            AppState.restoreInstanceState(instance.instanceId);
             return;
         }
         if (targetInstanceId) {
@@ -83,7 +85,10 @@ class WindowManager {
                 this.splitManager.splitLeaf(target.instanceId, direction, { type: 'pane', instanceId: instance.instanceId });
             }
         }
-        this.splitManager.registerRenderer(instance.instanceId, (pane) => instance.mount(pane));
+        this.splitManager.registerRenderer(instance.instanceId, (pane) => {
+            instance.mount(pane);
+            AppState.restoreInstanceState(instance.instanceId);
+        });
         this.splitManager.render();
     }
 
@@ -137,6 +142,7 @@ class WindowManager {
         const record = AppState.getRecord(instanceId);
         if (record) record.mode = 'tab';
         this.shellElement.innerHTML = '';
+        AppState.saveInstanceState(instanceId);
         this._mountTab(instance);
         AppState.setActiveInstance(instanceId);
     }

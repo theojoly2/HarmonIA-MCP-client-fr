@@ -21,6 +21,9 @@ class VisionApp extends AppBase {
     }
 
     render(container) {
+        // Any previous viewer is tied to a DOM container that will be replaced;
+        // discard the reference so a fresh viewer is created for the new container.
+        this.viewer = null;
         this.container = container;
         container.innerHTML = `
             <div class="vision-app h-full flex flex-col relative">
@@ -157,8 +160,9 @@ class VisionApp extends AppBase {
                 importContainer.classList.remove('vision-import-hidden');
             }
             if (viewer) {
-                viewer.style.opacity = '0';
                 viewer.classList.add('hidden');
+                viewer.style.opacity = '0';
+                viewer.style.transition = '';
             }
             this.setTitle(this.constructor.title);
             return;
