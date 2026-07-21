@@ -146,6 +146,11 @@ venv.bak/
 data/
 documents/
 
+# PlantUML auto-downloaded native binaries
+**/plantuml-native-*/
+**/vendor/
+*.zip
+
 # Spyder project settings
 .spyderproject
 .spyproject

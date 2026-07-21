@@ -1,0 +1,4 @@
+/* === ChatApp styles === */
+.chat-app { background: #ffffff; }
+.user-msg-anchor { scroll-margin-top: 2px; }
+.chat-send-btn { background-image: radial-gradient(circle var(--glow-size, 0px) at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255,255,255,0.5) 0%, transparent 100%); }

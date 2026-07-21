@@ -10,6 +10,9 @@ import logging
 # Local application imports
 from .import_ttl import ttl_to_json
 from .import_xml import xml_to_json
+from .import_json import json_to_json, json_file_to_model
+from .import_sql import sql_to_model
+from .import_text import text_to_model
 from .export_xml import json_to_xml
 from .visualisation import get_image_bytes
 from .export_ttl import jsonld_to_ttl_bytes
@@ -59,7 +62,7 @@ async def with_timeout(coro, seconds: float = 60.0, on_timeout_msg: str = ""):
 def _detect_file_type(
     first_bytes: bytes,
     filename: Optional[str] = None,
-) -> Optional[Literal["xml", "ttl", "xmi"]]:
+) -> Optional[Literal["xml", "ttl", "xmi", "json", "jsonld", "sql", "text"]]:
     """
     Detect file type from filename first, then from content.
     """
@@ -71,8 +74,17 @@ def _detect_file_type(
             return "xmi"
         if suffix == ".xml":
             return "xml"
+        if suffix in {".json", ".jsonld"}:
+            return "json"
+        if suffix == ".sql":
+            return "sql"
+        if suffix in {".txt", ".html", ".htm", ".csv"}:
+            return "text"
 
-    sniff = first_bytes[:512].lstrip()
+    sniff = first_bytes[:512]
+    if sniff.startswith(b"\xef\xbb\xbf"):
+        sniff = sniff[3:]
+    sniff = sniff.lstrip()
 
     if sniff.startswith(b"<") or sniff.startswith(b"<?xml"):
         return "xml"
@@ -87,6 +99,14 @@ def _detect_file_type(
     )
     if any(marker in sniff for marker in turtle_markers):
         return "ttl"
+
+    json_markers = (b"{", b"[")
+    if sniff.startswith(json_markers):
+        return "json"
+
+    sql_markers = (b"CREATE TABLE", b"create table", b"CREATE TABLE")
+    if any(marker in sniff for marker in sql_markers):
+        return "sql"
 
     return None
 
@@ -205,7 +225,7 @@ def build_xmi_bytes(json_data: dict[str, Any]) -> bytes:
 async def process_and_upload_model(
     file_bytes: bytes, 
     filename: str, 
-    mcp_client: MCPClient
+    mcp_client: Any
 ) -> dict[str, Any]:
     """
     Imports an XML/XMI or TTL file, converts it to a JSON-compatible dictionary,
@@ -303,12 +323,12 @@ async def process_and_upload_model(
 # ----------------------------------------------------------------------
 # Visualisation
 # ----------------------------------------------------------------------
-def generate_visualisation(json_data: dict[str, Any]) -> bytes:
+def generate_visualisation(json_data: dict[str, Any], debug: bool = False) -> BytesIO:
     """
     Visualizes a JSON model and returns the image bytes directly.
     """
     try:
-        image_bytes = get_image_bytes(json_data)
+        image_bytes = get_image_bytes(json_data, debug=debug)
         if not image_bytes:
             raise ModelProcessingError("No image could be generated from the model.")
         return image_bytes

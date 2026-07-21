@@ -5,3 +5,5 @@ fastmcp
 markdown
 openai
 plantuml
+rdflib
+python-dotenv

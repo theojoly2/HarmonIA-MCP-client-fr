@@ -1,0 +1,16 @@
+/* === VisionApp styles === */
+.vision-app { background: #ffffff; }
+.vision-home {
+    justify-content: flex-start;
+    padding-top: 96px;
+    transition: all 0.5s ease;
+    flex: 1;
+}
+.vision-home.hidden { display: none; }
+.drop-zone {
+    border: 2px dashed #d1d5db;
+    border-radius: 1.5rem;
+    background: #f9fafb;
+    transition: all 0.2s ease;
+}
+.drop-zone.drag-over { border-color: #111827; background: #f3f4f6; }

@@ -209,8 +209,9 @@ def build_model(g: Graph, package_name: str | None = None) -> dict:
     # Index classes for quick lookup
     class_elems: dict[str, dict] = {}
 
-    # 1) Classes (OWL.Class and RDFS.Class)
-    for cls_type in (OWL.Class, RDFS.Class):
+    # 1) Classes (OWL.Class, RDFS.Class, and SKOS.Concept as classes)
+    class_types = (OWL.Class, RDFS.Class, SKOS.Concept)
+    for cls_type in class_types:
         for cls in g.subjects(RDF.type, cls_type):
             uri = str(cls)
             if uri in class_elems:
@@ -416,7 +417,7 @@ def build_model(g: Graph, package_name: str | None = None) -> dict:
                 }
                 model["connectors"].append(connector)
 
-    # 4) rdfs:subClassOf -> generalizations
+    # 4) rdfs:subClassOf / skos:broader -> generalizations
     for child, parent in g.subject_objects(RDFS.subClassOf):
         if isinstance(parent, URIRef):
             child_elem = ensure_class(child)
@@ -444,6 +445,34 @@ def build_model(g: Graph, package_name: str | None = None) -> dict:
                 "tags_target": [{"name": "connector_id", "value": connector_id}]
             }
             model["connectors"].append(gen)
+
+    # SKOS broader/narrower are also hierarchical relationships
+    for child, parent in g.subject_objects(SKOS.broader):
+        if isinstance(parent, URIRef):
+            child_elem = ensure_class(child)
+            parent_elem = ensure_class(parent)
+            if child_elem is None or parent_elem is None:
+                continue
+
+            connector_id = ea_id("CONN", f"{str(child)}:{str(parent)}:broader")
+
+            model["connectors"].append({
+                "connector_id": connector_id,
+                "source_id": child_elem["ID"],
+                "target_id": parent_elem["ID"],
+                "source_name": child_elem["name"],
+                "target_name": parent_elem["name"],
+                "relationship": "Generalization",
+                "name": "broader",
+                "uri": "http://www.w3.org/2004/02/skos/core#broader",
+                "lb": "",
+                "lt": "",
+                "rb": "",
+                "rt": "",
+                "tags": [{"name": "connector_id", "value": connector_id}],
+                "tags_source": [],
+                "tags_target": [{"name": "connector_id", "value": connector_id}]
+            })
 
     # 5) rdfs:subPropertyOf -> dependency-like connectors (optional, helps visualise taxonomy)
     for child, parent in g.subject_objects(RDFS.subPropertyOf):
@@ -485,6 +514,76 @@ def build_model(g: Graph, package_name: str | None = None) -> dict:
     return model
 
 
+def _is_ontology_graph(g: Graph) -> bool:
+    """
+    Return True if the graph looks like an ontology (declared classes/properties
+    or a substantial SKOS thesaurus with hierarchical links).
+    Data dumps (LOV metadata, instance catalogs) are not ontologies.
+    """
+    ontology_class_count = sum(
+        1 for _ in g.subjects(RDF.type, OWL.Class)
+    ) + sum(1 for _ in g.subjects(RDF.type, RDFS.Class))
+    property_count = sum(
+        1 for s, t in g.subject_objects(RDF.type)
+        if str(t) in PROPERTY_TYPE_URIS
+    )
+    if ontology_class_count > 0 or property_count > 0:
+        return True
+
+    # SKOS thesauri are ontology-like enough for a class diagram overview.
+    skos_concepts = sum(1 for _ in g.subjects(RDF.type, SKOS.Concept))
+    skos_links = sum(
+        1 for _ in g.subject_objects(SKOS.broader)
+    ) + sum(1 for _ in g.subject_objects(SKOS.narrower))
+    return skos_concepts > 0 and skos_links > 0
+
+
+def _build_non_ontology_placeholder(g: Graph, package_name: str | None = None) -> dict:
+    """
+    Build a minimal model for non-ontology data dumps that explains the situation
+    instead of rendering thousands of instances.
+    """
+    model = {"elements": [], "connectors": []}
+
+    root_pkg = extract_ontology_package(g, custom_name=package_name)
+    model["elements"].append(root_pkg)
+    root_pkg_id = root_pkg["ID"]
+
+    # Count what is in the graph for the message
+    class_count = sum(
+        1 for _ in g.subjects(RDF.type, OWL.Class)
+    ) + sum(1 for _ in g.subjects(RDF.type, RDFS.Class))
+    prop_count = sum(
+        1 for s, t in g.subject_objects(RDF.type)
+        if str(t) in PROPERTY_TYPE_URIS
+    )
+    instance_count = sum(
+        1 for s, o in g.subject_objects(RDF.type)
+        if str(o) not in _NON_ONTOLOGY_INSTANCE_TYPES
+    )
+
+    note_id = ea_id("EAID", "note:non-ontology")
+    note_text = (
+        f"Ce fichier ne semble pas être une ontologie déclarée.\n"
+        f"Classes OWL/RDFS déclarées: {class_count}\n"
+        f"Propriétés déclarées: {prop_count}\n"
+        f"Instances/ressources typées: {instance_count}\n"
+        f"Aucun diagramme de classes n'est disponible pour ce type de contenu."
+    )
+    model["elements"].append({
+        "name": note_text,
+        "ID": note_id,
+        "uri": None,
+        "type": "uml:Class",
+        "visibility": "public",
+        "package": root_pkg_id,
+        "tags": [{"name": "note", "value": note_text}],
+        "attributes": [],
+    })
+
+    return model
+
+
 def build_model_from_instances(g: Graph, package_name: str | None = None) -> dict:
     """
     Build a UML-ish model from concrete RDF instances (NamedIndividuals, foaf:Person, etc.).
@@ -503,14 +602,7 @@ def build_model_from_instances(g: Graph, package_name: str | None = None) -> dic
 
     # If the graph is clearly an ontology (has owl:Ontology and many classes/properties),
     # do not turn concrete instances into UML classes; that pollutes the class diagram.
-    ontology_class_count = sum(
-        1 for _ in g.subjects(RDF.type, OWL.Class)
-    ) + sum(1 for _ in g.subjects(RDF.type, RDFS.Class))
-    property_count = sum(
-        1 for s, t in g.subject_objects(RDF.type)
-        if str(t) in PROPERTY_TYPE_URIS
-    )
-    if onto_uri is not None and (ontology_class_count > 0 or property_count > 0):
+    if _is_ontology_graph(g):
         # Treat as a pure ontology: skip instance modelling.
         return model
 
@@ -647,67 +739,77 @@ def build_model_from_instances(g: Graph, package_name: str | None = None) -> dic
 
 def _repair_ttl_text(text: str) -> str:
     """
-    Attempt to repair common TTL corruptions found in some LOV dump files.
-    These files sometimes contain Python byte-string artifacts (e.g. b'...')
-    or stray caret characters inside URIs/literals.
+    Repair common TTL corruptions found in LOV dump files.
+
+    Handles:
+    - Python byte-string artifacts (b'...', ^b, stray quotes in URIs).
+    - Invalid characters and control bytes.
+    - Removes LOV metadata blocks that are not useful for UML modelling
+      (reviews, creators, review dates) because they bloat the file and
+      often contain broken literals.
+
+    Preserves line structure so that rdflib can parse the result.
     """
-    # Remove control chars except newlines/tabs
-    text = "".join(c for c in text if c == "\n" or c == "\t" or ord(c) >= 32)
+    # Remove control chars except newlines/tabs/spaces
+    text = text.translate(
+        dict.fromkeys(i for i in range(32) if i not in (9, 10, 13, 32))
+    )
 
-    # Fix Python byte-string artifacts around URIs and prefixed names.
-    # Examples seen in the wild:
-    #   ns3:creator <http://...bernard-vatant'^b'> ;
-    #   ...b'3:creator <http://...bernard-vatant'^b'> ;
-    # We remove isolated b' / 'b / ^b that appear to be artifacts.
+    # Remove LOV review/metadata blocks: ns2:hasReview [ ... ] ;
+    # These blocks are deeply nested, contain broken literals and are not
+    # needed for ontology overview diagrams.
+    text = re.sub(
+        r"\bns2:hasReview\s+\[.*?\]\s*;?",
+        "",
+        text,
+        flags=re.DOTALL,
+    )
 
-    # Remove stray single quotes and carets that are not part of valid Turtle syntax
-    # Heuristic: replace patterns like <...'b> with <...>
-    text = re.sub(r"<'?b?(\w+)", r"<\1", text)
-    text = re.sub(r"b?'(\w+)>", r"\1>", text)
+    # Remove standalone review-related triples in a single line scan.
+    lines = text.splitlines()
+    skip_patterns = tuple(re.compile(r"\b" + p + r"\b") for p in (
+        "ns3:creator", "ns3:date", "ns2:text", "foaf:name",
+    ))
+    cleaned_lines: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if any(p.search(stripped) for p in skip_patterns):
+            continue
+        cleaned_lines.append(line)
+    text = "\n".join(cleaned_lines)
 
-    # Remove any standalone b' or 'b not inside a string literal. We do this carefully:
-    # Split by string literal regions, process only outside.
-    result_parts: list[str] = []
-    i = 0
-    while i < len(text):
-        if text[i] == '"':
-            # find closing quote (skip escaped)
-            j = i + 1
-            while j < len(text):
-                if text[j] == "\\" and j + 1 < len(text):
-                    j += 2
-                elif text[j] == '"':
-                    j += 1
-                    break
-                else:
-                    j += 1
-            result_parts.append(text[i:j])
-            i = j
-        else:
-            result_parts.append(text[i])
-            i += 1
+    # Remove isolated Python byte artifacts and stray single quotes outside
+    # double-quoted literals. We process the text in segments to protect
+    # legitimate string literals.
+    def _clean_outside_literals(match: re.Match) -> str:
+        part = match.group(0)
+        if part.startswith('"'):
+            return part
+        part = part.replace("^b", "")
+        part = re.sub(r"\bb'(?=\s|\u003c|\"|\w)", "", part)
+        part = re.sub(r"(?<=\w)'\bb", "", part)
+        part = part.replace("\u003c'b", "\u003c")
+        part = part.replace("'b\u003e", "\u003e")
+        # Turtle only uses double quotes for literals; single quotes outside
+        # literals are corruption artifacts.
+        return part.replace("'", "")
 
-    outside = True
-    cleaned_parts: list[str] = []
-    for part in result_parts:
-        if part.startswith('"') and part.endswith('"'):
-            cleaned_parts.append(part)
-        else:
-            # Remove artifact patterns outside string literals
-            cleaned = re.sub(r"\bb'", "", part)
-            cleaned = re.sub(r"'\bb", "", cleaned)
-            cleaned = re.sub(r"\^b", "", cleaned)
-            cleaned = cleaned.replace("'", "")
-            cleaned_parts.append(cleaned)
+    text = re.sub(
+        r'"(?:[^"\\]|\\.)*"|[^"]+',
+        _clean_outside_literals,
+        text,
+        flags=re.DOTALL,
+    )
 
-    text = "".join(cleaned_parts)
-
-    # Collapse multiple spaces and normalize whitespace around punctuation
-    text = re.sub(r"\s+", " ", text)
-    text = re.sub(r" ;", ";", text)
-    text = re.sub(r" \.", ".", text)
-    text = re.sub(r" ,", ",", text)
-    text = text.replace(" ;", ";").replace(" .", ".")
+    # Normalize whitespace around Turtle punctuation without collapsing newlines
+    text = re.sub(r"[ \t]+", " ", text)
+    text = text.replace(" ;", ";")
+    text = text.replace(" .", ".")
+    text = text.replace(" ,", ",")
+    text = re.sub(r"\n[ \t]+", "\n", text)
+    text = re.sub(r"[ \t]+\n", "\n", text)
 
     return text
 
@@ -798,6 +900,75 @@ def _parse_ttl_regex(text: str) -> rdflib.Graph:
             g.add((s_node, p_node, o_node))
 
     return g
+
+
+def _looks_like_ontology_model(model: dict[str, Any]) -> bool:
+    """
+    Heuristic: a model is ontology-like if it contains declared OWL/RDFS classes
+    or properties. Instance-only models (Persons, dates, URIs) are not.
+    """
+    has_declared_class = any(
+        "owl:Class" in str(e.get("uri", "")) or "rdfs:Class" in str(e.get("uri", ""))
+        for e in model.get("elements", [])
+    )
+    if has_declared_class:
+        return True
+    # If most class names look like URIs, dates, emails, or nicknames, it's a data dump.
+    class_names = [
+        str(e.get("name", "")).strip()
+        for e in model.get("elements", [])
+        if e.get("type") == "uml:Class"
+    ]
+    if not class_names:
+        return False
+    non_ontology_markers = ("@", ".n3", "http://", "https://", "www.")
+    suspicious = sum(
+        1 for n in class_names
+        if any(m in n for m in non_ontology_markers) or len(n) <= 3 or n.isdigit()
+    )
+    return suspicious < len(class_names) * 0.5
+
+
+def _build_text_fallback_placeholder(
+    model: dict[str, Any],
+    root_pkg_id: str,
+) -> dict[str, Any]:
+    """
+    Replace an instance-only model with a simple explanatory placeholder.
+    """
+    note_id = ea_id("EAID", "note:non-ontology")
+    note_text = (
+        "Ce fichier ne semble pas être une ontologie déclarée.\\n"
+        "Aucune classe OWL/RDFS ou propriété n'a été trouvée.\\n"
+        "Le diagramme de classes n'est pas disponible pour ce type de contenu."
+    )
+    return {
+        "elements": [
+            next(
+                (e for e in model.get("elements", []) if e.get("type") == "uml:Package"),
+                {
+                    "name": "TTL Model",
+                    "ID": root_pkg_id,
+                    "uri": None,
+                    "type": "uml:Package",
+                    "visibility": "public",
+                    "package": "",
+                    "tags": [],
+                },
+            ),
+            {
+                "name": "Note",
+                "ID": note_id,
+                "uri": None,
+                "type": "uml:Class",
+                "visibility": "public",
+                "package": root_pkg_id,
+                "tags": [{"name": "note", "value": note_text}],
+                "attributes": [],
+            },
+        ],
+        "connectors": [],
+    }
 
 
 def _ttl_text_to_model(text: str) -> dict[str, Any]:
@@ -1061,6 +1232,11 @@ def _ttl_text_to_model(text: str) -> dict[str, Any]:
     if not any(e.get("type") == "uml:Class" for e in model["elements"]):
         _build_instance_model_from_text(text, prefixes, model, root_pkg_id, resolve, local_name, class_id)
 
+    # If the regex fallback still produced only instance-derived classes,
+    # treat it as a non-ontology and return a clean placeholder.
+    if not _looks_like_ontology_model(model):
+        model = _build_text_fallback_placeholder(model, root_pkg_id)
+
     return model
 
 
@@ -1187,14 +1363,12 @@ def ttl_to_json(uploaded_file: BytesIO) -> dict[str, Any]:
                 # Last resort: line-by-line extraction on repaired text
                 g3 = _parse_ttl_regex(repaired)
                 if len(g3) == 0:
-                    # If regex fallback also yields nothing, try direct model extraction
-                    model = _ttl_text_to_model(repaired)
-                    if not model.get("elements"):
-                        raise parse_error
+                    # The file is too corrupted to parse structurally.
+                    # Return a clean placeholder instead of a polluted instance diagram.
                     return {
                         "ttl": {},
                         "ttl_raw": text,
-                        "xmi": model,
+                        "xmi": _build_non_ontology_placeholder(rdflib.Graph()),
                     }
                 g = g3
 
@@ -1205,28 +1379,33 @@ def ttl_to_json(uploaded_file: BytesIO) -> dict[str, Any]:
         ttl_raw_bytes = g.serialize(format="ttl")
         ttl_raw = ttl_raw_bytes.decode("utf-8") if isinstance(ttl_raw_bytes, (bytes, bytearray)) else str(ttl_raw_bytes)
 
-        xmi = build_model(g)
+        # Decide whether this graph is an ontology or a data dump.
+        # For data dumps we return a placeholder instead of a polluted class diagram.
+        if _is_ontology_graph(g):
+            xmi = build_model(g)
 
-        instances_xmi = build_model_from_instances(g)
-        if instances_xmi.get("elements") and len(instances_xmi["elements"]) > 1:
-            xmi_elements = xmi.get("elements", [])
-            xmi_connectors = xmi.get("connectors", [])
-            existing_ids = {e.get("ID") for e in xmi_elements}
-            for elem in instances_xmi.get("elements", []):
-                if elem.get("ID") not in existing_ids:
-                    xmi_elements.append(elem)
-                    existing_ids.add(elem.get("ID"))
-            existing_conn_keys = {
-                (c.get("source_id"), c.get("target_id"), c.get("name"))
-                for c in xmi_connectors
-            }
-            for conn in instances_xmi.get("connectors", []):
-                key = (conn.get("source_id"), conn.get("target_id"), conn.get("name"))
-                if key not in existing_conn_keys:
-                    xmi_connectors.append(conn)
-                    existing_conn_keys.add(key)
-            xmi["elements"] = xmi_elements
-            xmi["connectors"] = xmi_connectors
+            instances_xmi = build_model_from_instances(g)
+            if instances_xmi.get("elements") and len(instances_xmi["elements"]) > 1:
+                xmi_elements = xmi.get("elements", [])
+                xmi_connectors = xmi.get("connectors", [])
+                existing_ids = {e.get("ID") for e in xmi_elements}
+                for elem in instances_xmi.get("elements", []):
+                    if elem.get("ID") not in existing_ids:
+                        xmi_elements.append(elem)
+                        existing_ids.add(elem.get("ID"))
+                existing_conn_keys = {
+                    (c.get("source_id"), c.get("target_id"), c.get("name"))
+                    for c in xmi_connectors
+                }
+                for conn in instances_xmi.get("connectors", []):
+                    key = (conn.get("source_id"), conn.get("target_id"), conn.get("name"))
+                    if key not in existing_conn_keys:
+                        xmi_connectors.append(conn)
+                        existing_conn_keys.add(key)
+                xmi["elements"] = xmi_elements
+                xmi["connectors"] = xmi_connectors
+        else:
+            xmi = _build_non_ontology_placeholder(g)
 
         return {
             "ttl": json_data,

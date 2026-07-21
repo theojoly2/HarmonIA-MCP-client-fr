@@ -1,0 +1,102 @@
+/**
+ * PreviewApp
+ * Aperçu rapide d'un document avec visualisation SVG.
+ */
+
+class PreviewApp extends AppBase {
+    static id = "preview";
+    static title = "Aperçu";
+    static icon = "👁";
+    static canFloat = true;
+    static canSplit = true;
+    static singleton = false;
+
+    constructor(instanceId, props = {}) {
+        super(instanceId, props);
+        this.docId = props.docId || '';
+        this.documentId = props.documentId || '';
+        this.docName = props.name || 'Document';
+        this.svgText = '';
+        this.viewer = null;
+        this.viewerState = { scale: 1, x: 0, y: 0 };
+    }
+
+    render(container) {
+        this.container = container;
+        container.innerHTML = `
+            <div class="preview-app h-full w-full flex flex-col relative bg-white">
+                <div class="px-4 py-2 border-b border-gray-200 text-sm text-gray-500 truncate">
+                    ${this._escape(this.docName)}
+                </div>
+                <div id="preview-svg-viewer" class="flex-1 relative"></div>
+                <div id="preview-loading" class="absolute inset-0 flex items-center justify-center text-gray-500 z-10">
+                    <svg class="animate-spin h-8 w-8 text-gray-400 mr-3" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span class="text-sm font-medium">Génération de la modélisation...</span>
+                </div>
+            </div>
+        `;
+        this.setTitle(`Aperçu: ${this.docName}`);
+        this._load();
+    }
+
+    _escape(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    async _load() {
+        const loading = this.container.querySelector('#preview-loading');
+        const viewerContainer = this.container.querySelector('#preview-svg-viewer');
+        try {
+            const url = ApiClient.getDocumentVisualizeUrl(this.docId);
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`Preview failed: ${res.status}`);
+            this.svgText = await res.text();
+            const match = this.svgText.match(/data-main-class="([^"]*)"/);
+            const mainClassName = match ? match[1] : '';
+            if (loading) loading.classList.add('hidden');
+            if (!this.viewer) {
+                this.viewer = new SvgViewer(viewerContainer, {
+                    onTransform: (state) => { this.viewerState = state; }
+                });
+            }
+            this.viewer.setSvg(this.svgText, mainClassName);
+            if (Object.keys(this.viewerState).length) this.viewer.setState(this.viewerState);
+        } catch (err) {
+            console.error('Preview load error', err);
+            if (loading) loading.innerHTML = `<div class="text-red-500 text-sm">Erreur de chargement du diagramme.</div>`;
+        }
+    }
+
+    getState() {
+        return {
+            docId: this.docId,
+            documentId: this.documentId,
+            docName: this.docName,
+            viewerState: this.viewer ? this.viewer.getState() : this.viewerState,
+        };
+    }
+
+    setState(state) {
+        this.docId = state.docId || this.docId;
+        this.documentId = state.documentId || this.documentId;
+        this.docName = state.docName || this.docName;
+        this.viewerState = state.viewerState || { scale: 1, x: 0, y: 0 };
+        if (this.container) this.render(this.container);
+    }
+
+    unmount() {
+        if (this.viewer) {
+            this.viewerState = this.viewer.getState();
+            this.viewer.destroy();
+            this.viewer = null;
+        }
+        super.unmount();
+    }
+}
+
+window.PreviewApp = PreviewApp;

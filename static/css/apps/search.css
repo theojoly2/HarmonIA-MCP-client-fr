@@ -1,0 +1,53 @@
+/* === SearchApp styles === */
+.search-app { background: #ffffff; }
+#search-wrapper-inner { max-width: 768px; margin: 0 auto; transition: padding 0.55s cubic-bezier(0.4, 0, 0.2, 1); }
+#search-input {
+    font-size: clamp(0.875rem, 1.3vw, 1.125rem);
+    padding: 0.75rem clamp(4.5rem, 9vw, 8rem) 0.75rem clamp(0.875rem, 1.8vw, 1.5rem);
+    border-radius: 9999px;
+}
+#search-wrapper { position: relative; border-radius: 9999px; isolation: isolate; width: 100%; }
+#submit-btn {
+    position: absolute;
+    right: 0.5rem;
+    top: 0.5rem;
+    bottom: 0.5rem;
+    font-size: clamp(0.75rem, 1.1vw, 1rem);
+    padding: 0 1rem;
+    background-color: #111827;
+    color: white;
+    border-radius: 9999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    white-space: nowrap;
+}
+#submit-btn.loading { background-color: #6b7280; pointer-events: none; }
+.title-glow {
+    display: inline-block;
+    background-color: #111827;
+    background-image: radial-gradient(circle var(--glow-size, 0px) at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255,255,255,0.85) 0%, rgba(255,255,255,0) 100%);
+    background-repeat: no-repeat;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    transition: --glow-size 0.3s ease;
+}
+.interactive-title { display: inline-block; position: relative; text-decoration: none; cursor: pointer; }
+.tag-label input:checked ~ span { background-color: #111827; color: white; border-color: #111827; }
+.tag-label span {
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    transition: all 0.2s ease;
+}
+.tag-label input:not(:checked) ~ span { background-color: #ffffff; color: #374151; }
+.tag-label input:not(:checked) ~ span:hover { border-color: #d1d5db; }
+.icon-unchecked, .icon-checked { display: none; }
+.tag-label input:not(:checked) ~ span .icon-unchecked { display: inline; }
+.tag-label input:checked ~ span .icon-checked { display: inline; }
