@@ -82,6 +82,7 @@ class PreviewApp extends AppBase {
             this.svgText = await res.text();
             log('svg chars=' + this.svgText.length);
             log('svg starts=' + this.svgText.slice(0, 120));
+            log('svg ends=' + this.svgText.slice(-120));
             const match = this.svgText.match(/data-main-class="([^"]*)"/);
             const mainClassName = match ? match[1] : '';
             log('mainClass=' + mainClassName);
