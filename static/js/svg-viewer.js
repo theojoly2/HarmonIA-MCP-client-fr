@@ -98,6 +98,21 @@ class SvgViewer {
             .replace(/background:#000000/g, 'background:#ffffff')
             .replace(/\u003csvg/, '\u003csvg class="svg-diagram"');
         this.svg = this.canvas.querySelector('svg.svg-diagram');
+        if (this.svg) this._makeSvgScalable();
+    }
+
+    /**
+     * Remove fixed width/height attributes so the SVG renders as a continuous
+     * vector surface instead of a scaled bitmap, keeping zoom crisp.
+     */
+    _makeSvgScalable() {
+        if (!this.svg) return;
+        this.svg.removeAttribute('width');
+        this.svg.removeAttribute('height');
+        this.svg.setAttribute('width', '100%');
+        this.svg.setAttribute('height', '100%');
+        this.svg.style.maxWidth = 'none';
+        this.svg.style.maxHeight = 'none';
     }
 
     setSvgAndRestore(svgText, mainClassName = '', state = null) {
