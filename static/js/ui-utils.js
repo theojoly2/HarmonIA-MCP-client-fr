@@ -20,12 +20,14 @@ const UiUtils = (() => {
             if (!isDragging) return;
             const vw = window.innerWidth, vh = window.innerHeight;
             const rect = win.getBoundingClientRect();
-            const minVisible = options.minVisible || 30;
+            const minVisible = options.minVisible || 60;
             let left = initialLeft + (e.clientX - startX);
             let top = initialTop + (e.clientY - startY);
-            // Allow the window to partially leave the viewport, but keep minVisible pixels visible.
+            // Block at the top edge (no negative top).
+            top = Math.max(0, top);
+            // Allow partial exit left/right/bottom, but keep minVisible pixels visible.
             left = Math.max(minVisible - rect.width, Math.min(vw - minVisible, left));
-            top = Math.max(minVisible - rect.height, Math.min(vh - minVisible, top));
+            top = Math.min(vh - minVisible, top);
             win.style.left = left + 'px';
             win.style.top = top + 'px';
             win.style.transform = 'none';
@@ -61,7 +63,7 @@ const UiUtils = (() => {
             if (!isResizing) return;
             const vw = window.innerWidth, vh = window.innerHeight;
             const rect = win.getBoundingClientRect();
-            const minVisible = options.minVisible || 30;
+            const minVisible = options.minVisible || 60;
             // Prevent resizing beyond the viewport; keep at least minVisible pixels visible.
             const maxW = vw - rect.left + Math.max(0, rect.width - minVisible);
             const maxH = vh - rect.top + Math.max(0, rect.height - minVisible);
