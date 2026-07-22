@@ -19,6 +19,7 @@ class VisionApp extends AppBase {
         this.viewerState = { scale: 1, x: 0, y: 0 };
         this.viewer = null;
         this._centerOnNextShow = true;
+        this._homeTimeout = null;
     }
 
     render(container) {
@@ -96,10 +97,16 @@ class VisionApp extends AppBase {
     }
 
     async _handleFile(file) {
+        console.log('[Vision] _handleFile', file.name);
         this.fileName = file.name;
         // Every new import must be centered.
         this._centerOnNextShow = true;
         this.viewerState = { scale: 1, x: 0, y: 0 };
+        // Cancel any pending return-to-home transition that would overwrite this import.
+        if (this._homeTimeout) {
+            clearTimeout(this._homeTimeout);
+            this._homeTimeout = null;
+        }
         if (this.viewer) {
             this.viewer.destroy();
             this.viewer = null;
@@ -110,6 +117,7 @@ class VisionApp extends AppBase {
             this.svgText = await ApiClient.importVisionFile(file);
             const match = this.svgText.match(/data-main-class="([^"]*)"/);
             this.mainClassName = match ? match[1] : '';
+            console.log('[Vision] import done, calling _showViewer');
             this._showViewer();
         } catch (err) {
             console.error('Vision import error', err);
@@ -158,11 +166,13 @@ class VisionApp extends AppBase {
     }
 
     _showVisionHome() {
+        console.log('[Vision] _showVisionHome');
         const home = this.container.querySelector('#vision-home');
         const importContainer = this.container.querySelector('#vision-import-container');
         const viewer = this.container.querySelector('#vision-viewer');
 
         const finalizeHome = () => {
+            console.log('[Vision] finalizeHome');
             this.svgText = '';
             this.fileName = '';
             this.mainClassName = '';
@@ -196,7 +206,8 @@ class VisionApp extends AppBase {
         viewer.style.transition = 'opacity 0.45s ease';
         viewer.style.opacity = '0';
 
-        setTimeout(() => {
+        this._homeTimeout = setTimeout(() => {
+            this._homeTimeout = null;
             finalizeHome();
         }, 450);
     }
