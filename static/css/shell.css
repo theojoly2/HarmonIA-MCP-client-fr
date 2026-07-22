@@ -102,7 +102,8 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
     top: 0;
     left: 0;
     transform-origin: 0 0;
-    will-change: transform;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
 }
 .svg-canvas .svg-diagram {
     display: block;
