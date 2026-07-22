@@ -50,6 +50,7 @@ class WindowManager {
     _mountFloating(instance, props) {
         AppState.saveInstanceState(instance.instanceId);
         const { width = 800, height = 600, offsetX = 0, offsetY = 0 } = props;
+        let resizeAnchorSaved = false;
         const floatWin = UiUtils.createFloatingWindow({
             title: instance.getTitle(),
             icon: instance.constructor.iconSvg,
@@ -57,6 +58,23 @@ class WindowManager {
             height,
             onClose: () => this.close(instance.instanceId),
             onFocus: () => this._bringToFront(instance.instanceId),
+            onResizeStart: () => {
+                if (instance.viewer && instance.viewer.saveResizeAnchor) {
+                    instance.viewer.saveResizeAnchor();
+                    resizeAnchorSaved = true;
+                }
+            },
+            onResize: () => {
+                if (resizeAnchorSaved && instance.viewer && instance.viewer.restoreResizeAnchor) {
+                    instance.viewer.restoreResizeAnchor();
+                }
+            },
+            onResizeEnd: () => {
+                if (resizeAnchorSaved && instance.viewer && instance.viewer.restoreResizeAnchor) {
+                    instance.viewer.restoreResizeAnchor();
+                }
+                resizeAnchorSaved = false;
+            },
         });
         this.floatingRoot.appendChild(floatWin.win);
         const body = floatWin.body;

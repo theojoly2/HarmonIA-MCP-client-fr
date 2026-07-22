@@ -96,7 +96,7 @@ const UiUtils = (() => {
         clampWindowPosition(win);
     }
 
-    function createFloatingWindow({ title = '', icon = '', width = 800, height = 600, onClose, onFocus }) {
+    function createFloatingWindow({ title = '', icon = '', width = 800, height = 600, onClose, onFocus, onResizeStart, onResize, onResizeEnd }) {
         const win = document.createElement('div');
         win.className = 'floating-window';
         win.style.width = width + 'px';
@@ -127,7 +127,11 @@ const UiUtils = (() => {
             onStart: () => { if (onFocus) onFocus(); }
         });
         const resizeCleanup = makeResizable(win, handle, {
-            onStart: () => { if (onFocus) onFocus(); }
+            minWidth: 320,
+            minHeight: 200,
+            onStart: () => { if (onFocus) onFocus(); if (onResizeStart) onResizeStart(); },
+            onResize: (w, h) => { if (onResize) onResize(w, h); },
+            onEnd: () => { if (onResizeEnd) onResizeEnd(); }
         });
         closeBtn.addEventListener('click', () => {
             if (onClose) onClose();

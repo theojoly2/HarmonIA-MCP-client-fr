@@ -222,6 +222,25 @@ class SvgViewer {
         this.centerDiagram();
     }
 
+    /**
+     * Keep the diagram centered while the floating window is being resized.
+     * saveResizeAnchor() records the world coordinate at the center of the viewer.
+     * restoreResizeAnchor() recenters that world coordinate after the resize.
+     */
+    saveResizeAnchor() {
+        const rect = this.container.getBoundingClientRect();
+        this._resizeAnchorX = (rect.width / 2 - this.state.x) / this.state.scale;
+        this._resizeAnchorY = (rect.height / 2 - this.state.y) / this.state.scale;
+    }
+
+    restoreResizeAnchor() {
+        const rect = this.container.getBoundingClientRect();
+        if (this._resizeAnchorX === undefined || this._resizeAnchorY === undefined) return;
+        this.state.x = (rect.width / 2) - this._resizeAnchorX * this.state.scale;
+        this.state.y = (rect.height / 2) - this._resizeAnchorY * this.state.scale;
+        this.applyTransform();
+    }
+
     destroy() {
         this._listeners.forEach(({ target, event, handler, options }) => {
             target.removeEventListener(event, handler, options);
