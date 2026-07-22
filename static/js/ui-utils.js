@@ -22,9 +22,9 @@ const UiUtils = (() => {
             const rect = win.getBoundingClientRect();
             let left = initialLeft + (e.clientX - startX);
             let top = initialTop + (e.clientY - startY);
-            const minVisible = options.minVisible || 60;
-            left = Math.max(minVisible - rect.width, Math.min(vw - minVisible, left));
-            top = Math.max(0, Math.min(vh - minVisible, top));
+            // Keep the entire window inside the viewport.
+            left = Math.max(0, Math.min(vw - rect.width, left));
+            top = Math.max(0, Math.min(vh - rect.height, top));
             win.style.left = left + 'px';
             win.style.top = top + 'px';
             win.style.transform = 'none';
@@ -60,8 +60,10 @@ const UiUtils = (() => {
             if (!isResizing) return;
             const vw = window.innerWidth, vh = window.innerHeight;
             const rect = win.getBoundingClientRect();
-            const maxW = vw - rect.left;
-            const maxH = vh - rect.top;
+            const minVisible = options.minVisible || 60;
+            // Keep bottom/right edges inside the viewport; keep at least minVisible visible.
+            const maxW = Math.min(vw - rect.left + rect.width - minVisible, vw - rect.left);
+            const maxH = Math.min(vh - rect.top + rect.height - minVisible, vh - rect.top);
             let w = Math.max(options.minWidth || 320, initialW + (e.clientX - startX));
             let h = Math.max(options.minHeight || 200, initialH + (e.clientY - startY));
             w = Math.min(w, maxW);
