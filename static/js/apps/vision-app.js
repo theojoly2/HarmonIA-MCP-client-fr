@@ -18,6 +18,7 @@ class VisionApp extends AppBase {
         this.mainClassName = props.mainClassName || '';
         this.viewerState = { scale: 1, x: 0, y: 0 };
         this.viewer = null;
+        this._centerOnNextShow = true;
     }
 
     render(container) {
@@ -96,7 +97,8 @@ class VisionApp extends AppBase {
 
     async _handleFile(file) {
         this.fileName = file.name;
-        // Reset the view so every new import is centered; window switching keeps the saved state.
+        // Every new import must be centered.
+        this._centerOnNextShow = true;
         this.viewerState = { scale: 1, x: 0, y: 0 };
         if (this.viewer) {
             this.viewer.destroy();
@@ -141,10 +143,10 @@ class VisionApp extends AppBase {
                 onTransform: (state) => { this.viewerState = state; }
             });
         }
-        // First-time import: center diagram. Reopen: restore exact position/zoom.
-        const isFirstImport = !this.viewerState || (this.viewerState.scale === 1 && this.viewerState.x === 0 && this.viewerState.y === 0);
-        if (isFirstImport) {
+        // New import: center diagram. Window switching: restore exact position/zoom.
+        if (this._centerOnNextShow) {
             this.viewer.setSvgAndRestore(this.svgText, this.mainClassName, null);
+            this._centerOnNextShow = false;
         } else {
             this.viewer.setSvg(this.svgText, this.mainClassName);
             this.viewer.restoreState(this.viewerState);
@@ -225,6 +227,8 @@ class VisionApp extends AppBase {
         this.svgText = state.svgText || '';
         this.mainClassName = state.mainClassName || '';
         this.viewerState = state.viewerState || { scale: 1, x: 0, y: 0 };
+        // Restoring from a saved state is a window switch, not a new import.
+        this._centerOnNextShow = false;
         if (this.container) {
             this.render(this.container);
             this._updateHomeVisibility();
