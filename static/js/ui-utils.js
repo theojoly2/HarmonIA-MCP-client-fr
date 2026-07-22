@@ -18,8 +18,13 @@ const UiUtils = (() => {
         };
         const onMove = (e) => {
             if (!isDragging) return;
+            const vw = window.innerWidth, vh = window.innerHeight;
+            const rect = win.getBoundingClientRect();
             let left = initialLeft + (e.clientX - startX);
             let top = initialTop + (e.clientY - startY);
+            const minVisible = options.minVisible || 60;
+            left = Math.max(minVisible - rect.width, Math.min(vw - minVisible, left));
+            top = Math.max(0, Math.min(vh - minVisible, top));
             win.style.left = left + 'px';
             win.style.top = top + 'px';
             win.style.transform = 'none';
@@ -53,8 +58,14 @@ const UiUtils = (() => {
         };
         const onMove = (e) => {
             if (!isResizing) return;
-            const w = Math.max(options.minWidth || 320, initialW + (e.clientX - startX));
-            const h = Math.max(options.minHeight || 200, initialH + (e.clientY - startY));
+            const vw = window.innerWidth, vh = window.innerHeight;
+            const rect = win.getBoundingClientRect();
+            const maxW = vw - rect.left;
+            const maxH = vh - rect.top;
+            let w = Math.max(options.minWidth || 320, initialW + (e.clientX - startX));
+            let h = Math.max(options.minHeight || 200, initialH + (e.clientY - startY));
+            w = Math.min(w, maxW);
+            h = Math.min(h, maxH);
             win.style.width = w + 'px';
             win.style.height = h + 'px';
             if (options.onResize) options.onResize(w, h);
