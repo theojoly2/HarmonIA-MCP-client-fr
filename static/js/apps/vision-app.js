@@ -96,6 +96,12 @@ class VisionApp extends AppBase {
 
     async _handleFile(file) {
         this.fileName = file.name;
+        // Reset the view so every new import is centered; window switching keeps the saved state.
+        this.viewerState = { scale: 1, x: 0, y: 0 };
+        if (this.viewer) {
+            this.viewer.destroy();
+            this.viewer = null;
+        }
         // Switch to viewer area and show spinner while keeping the import UI visible briefly
         this._enterLoadingMode();
         try {
