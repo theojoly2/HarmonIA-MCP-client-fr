@@ -20,11 +20,12 @@ const UiUtils = (() => {
             if (!isDragging) return;
             const vw = window.innerWidth, vh = window.innerHeight;
             const rect = win.getBoundingClientRect();
+            const minVisible = options.minVisible || 30;
             let left = initialLeft + (e.clientX - startX);
             let top = initialTop + (e.clientY - startY);
-            // Keep the entire window inside the viewport.
-            left = Math.max(0, Math.min(vw - rect.width, left));
-            top = Math.max(0, Math.min(vh - rect.height, top));
+            // Allow the window to partially leave the viewport, but keep minVisible pixels visible.
+            left = Math.max(minVisible - rect.width, Math.min(vw - minVisible, left));
+            top = Math.max(minVisible - rect.height, Math.min(vh - minVisible, top));
             win.style.left = left + 'px';
             win.style.top = top + 'px';
             win.style.transform = 'none';
@@ -60,10 +61,10 @@ const UiUtils = (() => {
             if (!isResizing) return;
             const vw = window.innerWidth, vh = window.innerHeight;
             const rect = win.getBoundingClientRect();
-            const minVisible = options.minVisible || 60;
-            // Keep bottom/right edges inside the viewport; keep at least minVisible visible.
-            const maxW = Math.min(vw - rect.left + rect.width - minVisible, vw - rect.left);
-            const maxH = Math.min(vh - rect.top + rect.height - minVisible, vh - rect.top);
+            const minVisible = options.minVisible || 30;
+            // Prevent resizing beyond the viewport; keep at least minVisible pixels visible.
+            const maxW = vw - rect.left + Math.max(0, rect.width - minVisible);
+            const maxH = vh - rect.top + Math.max(0, rect.height - minVisible);
             let w = Math.max(options.minWidth || 320, initialW + (e.clientX - startX));
             let h = Math.max(options.minHeight || 200, initialH + (e.clientY - startY));
             w = Math.min(w, maxW);
