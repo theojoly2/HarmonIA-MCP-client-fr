@@ -230,19 +230,16 @@ class SvgViewer {
 
     /**
      * Force a crisp reflow/repaint of the SVG after zooming stops.
-     * This reduces blurriness caused by the browser's transform interpolation.
+     * Re-injecting the SVG forces the browser to re-render the vector content
+     * at the current transform scale, eliminating the blurry bitmap layer.
      */
     sharpen() {
         if (!this.svg || !this.canvas) return;
-        const saved = this.canvas.style.transform;
-        // Remove the transform and force a full reflow/repaint.
-        this.canvas.style.transform = 'none';
-        void this.svg.getBoundingClientRect();
-        void this.container.offsetHeight;
-        // Restore the transform; the browser will now render the SVG crisply at the new scale.
-        requestAnimationFrame(() => {
-            this.canvas.style.transform = saved;
-        });
+        const html = this.canvas.innerHTML;
+        this.canvas.innerHTML = '';
+        void this.canvas.offsetHeight;
+        this.canvas.innerHTML = html;
+        this.svg = this.canvas.querySelector('svg.svg-diagram');
     }
 
     /**
