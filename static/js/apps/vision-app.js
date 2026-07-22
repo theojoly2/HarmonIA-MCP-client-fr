@@ -151,7 +151,9 @@ class VisionApp extends AppBase {
         }
         // New import: center diagram. Window switching: restore exact position/zoom.
         if (this._centerOnNextShow) {
-            this.viewer.setSvgAndRestore(this.svgText, this.mainClassName, null);
+            this.viewer.setSvg(this.svgText, this.mainClassName);
+            // Reset the view as if the user clicked the reset button (centers the new diagram).
+            this.viewer.resetZoom();
             this._centerOnNextShow = false;
         } else {
             this.viewer.setSvg(this.svgText, this.mainClassName);
