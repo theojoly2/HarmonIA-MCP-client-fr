@@ -40,6 +40,7 @@ class SvgViewer {
         this._bind(zoomOut, 'click', () => this.zoomAtCenter(1 / 1.2));
         this._bind(reset, 'click', () => this.resetZoom());
 
+        this._wheelTimeout = null;
         this._bind(this.container, 'wheel', (e) => {
             if (!this.svg) return;
             e.preventDefault();
@@ -49,6 +50,9 @@ class SvgViewer {
                 x: e.clientX - rect.left,
                 y: e.clientY - rect.top,
             }, factor);
+            // Once the user stops zooming, force a crisp reflow/repaint of the SVG.
+            clearTimeout(this._wheelTimeout);
+            this._wheelTimeout = setTimeout(() => this.sharpen(), 120);
         }, { passive: false });
 
         this._bind(this.container, 'mousedown', (e) => {
@@ -222,6 +226,19 @@ class SvgViewer {
     resetZoom() {
         this.state.scale = 1;
         this.centerDiagram();
+    }
+
+    /**
+     * Force a crisp reflow/repaint of the SVG after zooming stops.
+     * This reduces blurriness caused by the browser's transform interpolation.
+     */
+    sharpen() {
+        if (!this.svg || !this.canvas) return;
+        // Force the browser to recalculate layout and repaint.
+        try { this.svg.getBBox(); } catch (e) {}
+        void this.container.offsetHeight;
+        // Re-apply the same transform to trigger a fresh composite layer.
+        this.canvas.style.transform = `translate(${this.state.x}px, ${this.state.y}px) scale(${this.state.scale})`;
     }
 
     /**
