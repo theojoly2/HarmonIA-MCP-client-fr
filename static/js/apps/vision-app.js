@@ -143,6 +143,7 @@ class VisionApp extends AppBase {
                 onTransform: (state) => { this.viewerState = state; }
             });
         }
+        console.log('[Vision] _showViewer _centerOnNextShow=', this._centerOnNextShow, 'viewerState=', this.viewerState);
         // New import: center diagram. Window switching: restore exact position/zoom.
         if (this._centerOnNextShow) {
             this.viewer.setSvgAndRestore(this.svgText, this.mainClassName, null);
