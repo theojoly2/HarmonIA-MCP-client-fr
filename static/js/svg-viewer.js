@@ -234,11 +234,15 @@ class SvgViewer {
      */
     sharpen() {
         if (!this.svg || !this.canvas) return;
-        // Force the browser to recalculate layout and repaint.
-        try { this.svg.getBBox(); } catch (e) {}
+        const saved = this.canvas.style.transform;
+        // Remove the transform and force a full reflow/repaint.
+        this.canvas.style.transform = 'none';
+        void this.svg.getBoundingClientRect();
         void this.container.offsetHeight;
-        // Re-apply the same transform to trigger a fresh composite layer.
-        this.canvas.style.transform = `translate(${this.state.x}px, ${this.state.y}px) scale(${this.state.scale})`;
+        // Restore the transform; the browser will now render the SVG crisply at the new scale.
+        requestAnimationFrame(() => {
+            this.canvas.style.transform = saved;
+        });
     }
 
     /**
