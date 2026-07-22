@@ -97,7 +97,6 @@ class VisionApp extends AppBase {
     }
 
     async _handleFile(file) {
-        console.log('[Vision] _handleFile', file.name);
         this.fileName = file.name;
         // Every new import must be centered.
         this._centerOnNextShow = true;
@@ -117,7 +116,6 @@ class VisionApp extends AppBase {
             this.svgText = await ApiClient.importVisionFile(file);
             const match = this.svgText.match(/data-main-class="([^"]*)"/);
             this.mainClassName = match ? match[1] : '';
-            console.log('[Vision] import done, calling _showViewer');
             this._showViewer();
         } catch (err) {
             console.error('Vision import error', err);
@@ -151,7 +149,6 @@ class VisionApp extends AppBase {
                 onTransform: (state) => { this.viewerState = state; }
             });
         }
-        console.log('[Vision] _showViewer _centerOnNextShow=', this._centerOnNextShow, 'viewerState=', this.viewerState);
         // New import: center diagram. Window switching: restore exact position/zoom.
         if (this._centerOnNextShow) {
             this.viewer.setSvgAndRestore(this.svgText, this.mainClassName, null);
@@ -166,13 +163,11 @@ class VisionApp extends AppBase {
     }
 
     _showVisionHome() {
-        console.log('[Vision] _showVisionHome');
         const home = this.container.querySelector('#vision-home');
         const importContainer = this.container.querySelector('#vision-import-container');
         const viewer = this.container.querySelector('#vision-viewer');
 
         const finalizeHome = () => {
-            console.log('[Vision] finalizeHome');
             this.svgText = '';
             this.fileName = '';
             this.mainClassName = '';

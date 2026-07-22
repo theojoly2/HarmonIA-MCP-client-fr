@@ -84,14 +84,16 @@ class SvgViewer {
     }
 
     setSvg(svgText, mainClassName = '') {
-        console.log('[SvgViewer.setSvg] canvas=', this.canvas, 'canvas in DOM=', this.canvas ? this.canvas.isConnected : false);
+        // Reset any previous transform so a new SVG is never shown with an old offset/zoom.
+        this.state.scale = 1;
+        this.state.x = 0;
+        this.state.y = 0;
+        if (this.canvas) this.canvas.style.transform = '';
         this.canvas.innerHTML = svgText
             .replace(/style="background:#000000;"/g, 'style="background:#ffffff;"')
             .replace(/background:#000000/g, 'background:#ffffff')
             .replace(/\u003csvg/, '\u003csvg class="svg-diagram"');
-        console.log('[SvgViewer.setSvg] innerHTML length=', this.canvas.innerHTML.length, 'first svg tag=', this.canvas.innerHTML.slice(0, 200));
         this.svg = this.canvas.querySelector('svg.svg-diagram');
-        console.log('[SvgViewer.setSvg] this.svg=', this.svg);
     }
 
     setSvgAndRestore(svgText, mainClassName = '', state = null) {
