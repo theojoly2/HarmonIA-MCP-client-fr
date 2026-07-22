@@ -104,7 +104,15 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
     transform-origin: 0 0;
     will-change: transform;
 }
-.svg-canvas .svg-diagram { display: block; max-width: none; max-height: none; }
+.svg-canvas .svg-diagram {
+    display: block;
+    max-width: none;
+    max-height: none;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+    shape-rendering: geometricPrecision;
+    text-rendering: geometricPrecision;
+}
 .svg-controls {
     position: absolute;
     bottom: 1rem;
