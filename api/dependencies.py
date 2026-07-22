@@ -99,11 +99,10 @@ def render_results(results_data: list, query: str = "") -> dict:
             preview = normalize_preview(preview)
             preview_html = markdown.markdown(preview)
             safe_filename = urllib.parse.quote(filename)
-            file_url = f"/api/documents/{urllib.parse.quote(chunk0_id)}/file"
             results_html += f"""
             <div class="py-8 border-b border-gray-200 last:border-0 result-item">
                 <h3 class="text-xl font-bold mb-3">
-                    <a href="{file_url}" target="_blank" class="text-black hover:text-blue-600 hover:underline transition-colors" title="Ouvrir le document">
+                    <a href="{safe_filename}?download={chunk0_id}" target="_blank" class="text-black hover:text-blue-600 hover:underline transition-colors" title="Ouvrir le document">
                         {filename}
                     </a>
                 </h3>
