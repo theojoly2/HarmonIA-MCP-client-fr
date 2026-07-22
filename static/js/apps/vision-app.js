@@ -169,14 +169,6 @@ class VisionApp extends AppBase {
         const importContainer = this.container.querySelector('#vision-import-container');
         const viewer = this.container.querySelector('#vision-viewer');
 
-        // Reset the view before leaving the viewer so the next import starts centered.
-        if (this.viewer) {
-            this.viewer.resetZoom();
-            this.viewerState = this.viewer.getState();
-        } else {
-            this.viewerState = { scale: 1, x: 0, y: 0 };
-        }
-
         const finalizeHome = () => {
             this.svgText = '';
             this.fileName = '';
