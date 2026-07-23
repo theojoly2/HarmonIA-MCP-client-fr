@@ -188,17 +188,6 @@ class VisionApp extends AppBase {
             return;
         }
 
-        // Keep viewer visible while header moves down; hide it once import UI is fully expanded
-        if (importContainer) {
-            importContainer.style.transition = 'none';
-            importContainer.classList.remove('vision-import-hidden');
-            importContainer.style.maxHeight = '';
-            importContainer.style.opacity = '1';
-            importContainer.style.transform = '';
-            void importContainer.offsetHeight;
-            importContainer.style.transition = '';
-        }
-
         home.classList.remove('vision-top');
 
         viewer.style.transition = 'opacity 0.45s ease';
@@ -254,24 +243,13 @@ class VisionApp extends AppBase {
         if (this.svgText) {
             // Viewer mode: compact header, hidden import UI
             home.classList.add('vision-top');
-            home.style.paddingTop = '0px';
             importContainer.classList.add('vision-import-hidden');
             viewer.classList.remove('hidden');
             viewer.style.opacity = '1';
             viewer.style.transition = '';
         } else {
-            // Home mode: show import UI, hide viewer, vertically centered by padding.
-            // Measure content height without relying on the changing paddingTop.
+            // Home mode: show import UI, hide viewer, vertically centered via CSS flexbox
             home.classList.remove('vision-top');
-            home.style.paddingTop = '0px';
-            const rect = home.getBoundingClientRect();
-            const styles = getComputedStyle(home);
-            const paddingTop = parseFloat(styles.paddingTop) || 0;
-            const paddingBottom = parseFloat(styles.paddingBottom) || 0;
-            const contentHeight = rect.height - paddingTop - paddingBottom || 360;
-            const available = Math.max(this.container.clientHeight, contentHeight);
-            const offset = Math.max(0, (available - contentHeight) / 2);
-            home.style.paddingTop = offset + 'px';
             importContainer.classList.remove('vision-import-hidden');
             viewer.classList.add('hidden');
             viewer.style.opacity = '0';
