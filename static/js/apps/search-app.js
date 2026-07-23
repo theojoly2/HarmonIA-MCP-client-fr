@@ -19,6 +19,8 @@ class SearchApp extends AppBase {
         this.tagsHtml = "";
         this.loading = false;
         this.timerInterval = null;
+        this._resizeObserver = null;
+        this._skipNextTransition = false;
     }
 
     render(container) {
@@ -56,13 +58,18 @@ class SearchApp extends AppBase {
         `;
         this._bindEvents();
         this._updateHomeModeClass();
+        // First render: position immediately without transition to avoid a jump.
+        const wrapper = this.container.querySelector('#search-wrapper-inner');
+        if (wrapper) wrapper.style.transition = 'none';
+        this._skipNextTransition = true;
         this._applyCentering();
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-                const wrapper = this.container.querySelector('#search-wrapper-inner');
                 if (wrapper) wrapper.style.transition = '';
+                this._skipNextTransition = false;
             });
         });
+        this._observeResize();
         if (this.resultsHtml) this._animateResults();
         this._loadTags();
     }
@@ -333,7 +340,7 @@ class SearchApp extends AppBase {
         });
     }
 
-    _applyCentering() {
+    _applyCentering(skipTransition) {
         const wrapper = this.container.querySelector('#search-wrapper-inner');
         if (!wrapper) return;
 
@@ -344,6 +351,8 @@ class SearchApp extends AppBase {
         if (!this.query && !this.resultsHtml) {
             // Vertically center the home content based on the container height.
             // Reset padding before measuring to avoid including previous padding in offsetHeight.
+            const was = wrapper.style.transition;
+            if (skipTransition || this._skipNextTransition) wrapper.style.transition = 'none';
             wrapper.style.paddingTop = '0px';
             wrapper.style.paddingBottom = '0px';
             const contentHeight = wrapper.offsetHeight || 220;
@@ -351,10 +360,32 @@ class SearchApp extends AppBase {
             const offset = Math.max(0, (available - contentHeight) / 2);
             wrapper.style.paddingTop = offset + 'px';
             wrapper.style.paddingBottom = '0px';
+            if (skipTransition || this._skipNextTransition) {
+                wrapper.offsetHeight; // force reflow
+                wrapper.style.transition = was;
+            }
         } else {
             wrapper.style.paddingTop = '2rem';
             wrapper.style.paddingBottom = '2rem';
         }
+    }
+
+    _observeResize() {
+        if (this._resizeObserver) this._resizeObserver.disconnect();
+        if (!this.container || typeof ResizeObserver === 'undefined') return;
+        this._resizeObserver = new ResizeObserver(() => {
+            if (!this.query && !this.resultsHtml) {
+                this._applyCentering(true);
+            }
+        });
+        this._resizeObserver.observe(this.container);
+    }
+
+    unmount() {
+        this._stopTimer();
+        if (this._resizeObserver) this._resizeObserver.disconnect();
+        this._resizeObserver = null;
+        super.unmount();
     }
 
     getState() {

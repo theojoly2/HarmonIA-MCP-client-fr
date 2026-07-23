@@ -20,6 +20,8 @@ class VisionApp extends AppBase {
         this.viewer = null;
         this._centerOnNextShow = true;
         this._homeTimeout = null;
+        this._resizeObserver = null;
+        this._skipNextTransition = false;
     }
 
     render(container) {
@@ -68,7 +70,17 @@ class VisionApp extends AppBase {
                 requestAnimationFrame(() => this._showViewer());
             });
         } else {
+            const home = this.container.querySelector('#vision-home');
+            if (home) home.style.transition = 'none';
+            this._skipNextTransition = true;
             this._updateHomeVisibility();
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    if (home) home.style.transition = '';
+                    this._skipNextTransition = false;
+                });
+            });
+            this._observeResize();
         }
     }
 
@@ -234,7 +246,7 @@ class VisionApp extends AppBase {
         }
     }
 
-    _updateHomeVisibility() {
+    _updateHomeVisibility(skipTransition) {
         const home = this.container.querySelector('#vision-home');
         const importContainer = this.container.querySelector('#vision-import-container');
         const viewer = this.container.querySelector('#vision-viewer');
@@ -251,17 +263,32 @@ class VisionApp extends AppBase {
         } else {
             // Home mode: show import UI, hide viewer, vertically centered by paddingTop.
             // Reset padding before measuring so offsetHeight does not include old padding.
+            const was = home.style.transition;
+            if (skipTransition || this._skipNextTransition) home.style.transition = 'none';
             home.classList.remove('vision-top');
             home.style.paddingTop = '0px';
             const contentHeight = home.offsetHeight || 360;
             const available = Math.max(this.container.clientHeight, contentHeight);
             const offset = Math.max(0, (available - contentHeight) / 2);
             home.style.paddingTop = offset + 'px';
+            if (skipTransition || this._skipNextTransition) {
+                home.offsetHeight; // force reflow
+                home.style.transition = was;
+            }
             importContainer.classList.remove('vision-import-hidden');
             viewer.classList.add('hidden');
             viewer.style.opacity = '0';
             viewer.style.transition = '';
         }
+    }
+
+    _observeResize() {
+        if (this._resizeObserver) this._resizeObserver.disconnect();
+        if (!this.container || typeof ResizeObserver === 'undefined') return;
+        this._resizeObserver = new ResizeObserver(() => {
+            if (!this.svgText) this._updateHomeVisibility(true);
+        });
+        this._resizeObserver.observe(this.container);
     }
 
     unmount() {
@@ -270,6 +297,8 @@ class VisionApp extends AppBase {
             this.viewer.destroy();
             this.viewer = null;
         }
+        if (this._resizeObserver) this._resizeObserver.disconnect();
+        this._resizeObserver = null;
         super.unmount();
     }
 }
