@@ -347,10 +347,14 @@ class SearchApp extends AppBase {
 
         if (!this.query && !this.resultsHtml) {
             // Vertically center the home content based on the container height.
-            // We must not include the current paddingTop in the content measurement.
+            // Measure the content box height without relying on padding.
             wrapper.style.paddingTop = '0px';
             wrapper.style.paddingBottom = '0px';
-            const contentHeight = wrapper.offsetHeight || 220;
+            const rect = wrapper.getBoundingClientRect();
+            const styles = getComputedStyle(wrapper);
+            const paddingTop = parseFloat(styles.paddingTop) || 0;
+            const paddingBottom = parseFloat(styles.paddingBottom) || 0;
+            const contentHeight = rect.height - paddingTop - paddingBottom || 220;
             const available = Math.max(this.container.clientHeight, contentHeight);
             const offset = Math.max(0, (available - contentHeight) / 2);
             wrapper.style.paddingTop = offset + 'px';
