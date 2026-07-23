@@ -344,8 +344,11 @@ class SearchApp extends AppBase {
         wrapper.style.maxWidth = (vw <= 1440 ? Math.min(690, vw * 0.82) : 768) + 'px';
 
         if (!this.query && !this.resultsHtml) {
-            // Match Vision home top offset
-            wrapper.style.paddingTop = '96px';
+            // Vertically center the home content based on the viewport height
+            const vh = this.container.clientHeight;
+            const contentHeight = wrapper.offsetHeight || 220;
+            const offset = Math.max(0, (vh - contentHeight) / 2 - 24);
+            wrapper.style.paddingTop = offset + 'px';
             wrapper.style.paddingBottom = '0px';
         } else {
             wrapper.style.paddingTop = '2rem';
