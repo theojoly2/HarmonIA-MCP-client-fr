@@ -61,7 +61,7 @@ class SearchApp extends AppBase {
             requestAnimationFrame(() => {
                 const wrapper = this.container.querySelector('#search-wrapper-inner');
                 if (wrapper) {
-                    wrapper.style.transition = 'padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 0.55s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.55s cubic-bezier(0.4, 0, 0.2, 1)';
+                    wrapper.style.transition = '';
                 }
             });
         });
@@ -343,16 +343,11 @@ class SearchApp extends AppBase {
         const vw = this.container.clientWidth;
         wrapper.style.maxWidth = (vw <= 1440 ? Math.min(690, vw * 0.82) : 768) + 'px';
 
+        // Use CSS flex centering in home mode; results align to top
         if (!this.query && !this.resultsHtml) {
-            // Vertically center the home content based on the viewport height
-            const vh = this.container.clientHeight;
-            const contentHeight = wrapper.offsetHeight || 220;
-            const offset = Math.max(0, (vh - contentHeight) / 2 - 24);
-            wrapper.style.paddingTop = offset + 'px';
-            wrapper.style.paddingBottom = '0px';
+            wrapper.classList.remove('results-mode');
         } else {
-            wrapper.style.paddingTop = '2rem';
-            wrapper.style.paddingBottom = '2rem';
+            wrapper.classList.add('results-mode');
         }
     }
 
