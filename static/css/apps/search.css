@@ -3,14 +3,8 @@
 .search-app.home-mode { overflow: hidden; }
 #search-wrapper-inner {
     margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
+    transition: padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 0.55s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.55s cubic-bezier(0.4, 0, 0.2, 1);
     min-height: 100%;
-    transition: max-width 0.55s cubic-bezier(0.4, 0, 0.2, 1);
-}
-#search-wrapper-inner.results-mode {
-    justify-content: flex-start;
 }
 #search-input {
     font-size: clamp(0.875rem, 1.3vw, 1.125rem);

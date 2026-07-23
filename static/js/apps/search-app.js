@@ -56,12 +56,14 @@ class SearchApp extends AppBase {
         `;
         this._bindEvents();
         this._updateHomeModeClass();
+        // Disable transition for the very first measurement to avoid a jump from 0.
+        const wrapper = this.container.querySelector('#search-wrapper-inner');
+        if (wrapper) wrapper.style.transition = 'none';
         this._applyCentering();
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-                const wrapper = this.container.querySelector('#search-wrapper-inner');
                 if (wrapper) {
-                    wrapper.style.transition = '';
+                    wrapper.style.transition = 'padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 0.55s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.55s cubic-bezier(0.4, 0, 0.2, 1)';
                 }
             });
         });
@@ -343,11 +345,19 @@ class SearchApp extends AppBase {
         const vw = this.container.clientWidth;
         wrapper.style.maxWidth = (vw <= 1440 ? Math.min(690, vw * 0.82) : 768) + 'px';
 
-        // Use CSS flex centering in home mode; results align to top
         if (!this.query && !this.resultsHtml) {
-            wrapper.classList.remove('results-mode');
+            // Vertically center the home content based on the container height.
+            // We must not include the current paddingTop in the content measurement.
+            wrapper.style.paddingTop = '0px';
+            wrapper.style.paddingBottom = '0px';
+            const contentHeight = wrapper.offsetHeight || 220;
+            const available = Math.max(this.container.clientHeight, contentHeight);
+            const offset = Math.max(0, (available - contentHeight) / 2);
+            wrapper.style.paddingTop = offset + 'px';
+            wrapper.style.paddingBottom = '0px';
         } else {
-            wrapper.classList.add('results-mode');
+            wrapper.style.paddingTop = '2rem';
+            wrapper.style.paddingBottom = '2rem';
         }
     }
 
