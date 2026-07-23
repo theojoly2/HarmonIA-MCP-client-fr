@@ -341,11 +341,19 @@ class SearchApp extends AppBase {
         const vw = this.container.clientWidth;
         wrapper.style.maxWidth = (vw <= 1440 ? Math.min(690, vw * 0.82) : 768) + 'px';
 
-        // Use CSS flex centering for home mode; switch to top-aligned results mode otherwise.
         if (!this.query && !this.resultsHtml) {
-            wrapper.classList.remove('results-mode');
+            // Vertically center the home content based on the container height.
+            // Reset padding before measuring to avoid including previous padding in offsetHeight.
+            wrapper.style.paddingTop = '0px';
+            wrapper.style.paddingBottom = '0px';
+            const contentHeight = wrapper.offsetHeight || 220;
+            const available = Math.max(this.container.clientHeight, contentHeight);
+            const offset = Math.max(0, (available - contentHeight) / 2);
+            wrapper.style.paddingTop = offset + 'px';
+            wrapper.style.paddingBottom = '0px';
         } else {
-            wrapper.classList.add('results-mode');
+            wrapper.style.paddingTop = '2rem';
+            wrapper.style.paddingBottom = '2rem';
         }
     }
 

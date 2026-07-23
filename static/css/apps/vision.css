@@ -1,20 +1,15 @@
 .vision-app { background: #ffffff; display: flex; flex-direction: column; height: 100%; }
 .vision-home {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    min-height: 100%;
+    justify-content: flex-start;
     padding-top: 0;
     padding-bottom: 0;
-    transition: min-height 0.55s cubic-bezier(0.4, 0, 0.2, 1), justify-content 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.45s ease;
+    transition: padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.45s ease;
     flex-shrink: 0;
 }
 .vision-home.hidden { display: none; }
 
 .vision-top {
-    min-height: auto !important;
-    justify-content: flex-start !important;
+    justify-content: flex-start;
     padding-top: 0 !important;
     padding-bottom: 0 !important;
     flex-shrink: 0;

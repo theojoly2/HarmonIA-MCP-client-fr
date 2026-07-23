@@ -243,13 +243,20 @@ class VisionApp extends AppBase {
         if (this.svgText) {
             // Viewer mode: compact header, hidden import UI
             home.classList.add('vision-top');
+            home.style.paddingTop = '0px';
             importContainer.classList.add('vision-import-hidden');
             viewer.classList.remove('hidden');
             viewer.style.opacity = '1';
             viewer.style.transition = '';
         } else {
-            // Home mode: show import UI, hide viewer, vertically centered via CSS flexbox
+            // Home mode: show import UI, hide viewer, vertically centered by paddingTop.
+            // Reset padding before measuring so offsetHeight does not include old padding.
             home.classList.remove('vision-top');
+            home.style.paddingTop = '0px';
+            const contentHeight = home.offsetHeight || 360;
+            const available = Math.max(this.container.clientHeight, contentHeight);
+            const offset = Math.max(0, (available - contentHeight) / 2);
+            home.style.paddingTop = offset + 'px';
             importContainer.classList.remove('vision-import-hidden');
             viewer.classList.add('hidden');
             viewer.style.opacity = '0';
