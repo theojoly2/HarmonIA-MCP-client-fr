@@ -58,20 +58,23 @@ class SearchApp extends AppBase {
         `;
         this._bindEvents();
         this._updateHomeModeClass();
-        // First render: position immediately without transition to avoid a jump.
         const wrapper = this.container.querySelector('#search-wrapper-inner');
         if (wrapper) wrapper.style.transition = 'none';
         this._skipNextTransition = true;
-        this._applyCentering();
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                if (wrapper) wrapper.style.transition = '';
-                this._skipNextTransition = false;
-            });
-        });
         this._observeResize();
         if (this.resultsHtml) this._animateResults();
         this._loadTags();
+        // Measure and position after layout is stable, then re-enable transition.
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                this._applyCentering(true);
+                if (wrapper) {
+                    wrapper.offsetHeight; // force reflow
+                    wrapper.style.transition = 'padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 0.55s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.55s cubic-bezier(0.4, 0, 0.2, 1)';
+                }
+                this._skipNextTransition = false;
+            });
+        });
     }
 
     _updateHomeModeClass() {
@@ -403,11 +406,6 @@ class SearchApp extends AppBase {
         this.resultsHtml = state.resultsHtml || '';
         this.tagsHtml = state.tagsHtml || '';
         if (this.container) this.render(this.container);
-    }
-
-    unmount() {
-        this._stopTimer();
-        super.unmount();
     }
 }
 
