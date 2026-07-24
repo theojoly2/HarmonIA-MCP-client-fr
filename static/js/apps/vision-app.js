@@ -206,15 +206,46 @@ class VisionApp extends AppBase {
             return;
         }
 
-        home.classList.remove('vision-top');
-
-        viewer.style.transition = 'opacity 0.45s ease';
+        // Step 1: fade out the diagram viewer while keeping the import container hidden.
+        viewer.style.transition = 'opacity 0.5s ease';
         viewer.style.opacity = '0';
 
         this._homeTimeout = setTimeout(() => {
             this._homeTimeout = null;
-            finalizeHome();
-        }, 450);
+            // Step 2: switch to home layout (compact header, hidden viewer).
+            home.classList.add('vision-home-revealing');
+            home.classList.remove('vision-top');
+            this._updateHomeVisibility();
+            if (importContainer) {
+                importContainer.style.transition = 'none';
+                importContainer.style.opacity = '0';
+                importContainer.style.transform = 'translateY(-10px)';
+                void importContainer.offsetHeight;
+                importContainer.style.transition = 'opacity 0.5s ease, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1)';
+                requestAnimationFrame(() => {
+                    importContainer.style.opacity = '1';
+                    importContainer.style.transform = 'translateY(0)';
+                });
+            }
+            // Step 3: fade the import button/area into the home view.
+            requestAnimationFrame(() => {
+                this._fadeInImportButton();
+            });
+        }, 500);
+    }
+
+    _fadeInImportButton() {
+        const dropZone = this.container.querySelector('#vision-drop-zone');
+        if (!dropZone) return;
+        dropZone.style.transition = 'none';
+        dropZone.style.opacity = '0';
+        dropZone.style.transform = 'scale(0.96)';
+        void dropZone.offsetHeight;
+        dropZone.style.transition = 'opacity 0.5s ease, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1)';
+        requestAnimationFrame(() => {
+            dropZone.style.opacity = '1';
+            dropZone.style.transform = 'scale(1)';
+        });
     }
 
     _setLoading(isLoading) {
