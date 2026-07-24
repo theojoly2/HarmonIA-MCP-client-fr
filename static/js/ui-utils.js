@@ -131,7 +131,7 @@ const UiUtils = (() => {
         clampWindowPosition(win);
     }
 
-    function createFloatingWindow({ title = '', icon = '', width = 800, height = 600, onClose, onFocus, onResizeStart, onResize, onResizeEnd }) {
+    function createFloatingWindow({ title = '', fileName = '', icon = '', width = 800, height = 600, onClose, onFocus, onResizeStart, onResize, onResizeEnd }) {
         const win = document.createElement('div');
         win.className = 'floating-window';
         win.style.width = width + 'px';
@@ -139,12 +139,14 @@ const UiUtils = (() => {
         win.style.top = '50%';
         win.style.left = '50%';
         win.style.transform = 'translate(-50%, -50%)';
+        const fileLabel = fileName ? `<span class="window-file font-medium text-gray-500 text-xs truncate max-w-[12rem]">${fileName}</span>` : '';
         win.innerHTML = `
             <div class="window-header">
                 <div class="flex items-center gap-2 min-w-0">
                     <span class="window-icon">${icon}</span>
-                    <div class="min-w-0">
-                        <h3 class="window-title font-bold text-gray-900 text-sm leading-tight">${title}</h3>
+                    <div class="min-w-0 flex flex-col items-start leading-tight">
+                        <h3 class="window-title font-bold text-gray-900 text-sm">${title}</h3>
+                        ${fileLabel}
                     </div>
                 </div>
                 <button class="window-close magic-btn text-gray-400 hover:text-black p-1.5 rounded-full transition-colors focus:outline-none flex-shrink-0" title="Fermer">
@@ -175,7 +177,26 @@ const UiUtils = (() => {
             win.remove();
         });
         win.addEventListener('mousedown', () => { if (onFocus) onFocus(); });
-        return { win, body: win.querySelector('.window-body'), setTitle: (t) => { win.querySelector('.window-title').textContent = t; } };
+        return {
+            win,
+            body: win.querySelector('.window-body'),
+            setTitle: (t) => { win.querySelector('.window-title').textContent = t; },
+            setFileName: (name) => {
+                let label = win.querySelector('.window-file');
+                if (name) {
+                    if (!label) {
+                        const titleEl = win.querySelector('.window-title');
+                        const container = titleEl.parentElement;
+                        label = document.createElement('span');
+                        label.className = 'window-file font-medium text-gray-500 text-xs truncate max-w-[12rem]';
+                        container.appendChild(label);
+                    }
+                    label.textContent = name;
+                } else if (label) {
+                    label.remove();
+                }
+            }
+        };
     }
 
     return {

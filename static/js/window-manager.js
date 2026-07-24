@@ -55,6 +55,7 @@ class WindowManager {
         let resizeAnchorSaved = false;
         const floatWin = UiUtils.createFloatingWindow({
             title: instance.getTitle(),
+            fileName: instance.fileName || instance.docName || '',
             icon: instance.constructor.iconSvg,
             width,
             height,
@@ -145,7 +146,11 @@ class WindowManager {
         const instance = AppState.getInstance(instanceId);
         if (instance) instance.setTitle(title);
         const floatWin = this.floatWindows.get(instanceId);
-        if (floatWin) floatWin.setTitle(title);
+        if (floatWin) {
+            floatWin.setTitle(title);
+            const fileName = instance ? (instance.fileName || instance.docName || '') : '';
+            if (fileName) floatWin.setFileName(fileName);
+        }
     }
 
     _clampAllFloating() {
