@@ -73,14 +73,19 @@ class VisionApp extends AppBase {
             const home = this.container.querySelector('#vision-home');
             if (home) home.style.transition = 'none';
             this._skipNextTransition = true;
-            this._updateHomeVisibility();
+            this._observeResize();
+            // Wait for the browser to finish layout before measuring height,
+            // otherwise the first render computes an incorrect large offset.
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
-                    if (home) home.style.transition = '';
+                    this._updateHomeVisibility(true);
+                    if (home) {
+                        home.offsetHeight; // force reflow
+                        home.style.transition = 'padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.45s ease';
+                    }
                     this._skipNextTransition = false;
                 });
             });
-            this._observeResize();
         }
     }
 
