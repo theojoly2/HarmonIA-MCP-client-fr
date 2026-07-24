@@ -26,8 +26,9 @@ class SearchApp extends AppBase {
 
     async render(container) {
         this.container = container;
-        // Load tags first so the initial layout and centering include them.
+        // Load tags first so we can stage their appearance after the title/search bar.
         if (!this.tagsHtml) await this._loadTags();
+        const showTags = this._firstTagAnimation;
         container.innerHTML = `
             <div class="search-app h-full overflow-y-auto px-4 sm:px-6">
                 <div id="search-wrapper-inner" class="mx-auto" style="transition: none;">
@@ -47,8 +48,8 @@ class SearchApp extends AppBase {
                                 <span class="btn-label">Chercher</span>
                             </button>
                         </div>
-                        <div id="tags-container" class="mt-5 flex flex-wrap gap-2 justify-center">
-                            ${this.tagsHtml || '<span class="text-gray-500 font-medium text-sm">Aucune source disponible.</span>'}
+                        <div id="tags-container" class="mt-5 flex flex-wrap gap-2 justify-center ${showTags ? 'tags-staged' : ''}">
+                            ${showTags ? '<span class="text-gray-500 font-medium text-sm">Chargement des sources...</span>' : (this.tagsHtml || '<span class="text-gray-500 font-medium text-sm">Aucune source disponible.</span>')}
                         </div>
                     </form>
                     <div id="loading-indicator" class="text-center mt-2 mb-6">
@@ -66,15 +67,19 @@ class SearchApp extends AppBase {
         this._skipNextTransition = true;
         this._observeResize();
         if (this.resultsHtml) this._animateResults();
-        // Measure and position after layout is stable, then re-enable transition.
+        // Stage 1: center title + search bar only.
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
                 this._applyCentering(true);
                 requestAnimationFrame(() => {
                     if (wrapper) {
-                        wrapper.style.transition = 'padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 0.55s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.55s cubic-bezier(0.4, 0, 0.2, 1)';
+                        wrapper.style.transition = 'padding-top 0.85s cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 0.55s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.55s cubic-bezier(0.4, 0, 0.2, 1)';
                     }
                     this._skipNextTransition = false;
+                    if (showTags) {
+                        // Stage 2: reveal tags and glide the title/bar upward.
+                        setTimeout(() => this._revealTags(), 400);
+                    }
                 });
             });
         });
@@ -222,12 +227,11 @@ class SearchApp extends AppBase {
             tagsContainer.innerHTML = '<span class="text-gray-500 font-medium text-sm">Aucune source disponible.</span>';
             return;
         }
-        const animate = this._firstTagAnimation;
         this.tagsHtml = tags.map(t => {
             const tagName = (typeof t === 'object' ? t.tag : t) || '';
             const isChecked = this.selectedTags.includes(tagName) ? 'checked' : '';
             return `
-                <label class="cursor-pointer select-none tag-label ${animate ? 'tag-land' : ''}" title="${tagName}">
+                <label class="cursor-pointer select-none tag-label" title="${tagName}">
                     <input type="checkbox" name="t" value="${tagName}" class="peer hidden" ${isChecked}>
                     <span class="inline-flex items-center rounded-full font-bold border-2 border-gray-200 text-gray-700 peer-checked:bg-black peer-checked:text-white peer-checked:border-black hover:border-gray-400 transition-colors overflow-hidden relative">
                         <svg class="icon-unchecked w-3.5 h-3.5 mr-1.5 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4"></path></svg>
@@ -238,14 +242,26 @@ class SearchApp extends AppBase {
             `;
         }).join('');
         tagsContainer.innerHTML = this.tagsHtml;
-        if (animate) {
-            this._firstTagAnimation = false;
-            const labels = tagsContainer.querySelectorAll('.tag-land');
+        if (window.GlowEffects) window.GlowEffects.scanAndBind();
+    }
+
+    _revealTags() {
+        const wrapper = this.container.querySelector('#search-wrapper-inner');
+        const tagsContainer = this.container.querySelector('#tags-container');
+        if (!tagsContainer) return;
+        this._firstTagAnimation = false;
+        tagsContainer.classList.remove('tags-staged');
+        tagsContainer.innerHTML = this.tagsHtml || '<span class="text-gray-500 font-medium text-sm">Aucune source disponible.</span>';
+        if (window.GlowEffects) window.GlowEffects.scanAndBind();
+        // Re-measure with tags and glide the title/bar upward.
+        this._applyCentering();
+        if (wrapper) {
+            const labels = tagsContainer.querySelectorAll('.tag-label');
             labels.forEach((el, i) => {
-                el.style.animationDelay = (i * 0.06) + 's';
+                el.classList.add('tag-land');
+                el.style.animationDelay = (i * 0.12) + 's';
             });
         }
-        if (window.GlowEffects) window.GlowEffects.scanAndBind();
     }
 
     async _runSearch() {
