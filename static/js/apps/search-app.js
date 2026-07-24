@@ -63,7 +63,12 @@ class SearchApp extends AppBase {
         this._skipNextTransition = true;
         this._observeResize();
         if (this.resultsHtml) this._animateResults();
-        this._loadTags();
+        this._loadTags().then(() => {
+            if (!this.query && !this.resultsHtml) {
+                // Tags have loaded and may have changed content height; re-center without animation.
+                this._applyCentering(true);
+            }
+        });
         // Measure and position after layout is stable, then re-enable transition.
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
