@@ -34,14 +34,14 @@ class WindowManager {
         return instanceId;
     }
 
-    _mountTab(instance) {
+    async _mountTab(instance) {
         AppState.saveInstanceState(instance.instanceId);
         this.shellElement.innerHTML = '';
         const container = document.createElement('div');
         container.className = 'app-container h-full w-full';
         container.dataset.instanceId = instance.instanceId;
         this.shellElement.appendChild(container);
-        instance.mount(container);
+        await instance.mount(container);
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
                 AppState.restoreInstanceState(instance.instanceId);
@@ -49,7 +49,7 @@ class WindowManager {
         });
     }
 
-    _mountFloating(instance, props) {
+    async _mountFloating(instance, props) {
         AppState.saveInstanceState(instance.instanceId);
         const { width = 800, height = 600, offsetX = 0, offsetY = 0 } = props;
         let resizeAnchorSaved = false;
@@ -84,7 +84,7 @@ class WindowManager {
         // Position and force layout so the body has its final size before mounting the app.
         UiUtils.centerWindow(floatWin.win, offsetX, offsetY);
         void floatWin.win.offsetHeight;
-        instance.mount(body);
+        await instance.mount(body);
         requestAnimationFrame(() => {
             requestAnimationFrame(() => AppState.restoreInstanceState(instance.instanceId));
         });
@@ -113,8 +113,8 @@ class WindowManager {
                 this.splitManager.splitLeaf(target.instanceId, direction, { type: 'pane', instanceId: instance.instanceId });
             }
         }
-        this.splitManager.registerRenderer(instance.instanceId, (pane) => {
-            instance.mount(pane);
+        this.splitManager.registerRenderer(instance.instanceId, async (pane) => {
+            await instance.mount(pane);
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => AppState.restoreInstanceState(instance.instanceId));
             });
