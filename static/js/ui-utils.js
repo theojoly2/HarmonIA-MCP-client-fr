@@ -23,10 +23,9 @@ const UiUtils = (() => {
             const minVisible = options.minVisible || 60;
             let left = initialLeft + (e.clientX - startX);
             let top = initialTop + (e.clientY - startY);
-            // Block at the top edge (no negative top).
+            // Keep the entire window visible at the top and horizontally.
+            left = Math.max(0, Math.min(vw - rect.width, left));
             top = Math.max(0, top);
-            // Keep at least minVisible pixels visible on the left and right.
-            left = Math.max(minVisible - rect.width, Math.min(vw - minVisible, left));
             // Allow the window to slide partially below the viewport (for minimize-from-bottom behavior),
             // but keep at least minVisible pixels visible at the top.
             top = Math.min(vh + rect.height - minVisible, top);
@@ -97,9 +96,8 @@ const UiUtils = (() => {
         const rect = win.getBoundingClientRect();
         const vw = window.innerWidth, vh = window.innerHeight;
         let left = rect.left, top = rect.top;
-        // Keep at least minVisible pixels visible horizontally.
-        left = Math.max(minVisible - rect.width, Math.min(vw - minVisible, left));
-        // Never go above the top edge.
+        // Keep the entire window visible horizontally and at the top.
+        left = Math.max(0, Math.min(vw - rect.width, left));
         top = Math.max(0, top);
         // Allow partial exit at the bottom (for minimize-from-bottom behavior),
         // but keep at least minVisible pixels visible at the top.
