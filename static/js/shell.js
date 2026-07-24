@@ -1,0 +1,54 @@
+/**
+ * Shell
+ * Barre d'onglets + menu pour ouvrir les apps dans différents modes.
+ */
+
+class Shell {
+    constructor(container, windowManager) {
+        this.container = container;
+        this.windowManager = windowManager;
+        this.tabs = [];
+        this._init();
+    }
+
+    _init() {
+        this.container.innerHTML = `
+            <div id="global-header" class="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200 px-4 sm:px-6 py-3 flex items-center flex-shrink-0">
+                <div class="flex items-center gap-2" id="tab-bar"></div>
+            </div>
+            <div id="shell-content" class="flex-1 relative overflow-hidden"></div>
+        `;
+        this.tabBar = this.container.querySelector('#tab-bar');
+        this.contentArea = this.container.querySelector('#shell-content');
+    }
+
+    getContentArea() {
+        return this.contentArea;
+    }
+
+    addAppButton(appClass) {
+        const btn = document.createElement('button');
+        btn.className = 'nav-tab';
+        btn.dataset.appId = appClass.id;
+        const icon = appClass.iconSvg || '';
+        btn.innerHTML = `${icon} <span>${appClass.title}</span>`;
+        btn.addEventListener('click', () => {
+            const existing = AppState.listInstances().find(i => i.appId === appClass.id && i.mode === 'tab');
+            if (existing) {
+                this.windowManager.switchTab(existing.instanceId);
+            } else {
+                this.windowManager.open(appClass.id, { mode: 'tab' });
+            }
+        });
+        this.tabBar.appendChild(btn);
+        return btn;
+    }
+
+    setActiveTab(appId) {
+        Array.from(this.tabBar.children).forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.appId === appId);
+        });
+    }
+}
+
+window.Shell = Shell;
