@@ -218,8 +218,9 @@ class VisionApp extends AppBase {
             home.style.transition = 'transform 0.7s cubic-bezier(0.4, 0, 0.2, 1)';
             home.style.transform = `translateY(${finalOffset}px)`;
 
-            // Fade out the diagram viewer over the same period.
-            viewer.style.transition = 'opacity 0.7s ease';
+            // Fade out and slide the diagram viewer downward with the title.
+            viewer.style.transition = 'opacity 0.7s ease, transform 0.7s cubic-bezier(0.4, 0, 0.2, 1)';
+            viewer.style.transform = `translateY(${finalOffset}px)`;
             viewer.style.opacity = '0';
         });
 
@@ -237,6 +238,7 @@ class VisionApp extends AppBase {
             home.style.transition = 'none';
             home.style.transform = 'none';
             home.style.paddingTop = finalOffset + 'px';
+            viewer.style.transform = 'none';
             this._updateHomeVisibility(true);
             this.setTitle(this.constructor.title);
 
