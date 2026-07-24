@@ -27,12 +27,14 @@ class SearchApp extends AppBase {
 
     async render(container) {
         this.container = container;
-        // Load tags first so we can stage their appearance after the title/search bar.
-        if (!this.tagsHtml) await this._loadTags();
         const showTags = this._firstTagAnimation;
         if (showTags) {
             this._firstTagAnimation = false;
             this._introAnimating = true;
+            this._tagsReady = false;
+            this._layoutReady = false;
+            // Start loading tags in parallel; the reveal fires as soon as both tags and layout are ready.
+            this._loadTags().then(() => this._checkRevealReady());
         }
         // Hide tags initially so only the title/search bar affect the first centering.
         // Start with the wrapper invisible to avoid a flash at the top before centering is applied.
@@ -70,7 +72,6 @@ class SearchApp extends AppBase {
         this._bindEvents();
         this._updateHomeModeClass();
         const wrapper = this.container.querySelector('#search-wrapper-inner');
-        const tagsContainer = this.container.querySelector('#tags-container');
         if (wrapper) wrapper.style.transition = 'none';
         this._skipNextTransition = true;
         if (!showTags) this._observeResize();
@@ -86,14 +87,20 @@ class SearchApp extends AppBase {
                     }
                     this._skipNextTransition = false;
                     if (showTags) {
-                        // Stage 2: reveal tags and glide the title/bar upward.
-                        setTimeout(() => this._revealTags(), 200);
+                        this._layoutReady = true;
+                        this._checkRevealReady();
                     } else {
                         this._observeResize();
                     }
                 });
             });
         });
+    }
+
+    _checkRevealReady() {
+        if (this._tagsReady && this._layoutReady) {
+            this._revealTags();
+        }
     }
 
     _updateHomeModeClass() {
@@ -222,13 +229,16 @@ class SearchApp extends AppBase {
     }
 
     async _loadTags() {
+        if (this.tagsHtml) return;
         try {
             const data = await ApiClient.getTags();
             const tags = data.tags || [];
             this.tagsHtml = this._buildTagsHtml(tags);
-            this._injectTagsHtml();
+            this._tagsReady = true;
         } catch (e) {
             console.error('Erreur chargement tags', e);
+            this.tagsHtml = '';
+            this._tagsReady = true;
         }
     }
 
