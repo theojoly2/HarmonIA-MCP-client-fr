@@ -3,7 +3,7 @@
  * Bootstraps the shell, window manager, and registers all apps.
  */
 
-(async function() {
+(function() {
     // Register apps
     AppState.registerApp(SearchApp);
     AppState.registerApp(VisionApp);
@@ -20,7 +20,7 @@
 
     // Split manager for shell content
     const splitManager = new SplitManager(contentArea, {
-        onEmpty: async () => {
+        onEmpty: () => {
             // When no split leaves, show active tab app
             const active = AppState.getActiveInstance();
             if (active) {
@@ -30,7 +30,7 @@
                     const pane = document.createElement('div');
                     pane.className = 'h-full w-full';
                     contentArea.appendChild(pane);
-                    await inst.mount(pane);
+                    inst.mount(pane);
                 }
             }
         }
@@ -68,7 +68,7 @@
     GlowEffects.init();
 
     // Initial app: search
-    await windowManager.open('search', { mode: 'tab' });
+    windowManager.open('search', { mode: 'tab' });
 
     // Window resize handling for centering
     window.addEventListener('resize', () => {

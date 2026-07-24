@@ -89,6 +89,28 @@ h1 .title-glow { font-size: clamp(1.25rem, 2.5vw, 2.25rem); }
 }
 .tag-label input:not(:checked) ~ span:hover { border-color: #d1d5db; }
 
+.tag-land {
+    display: inline-block;
+    opacity: 0;
+    transform: scale(1.6) translateY(-12px);
+    animation: tagLand 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes tagLand {
+    0% {
+        opacity: 0;
+        transform: scale(1.6) translateY(-12px);
+    }
+    70% {
+        opacity: 1;
+        transform: scale(0.98) translateY(2px);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
 .tag-label input:checked ~ span {
     background-color: #111827;
     color: white;

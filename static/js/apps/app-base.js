@@ -25,8 +25,8 @@ class AppBase {
         container.innerHTML = `<div class="p-8 text-center text-gray-500">App ${this.constructor.id} non implémentée.</div>`;
     }
 
-    async mount(container) {
-        await this.render(container);
+    mount(container) {
+        this.render(container);
         this.mounted = true;
     }
 
