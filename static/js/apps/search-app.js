@@ -22,6 +22,7 @@ class SearchApp extends AppBase {
         this._resizeObserver = null;
         this._skipNextTransition = false;
         this._firstTagAnimation = true;
+        this._introAnimating = false;
     }
 
     async render(container) {
@@ -29,11 +30,15 @@ class SearchApp extends AppBase {
         // Load tags first so we can stage their appearance after the title/search bar.
         if (!this.tagsHtml) await this._loadTags();
         const showTags = this._firstTagAnimation;
-        if (showTags) this._firstTagAnimation = false;
+        if (showTags) {
+            this._firstTagAnimation = false;
+            this._introAnimating = true;
+        }
         // Hide tags initially so only the title/search bar affect the first centering.
+        // Start with the wrapper invisible to avoid a flash at the top before centering is applied.
         container.innerHTML = `
             <div class="search-app h-full overflow-y-auto px-4 sm:px-6">
-                <div id="search-wrapper-inner" class="mx-auto" style="transition: none;">
+                <div id="search-wrapper-inner" class="mx-auto" style="transition: none; opacity: 0;">
                     <h1 class="font-bold tracking-tight text-center text-black mb-5 sm:mb-8">
                         <a href="?" class="interactive-title" title="Réinitialiser la recherche">
                             <span class="title-glow">Recherche Sémantique</span>
@@ -76,7 +81,8 @@ class SearchApp extends AppBase {
                 this._applyCentering(true);
                 requestAnimationFrame(() => {
                     if (wrapper) {
-                        wrapper.style.transition = 'padding-top 0.85s cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 0.55s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.55s cubic-bezier(0.4, 0, 0.2, 1)';
+                        wrapper.style.transition = 'padding-top 0.85s cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 0.55s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease';
+                        wrapper.style.opacity = '1';
                     }
                     this._skipNextTransition = false;
                     if (showTags) {
@@ -258,6 +264,8 @@ class SearchApp extends AppBase {
         tagsContainer.innerHTML = this.tagsHtml || '<span class="text-gray-500 font-medium text-sm">Aucune source disponible.</span>';
         if (window.GlowEffects) window.GlowEffects.scanAndBind();
         // Re-measure with tags and glide the title/bar upward.
+        // Force reflow so the browser sees the new content before the padding transition starts.
+        if (wrapper) wrapper.offsetHeight;
         this._applyCentering();
         if (wrapper) {
             const labels = tagsContainer.querySelectorAll('.tag-label');
@@ -267,7 +275,10 @@ class SearchApp extends AppBase {
             });
         }
         // Re-enable resize observer after the intro animation finishes.
-        setTimeout(() => this._observeResize(), 1200);
+        setTimeout(() => {
+            this._introAnimating = false;
+            this._observeResize();
+        }, 1200);
     }
 
     async _runSearch() {
@@ -458,8 +469,8 @@ class SearchApp extends AppBase {
         this.selectedTags = newSelectedTags;
         this.resultsHtml = newResultsHtml;
         this.tagsHtml = newTagsHtml;
-        // Avoid re-rendering from a restore if it would replay the intro animation or if nothing changed.
-        if (this.container && changed && !this._firstTagAnimation) this.render(this.container);
+        // Avoid re-rendering from a restore during/after the intro animation or if nothing changed.
+        if (this.container && changed && !this._introAnimating) this.render(this.container);
     }
 }
 
