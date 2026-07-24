@@ -251,6 +251,19 @@ class VisionApp extends AppBase {
             viewer.style.opacity = '0';
         });
 
+        // While the title/diagram descend, start fading in the import container so it is fully
+        // visible once the title reaches the centered home position.
+        if (importContainer) {
+            setTimeout(() => {
+                void importContainer.offsetHeight;
+                importContainer.style.transition = 'opacity 0.55s ease, transform 0.55s cubic-bezier(0.16, 1, 0.3, 1)';
+                requestAnimationFrame(() => {
+                    importContainer.style.opacity = '1';
+                    importContainer.style.transform = 'translateY(0)';
+                });
+            }, 250);
+        }
+
         // When the fade-out completes, hide the viewer and reveal the import UI.
         this._homeTimeout = setTimeout(() => {
             this._homeTimeout = null;
@@ -268,16 +281,6 @@ class VisionApp extends AppBase {
             viewer.style.transform = 'none';
             this._updateHomeVisibility(true);
             this.setTitle(this.constructor.title);
-
-            // Fade/slide the import container into view.
-            if (importContainer) {
-                void importContainer.offsetHeight;
-                importContainer.style.transition = 'opacity 0.6s ease, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1)';
-                requestAnimationFrame(() => {
-                    importContainer.style.opacity = '1';
-                    importContainer.style.transform = 'translateY(0)';
-                });
-            }
         }, 700);
     }
 
