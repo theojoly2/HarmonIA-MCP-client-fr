@@ -87,7 +87,7 @@ class SearchApp extends AppBase {
                     this._skipNextTransition = false;
                     if (showTags) {
                         // Stage 2: reveal tags and glide the title/bar upward.
-                        setTimeout(() => this._revealTags(), 400);
+                        setTimeout(() => this._revealTags(), 600);
                     } else {
                         this._observeResize();
                     }
@@ -225,20 +225,16 @@ class SearchApp extends AppBase {
         try {
             const data = await ApiClient.getTags();
             const tags = data.tags || [];
-            this._renderTags(tags);
+            this.tagsHtml = this._buildTagsHtml(tags);
+            this._injectTagsHtml();
         } catch (e) {
             console.error('Erreur chargement tags', e);
         }
     }
 
-    _renderTags(tags) {
-        const tagsContainer = this.container.querySelector('#tags-container');
-        if (!tagsContainer) return;
-        if (!tags.length) {
-            tagsContainer.innerHTML = '<span class="text-gray-500 font-medium text-sm">Aucune source disponible.</span>';
-            return;
-        }
-        this.tagsHtml = tags.map(t => {
+    _buildTagsHtml(tags) {
+        if (!tags.length) return '';
+        return tags.map(t => {
             const tagName = (typeof t === 'object' ? t.tag : t) || '';
             const isChecked = this.selectedTags.includes(tagName) ? 'checked' : '';
             return `
@@ -252,8 +248,18 @@ class SearchApp extends AppBase {
                 </label>
             `;
         }).join('');
-        tagsContainer.innerHTML = this.tagsHtml;
+    }
+
+    _injectTagsHtml() {
+        const tagsContainer = this.container ? this.container.querySelector('#tags-container') : null;
+        if (!tagsContainer) return;
+        tagsContainer.innerHTML = this.tagsHtml || '<span class="text-gray-500 font-medium text-sm">Aucune source disponible.</span>';
         if (window.GlowEffects) window.GlowEffects.scanAndBind();
+    }
+
+    _renderTags(tags) {
+        this.tagsHtml = this._buildTagsHtml(tags);
+        this._injectTagsHtml();
     }
 
     _revealTags() {
@@ -264,21 +270,20 @@ class SearchApp extends AppBase {
         tagsContainer.innerHTML = this.tagsHtml || '<span class="text-gray-500 font-medium text-sm">Aucune source disponible.</span>';
         if (window.GlowEffects) window.GlowEffects.scanAndBind();
         // Re-measure with tags and glide the title/bar upward.
-        // Force reflow so the browser sees the new content before the padding transition starts.
         if (wrapper) wrapper.offsetHeight;
         this._applyCentering();
         if (wrapper) {
             const labels = tagsContainer.querySelectorAll('.tag-label');
             labels.forEach((el, i) => {
                 el.classList.add('tag-land');
-                el.style.animationDelay = (i * 0.12) + 's';
+                el.style.animationDelay = (i * 0.18) + 's';
             });
         }
         // Re-enable resize observer after the intro animation finishes.
         setTimeout(() => {
             this._introAnimating = false;
             this._observeResize();
-        }, 1200);
+        }, 1600);
     }
 
     async _runSearch() {
@@ -401,7 +406,7 @@ class SearchApp extends AppBase {
         return Math.max(contentHeight, 220);
     }
 
-    _applyCentering(skipTransition) {
+    _applyCentering(skipTransition, extraOffset = 0) {
         const wrapper = this.container.querySelector('#search-wrapper-inner');
         if (!wrapper) return;
 
@@ -416,7 +421,7 @@ class SearchApp extends AppBase {
             if (skipTransition || this._skipNextTransition) wrapper.style.transition = 'none';
             const contentHeight = this._measureContentHeight(wrapper);
             const available = Math.max(this.container.clientHeight, contentHeight);
-            const offset = Math.max(0, (available - contentHeight) / 2);
+            const offset = Math.max(0, (available - contentHeight) / 2 + extraOffset);
             wrapper.style.paddingTop = offset + 'px';
             wrapper.style.paddingBottom = '0px';
             if (skipTransition || this._skipNextTransition) {
@@ -457,6 +462,9 @@ class SearchApp extends AppBase {
     }
 
     setState(state) {
+        // While the intro animation is running, ignore state restores so loaded data
+        // (e.g. tags just fetched in render) is not overwritten by an empty saved state.
+        if (this._introAnimating) return;
         const newQuery = state.query || '';
         const newSelectedTags = state.selectedTags || [];
         const newResultsHtml = state.resultsHtml || '';
@@ -469,8 +477,7 @@ class SearchApp extends AppBase {
         this.selectedTags = newSelectedTags;
         this.resultsHtml = newResultsHtml;
         this.tagsHtml = newTagsHtml;
-        // Avoid re-rendering from a restore during/after the intro animation or if nothing changed.
-        if (this.container && changed && !this._introAnimating) this.render(this.container);
+        if (this.container && changed) this.render(this.container);
     }
 }
 

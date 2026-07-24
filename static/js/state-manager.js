@@ -54,6 +54,8 @@ const AppState = (() => {
     function restoreInstanceState(instanceId) {
         const record = store.instances.get(instanceId);
         if (!record || !record.instance) return;
+        // Only restore if there is actual saved state; an empty saved state should not
+        // overwrite data that was just initialized (e.g. tags loaded during render).
         if (record.instance.setState && Object.keys(record.savedState).length) {
             record.instance.setState(record.savedState);
         }
