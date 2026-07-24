@@ -72,7 +72,7 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
     height: 14px;
     border-right: 2px solid #d1d5db;
     border-bottom: 2px solid #d1d5db;
-    border-bottom-right-radius: 6px;
+    border-bottom-right-radius: 10px;
 }
 
 /* === Split panes === */
