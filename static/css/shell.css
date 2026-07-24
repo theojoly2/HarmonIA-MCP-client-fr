@@ -56,18 +56,18 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
 .window-body { flex: 1; position: relative; overflow: hidden; }
 .resize-handle {
     position: absolute;
-    bottom: 8px;
-    right: 8px;
-    width: 22px;
-    height: 22px;
+    bottom: -4px;
+    right: -4px;
+    width: 28px;
+    height: 28px;
     cursor: se-resize;
     z-index: 10;
 }
 .resize-handle::after {
     content: '';
     position: absolute;
-    bottom: 0;
-    right: 0;
+    bottom: 10px;
+    right: 10px;
     width: 10px;
     height: 10px;
     border-right: 2px solid #d1d5db;
