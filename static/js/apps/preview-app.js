@@ -32,9 +32,6 @@ class PreviewApp extends AppBase {
         this.container = container;
         container.innerHTML = `
             <div class="preview-app h-full w-full flex flex-col relative bg-white">
-                <div class="px-4 py-2 border-b border-gray-200 text-sm text-gray-500 truncate">
-                    ${this._escape(this.docName)}
-                </div>
                 <div id="preview-svg-viewer" class="flex-1 relative"></div>
                 <div id="preview-loading" class="absolute inset-0 flex items-center justify-center text-gray-500 z-10 bg-white/80 backdrop-blur-sm transition-opacity duration-300">
                     <svg class="animate-spin h-8 w-8 text-gray-400 mr-3" fill="none" viewBox="0 0 24 24">
