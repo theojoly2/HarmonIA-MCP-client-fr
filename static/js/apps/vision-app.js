@@ -230,8 +230,18 @@ class VisionApp extends AppBase {
             importContainer.style.transform = 'translateY(-16px)';
         }
 
+        // Snapshot the viewer's visual rectangle so we can detach it from the flex flow
+        // and animate it without the browser repositioning it mid-animation.
+        const viewerRect = viewer.getBoundingClientRect();
+        const containerRect = this.container.getBoundingClientRect();
+        viewer.style.position = 'absolute';
+        viewer.style.left = (viewerRect.left - containerRect.left) + 'px';
+        viewer.style.top = (viewerRect.top - containerRect.top) + 'px';
+        viewer.style.width = viewerRect.width + 'px';
+        viewer.style.height = viewerRect.height + 'px';
+        viewer.style.margin = '0';
+
         // Start the title/diagram descent and viewer fade-out together.
-        // Use transform to animate the title downward, avoiding padding !important conflicts.
         home.style.transition = 'none';
         home.style.transform = 'translateY(0px)';
         viewer.style.transition = 'none';
@@ -278,6 +288,13 @@ class VisionApp extends AppBase {
             home.style.transition = 'none';
             home.style.transform = 'none';
             home.style.paddingTop = finalOffset + 'px';
+            // Restore viewer to normal flex layout and hide it.
+            viewer.style.position = '';
+            viewer.style.left = '';
+            viewer.style.top = '';
+            viewer.style.width = '';
+            viewer.style.height = '';
+            viewer.style.margin = '';
             viewer.style.transform = 'none';
             this._updateHomeVisibility(true);
             this.setTitle(this.constructor.title);
