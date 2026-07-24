@@ -13,6 +13,8 @@ class WindowManager {
         this.floatWindows = new Map(); // instanceId -> { win, body, setTitle }
         this.activeFloat = null;
         this.options = options;
+        this._viewportHandler = () => this._clampAllFloating();
+        window.addEventListener('resize', this._viewportHandler);
     }
 
     open(appId, props = {}) {
@@ -146,6 +148,13 @@ class WindowManager {
         if (floatWin) floatWin.setTitle(title);
     }
 
+    _clampAllFloating() {
+        this.floatWindows.forEach((fw) => {
+            UiUtils.clampWindowPosition(fw.win);
+            UiUtils.clampWindowSize(fw.win, { minWidth: 320, minHeight: 200, minVisible: 60 });
+        });
+    }
+
     close(instanceId) {
         AppState.saveInstanceState(instanceId);
         const record = AppState.getRecord(instanceId);
@@ -162,6 +171,9 @@ class WindowManager {
             this.shellElement.innerHTML = '';
         }
         AppState.removeInstance(instanceId);
+        if (this.floatWindows.size === 0) {
+            window.removeEventListener('resize', this._viewportHandler);
+        }
     }
 
     switchTab(instanceId) {

@@ -64,9 +64,10 @@ const UiUtils = (() => {
             const vw = window.innerWidth, vh = window.innerHeight;
             const rect = win.getBoundingClientRect();
             const minVisible = options.minVisible || 60;
-            // Prevent resizing beyond the viewport; keep at least minVisible pixels visible.
-            const maxW = vw - rect.left + Math.max(0, rect.width - minVisible);
-            const maxH = vh - rect.top + Math.max(0, rect.height - minVisible);
+            // Hard clamp: the window edges must stay inside the viewport.
+            // Right edge cannot go past vw, bottom edge cannot go past vh.
+            const maxW = Math.max(minVisible, vw - rect.left);
+            const maxH = Math.max(minVisible, vh - rect.top);
             let w = Math.max(options.minWidth || 320, initialW + (e.clientX - startX));
             let h = Math.max(options.minHeight || 200, initialH + (e.clientY - startY));
             w = Math.min(w, maxW);
@@ -99,6 +100,21 @@ const UiUtils = (() => {
         win.style.left = left + 'px';
         win.style.top = top + 'px';
         win.style.transform = 'none';
+    }
+
+    function clampWindowSize(win, options = {}) {
+        const rect = win.getBoundingClientRect();
+        const vw = window.innerWidth, vh = window.innerHeight;
+        const minVisible = options.minVisible || 60;
+        const minWidth = options.minWidth || 320;
+        const minHeight = options.minHeight || 200;
+        const maxW = Math.max(minWidth, Math.max(minVisible, vw - rect.left));
+        const maxH = Math.max(minHeight, Math.max(minVisible, vh - rect.top));
+        let w = Math.max(minWidth, Math.min(rect.width, maxW));
+        let h = Math.max(minHeight, Math.min(rect.height, maxH));
+        win.style.width = w + 'px';
+        win.style.height = h + 'px';
+        return { width: w, height: h };
     }
 
     function centerWindow(win, offsetX = 0, offsetY = 0) {
@@ -163,6 +179,7 @@ const UiUtils = (() => {
         makeDraggable,
         makeResizable,
         clampWindowPosition,
+        clampWindowSize,
         centerWindow,
         createFloatingWindow,
     };
