@@ -10,11 +10,13 @@ class WindowManager {
         this.floatingRoot = document.createElement('div');
         this.floatingRoot.id = 'floating-root';
         document.body.appendChild(this.floatingRoot);
-        this.floatWindows = new Map(); // instanceId -> { win, body, setTitle }
+        this.floatWindows = new Map(); // instanceId -> { win, body, setTitle, savedRect, minimized }
         this.activeFloat = null;
         this.options = options;
         this._viewportHandler = () => this._clampAllFloating();
         window.addEventListener('resize', this._viewportHandler);
+        this._outsideClickHandler = (e) => this._onOutsideClick(e);
+        document.addEventListener('mousedown', this._outsideClickHandler);
     }
 
     open(appId, props = {}) {
@@ -155,6 +157,78 @@ class WindowManager {
         });
     }
 
+    _onOutsideClick(e) {
+        // Ignore if there are no floating windows.
+        if (this.floatWindows.size === 0) return;
+        // Ignore clicks inside any floating window or inside the shell header/tab bar.
+        const target = e.target;
+        if (target.closest('.floating-window')) return;
+        if (target.closest('#shell-header') || target.closest('#shell-tabs')) return;
+        // Minimize all floating windows.
+        this.floatWindows.forEach((_, instanceId) => this._minimizeFloat(instanceId));
+    }
+
+    _minimizeFloat(instanceId) {
+        const fw = this.floatWindows.get(instanceId);
+        if (!fw || fw.minimized) return;
+        const rect = fw.win.getBoundingClientRect();
+        fw.savedRect = {
+            left: parseFloat(fw.win.style.left) || rect.left,
+            top: parseFloat(fw.win.style.top) || rect.top,
+            width: parseFloat(fw.win.style.width) || rect.width,
+            height: parseFloat(fw.win.style.height) || rect.height,
+        };
+        fw.minimized = true;
+        fw.win.classList.add('minimized');
+        // Stack minimized windows side by side at the bottom.
+        const vh = window.innerHeight;
+        const minVisible = 48;
+        const minimizedWindows = Array.from(this.floatWindows.values()).filter(x => x.minimized);
+        const index = minimizedWindows.indexOf(fw);
+        const total = minimizedWindows.length;
+        const baseWidth = Math.max(220, Math.min(320, window.innerWidth / total));
+        const targetLeft = index * baseWidth;
+        const targetTop = vh - minVisible;
+        fw.win.style.transition = 'top 0.45s cubic-bezier(0.4, 0, 0.2, 1), left 0.45s cubic-bezier(0.4, 0, 0.2, 1), width 0.45s ease, height 0.45s ease';
+        fw.win.style.left = targetLeft + 'px';
+        fw.win.style.top = targetTop + 'px';
+        fw.win.style.width = baseWidth + 'px';
+        fw.win.style.height = minVisible + 'px';
+        fw.win.querySelector('.window-body').style.opacity = '0';
+    }
+
+    _restoreFloat(instanceId) {
+        const fw = this.floatWindows.get(instanceId);
+        if (!fw || !fw.minimized) return;
+        const saved = fw.savedRect;
+        if (!saved) return;
+        fw.win.classList.remove('minimized');
+        fw.win.style.transition = 'top 0.45s cubic-bezier(0.4, 0, 0.2, 1), left 0.45s cubic-bezier(0.4, 0, 0.2, 1), width 0.45s ease, height 0.45s ease';
+        fw.win.style.left = saved.left + 'px';
+        fw.win.style.top = saved.top + 'px';
+        fw.win.style.width = saved.width + 'px';
+        fw.win.style.height = saved.height + 'px';
+        fw.win.querySelector('.window-body').style.opacity = '1';
+        fw.minimized = false;
+        // Re-layout remaining minimized windows so they fill the bottom bar evenly.
+        this._relayoutMinimized();
+    }
+
+    _relayoutMinimized() {
+        const minimized = Array.from(this.floatWindows.entries()).filter(([, fw]) => fw.minimized);
+        const total = minimized.length;
+        if (total === 0) return;
+        const vh = window.innerHeight;
+        const minVisible = 48;
+        const baseWidth = Math.max(220, Math.min(320, window.innerWidth / total));
+        minimized.forEach(([instanceId, fw], index) => {
+            fw.win.style.transition = 'top 0.35s cubic-bezier(0.4, 0, 0.2, 1), left 0.35s cubic-bezier(0.4, 0, 0.2, 1), width 0.35s ease';
+            fw.win.style.left = (index * baseWidth) + 'px';
+            fw.win.style.top = (vh - minVisible) + 'px';
+            fw.win.style.width = baseWidth + 'px';
+        });
+    }
+
     close(instanceId) {
         AppState.saveInstanceState(instanceId);
         const record = AppState.getRecord(instanceId);
@@ -173,6 +247,7 @@ class WindowManager {
         AppState.removeInstance(instanceId);
         if (this.floatWindows.size === 0) {
             window.removeEventListener('resize', this._viewportHandler);
+            document.removeEventListener('mousedown', this._outsideClickHandler);
         }
     }
 
