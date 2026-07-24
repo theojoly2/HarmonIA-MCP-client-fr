@@ -68,11 +68,12 @@ class SearchApp extends AppBase {
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
                 this._applyCentering(true);
-                if (wrapper) {
-                    wrapper.offsetHeight; // force reflow
-                    wrapper.style.transition = 'padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 0.55s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.55s cubic-bezier(0.4, 0, 0.2, 1)';
-                }
-                this._skipNextTransition = false;
+                requestAnimationFrame(() => {
+                    if (wrapper) {
+                        wrapper.style.transition = 'padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 0.55s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.55s cubic-bezier(0.4, 0, 0.2, 1)';
+                    }
+                    this._skipNextTransition = false;
+                });
             });
         });
     }
