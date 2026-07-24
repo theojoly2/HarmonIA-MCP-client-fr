@@ -89,7 +89,11 @@ h1 .title-glow { font-size: clamp(1.25rem, 2.5vw, 2.25rem); }
 }
 .tag-label input:not(:checked) ~ span:hover { border-color: #d1d5db; }
 
-.tags-staged { opacity: 0; }
+.tags-staged {
+    opacity: 0;
+    min-height: 0;
+    overflow: hidden;
+}
 
 .tag-land {
     display: inline-block;

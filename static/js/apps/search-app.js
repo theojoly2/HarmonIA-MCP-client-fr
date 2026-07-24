@@ -30,6 +30,7 @@ class SearchApp extends AppBase {
         if (!this.tagsHtml) await this._loadTags();
         const showTags = this._firstTagAnimation;
         if (showTags) this._firstTagAnimation = false;
+        // Hide tags initially so only the title/search bar affect the first centering.
         container.innerHTML = `
             <div class="search-app h-full overflow-y-auto px-4 sm:px-6">
                 <div id="search-wrapper-inner" class="mx-auto" style="transition: none;">
@@ -50,7 +51,7 @@ class SearchApp extends AppBase {
                             </button>
                         </div>
                         <div id="tags-container" class="mt-5 flex flex-wrap gap-2 justify-center ${showTags ? 'tags-staged' : ''}">
-                            ${showTags ? '<span class="text-gray-500 font-medium text-sm">Chargement des sources...</span>' : (this.tagsHtml || '<span class="text-gray-500 font-medium text-sm">Aucune source disponible.</span>')}
+                            ${showTags ? '' : (this.tagsHtml || '<span class="text-gray-500 font-medium text-sm">Aucune source disponible.</span>')}
                         </div>
                     </form>
                     <div id="loading-indicator" class="text-center mt-2 mb-6">
@@ -64,6 +65,7 @@ class SearchApp extends AppBase {
         this._bindEvents();
         this._updateHomeModeClass();
         const wrapper = this.container.querySelector('#search-wrapper-inner');
+        const tagsContainer = this.container.querySelector('#tags-container');
         if (wrapper) wrapper.style.transition = 'none';
         this._skipNextTransition = true;
         if (!showTags) this._observeResize();
@@ -444,12 +446,20 @@ class SearchApp extends AppBase {
     }
 
     setState(state) {
-        this.query = state.query || '';
-        this.selectedTags = state.selectedTags || [];
-        this.resultsHtml = state.resultsHtml || '';
-        this.tagsHtml = state.tagsHtml || '';
-        // Avoid re-rendering from a restore if it would replay the intro animation.
-        if (this.container && !this._firstTagAnimation) this.render(this.container);
+        const newQuery = state.query || '';
+        const newSelectedTags = state.selectedTags || [];
+        const newResultsHtml = state.resultsHtml || '';
+        const newTagsHtml = state.tagsHtml || '';
+        const changed = this.query !== newQuery
+            || JSON.stringify(this.selectedTags) !== JSON.stringify(newSelectedTags)
+            || this.resultsHtml !== newResultsHtml
+            || this.tagsHtml !== newTagsHtml;
+        this.query = newQuery;
+        this.selectedTags = newSelectedTags;
+        this.resultsHtml = newResultsHtml;
+        this.tagsHtml = newTagsHtml;
+        // Avoid re-rendering from a restore if it would replay the intro animation or if nothing changed.
+        if (this.container && changed && !this._firstTagAnimation) this.render(this.container);
     }
 }
 
