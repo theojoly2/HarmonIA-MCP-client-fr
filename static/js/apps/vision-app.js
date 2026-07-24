@@ -189,7 +189,38 @@ class VisionApp extends AppBase {
         const importContainer = this.container.querySelector('#vision-import-container');
         const viewer = this.container.querySelector('#vision-viewer');
 
-        const finalizeHome = () => {
+        if (!home || !viewer || viewer.classList.contains('hidden')) {
+            this._finalizeHomeAndCenter(true);
+            return;
+        }
+
+        // Compute final centered offset for the home view.
+        const contentHeight = this._measureHomeContentHeight(home);
+        const available = Math.max(this.container.clientHeight, contentHeight);
+        const finalOffset = Math.max(0, (available - contentHeight) / 2);
+
+        // Stage the import container hidden so it can fade in later.
+        if (importContainer) {
+            importContainer.classList.remove('vision-import-hidden');
+            importContainer.style.transition = 'none';
+            importContainer.style.opacity = '0';
+            importContainer.style.transform = 'translateY(-16px)';
+        }
+
+        // Start the title/diagram descent and viewer fade-out together.
+        requestAnimationFrame(() => {
+            // Animate the title downward while the diagram fades out.
+            home.style.transition = 'padding-top 0.7s cubic-bezier(0.4, 0, 0.2, 1)';
+            home.style.paddingTop = finalOffset + 'px';
+
+            // Fade out the diagram viewer over the same period.
+            viewer.style.transition = 'opacity 0.7s ease';
+            viewer.style.opacity = '0';
+        });
+
+        // When the fade-out completes, hide the viewer and reveal the import UI.
+        this._homeTimeout = setTimeout(() => {
+            this._homeTimeout = null;
             this.svgText = '';
             this.fileName = '';
             this.mainClassName = '';
@@ -199,45 +230,8 @@ class VisionApp extends AppBase {
             }
             this._updateHomeVisibility(true);
             this.setTitle(this.constructor.title);
-        };
 
-        if (!home || !viewer || viewer.classList.contains('hidden')) {
-            finalizeHome();
-            return;
-        }
-
-        // Step 1: fade out the diagram viewer.
-        viewer.style.transition = 'opacity 0.5s ease';
-        viewer.style.opacity = '0';
-
-        this._homeTimeout = setTimeout(() => {
-            this._homeTimeout = null;
-            // Step 2: reset to home state (viewer hidden, import container staged for reveal).
-            finalizeHome();
-
-            // Step 3: stage import container off-screen/transparent.
-            if (importContainer) {
-                importContainer.classList.remove('vision-import-hidden');
-                importContainer.style.transition = 'none';
-                importContainer.style.opacity = '0';
-                importContainer.style.transform = 'translateY(-16px)';
-            }
-
-            // Step 4: animate the title downward (paddingTop) to the centered home position.
-            // finalizeHome already set paddingTop to the final centered value without transition.
-            // Reset it to the viewer-mode value (0) so the transition can animate the descent.
-            const contentHeight = this._measureHomeContentHeight(home);
-            const available = Math.max(this.container.clientHeight, contentHeight);
-            const offset = Math.max(0, (available - contentHeight) / 2);
-            home.style.transition = 'none';
-            home.style.paddingTop = '0px';
-            void home.offsetHeight;
-            home.style.transition = 'padding-top 0.7s cubic-bezier(0.4, 0, 0.2, 1)';
-            requestAnimationFrame(() => {
-                home.style.paddingTop = offset + 'px';
-            });
-
-            // Step 5: fade/slide the import container into view.
+            // Fade/slide the import container into view.
             if (importContainer) {
                 void importContainer.offsetHeight;
                 importContainer.style.transition = 'opacity 0.6s ease, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1)';
@@ -246,7 +240,19 @@ class VisionApp extends AppBase {
                     importContainer.style.transform = 'translateY(0)';
                 });
             }
-        }, 500);
+        }, 700);
+    }
+
+    _finalizeHomeAndCenter(skipTransition) {
+        this.svgText = '';
+        this.fileName = '';
+        this.mainClassName = '';
+        if (this.viewer) {
+            this.viewer.destroy();
+            this.viewer = null;
+        }
+        this._updateHomeVisibility(skipTransition);
+        this.setTitle(this.constructor.title);
     }
 
     _setLoading(isLoading) {
