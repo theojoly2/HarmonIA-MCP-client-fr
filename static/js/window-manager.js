@@ -180,14 +180,13 @@ class WindowManager {
         };
         fw.minimized = true;
         fw.win.classList.add('minimized');
-        // Slide the window straight down, keeping its width and horizontal position.
+        // Slide the window straight down, keeping its full width, height and horizontal position.
+        // Only 30px remain visible at the bottom, exactly like the drag safety clamp.
         const vh = window.innerHeight;
         const minVisible = 30;
-        const targetTop = vh - minVisible;
-        fw.win.style.transition = 'top 0.45s cubic-bezier(0.4, 0, 0.2, 1), height 0.45s ease';
+        const targetTop = vh + fw.savedRect.height - minVisible;
+        fw.win.style.transition = 'top 0.45s cubic-bezier(0.4, 0, 0.2, 1)';
         fw.win.style.top = targetTop + 'px';
-        fw.win.style.height = minVisible + 'px';
-        fw.win.querySelector('.window-body').style.opacity = '0';
     }
 
     _restoreFloat(instanceId) {
@@ -196,12 +195,11 @@ class WindowManager {
         const saved = fw.savedRect;
         if (!saved) return;
         fw.win.classList.remove('minimized');
-        fw.win.style.transition = 'top 0.45s cubic-bezier(0.4, 0, 0.2, 1), left 0.45s ease, width 0.45s ease, height 0.45s ease';
+        fw.win.style.transition = 'top 0.45s cubic-bezier(0.4, 0, 0.2, 1)';
         fw.win.style.left = saved.left + 'px';
         fw.win.style.top = saved.top + 'px';
         fw.win.style.width = saved.width + 'px';
         fw.win.style.height = saved.height + 'px';
-        fw.win.querySelector('.window-body').style.opacity = '1';
         fw.minimized = false;
     }
 
