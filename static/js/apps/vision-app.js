@@ -20,6 +20,7 @@ class VisionApp extends AppBase {
         this.viewer = null;
         this._centerOnNextShow = true;
         this._homeTimeout = null;
+        this._loadingTimeout = null;
         this._resizeObserver = null;
         this._skipNextTransition = false;
     }
@@ -150,14 +151,36 @@ class VisionApp extends AppBase {
         const viewer = this.container.querySelector('#vision-viewer');
         if (!home || !importContainer || !viewer) return;
 
-        // Collapse import UI (text + button slide up and fade out)
-        home.classList.add('vision-top');
+        // Remove the compact viewer class so we can animate the title upward from its centered position.
+        home.classList.remove('vision-top');
+        home.style.transform = 'none';
+        const startPadding = parseFloat(getComputedStyle(home).paddingTop) || 0;
+        home.style.transition = 'none';
+        home.style.paddingTop = startPadding + 'px';
+        void home.offsetHeight;
+
+        // Animate the title upward while the import UI collapses.
+        home.style.transition = 'padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1)';
+        home.style.paddingTop = '0px';
         importContainer.classList.add('vision-import-hidden');
 
-        // Reveal the viewer area and show spinner inside it at the same time
+        // Reveal the viewer area and fade it in.
         viewer.classList.remove('hidden');
+        viewer.style.transition = 'none';
+        viewer.style.opacity = '0';
+        viewer.style.transform = 'none';
+        void viewer.offsetHeight;
+        viewer.style.transition = 'opacity 0.55s ease';
         viewer.style.opacity = '1';
         this._setLoading(true);
+
+        // Lock the compact viewer state once the upward glide finishes.
+        if (this._loadingTimeout) clearTimeout(this._loadingTimeout);
+        this._loadingTimeout = setTimeout(() => {
+            home.classList.add('vision-top');
+            home.style.transition = '';
+            home.style.paddingTop = '';
+        }, 550);
     }
 
     _showViewer() {
