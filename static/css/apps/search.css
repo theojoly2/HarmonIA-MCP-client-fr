@@ -92,18 +92,18 @@ h1 .title-glow { font-size: clamp(1.25rem, 2.5vw, 2.25rem); }
 .tag-land {
     display: inline-block;
     opacity: 0;
-    transform: scale(1.6) translateY(-12px);
-    animation: tagLand 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    transform: scale(1.8) translateY(-18px);
+    animation: tagLand 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes tagLand {
     0% {
         opacity: 0;
-        transform: scale(1.6) translateY(-12px);
+        transform: scale(1.8) translateY(-18px);
     }
-    70% {
+    60% {
         opacity: 1;
-        transform: scale(0.98) translateY(2px);
+        transform: scale(0.96) translateY(3px);
     }
     100% {
         opacity: 1;
