@@ -151,12 +151,11 @@ class VisionApp extends AppBase {
         const viewer = this.container.querySelector('#vision-viewer');
         if (!home || !importContainer || !viewer) return;
 
-        // Remove the compact viewer class so we can animate the title upward from its centered position.
-        home.classList.remove('vision-top');
-        home.style.transform = 'none';
+        // Get current centered padding and animate it to 0 (compact header) as the import begins.
         const startPadding = parseFloat(getComputedStyle(home).paddingTop) || 0;
         home.style.transition = 'none';
         home.style.paddingTop = startPadding + 'px';
+        home.classList.remove('vision-top');
         void home.offsetHeight;
 
         // Animate the title upward while the import UI collapses.
@@ -164,11 +163,10 @@ class VisionApp extends AppBase {
         home.style.paddingTop = '0px';
         importContainer.classList.add('vision-import-hidden');
 
-        // Reveal the viewer area and fade it in.
+        // Reveal the viewer area and fade it in as the title glides up.
         viewer.classList.remove('hidden');
         viewer.style.transition = 'none';
         viewer.style.opacity = '0';
-        viewer.style.transform = 'none';
         void viewer.offsetHeight;
         viewer.style.transition = 'opacity 0.55s ease';
         viewer.style.opacity = '1';
@@ -230,38 +228,24 @@ class VisionApp extends AppBase {
             importContainer.style.transform = 'translateY(-16px)';
         }
 
-        // Snapshot the viewer's visual rectangle so we can detach it from the flex flow
-        // and fade it out in place while the title glides down to the centered home position.
-        const viewerRect = viewer.getBoundingClientRect();
-        const containerRect = this.container.getBoundingClientRect();
-        const scrollTop = this.container.scrollTop || 0;
-        viewer.style.position = 'absolute';
-        viewer.style.left = '0px';
-        viewer.style.top = (viewerRect.top - containerRect.top + scrollTop) + 'px';
-        viewer.style.width = viewerRect.width + 'px';
-        viewer.style.height = viewerRect.height + 'px';
-        viewer.style.margin = '0';
+        // Remove compact class and reset padding so we can animate from the current viewer layout.
+        home.classList.remove('vision-top');
 
-        // Start the title descent and viewer fade-out together.
+        // Start the title/diagram descent using paddingTop in the normal flex flow.
         home.style.transition = 'none';
-        home.style.transform = 'translateY(0px)';
-        viewer.style.transition = 'none';
-        viewer.style.opacity = '1';
+        home.style.paddingTop = '0px';
         void home.offsetHeight;
-        void viewer.offsetHeight;
 
         requestAnimationFrame(() => {
-            // Animate the title downward while the diagram fades out in place.
-            home.style.transition = 'transform 0.7s cubic-bezier(0.4, 0, 0.2, 1)';
-            home.style.transform = `translateY(${finalOffset}px)`;
+            home.style.transition = 'padding-top 0.7s cubic-bezier(0.4, 0, 0.2, 1)';
+            home.style.paddingTop = finalOffset + 'px';
 
-            // Fade out the diagram viewer in place (no movement, no teleportation).
+            // Fade out the diagram viewer as it follows the title downward naturally.
             viewer.style.transition = 'opacity 0.7s ease';
             viewer.style.opacity = '0';
         });
 
-        // While the title/diagram descend, start fading in the import container so it is fully
-        // visible once the title reaches the centered home position.
+        // Fade in the import container so it is fully visible when the title reaches center.
         if (importContainer) {
             setTimeout(() => {
                 void importContainer.offsetHeight;
@@ -273,7 +257,7 @@ class VisionApp extends AppBase {
             }, 250);
         }
 
-        // When the fade-out completes, hide the viewer and reveal the import UI.
+        // When the fade-out completes, clean up state and lock the home layout.
         this._homeTimeout = setTimeout(() => {
             this._homeTimeout = null;
             this.svgText = '';
@@ -283,18 +267,6 @@ class VisionApp extends AppBase {
                 this.viewer.destroy();
                 this.viewer = null;
             }
-            // Lock the final centered position into paddingTop, then remove the transform.
-            home.style.transition = 'none';
-            home.style.transform = 'none';
-            home.style.paddingTop = finalOffset + 'px';
-            // Restore viewer to normal flex layout and hide it.
-            viewer.style.position = '';
-            viewer.style.left = '';
-            viewer.style.top = '';
-            viewer.style.width = '';
-            viewer.style.height = '';
-            viewer.style.margin = '';
-            viewer.style.transform = 'none';
             this._updateHomeVisibility(true);
             this.setTitle(this.constructor.title);
         }, 700);
