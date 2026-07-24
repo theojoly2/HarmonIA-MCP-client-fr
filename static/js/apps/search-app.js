@@ -29,6 +29,7 @@ class SearchApp extends AppBase {
         // Load tags first so we can stage their appearance after the title/search bar.
         if (!this.tagsHtml) await this._loadTags();
         const showTags = this._firstTagAnimation;
+        if (showTags) this._firstTagAnimation = false;
         container.innerHTML = `
             <div class="search-app h-full overflow-y-auto px-4 sm:px-6">
                 <div id="search-wrapper-inner" class="mx-auto" style="transition: none;">
@@ -251,7 +252,6 @@ class SearchApp extends AppBase {
         const wrapper = this.container.querySelector('#search-wrapper-inner');
         const tagsContainer = this.container.querySelector('#tags-container');
         if (!tagsContainer) return;
-        this._firstTagAnimation = false;
         tagsContainer.classList.remove('tags-staged');
         tagsContainer.innerHTML = this.tagsHtml || '<span class="text-gray-500 font-medium text-sm">Aucune source disponible.</span>';
         if (window.GlowEffects) window.GlowEffects.scanAndBind();
@@ -448,7 +448,8 @@ class SearchApp extends AppBase {
         this.selectedTags = state.selectedTags || [];
         this.resultsHtml = state.resultsHtml || '';
         this.tagsHtml = state.tagsHtml || '';
-        if (this.container) this.render(this.container);
+        // Avoid re-rendering from a restore if it would replay the intro animation.
+        if (this.container && !this._firstTagAnimation) this.render(this.container);
     }
 }
 
