@@ -36,7 +36,7 @@ class ChatApp extends AppBase {
                     <form id="ai-chat-form" class="relative flex items-center">
                         <input type="text" id="ai-chat-input" autocomplete="off"
                             placeholder="Interrogez le modèle..."
-                            class="w-full bg-gray-50 border border-gray-100 rounded-[2rem] pl-4 pr-12 py-3 text-sm font-medium focus:outline-none focus:bg-white focus:border-gray-300 focus:shadow-sm transition-all"
+                            class="w-full rounded-[2rem] border-2 border-gray-300 focus:outline-none focus:border-black font-medium transition-colors placeholder-gray-500 pl-4 pr-12 py-3 text-sm"
                             value="${this._escape(this.inputDraft)}">
                         <button type="submit" class="magic-btn chat-send-btn absolute right-2 text-white bg-black hover:bg-gray-800 rounded-full w-9 h-9 flex items-center justify-center transition-colors">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
