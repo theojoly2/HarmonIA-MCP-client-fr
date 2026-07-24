@@ -23,8 +23,10 @@ class SearchApp extends AppBase {
         this._skipNextTransition = false;
     }
 
-    render(container) {
+    async render(container) {
         this.container = container;
+        // Load tags first so the initial layout already includes them.
+        if (!this.tagsHtml) await this._loadTags();
         container.innerHTML = `
             <div class="search-app h-full overflow-y-auto px-4 sm:px-6">
                 <div id="search-wrapper-inner" class="mx-auto" style="transition: none;">
@@ -45,7 +47,7 @@ class SearchApp extends AppBase {
                             </button>
                         </div>
                         <div id="tags-container" class="mt-5 flex flex-wrap gap-2 justify-center">
-                            ${this.tagsHtml || '<span class="text-gray-500 font-medium text-sm">Chargement des sources...</span>'}
+                            ${this.tagsHtml || '<span class="text-gray-500 font-medium text-sm">Aucune source disponible.</span>'}
                         </div>
                     </form>
                     <div id="loading-indicator" class="text-center mt-2 mb-6">
@@ -63,12 +65,6 @@ class SearchApp extends AppBase {
         this._skipNextTransition = true;
         this._observeResize();
         if (this.resultsHtml) this._animateResults();
-        this._loadTags().then(() => {
-            if (!this.query && !this.resultsHtml) {
-                // Tags have loaded and may have changed content height; re-center without animation.
-                this._applyCentering(true);
-            }
-        });
         // Measure and position after layout is stable, then re-enable transition.
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
