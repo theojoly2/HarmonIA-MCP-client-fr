@@ -73,19 +73,20 @@ class VisionApp extends AppBase {
             const home = this.container.querySelector('#vision-home');
             if (home) home.style.transition = 'none';
             this._skipNextTransition = true;
-            this._observeResize();
-            // Wait for the browser to finish layout before measuring height,
-            // otherwise the first render computes an incorrect large offset.
+        this._observeResize();
+        // Wait for the browser to finish layout before measuring height,
+        // otherwise the first render computes an incorrect large offset.
+        requestAnimationFrame(() => {
             requestAnimationFrame(() => {
+                this._updateHomeVisibility(true);
                 requestAnimationFrame(() => {
-                    this._updateHomeVisibility(true);
                     if (home) {
-                        home.offsetHeight; // force reflow
                         home.style.transition = 'padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.45s ease';
                     }
                     this._skipNextTransition = false;
                 });
             });
+        });
         }
     }
 
@@ -251,6 +252,18 @@ class VisionApp extends AppBase {
         }
     }
 
+    _measureHomeContentHeight(home) {
+        let contentHeight = 0;
+        for (const child of home.children) {
+            const rect = child.getBoundingClientRect();
+            const styles = getComputedStyle(child);
+            const marginTop = parseFloat(styles.marginTop) || 0;
+            const marginBottom = parseFloat(styles.marginBottom) || 0;
+            contentHeight += rect.height + marginTop + marginBottom;
+        }
+        return Math.max(contentHeight, 360);
+    }
+
     _updateHomeVisibility(skipTransition) {
         const home = this.container.querySelector('#vision-home');
         const importContainer = this.container.querySelector('#vision-import-container');
@@ -267,12 +280,11 @@ class VisionApp extends AppBase {
             viewer.style.transition = '';
         } else {
             // Home mode: show import UI, hide viewer, vertically centered by paddingTop.
-            // Reset padding before measuring so offsetHeight does not include old padding.
+            // Measure the children directly so the current padding does not influence it.
             const was = home.style.transition;
             if (skipTransition || this._skipNextTransition) home.style.transition = 'none';
             home.classList.remove('vision-top');
-            home.style.paddingTop = '0px';
-            const contentHeight = home.offsetHeight || 360;
+            const contentHeight = this._measureHomeContentHeight(home);
             const available = Math.max(this.container.clientHeight, contentHeight);
             const offset = Math.max(0, (available - contentHeight) / 2);
             home.style.paddingTop = offset + 'px';

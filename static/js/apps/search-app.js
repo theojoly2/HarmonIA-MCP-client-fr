@@ -343,6 +343,20 @@ class SearchApp extends AppBase {
         });
     }
 
+    _measureContentHeight(wrapper) {
+        // Sum the heights of the direct children (title, form, loading, results header)
+        // to get the true content height regardless of current padding.
+        let contentHeight = 0;
+        for (const child of wrapper.children) {
+            const rect = child.getBoundingClientRect();
+            const styles = getComputedStyle(child);
+            const marginTop = parseFloat(styles.marginTop) || 0;
+            const marginBottom = parseFloat(styles.marginBottom) || 0;
+            contentHeight += rect.height + marginTop + marginBottom;
+        }
+        return Math.max(contentHeight, 220);
+    }
+
     _applyCentering(skipTransition) {
         const wrapper = this.container.querySelector('#search-wrapper-inner');
         if (!wrapper) return;
@@ -353,12 +367,10 @@ class SearchApp extends AppBase {
 
         if (!this.query && !this.resultsHtml) {
             // Vertically center the home content based on the container height.
-            // Reset padding before measuring to avoid including previous padding in offsetHeight.
+            // Measure the children directly so the current padding does not influence it.
             const was = wrapper.style.transition;
             if (skipTransition || this._skipNextTransition) wrapper.style.transition = 'none';
-            wrapper.style.paddingTop = '0px';
-            wrapper.style.paddingBottom = '0px';
-            const contentHeight = wrapper.offsetHeight || 220;
+            const contentHeight = this._measureContentHeight(wrapper);
             const available = Math.max(this.container.clientHeight, contentHeight);
             const offset = Math.max(0, (available - contentHeight) / 2);
             wrapper.style.paddingTop = offset + 'px';
