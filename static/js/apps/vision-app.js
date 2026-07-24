@@ -224,11 +224,18 @@ class VisionApp extends AppBase {
             }
 
             // Step 4: animate the title downward (paddingTop) to the centered home position.
-            home.style.transition = 'padding-top 0.7s cubic-bezier(0.4, 0, 0.2, 1)';
+            // finalizeHome already set paddingTop to the final centered value without transition.
+            // Reset it to the viewer-mode value (0) so the transition can animate the descent.
             const contentHeight = this._measureHomeContentHeight(home);
             const available = Math.max(this.container.clientHeight, contentHeight);
             const offset = Math.max(0, (available - contentHeight) / 2);
-            home.style.paddingTop = offset + 'px';
+            home.style.transition = 'none';
+            home.style.paddingTop = '0px';
+            void home.offsetHeight;
+            home.style.transition = 'padding-top 0.7s cubic-bezier(0.4, 0, 0.2, 1)';
+            requestAnimationFrame(() => {
+                home.style.paddingTop = offset + 'px';
+            });
 
             // Step 5: fade/slide the import container into view.
             if (importContainer) {
