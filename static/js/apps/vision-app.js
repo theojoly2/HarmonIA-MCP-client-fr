@@ -197,7 +197,7 @@ class VisionApp extends AppBase {
                 this.viewer.destroy();
                 this.viewer = null;
             }
-            this._updateHomeVisibility();
+            this._updateHomeVisibility(true);
             this.setTitle(this.constructor.title);
         };
 
@@ -206,46 +206,40 @@ class VisionApp extends AppBase {
             return;
         }
 
-        // Step 1: fade out the diagram viewer while keeping the import container hidden.
+        // Step 1: fade out the diagram viewer.
         viewer.style.transition = 'opacity 0.5s ease';
         viewer.style.opacity = '0';
 
         this._homeTimeout = setTimeout(() => {
             this._homeTimeout = null;
-            // Step 2: switch to home layout (compact header, hidden viewer).
-            home.classList.add('vision-home-revealing');
-            home.classList.remove('vision-top');
-            this._updateHomeVisibility();
+            // Step 2: reset to home state (viewer hidden, import container staged for reveal).
+            finalizeHome();
+
+            // Step 3: stage import container off-screen/transparent.
             if (importContainer) {
+                importContainer.classList.remove('vision-import-hidden');
                 importContainer.style.transition = 'none';
                 importContainer.style.opacity = '0';
-                importContainer.style.transform = 'translateY(-10px)';
+                importContainer.style.transform = 'translateY(-16px)';
+            }
+
+            // Step 4: animate the title downward (paddingTop) to the centered home position.
+            home.style.transition = 'padding-top 0.7s cubic-bezier(0.4, 0, 0.2, 1)';
+            const contentHeight = this._measureHomeContentHeight(home);
+            const available = Math.max(this.container.clientHeight, contentHeight);
+            const offset = Math.max(0, (available - contentHeight) / 2);
+            home.style.paddingTop = offset + 'px';
+
+            // Step 5: fade/slide the import container into view.
+            if (importContainer) {
                 void importContainer.offsetHeight;
-                importContainer.style.transition = 'opacity 0.5s ease, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1)';
+                importContainer.style.transition = 'opacity 0.6s ease, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1)';
                 requestAnimationFrame(() => {
                     importContainer.style.opacity = '1';
                     importContainer.style.transform = 'translateY(0)';
                 });
             }
-            // Step 3: fade the import button/area into the home view.
-            requestAnimationFrame(() => {
-                this._fadeInImportButton();
-            });
         }, 500);
-    }
-
-    _fadeInImportButton() {
-        const dropZone = this.container.querySelector('#vision-drop-zone');
-        if (!dropZone) return;
-        dropZone.style.transition = 'none';
-        dropZone.style.opacity = '0';
-        dropZone.style.transform = 'scale(0.96)';
-        void dropZone.offsetHeight;
-        dropZone.style.transition = 'opacity 0.5s ease, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1)';
-        requestAnimationFrame(() => {
-            dropZone.style.opacity = '1';
-            dropZone.style.transform = 'scale(1)';
-        });
     }
 
     _setLoading(isLoading) {
