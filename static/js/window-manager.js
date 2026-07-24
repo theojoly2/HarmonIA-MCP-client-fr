@@ -10,13 +10,11 @@ class WindowManager {
         this.floatingRoot = document.createElement('div');
         this.floatingRoot.id = 'floating-root';
         document.body.appendChild(this.floatingRoot);
-        this.floatWindows = new Map(); // instanceId -> { win, body, setTitle, savedRect, minimized }
+        this.floatWindows = new Map(); // instanceId -> { win, body, setTitle }
         this.activeFloat = null;
         this.options = options;
         this._viewportHandler = () => this._clampAllFloating();
         window.addEventListener('resize', this._viewportHandler);
-        this._outsideClickHandler = (e) => this._onOutsideClick(e);
-        document.addEventListener('mousedown', this._outsideClickHandler);
     }
 
     open(appId, props = {}) {
@@ -157,52 +155,6 @@ class WindowManager {
         });
     }
 
-    _onOutsideClick(e) {
-        // Ignore if there are no floating windows.
-        if (this.floatWindows.size === 0) return;
-        // Ignore clicks inside any floating window or inside the shell header/tab bar.
-        const target = e.target;
-        if (target.closest('.floating-window')) return;
-        if (target.closest('#shell-header') || target.closest('#shell-tabs')) return;
-        // Minimize all floating windows.
-        this.floatWindows.forEach((_, instanceId) => this._minimizeFloat(instanceId));
-    }
-
-    _minimizeFloat(instanceId) {
-        const fw = this.floatWindows.get(instanceId);
-        if (!fw || fw.minimized) return;
-        const rect = fw.win.getBoundingClientRect();
-        fw.savedRect = {
-            left: parseFloat(fw.win.style.left) || rect.left,
-            top: parseFloat(fw.win.style.top) || rect.top,
-            width: parseFloat(fw.win.style.width) || rect.width,
-            height: parseFloat(fw.win.style.height) || rect.height,
-        };
-        fw.minimized = true;
-        fw.win.classList.add('minimized');
-        // Slide the window straight down, keeping its full width, height and horizontal position.
-        // Only 30px remain visible at the bottom, exactly like the drag safety clamp.
-        const vh = window.innerHeight;
-        const minVisible = 30;
-        const targetTop = vh + fw.savedRect.height - minVisible;
-        fw.win.style.transition = 'top 0.45s cubic-bezier(0.4, 0, 0.2, 1)';
-        fw.win.style.top = targetTop + 'px';
-    }
-
-    _restoreFloat(instanceId) {
-        const fw = this.floatWindows.get(instanceId);
-        if (!fw || !fw.minimized) return;
-        const saved = fw.savedRect;
-        if (!saved) return;
-        fw.win.classList.remove('minimized');
-        fw.win.style.transition = 'top 0.45s cubic-bezier(0.4, 0, 0.2, 1)';
-        fw.win.style.left = saved.left + 'px';
-        fw.win.style.top = saved.top + 'px';
-        fw.win.style.width = saved.width + 'px';
-        fw.win.style.height = saved.height + 'px';
-        fw.minimized = false;
-    }
-
     close(instanceId) {
         AppState.saveInstanceState(instanceId);
         const record = AppState.getRecord(instanceId);
@@ -221,7 +173,6 @@ class WindowManager {
         AppState.removeInstance(instanceId);
         if (this.floatWindows.size === 0) {
             window.removeEventListener('resize', this._viewportHandler);
-            document.removeEventListener('mousedown', this._outsideClickHandler);
         }
     }
 

@@ -42,15 +42,6 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
     transform: translate(-50%, -50%);
 }
 .floating-window.active { z-index: 70; }
-.floating-window.minimized {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    border-radius: 1rem 1rem 0 0;
-    overflow: hidden;
-    cursor: pointer;
-}
-.floating-window.minimized .window-header { border-bottom: none; }
-.floating-window.minimized .resize-handle { display: none; }
-.floating-window.minimized .window-body { opacity: 0; transition: opacity 0.3s ease; }
 .window-header {
     display: flex;
     align-items: center;
