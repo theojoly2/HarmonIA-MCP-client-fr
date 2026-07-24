@@ -234,9 +234,11 @@ class VisionApp extends AppBase {
         // and animate it without the browser repositioning it mid-animation.
         const viewerRect = viewer.getBoundingClientRect();
         const containerRect = this.container.getBoundingClientRect();
+        // Recalculate top relative to the positioned ancestor (this.container) and account for any scroll.
+        const scrollTop = this.container.scrollTop || 0;
         viewer.style.position = 'absolute';
-        viewer.style.left = (viewerRect.left - containerRect.left) + 'px';
-        viewer.style.top = (viewerRect.top - containerRect.top) + 'px';
+        viewer.style.left = '0px';
+        viewer.style.top = (viewerRect.top - containerRect.top + scrollTop) + 'px';
         viewer.style.width = viewerRect.width + 'px';
         viewer.style.height = viewerRect.height + 'px';
         viewer.style.margin = '0';
