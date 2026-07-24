@@ -65,7 +65,7 @@ class SearchApp extends AppBase {
         const wrapper = this.container.querySelector('#search-wrapper-inner');
         if (wrapper) wrapper.style.transition = 'none';
         this._skipNextTransition = true;
-        this._observeResize();
+        if (!showTags) this._observeResize();
         if (this.resultsHtml) this._animateResults();
         // Stage 1: center title + search bar only.
         requestAnimationFrame(() => {
@@ -79,6 +79,8 @@ class SearchApp extends AppBase {
                     if (showTags) {
                         // Stage 2: reveal tags and glide the title/bar upward.
                         setTimeout(() => this._revealTags(), 400);
+                    } else {
+                        this._observeResize();
                     }
                 });
             });
@@ -262,6 +264,8 @@ class SearchApp extends AppBase {
                 el.style.animationDelay = (i * 0.12) + 's';
             });
         }
+        // Re-enable resize observer after the intro animation finishes.
+        setTimeout(() => this._observeResize(), 1200);
     }
 
     async _runSearch() {
