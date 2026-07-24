@@ -87,7 +87,7 @@ class SearchApp extends AppBase {
                     this._skipNextTransition = false;
                     if (showTags) {
                         // Stage 2: reveal tags and glide the title/bar upward.
-                        setTimeout(() => this._revealTags(), 600);
+                        setTimeout(() => this._revealTags(), 200);
                     } else {
                         this._observeResize();
                     }
