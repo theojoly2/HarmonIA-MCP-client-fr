@@ -207,16 +207,16 @@ class VisionApp extends AppBase {
             importContainer.style.transform = 'translateY(-16px)';
         }
 
-        // Force home padding to 0 without transition, then animate to the centered offset.
+        // Start the title/diagram descent and viewer fade-out together.
+        // Use transform to animate the title downward, avoiding padding !important conflicts.
         home.style.transition = 'none';
-        home.style.paddingTop = '0px';
+        home.style.transform = 'translateY(0px)';
         void home.offsetHeight;
 
-        // Start the title/diagram descent and viewer fade-out together.
         requestAnimationFrame(() => {
             // Animate the title downward while the diagram fades out.
-            home.style.transition = 'padding-top 0.7s cubic-bezier(0.4, 0, 0.2, 1)';
-            home.style.paddingTop = finalOffset + 'px';
+            home.style.transition = 'transform 0.7s cubic-bezier(0.4, 0, 0.2, 1)';
+            home.style.transform = `translateY(${finalOffset}px)`;
 
             // Fade out the diagram viewer over the same period.
             viewer.style.transition = 'opacity 0.7s ease';
@@ -233,6 +233,10 @@ class VisionApp extends AppBase {
                 this.viewer.destroy();
                 this.viewer = null;
             }
+            // Lock the final centered position into paddingTop, then remove the transform.
+            home.style.transition = 'none';
+            home.style.transform = 'none';
+            home.style.paddingTop = finalOffset + 'px';
             this._updateHomeVisibility(true);
             this.setTitle(this.constructor.title);
 
