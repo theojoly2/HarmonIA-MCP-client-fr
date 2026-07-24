@@ -211,7 +211,11 @@ class VisionApp extends AppBase {
         // Use transform to animate the title downward, avoiding padding !important conflicts.
         home.style.transition = 'none';
         home.style.transform = 'translateY(0px)';
+        viewer.style.transition = 'none';
+        viewer.style.transform = 'translateY(0px)';
+        viewer.style.opacity = '1';
         void home.offsetHeight;
+        void viewer.offsetHeight;
 
         requestAnimationFrame(() => {
             // Animate the title downward while the diagram fades out.
