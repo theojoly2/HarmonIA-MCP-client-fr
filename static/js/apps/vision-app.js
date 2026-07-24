@@ -231,10 +231,9 @@ class VisionApp extends AppBase {
         }
 
         // Snapshot the viewer's visual rectangle so we can detach it from the flex flow
-        // and animate it without the browser repositioning it mid-animation.
+        // and fade it out in place while the title glides down to the centered home position.
         const viewerRect = viewer.getBoundingClientRect();
         const containerRect = this.container.getBoundingClientRect();
-        // Recalculate top relative to the positioned ancestor (this.container) and account for any scroll.
         const scrollTop = this.container.scrollTop || 0;
         viewer.style.position = 'absolute';
         viewer.style.left = '0px';
@@ -243,23 +242,21 @@ class VisionApp extends AppBase {
         viewer.style.height = viewerRect.height + 'px';
         viewer.style.margin = '0';
 
-        // Start the title/diagram descent and viewer fade-out together.
+        // Start the title descent and viewer fade-out together.
         home.style.transition = 'none';
         home.style.transform = 'translateY(0px)';
         viewer.style.transition = 'none';
-        viewer.style.transform = 'translateY(0px)';
         viewer.style.opacity = '1';
         void home.offsetHeight;
         void viewer.offsetHeight;
 
         requestAnimationFrame(() => {
-            // Animate the title downward while the diagram fades out.
+            // Animate the title downward while the diagram fades out in place.
             home.style.transition = 'transform 0.7s cubic-bezier(0.4, 0, 0.2, 1)';
             home.style.transform = `translateY(${finalOffset}px)`;
 
-            // Fade out and slide the diagram viewer downward with the title.
-            viewer.style.transition = 'opacity 0.7s ease, transform 0.7s cubic-bezier(0.4, 0, 0.2, 1)';
-            viewer.style.transform = `translateY(${finalOffset}px)`;
+            // Fade out the diagram viewer in place (no movement, no teleportation).
+            viewer.style.transition = 'opacity 0.7s ease';
             viewer.style.opacity = '0';
         });
 
