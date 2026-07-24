@@ -207,6 +207,11 @@ class VisionApp extends AppBase {
             importContainer.style.transform = 'translateY(-16px)';
         }
 
+        // Force home padding to 0 without transition, then animate to the centered offset.
+        home.style.transition = 'none';
+        home.style.paddingTop = '0px';
+        void home.offsetHeight;
+
         // Start the title/diagram descent and viewer fade-out together.
         requestAnimationFrame(() => {
             // Animate the title downward while the diagram fades out.
