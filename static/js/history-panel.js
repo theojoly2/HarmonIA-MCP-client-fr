@@ -74,12 +74,13 @@ class HistoryPanel {
         }
         this.emptyEl.classList.add("hidden");
         this.models.forEach((model) => {
+            const modelName = model.name || model.id || "";
             const li = document.createElement("li");
             li.className = "history-item";
-            li.dataset.modelId = model.id;
+            li.dataset.modelName = modelName;
             li.innerHTML = `
                 <div class="history-item-info">
-                    <span class="history-item-name" title="${this._escape(model.name)}">${this._escape(model.name)}</span>
+                    <span class="history-item-name" title="${this._escape(modelName)}">${this._escape(modelName)}</span>
                     <span class="history-item-meta">${this._escape(model.source_format || "")}</span>
                 </div>
                 <div class="history-item-actions">
@@ -103,15 +104,15 @@ class HistoryPanel {
             `;
             li.querySelector(".history-action-open").addEventListener("click", (e) => {
                 e.stopPropagation();
-                this._openModel(model.id);
+                this._openModel(modelName);
             });
             li.querySelector(".history-action-rename").addEventListener("click", (e) => {
                 e.stopPropagation();
-                this._renameModel(model.id, model.name);
+                this._renameModel(modelName, modelName);
             });
             li.querySelector(".history-action-delete").addEventListener("click", (e) => {
                 e.stopPropagation();
-                this._deleteModel(model.id);
+                this._deleteModel(modelName);
             });
             this.listEl.appendChild(li);
         });
@@ -125,16 +126,16 @@ class HistoryPanel {
             .replace(/\u003e/g, "&gt;");
     }
 
-    async _openModel(modelId) {
+    async _openModel(modelName) {
         try {
-            const res = await fetch(`api/models/${modelId}/open`, {
+            const encodedName = encodeURIComponent(modelName);
+            const res = await fetch(`api/models/${encodedName}/open`, {
                 method: "POST",
                 credentials: "same-origin",
             });
             if (!res.ok) throw new Error("open_failed");
             const svgText = await res.text();
-            const fileName = res.headers.get("X-Model-Name") || "Modèle";
-            const modelIdFromHeader = res.headers.get("X-Model-Id") || modelId;
+            const fileName = res.headers.get("X-Model-Name") || modelName;
 
             // Replace current Vision instance (tab) with this model
             const existingVision = AppState.listInstances().find((i) => i.appId === "vision" && i.mode === "tab");
@@ -146,7 +147,6 @@ class HistoryPanel {
                 fileName,
                 svgText,
                 mainClassName: "",
-                modelId: modelIdFromHeader,
             });
             this.close();
         } catch (err) {
@@ -155,11 +155,12 @@ class HistoryPanel {
         }
     }
 
-    async _renameModel(modelId, currentName) {
+    async _renameModel(modelName, currentName) {
         const newName = prompt("Renommer le modèle :", currentName);
         if (!newName || newName.trim() === currentName) return;
         try {
-            const res = await fetch(`api/models/${modelId}/rename`, {
+            const encodedName = encodeURIComponent(modelName);
+            const res = await fetch(`api/models/${encodedName}/rename`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 credentials: "same-origin",
@@ -173,10 +174,11 @@ class HistoryPanel {
         }
     }
 
-    async _deleteModel(modelId) {
+    async _deleteModel(modelName) {
         if (!confirm("Supprimer ce modèle de votre historique ?")) return;
         try {
-            const res = await fetch(`api/models/${modelId}`, {
+            const encodedName = encodeURIComponent(modelName);
+            const res = await fetch(`api/models/${encodedName}`, {
                 method: "DELETE",
                 credentials: "same-origin",
             });

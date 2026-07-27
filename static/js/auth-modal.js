@@ -9,6 +9,7 @@ const AuthManager = (() => {
     let pendingImport = null; // { file, fileName, svgText }
     let modal = null;
     let onLoginCallbacks = [];
+    let onLogoutCallbacks = [];
 
     async function init() {
         try {
@@ -49,6 +50,14 @@ const AuthManager = (() => {
         onLoginCallbacks.forEach((cb) => cb(user));
     }
 
+    function onLogout(cb) {
+        onLogoutCallbacks.push(cb);
+    }
+
+    function emitLogout() {
+        onLogoutCallbacks.forEach((cb) => cb());
+    }
+
     async function register(username, password) {
         const res = await fetch("api/auth/register", {
             method: "POST",
@@ -87,6 +96,7 @@ const AuthManager = (() => {
             credentials: "same-origin",
         });
         currentUser = null;
+        emitLogout();
     }
 
     function showModal() {
@@ -108,6 +118,7 @@ const AuthManager = (() => {
         getPendingImport,
         clearPendingImport,
         onLogin,
+        onLogout,
         register,
         login,
         logout,

@@ -94,3 +94,76 @@ async def fetch_document_file(document_id: str) -> dict:
                 return {"success": False, "error": err}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+async def _mcp_call_tool(tool_name: str, args: dict, timeout: float = 15.0) -> Any:
+    async with Client(MCP_SERVER_URL) as client:
+        res = await asyncio.wait_for(client.call_tool(tool_name, args), timeout=timeout)
+        data = getattr(res, "structured_content", None)
+        if data is None:
+            text = "".join(getattr(c, "text", str(c)) for c in (res.content or []))
+            if text:
+                data = json.loads(text)
+        return data
+
+
+async def upload_model_mcp(user: str, name: str, model: dict[str, Any]) -> dict[str, Any]:
+    try:
+        data = await _mcp_call_tool("upload_model", {"user": user, "name": name, "model": model}, timeout=60.0)
+        if isinstance(data, dict) and "error" in data:
+            raise RuntimeError(data["error"])
+        return data
+    except Exception as e:
+        print(f"[MCP upload_model] {e}", flush=True)
+        raise
+
+
+async def get_model_mcp(user: str, name: str) -> Optional[dict[str, Any]]:
+    try:
+        data = await _mcp_call_tool("get_model", {"user": user, "name": name}, timeout=15.0)
+        if isinstance(data, dict) and "error" in data:
+            raise RuntimeError(data["error"])
+        if not data:
+            return None
+        return data
+    except Exception as e:
+        print(f"[MCP get_model] {e}", flush=True)
+        raise
+
+
+async def list_models_mcp(user: str) -> list[dict[str, Any]]:
+    try:
+        data = await _mcp_call_tool("list_models", {"user": user}, timeout=10.0)
+        if isinstance(data, dict) and "error" in data:
+            raise RuntimeError(data["error"])
+        if isinstance(data, dict) and "models" in data:
+            return data["models"]
+        if isinstance(data, list):
+            return data
+        return []
+    except Exception as e:
+        print(f"[MCP list_models] {e}", flush=True)
+        raise
+
+
+async def rename_model_mcp(user: str, old_name: str, new_name: str) -> dict[str, Any]:
+    try:
+        data = await _mcp_call_tool(
+            "rename_model", {"user": user, "old_name": old_name, "new_name": new_name}, timeout=15.0
+        )
+        if isinstance(data, dict) and "error" in data:
+            raise RuntimeError(data["error"])
+        return data
+    except Exception as e:
+        print(f"[MCP rename_model] {e}", flush=True)
+        raise
+
+
+async def delete_model_mcp(user: str, name: str) -> None:
+    try:
+        data = await _mcp_call_tool("delete_model", {"user": user, "name": name}, timeout=10.0)
+        if isinstance(data, dict) and "error" in data:
+            raise RuntimeError(data["error"])
+    except Exception as e:
+        print(f"[MCP delete_model] {e}", flush=True)
+        raise

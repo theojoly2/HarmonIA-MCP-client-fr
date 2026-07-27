@@ -77,6 +77,11 @@
         historyPanel.load();
     });
 
+    AuthManager.onLogout(() => {
+        shell.renderAuthActions(null);
+        historyPanel.close();
+    });
+
     // Auth modal: show when not authenticated, but allow browsing search without login.
     // Wait until the initial search tab is mounted so the UI is not empty behind the modal.
     if (!AuthManager.isLoggedIn()) {

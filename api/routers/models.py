@@ -1,4 +1,8 @@
-"""User model history router."""
+"""User model history router.
+
+Models are persisted by name (unique per user) on the MCP server under
+resources/semantic_model/models/{user}/{name}.json.
+"""
 
 import json
 from typing import Optional
@@ -10,7 +14,6 @@ from api.dependencies import generate_svg_for_bytes
 from api.routers.auth import require_user
 from api.services.model_store import (
     delete_model,
-    ensure_user_store,
     get_model,
     list_models,
     rename_model,
@@ -22,11 +25,8 @@ router = APIRouter(prefix="/api/models", tags=["models"])
 
 
 class ImportResponse(BaseModel):
-    id: str
     name: str
     source_format: str
-    created_at: str
-    updated_at: str
 
 
 class RenameBody(BaseModel):
@@ -35,8 +35,8 @@ class RenameBody(BaseModel):
 
 @router.get("")
 async def get_models(username: str = Depends(require_user)):
-    ensure_user_store(username)
-    return {"models": list_models(username)}
+    models = await list_models(username)
+    return {"models": models}
 
 
 @router.post("/import", response_model=ImportResponse)
@@ -46,7 +46,6 @@ async def import_model(
     name: Optional[str] = Form(None),
     username: str = Depends(require_user),
 ):
-    ensure_user_store(username)
     file_bytes = await file.read()
     filename = file.filename or "model.txt"
     display_name = name or filename
@@ -94,78 +93,50 @@ async def import_model(
     stored_data["svg"] = svg_text
     stored_data["source_filename"] = filename
     stored_data["source_bytes_b64"] = base64_for_bytes(file_bytes)
+    stored_data["source_format"] = kind or "unknown"
+    stored_data["name"] = display_name
 
-    payload = save_model(
+    payload = await save_model(
         username=username,
-        model_data=stored_data,
         name=display_name,
-        source_format=kind or "unknown",
+        model_data=stored_data,
     )
     return ImportResponse(
-        id=payload["id"],
-        name=payload["name"],
-        source_format=payload["source_format"],
-        created_at=payload["created_at"],
-        updated_at=payload["updated_at"],
+        name=payload.get("name", display_name),
+        source_format=payload.get("source_format", kind or "unknown"),
     )
 
 
-@router.get("/{model_id}")
-async def read_model(model_id: str, username: str = Depends(require_user)):
-    model = get_model(username, model_id)
+@router.get("/{model_name}")
+async def read_model(model_name: str, username: str = Depends(require_user)):
+    model = await get_model(username, model_name)
     if not model:
         return Response(status_code=404, content=json.dumps({"detail": "model_not_found"}))
     return model
 
 
-@router.post("/{model_id}/open")
-async def open_model(model_id: str, username: str = Depends(require_user)):
-    model = get_model(username, model_id)
+@router.post("/{model_name}/open")
+async def open_model(model_name: str, username: str = Depends(require_user)):
+    model = await get_model(username, model_name)
     if not model:
         return Response(status_code=404, content=json.dumps({"detail": "model_not_found"}))
-    svg = model.get("data", {}).get("svg", "")
+    svg = model.get("svg", "")
     if not svg:
         return Response(status_code=422, content=json.dumps({"detail": "no_svg_for_model"}))
     return Response(content=svg.encode("utf-8"), media_type="image/svg+xml", headers={
-        "X-Model-Id": model_id,
         "X-Model-Name": model.get("name", ""),
     })
 
 
-@router.post("/{model_id}/open-source")
-async def open_model_source(model_id: str, username: str = Depends(require_user)):
-    model = get_model(username, model_id)
-    if not model:
-        return Response(status_code=404, content=json.dumps({"detail": "model_not_found"}))
-    data = model.get("data", {})
-    source_b64 = data.get("source_bytes_b64")
-    if source_b64:
-        import base64
-        source_bytes = base64.b64decode(source_b64)
-    elif "ttl_raw" in data:
-        source_bytes = data["ttl_raw"].encode("utf-8")
-    elif "source" in data:
-        source_bytes = json.dumps(data["source"], ensure_ascii=False).encode("utf-8")
-    else:
-        source_bytes = b""
-    from fastapi.responses import StreamingResponse
-    from io import BytesIO
-    return StreamingResponse(BytesIO(source_bytes), media_type="application/octet-stream", headers={
-        "X-Model-Id": model_id,
-        "X-Model-Name": model.get("name", ""),
-        "X-Source-Format": model.get("source_format", ""),
-    })
-
-
-@router.patch("/{model_id}/rename")
-async def rename(model_id: str, body: RenameBody, username: str = Depends(require_user)):
-    meta = rename_model(username, model_id, body.name.strip())
+@router.patch("/{model_name}/rename")
+async def rename(model_name: str, body: RenameBody, username: str = Depends(require_user)):
+    meta = await rename_model(username, model_name, body.name.strip())
     return meta
 
 
-@router.delete("/{model_id}")
-async def remove(model_id: str, username: str = Depends(require_user)):
-    delete_model(username, model_id)
+@router.delete("/{model_name}")
+async def remove(model_name: str, username: str = Depends(require_user)):
+    await delete_model(username, model_name)
     return {"ok": True}
 
 

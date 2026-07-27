@@ -68,12 +68,11 @@ class Shell {
             const logoutBtn = document.createElement('button');
             logoutBtn.className = 'shell-action-btn';
             logoutBtn.textContent = 'Déconnexion';
-            logoutBtn.addEventListener('click', () => {
-                if (this.authManager) {
-                    this.authManager.logout().then(() => {
-                        if (this.historyPanel) this.historyPanel.close();
-                    });
-                }
+            logoutBtn.addEventListener('click', async () => {
+                if (!this.authManager) return;
+                await this.authManager.logout();
+                if (this.historyPanel) this.historyPanel.close();
+                this.renderAuthActions(null);
             });
 
             this.actionsArea.appendChild(historyBtn);
