@@ -58,7 +58,11 @@ class HistoryPanel {
             const res = await fetch("api/models", { credentials: "same-origin" });
             if (!res.ok) throw new Error("fetch_failed");
             const data = await res.json();
-            this.models = data.models || [];
+            this.models = (data.models || []).sort((a, b) => {
+                const ta = a.last_opened_at || 0;
+                const tb = b.last_opened_at || 0;
+                return tb - ta;
+            });
         } catch (err) {
             console.error("History load error", err);
             this.models = [];
