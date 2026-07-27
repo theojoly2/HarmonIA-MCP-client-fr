@@ -532,3 +532,37 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
 }
 .history-action:hover { background: #f3f4f6; color: #111827; }
 .history-action-delete:hover { color: #dc2626; background: #fef2f2; }
+
+/* === History item menu === */
+.history-menu {
+    position: fixed;
+    z-index: 300;
+    min-width: 140px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12);
+    padding: 0.35rem;
+    display: flex;
+    flex-direction: column;
+    animation: fadeIn 0.12s ease;
+}
+.history-menu-item {
+    padding: 0.55rem 0.9rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #374151;
+    text-align: left;
+    border: none;
+    border-radius: 0.5rem;
+    background: transparent;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.history-menu-item:hover {
+    background: #f3f4f6;
+}
+.history-menu-delete:hover {
+    color: #dc2626;
+    background: #fef2f2;
+}
