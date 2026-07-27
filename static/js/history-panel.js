@@ -74,7 +74,11 @@ class HistoryPanel {
             let searches = [];
             if (modelsRes.ok) {
                 const data = await modelsRes.json();
-                models = (data.models || []).map((m) => ({ ...m, kind: "model", sortKey: m.last_opened_at || 0 }));
+                models = (data.models || []).map((m) => ({
+                    ...m,
+                    kind: "model",
+                    sortKey: Number(m.last_opened_at) || 0,
+                }));
             }
             if (searchesRes.ok) {
                 const data = await searchesRes.json();
@@ -83,14 +87,10 @@ class HistoryPanel {
                     kind: "search",
                     name: s.query,
                     source_format: (s.tags || "").split(",").filter(Boolean).join(", ") || "recherche",
-                    last_opened_at: s.last_opened_at || 0,
+                    sortKey: Number(s.last_opened_at) || 0,
                 }));
             }
-                this.items = [...models, ...searches].sort((a, b) => {
-                    const ta = a.last_opened_at || a.sortKey || 0;
-                    const tb = b.last_opened_at || b.sortKey || 0;
-                    return tb - ta;
-                });
+            this.items = [...models, ...searches].sort((a, b) => b.sortKey - a.sortKey);
         } catch (err) {
             console.error("History load error", err);
             this.items = [];
