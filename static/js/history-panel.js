@@ -158,8 +158,8 @@ class HistoryPanel {
     _showDeleteConfirm(menu, modelName) {
         menu.innerHTML = `
             <div class="history-menu-text">Supprimer « ${this._escape(modelName)} » ?</div>
-            <button type="button" class="history-menu-item history-menu-confirm-delete">Confirmer</button>
             <button type="button" class="history-menu-item history-menu-cancel">Annuler</button>
+            <button type="button" class="history-menu-item history-menu-confirm-delete">Supprimer</button>
         `;
         menu.querySelector(".history-menu-confirm-delete").addEventListener("click", async (e) => {
             e.stopPropagation();
