@@ -43,14 +43,14 @@ def init_search_history_db():
                 query TEXT NOT NULL,
                 tags TEXT DEFAULT '',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_opened_at INTEGER DEFAULT (strftime('%s', 'now'))
+                last_opened_at INTEGER DEFAULT (strftime('%s', 'now') * 1000)
             )
             """
         )
     elif not _column_exists(conn, "search_history", "last_opened_at"):
-        conn.execute("ALTER TABLE search_history ADD COLUMN last_opened_at INTEGER DEFAULT (strftime('%s', 'now'))")
+        conn.execute("ALTER TABLE search_history ADD COLUMN last_opened_at INTEGER DEFAULT (strftime('%s', 'now') * 1000)")
         conn.execute(
-            "UPDATE search_history SET last_opened_at = strftime('%s', 'now') WHERE last_opened_at IS NULL"
+            "UPDATE search_history SET last_opened_at = strftime('%s', 'now') * 1000 WHERE last_opened_at IS NULL"
         )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_search_history_username ON search_history(username)"
@@ -62,7 +62,7 @@ def init_search_history_db():
 def save_search(username: str, query: str, tags: list[str]) -> dict:
     conn = _get_conn()
     cur = conn.execute(
-        "INSERT INTO search_history (username, query, tags) VALUES (?, ?, ?)",
+        "INSERT INTO search_history (username, query, tags, last_opened_at) VALUES (?, ?, ?, strftime('%s', 'now') * 1000)",
         (username, query.strip(), ",".join(tags or [])),
     )
     inserted_id = cur.lastrowid
@@ -73,12 +73,12 @@ def save_search(username: str, query: str, tags: list[str]) -> dict:
     ).fetchone()
     conn.close()
     item = dict(row)
-    if isinstance(item.get("last_opened_at"), str):
-        try:
-            item["last_opened_at"] = int(datetime.fromisoformat(item["last_opened_at"]).timestamp())
-        except Exception:
-            import time
-            item["last_opened_at"] = int(time.time())
+        if isinstance(item.get("last_opened_at"), str):
+            try:
+                item["last_opened_at"] = int(datetime.fromisoformat(item["last_opened_at"]).timestamp() * 1000)
+            except Exception:
+                import time
+                item["last_opened_at"] = int(time.time() * 1000)
     return item
 
 
@@ -103,11 +103,11 @@ def list_searches(username: str, limit: int = 200) -> list[dict]:
         if isinstance(lo, str):
             try:
                 dt = datetime.fromisoformat(lo)
-                item["last_opened_at"] = int(dt.timestamp())
+                item["last_opened_at"] = int(dt.timestamp() * 1000)
             except Exception:
-                item["last_opened_at"] = int(time.time())
+                item["last_opened_at"] = int(time.time() * 1000)
         elif lo is None:
-            item["last_opened_at"] = int(time.time())
+            item["last_opened_at"] = int(time.time() * 1000)
         out.append(item)
     return out
 
@@ -116,7 +116,7 @@ def touch_search(username: str, search_id: int) -> dict | None:
     import time
     conn = _get_conn()
     conn.execute(
-        "UPDATE search_history SET last_opened_at = strftime('%s', 'now') WHERE id = ? AND username = ?",
+        "UPDATE search_history SET last_opened_at = strftime('%s', 'now') * 1000 WHERE id = ? AND username = ?",
         (search_id, username),
     )
     conn.commit()
@@ -128,9 +128,9 @@ def touch_search(username: str, search_id: int) -> dict | None:
     item = dict(row) if row else None
     if item and isinstance(item.get("last_opened_at"), str):
         try:
-            item["last_opened_at"] = int(datetime.fromisoformat(item["last_opened_at"]).timestamp())
+            item["last_opened_at"] = int(datetime.fromisoformat(item["last_opened_at"]).timestamp() * 1000)
         except Exception:
-            item["last_opened_at"] = int(time.time())
+            item["last_opened_at"] = int(time.time() * 1000)
     return item
 
 
