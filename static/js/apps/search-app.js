@@ -308,7 +308,10 @@ class SearchApp extends AppBase {
             const resultsContainer = this.container.querySelector('#results-container');
             if (resultsContainer) {
                 resultsContainer.innerHTML = this.resultsHtml;
-                this._animateResults();
+                this._animateResults(() => {
+                    this._setLoading(false);
+                    this._stopTimer();
+                });
             }
             this._applyCentering();
 
@@ -330,7 +333,6 @@ class SearchApp extends AppBase {
                     ⏳ Délai dépassé (Timeout). Veuillez relancer la recherche.
                 </div>`;
             }
-        } finally {
             this._setLoading(false);
             this._stopTimer();
         }
@@ -407,9 +409,12 @@ class SearchApp extends AppBase {
         if (el) el.textContent = '';
     }
 
-    _animateResults() {
+    _animateResults(onDone) {
         const container = this.container.querySelector('#results-container');
-        if (!container) return;
+        if (!container) {
+            if (onDone) onDone();
+            return;
+        }
         container.classList.remove('results-visible');
         const items = container.querySelectorAll('.result-item');
         items.forEach((el, i) => {
@@ -417,6 +422,22 @@ class SearchApp extends AppBase {
         });
         requestAnimationFrame(() => {
             container.classList.add('results-visible');
+            if (onDone) {
+                const last = items[items.length - 1];
+                if (last) {
+                    const finish = (e) => {
+                        if (e.target === last && e.animationName === 'fadeSlideUp') {
+                            last.removeEventListener('animationend', finish);
+                            onDone();
+                        }
+                    };
+                    last.addEventListener('animationend', finish);
+                    // Safety fallback if animation events are skipped
+                    setTimeout(onDone, items.length * 80 + 400);
+                } else {
+                    onDone();
+                }
+            }
         });
     }
 
