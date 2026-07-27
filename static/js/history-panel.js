@@ -356,7 +356,7 @@ class HistoryPanel {
                 } else if (existingSearch.mode === "split") {
                     windowManager.renderSplit();
                 }
-                requestAnimationFrame(() => inst._runSearch());
+                inst._runSearch();
                 return;
             }
         }

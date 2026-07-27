@@ -174,17 +174,7 @@ class SearchApp extends AppBase {
                 this.selectedTags = Array.from(tagsContainer.querySelectorAll('input[name="t"]:checked')).map(cb => cb.value);
                 this._updateHomeModeClass();
 
-                // Clear previous results immediately as soon as loading starts
-                if (resultsContainer) {
-                    resultsContainer.innerHTML = '';
-                    resultsContainer.classList.remove('results-hiding');
-                    resultsContainer.style.display = '';
-                    resultsContainer.style.visibility = '';
-                }
-
-                this._setLoading(true);
-                this._startTimer();
-                this._applyCentering();
+                // _runSearch handles loading state, timer and centering.
                 this._runSearch();
             };
 
@@ -301,14 +291,13 @@ class SearchApp extends AppBase {
         if (!this.query) return;
         this._setLoading(true);
         this._startTimer();
+        this._setLoading(true);
         this._applyCentering();
         // Clear previous results immediately so stale content is not shown during loading.
         const resultsContainer = this.container.querySelector('#results-container');
         if (resultsContainer) {
             resultsContainer.innerHTML = '';
-            resultsContainer.classList.remove('results-hiding');
-            resultsContainer.style.display = '';
-            resultsContainer.style.visibility = '';
+            resultsContainer.classList.remove('results-hiding', 'results-visible');
         }
         this.resultsHtml = '';
         try {
