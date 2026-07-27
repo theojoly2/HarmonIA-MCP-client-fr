@@ -80,8 +80,7 @@ class HistoryPanel {
             li.dataset.modelName = modelName;
             li.innerHTML = `
                 <div class="history-item-info">
-                    <span class="history-item-name" title="${this._escape(modelName)}">${this._escape(modelName)}</span>
-                    <span class="history-item-meta">${this._escape(model.source_format || "")}</span>
+                    <span class="history-item-name" title="Cliquer pour renommer">${this._escape(modelName)}</span>
                 </div>
                 <button type="button" class="history-action history-action-more" title="Actions" aria-haspopup="true">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -90,8 +89,13 @@ class HistoryPanel {
                 </button>
             `;
             li.addEventListener("click", (e) => {
-                if (e.target.closest(".history-action-more, .history-menu")) return;
+                if (e.target.closest(".history-action-more, .history-menu, .history-item-name")) return;
                 this._openModel(modelName);
+            });
+            const nameEl = li.querySelector(".history-item-name");
+            nameEl.addEventListener("click", (e) => {
+                e.stopPropagation();
+                this._startInlineRename(nameEl, modelName);
             });
             const moreBtn = li.querySelector(".history-action-more");
             moreBtn.addEventListener("click", (e) => {
@@ -128,7 +132,9 @@ class HistoryPanel {
         menu.querySelector(".history-menu-rename").addEventListener("click", (e) => {
             e.stopPropagation();
             this._closeMenu();
-            this._renameModel(modelName, modelName);
+            const li = this.listEl.querySelector(`li[data-model-name="${CSS.escape(modelName)}"]`) || anchorBtn.closest(".history-item");
+            const nameEl = li?.querySelector(".history-item-name");
+            if (nameEl) this._startInlineRename(nameEl, modelName);
         });
         menu.querySelector(".history-menu-delete").addEventListener("click", (e) => {
             e.stopPropagation();
@@ -152,6 +158,51 @@ class HistoryPanel {
             this._activeMenu.remove();
             this._activeMenu = null;
         }
+    }
+
+    _startInlineRename(nameEl, modelName) {
+        if (nameEl.querySelector("input")) return;
+        const input = document.createElement("input");
+        input.type = "text";
+        input.value = modelName;
+        input.className = "history-item-rename-input";
+        nameEl.textContent = "";
+        nameEl.appendChild(input);
+        input.focus();
+        input.select();
+
+        const finish = async (save) => {
+            const newName = input.value.trim();
+            input.remove();
+            if (!save || !newName || newName === modelName) {
+                nameEl.textContent = modelName;
+                return;
+            }
+            nameEl.textContent = newName;
+            try {
+                const encodedName = encodeURIComponent(modelName);
+                const res = await fetch(`api/models/${encodedName}/rename`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "same-origin",
+                    body: JSON.stringify({ name: newName }),
+                });
+                if (!res.ok) throw new Error("rename_failed");
+                // Keep displayed text; refresh list silently in background to sync ordering
+                this.load();
+            } catch (err) {
+                console.error("Rename model error", err);
+                nameEl.textContent = modelName;
+                alert("Impossible de renommer le modèle.");
+            }
+        };
+
+        input.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") finish(true);
+            else if (e.key === "Escape") finish(false);
+        });
+        input.addEventListener("blur", () => finish(true));
+        input.addEventListener("click", (e) => e.stopPropagation());
     }
 
     async _openModel(modelName) {
@@ -183,24 +234,7 @@ class HistoryPanel {
         }
     }
 
-    async _renameModel(modelName, currentName) {
-        const newName = prompt("Renommer le modèle :", currentName);
-        if (!newName || newName.trim() === currentName) return;
-        try {
-            const encodedName = encodeURIComponent(modelName);
-            const res = await fetch(`api/models/${encodedName}/rename`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                credentials: "same-origin",
-                body: JSON.stringify({ name: newName.trim() }),
-            });
-            if (!res.ok) throw new Error("rename_failed");
-            await this.load();
-        } catch (err) {
-            console.error("Rename model error", err);
-            alert("Impossible de renommer le modèle.");
-        }
-    }
+
 
     async _deleteModel(modelName) {
         if (!confirm("Supprimer ce modèle de votre historique ?")) return;

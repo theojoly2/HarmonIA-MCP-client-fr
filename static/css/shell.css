@@ -495,6 +495,7 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
     flex-direction: column;
     min-width: 0;
     flex: 1;
+    justify-content: center;
 }
 .history-item-name {
     font-size: 0.9rem;
@@ -503,13 +504,25 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    cursor: text;
+    border-radius: 0.35rem;
+    padding: 0.15rem 0.25rem;
+    margin-left: -0.25rem;
+    transition: background 0.15s;
 }
-.history-item-meta {
-    font-size: 0.75rem;
+.history-item-name:hover {
+    background: #f3f4f6;
+}
+.history-item-rename-input {
+    width: 100%;
+    font-size: 0.9rem;
     font-weight: 600;
-    color: #9ca3af;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
+    color: #111827;
+    border: 1px solid #111827;
+    border-radius: 0.35rem;
+    padding: 0.15rem 0.5rem;
+    outline: none;
+    background: #ffffff;
 }
 .history-item-actions {
     display: flex;
