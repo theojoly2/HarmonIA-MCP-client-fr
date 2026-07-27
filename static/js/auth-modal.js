@@ -175,13 +175,10 @@ class AuthModal {
         form.addEventListener("submit", (e) => this._onSubmit(e));
 
         const closeBtn = this.overlay.querySelector("#auth-close");
-        closeBtn.addEventListener("click", () => {
-            // Modal is modal; ignore close unless logged in
-            if (AuthManager.isLoggedIn()) this.close();
-        });
+        closeBtn.addEventListener("click", () => this.close());
 
         this.overlay.addEventListener("click", (e) => {
-            if (e.target === this.overlay && AuthManager.isLoggedIn()) this.close();
+            if (e.target === this.overlay) this.close();
         });
     }
 

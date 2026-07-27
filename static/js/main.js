@@ -54,7 +54,7 @@
     shell.addAppButton(SearchApp);
     shell.addAppButton(VisionApp);
 
-    shell.renderAuthActions(AuthManager.getUser());
+    shell.renderAuthActions(AuthManager.getUser(), historyPanel);
 
     // Handle pending import after login
     async function flushPendingImport() {
@@ -70,30 +70,21 @@
     }
 
     AuthManager.onLogin(async (user) => {
-        shell.renderAuthActions(user);
+        shell.renderAuthActions(user, historyPanel);
         await flushPendingImport();
         historyPanel.load();
     });
 
-    EventBus.on('show-auth', () => AuthManager.showModal());
-    EventBus.on('logout', async () => {
-        await AuthManager.logout();
-        shell.renderAuthActions(null);
-        historyPanel.close();
-    });
-    EventBus.on('toggle-history', () => {
-        if (!AuthManager.isLoggedIn()) {
-            AuthManager.showModal();
-            return;
-        }
-        historyPanel.toggle();
-    });
+    window.AuthManager.onLogin = AuthManager.onLogin;
 
     // Auth modal: show when not authenticated, but allow browsing search without login.
     // Wait until the initial search tab is mounted so the UI is not empty behind the modal.
     if (!AuthManager.isLoggedIn()) {
         setTimeout(() => AuthManager.showModal(), 0);
     }
+
+    // Global helper for non-logged-in shell login button
+    window.AuthManager = AuthManager;
 
     // Event bus handlers
     EventBus.on('open-preview', ({ docId, documentId, name }) => {

@@ -24,7 +24,7 @@ class Shell {
         this.contentArea = this.container.querySelector('#shell-content');
     }
 
-    renderAuthActions(user) {
+    renderAuthActions(user, historyPanel) {
         this.actionsArea.innerHTML = '';
         if (user) {
             const historyBtn = document.createElement('button');
@@ -37,7 +37,9 @@ class Shell {
                 </svg>
                 <span>Historique</span>
             `;
-            historyBtn.addEventListener('click', () => EventBus.emit('toggle-history'));
+            historyBtn.addEventListener('click', () => {
+                if (historyPanel) historyPanel.toggle();
+            });
 
             const userLabel = document.createElement('span');
             userLabel.className = 'shell-user-label';
@@ -46,7 +48,11 @@ class Shell {
             const logoutBtn = document.createElement('button');
             logoutBtn.className = 'shell-action-btn';
             logoutBtn.textContent = 'Déconnexion';
-            logoutBtn.addEventListener('click', () => EventBus.emit('logout'));
+            logoutBtn.addEventListener('click', () => {
+                if (window.AuthManager) window.AuthManager.logout().then(() => {
+                    if (historyPanel) historyPanel.close();
+                });
+            });
 
             this.actionsArea.appendChild(historyBtn);
             this.actionsArea.appendChild(userLabel);
