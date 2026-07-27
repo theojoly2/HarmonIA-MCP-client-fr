@@ -23,6 +23,7 @@ class SearchApp extends AppBase {
         this._skipNextTransition = false;
         this._firstTagAnimation = true;
         this._introAnimating = false;
+        this._skipHistorySave = !!props.fromHistory;
     }
 
     async render(container) {
@@ -298,6 +299,9 @@ class SearchApp extends AppBase {
 
     async _runSearch() {
         if (!this.query) return;
+        this._setLoading(true);
+        this._startTimer();
+        this._applyCentering();
         try {
             const data = await ApiClient.postSearch(this.query, this.selectedTags, 20);
             this.resultsHtml = data.results_html || '';
@@ -311,7 +315,7 @@ class SearchApp extends AppBase {
             this._applyCentering();
 
             // Persist search query to user history when logged in.
-            if (AuthManager.isLoggedIn()) {
+            if (AuthManager.isLoggedIn() && !this._skipHistorySave) {
                 try {
                     await ApiClient.saveSearch(this.query, this.selectedTags);
                     if (window.historyPanel) window.historyPanel.load();
@@ -319,6 +323,7 @@ class SearchApp extends AppBase {
                     console.error('Save search error', err);
                 }
             }
+            this._skipHistorySave = false;
         } catch (e) {
             console.error('Erreur recherche', e);
             const resultsContainer = this.container.querySelector('#results-container');

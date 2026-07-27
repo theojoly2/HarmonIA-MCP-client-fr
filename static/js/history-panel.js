@@ -323,6 +323,7 @@ class HistoryPanel {
             if (inst) {
                 inst.query = query;
                 inst.selectedTags = tags;
+                inst._skipHistorySave = true;
                 if (existingSearch.mode === "tab") {
                     windowManager.switchTab(existingSearch.instanceId);
                     inst.render(inst.container || shell.getContentArea().querySelector(".app-container"));
@@ -337,7 +338,7 @@ class HistoryPanel {
                 return;
             }
         }
-        windowManager.open("search", { mode: "tab", query, tags });
+        windowManager.open("search", { mode: "tab", query, tags, fromHistory: true });
     }
 
 
