@@ -29,19 +29,23 @@ class HistoryPanel {
                 <ul class="history-list" id="history-list"></ul>
             </div>
         `;
+        // Ensure pointer events work even inside a pointer-events-none overlay area.
+        this.panel.style.pointerEvents = "auto";
         this.container.appendChild(this.panel);
         this.listEl = this.panel.querySelector("#history-list");
         this.emptyEl = this.panel.querySelector("#history-empty");
         this.panel.querySelector("#history-close").addEventListener("click", () => this.close());
 
-        // Close when clicking outside (on the shell content area)
-        document.addEventListener("click", (e) => {
+        // Close when clicking outside the panel.
+        this._outsideClickHandler = (e) => {
             if (!this.isOpen) return;
             const target = e.target;
             if (!this.panel.contains(target) && !target.closest("#history-toggle")) {
                 this.close();
             }
-        });
+        };
+        // Use capture so we catch clicks before they reach other handlers.
+        document.addEventListener("click", this._outsideClickHandler, true);
     }
 
     async load() {
@@ -193,6 +197,13 @@ class HistoryPanel {
     close() {
         this.isOpen = false;
         this.panel.classList.remove("open");
+    }
+
+    destroy() {
+        if (this.panel) this.panel.remove();
+        if (this._outsideClickHandler) {
+            document.removeEventListener("click", this._outsideClickHandler, true);
+        }
     }
 
     toggle() {

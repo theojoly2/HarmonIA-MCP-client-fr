@@ -19,10 +19,12 @@
     splitRoot.className = 'h-full w-full';
 
     const shell = new Shell(appShell, null);
+    shell.setAuthManager(AuthManager);
     const contentArea = shell.getContentArea();
 
-    // History panel attached to the shell content area
-    const historyPanel = new HistoryPanel(contentArea);
+    // History panel attached to the dedicated overlay area so it survives tab mounts.
+    const historyPanel = new HistoryPanel(shell.getOverlayArea());
+    shell.setHistoryPanel(historyPanel);
 
     // Split manager for shell content
     const splitManager = new SplitManager(contentArea, {
@@ -54,7 +56,7 @@
     shell.addAppButton(SearchApp);
     shell.addAppButton(VisionApp);
 
-    shell.renderAuthActions(AuthManager.getUser(), historyPanel);
+    shell.renderAuthActions(AuthManager.getUser());
 
     // Handle pending import after login
     async function flushPendingImport() {
@@ -70,12 +72,10 @@
     }
 
     AuthManager.onLogin(async (user) => {
-        shell.renderAuthActions(user, historyPanel);
+        shell.renderAuthActions(user);
         await flushPendingImport();
         historyPanel.load();
     });
-
-    window.AuthManager.onLogin = AuthManager.onLogin;
 
     // Auth modal: show when not authenticated, but allow browsing search without login.
     // Wait until the initial search tab is mounted so the UI is not empty behind the modal.
@@ -83,7 +83,7 @@
         setTimeout(() => AuthManager.showModal(), 0);
     }
 
-    // Global helper for non-logged-in shell login button
+    // Global helper
     window.AuthManager = AuthManager;
 
     // Event bus handlers

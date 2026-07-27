@@ -17,14 +17,34 @@ class Shell {
                 <div class="flex items-center gap-2" id="tab-bar"></div>
                 <div class="flex items-center gap-2" id="shell-actions"></div>
             </div>
+            <div id="shell-overlays" class="absolute inset-0 pointer-events-none z-50"></div>
             <div id="shell-content" class="flex-1 relative overflow-hidden"></div>
         `;
         this.tabBar = this.container.querySelector('#tab-bar');
         this.actionsArea = this.container.querySelector('#shell-actions');
         this.contentArea = this.container.querySelector('#shell-content');
+        this.overlayArea = this.container.querySelector('#shell-overlays');
+        this.authManager = null;
+        this.historyPanel = null;
     }
 
-    renderAuthActions(user, historyPanel) {
+    setAuthManager(authManager) {
+        this.authManager = authManager;
+    }
+
+    setHistoryPanel(historyPanel) {
+        this.historyPanel = historyPanel;
+    }
+
+    getContentArea() {
+        return this.contentArea;
+    }
+
+    getOverlayArea() {
+        return this.overlayArea;
+    }
+
+    renderAuthActions(user) {
         this.actionsArea.innerHTML = '';
         if (user) {
             const historyBtn = document.createElement('button');
@@ -38,7 +58,7 @@ class Shell {
                 <span>Historique</span>
             `;
             historyBtn.addEventListener('click', () => {
-                if (historyPanel) historyPanel.toggle();
+                if (this.historyPanel) this.historyPanel.toggle();
             });
 
             const userLabel = document.createElement('span');
@@ -49,9 +69,11 @@ class Shell {
             logoutBtn.className = 'shell-action-btn';
             logoutBtn.textContent = 'Déconnexion';
             logoutBtn.addEventListener('click', () => {
-                if (window.AuthManager) window.AuthManager.logout().then(() => {
-                    if (historyPanel) historyPanel.close();
-                });
+                if (this.authManager) {
+                    this.authManager.logout().then(() => {
+                        if (this.historyPanel) this.historyPanel.close();
+                    });
+                }
             });
 
             this.actionsArea.appendChild(historyBtn);
@@ -61,13 +83,11 @@ class Shell {
             const loginBtn = document.createElement('button');
             loginBtn.className = 'shell-action-btn primary';
             loginBtn.textContent = 'Connexion';
-            loginBtn.addEventListener('click', () => EventBus.emit('show-auth'));
+            loginBtn.addEventListener('click', () => {
+                if (this.authManager) this.authManager.showModal();
+            });
             this.actionsArea.appendChild(loginBtn);
         }
-    }
-
-    getContentArea() {
-        return this.contentArea;
     }
 
     addAppButton(appClass) {
