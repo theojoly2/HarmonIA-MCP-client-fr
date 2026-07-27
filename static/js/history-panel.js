@@ -17,12 +17,19 @@ class HistoryPanel {
         this.panel.setAttribute("aria-label", "Historique des modèles");
         this.panel.innerHTML = `
             <div class="history-panel-header">
-                <h3 class="history-panel-title">Modèles enregistrés</h3>
-                <button type="button" class="history-panel-close" id="history-close" title="Fermer">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                </button>
+                <h3 class="history-panel-title">Historique</h3>
+                <div class="history-panel-actions">
+                    <button type="button" class="history-panel-delete-all" id="history-delete-all" title="Tout supprimer">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                    </button>
+                    <button type="button" class="history-panel-close" id="history-close" title="Fermer">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
             </div>
             <div class="history-panel-content" id="history-content">
                 <div class="history-empty" id="history-empty">Aucun modèle enregistré.</div>
@@ -35,6 +42,10 @@ class HistoryPanel {
         this.listEl = this.panel.querySelector("#history-list");
         this.emptyEl = this.panel.querySelector("#history-empty");
         this.panel.querySelector("#history-close").addEventListener("click", () => this.close());
+        this.panel.querySelector("#history-delete-all").addEventListener("click", (e) => {
+            e.stopPropagation();
+            this._deleteAll();
+        });
 
         // Close when clicking outside the panel (ignore history menus floating in body).
         this._outsideClickHandler = (e) => {
@@ -72,7 +83,7 @@ class HistoryPanel {
                     kind: "search",
                     name: s.query,
                     source_format: (s.tags || "").split(",").filter(Boolean).join(", ") || "recherche",
-                    last_opened_at: new Date(s.last_opened_at || s.created_at).getTime() / 1000,
+                    last_opened_at: s.last_opened_at || 0,
                 }));
             }
                 this.items = [...models, ...searches].sort((a, b) => {
@@ -343,19 +354,25 @@ class HistoryPanel {
 
 
 
-    async _deleteModel(modelName) {
-        if (!confirm("Supprimer ce modèle de votre historique ?")) return;
+    async _deleteAll() {
+        if (!confirm("Supprimer tout l'historique (modèles et recherches) ? Cette action est irréversible.")) return;
         try {
-            const encodedName = encodeURIComponent(modelName);
-            const res = await fetch(`api/models/${encodedName}`, {
-                method: "DELETE",
-                credentials: "same-origin",
-            });
-            if (!res.ok) throw new Error("delete_failed");
+            await Promise.all(
+                this.items.map((item) => {
+                    if (item.kind === "search") {
+                        return ApiClient.deleteSearch(item.id);
+                    }
+                    const encodedName = encodeURIComponent(item.name);
+                    return fetch(`api/models/${encodedName}`, {
+                        method: "DELETE",
+                        credentials: "same-origin",
+                    });
+                })
+            );
             await this.load();
         } catch (err) {
-            console.error("Delete model error", err);
-            alert("Impossible de supprimer le modèle.");
+            console.error("Delete all error", err);
+            alert("Impossible de supprimer tout l'historique.");
         }
     }
 

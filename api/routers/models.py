@@ -131,6 +131,12 @@ async def open_model(model_name: str, username: str = Depends(require_user)):
     })
 
 
+@router.post("/{model_name}/touch")
+async def touch_model_route(model_name: str, username: str = Depends(require_user)):
+    await touch_model(username, model_name)
+    return {"ok": True}
+
+
 @router.patch("/{model_name}/rename")
 async def rename(model_name: str, body: RenameBody, username: str = Depends(require_user)):
     meta = await rename_model(username, model_name, body.name.strip())

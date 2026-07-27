@@ -1,6 +1,6 @@
 """SQLite persistence for user search history."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -43,17 +43,14 @@ def init_search_history_db():
                 query TEXT NOT NULL,
                 tags TEXT DEFAULT '',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_opened_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                last_opened_at INTEGER DEFAULT (strftime('%s', 'now'))
             )
             """
         )
     elif not _column_exists(conn, "search_history", "last_opened_at"):
-        import datetime
-        conn.execute("ALTER TABLE search_history ADD COLUMN last_opened_at TIMESTAMP")
-        default_ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        conn.execute("ALTER TABLE search_history ADD COLUMN last_opened_at INTEGER DEFAULT (strftime('%s', 'now'))")
         conn.execute(
-            "UPDATE search_history SET last_opened_at = ? WHERE last_opened_at IS NULL",
-            (default_ts,),
+            "UPDATE search_history SET last_opened_at = strftime('%s', 'now') WHERE last_opened_at IS NULL"
         )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_search_history_username ON search_history(username)"
@@ -75,10 +72,18 @@ def save_search(username: str, query: str, tags: list[str]) -> dict:
         (inserted_id,),
     ).fetchone()
     conn.close()
-    return dict(row)
+    item = dict(row)
+    if isinstance(item.get("last_opened_at"), str):
+        try:
+            item["last_opened_at"] = int(datetime.fromisoformat(item["last_opened_at"]).timestamp())
+        except Exception:
+            import time
+            item["last_opened_at"] = int(time.time())
+    return item
 
 
 def list_searches(username: str, limit: int = 200) -> list[dict]:
+    import time
     conn = _get_conn()
     rows = conn.execute(
         """
@@ -91,13 +96,27 @@ def list_searches(username: str, limit: int = 200) -> list[dict]:
         (username, limit),
     ).fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+    out = []
+    for r in rows:
+        item = dict(r)
+        lo = item.get("last_opened_at")
+        if isinstance(lo, str):
+            try:
+                dt = datetime.fromisoformat(lo)
+                item["last_opened_at"] = int(dt.timestamp())
+            except Exception:
+                item["last_opened_at"] = int(time.time())
+        elif lo is None:
+            item["last_opened_at"] = int(time.time())
+        out.append(item)
+    return out
 
 
 def touch_search(username: str, search_id: int) -> dict | None:
+    import time
     conn = _get_conn()
     conn.execute(
-        "UPDATE search_history SET last_opened_at = CURRENT_TIMESTAMP WHERE id = ? AND username = ?",
+        "UPDATE search_history SET last_opened_at = strftime('%s', 'now') WHERE id = ? AND username = ?",
         (search_id, username),
     )
     conn.commit()
@@ -106,7 +125,13 @@ def touch_search(username: str, search_id: int) -> dict | None:
         (search_id,),
     ).fetchone()
     conn.close()
-    return dict(row) if row else None
+    item = dict(row) if row else None
+    if item and isinstance(item.get("last_opened_at"), str):
+        try:
+            item["last_opened_at"] = int(datetime.fromisoformat(item["last_opened_at"]).timestamp())
+        except Exception:
+            item["last_opened_at"] = int(time.time())
+    return item
 
 
 def delete_search(username: str, search_id: int) -> None:

@@ -448,7 +448,12 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
     color: #111827;
     margin: 0;
 }
-.history-panel-close {
+.history-panel-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+.history-panel-close, .history-panel-delete-all {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -462,6 +467,7 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
     transition: color 0.2s, background 0.2s;
 }
 .history-panel-close:hover { color: #111827; background: #f3f4f6; }
+.history-panel-delete-all:hover { color: #dc2626; background: #fef2f2; }
 .history-panel-content {
     flex: 1;
     overflow-y: auto;
