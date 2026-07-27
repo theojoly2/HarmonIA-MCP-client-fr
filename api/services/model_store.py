@@ -12,6 +12,7 @@ from api.services.mcp_service import (
     get_model_mcp,
     list_models_mcp,
     rename_model_mcp,
+    touch_model_mcp,
     upload_model_mcp,
 )
 
@@ -22,6 +23,10 @@ async def list_models(username: str) -> list[dict[str, Any]]:
 
 async def get_model(username: str, name: str) -> Optional[dict[str, Any]]:
     return await get_model_mcp(username, name)
+
+
+async def touch_model(username: str, name: str) -> None:
+    await touch_model_mcp(username, name)
 
 
 async def save_model(

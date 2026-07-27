@@ -131,6 +131,14 @@ async def get_model_mcp(user: str, name: str) -> Optional[dict[str, Any]]:
         raise
 
 
+async def touch_model_mcp(user: str, name: str) -> None:
+    try:
+        await _mcp_call_tool("touch_model", {"user": user, "name": name}, timeout=10.0)
+    except Exception as e:
+        print(f"[MCP touch_model] {e}", flush=True)
+        raise
+
+
 async def list_models_mcp(user: str) -> list[dict[str, Any]]:
     try:
         data = await _mcp_call_tool("list_models", {"user": user}, timeout=10.0)

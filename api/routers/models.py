@@ -18,6 +18,7 @@ from api.services.model_store import (
     list_models,
     rename_model,
     save_model,
+    touch_model,
 )
 
 
@@ -123,6 +124,8 @@ async def open_model(model_name: str, username: str = Depends(require_user)):
     svg = model.get("svg", "")
     if not svg:
         return Response(status_code=422, content=json.dumps({"detail": "no_svg_for_model"}))
+    # Update last-opened time so it bubbles to the top of the history list.
+    await touch_model(username, model_name)
     return Response(content=svg.encode("utf-8"), media_type="image/svg+xml", headers={
         "X-Model-Name": model.get("name", ""),
     })
