@@ -345,7 +345,7 @@ class AuthModal {
         } catch (err) {
             let msg = err.message;
             if (msg === "username_exists") msg = "Ce nom d'utilisateur est déjà pris.";
-            else if (msg === "invalid_credentials") msg = "Identifiants incorrects.";
+            else if (msg === "invalid_credentials") msg = "Nom d'utilisateur ou mot de passe incorrect.";
             else if (msg === "invalid_old_password") msg = "Ancien mot de passe incorrect.";
             this._setError(msg || "Une erreur est survenue.");
         } finally {
