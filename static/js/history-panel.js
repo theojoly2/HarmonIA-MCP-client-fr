@@ -355,7 +355,11 @@ class HistoryPanel {
 
 
     async _deleteAll() {
-        if (!confirm("Supprimer tout l'historique (modèles et recherches) ? Cette action est irréversible.")) return;
+        const confirmed = await this._showConfirmDialog(
+            "Supprimer tout l'historique",
+            "Cette action supprimera définitivement tous vos modèles et toutes vos recherches. Cette action est irréversible."
+        );
+        if (!confirmed) return;
         try {
             await Promise.all(
                 this.items.map((item) => {
@@ -374,6 +378,36 @@ class HistoryPanel {
             console.error("Delete all error", err);
             alert("Impossible de supprimer tout l'historique.");
         }
+    }
+
+    _showConfirmDialog(title, message) {
+        return new Promise((resolve) => {
+            const overlay = document.createElement("div");
+            overlay.className = "confirm-overlay";
+            overlay.innerHTML = `
+                <div class="confirm-modal">
+                    <h3 class="confirm-title">${this._escape(title)}</h3>
+                    <p class="confirm-message">${this._escape(message)}</p>
+                    <div class="confirm-actions">
+                        <button type="button" class="confirm-btn confirm-cancel">Annuler</button>
+                        <button type="button" class="confirm-btn confirm-danger">Supprimer tout</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            const close = (value) => {
+                overlay.classList.add("hidden");
+                setTimeout(() => overlay.remove(), 250);
+                resolve(value);
+            };
+
+            overlay.querySelector(".confirm-cancel").addEventListener("click", () => close(false));
+            overlay.querySelector(".confirm-danger").addEventListener("click", () => close(true));
+            overlay.addEventListener("click", (e) => {
+                if (e.target === overlay) close(false);
+            });
+        });
     }
 
     open() {
