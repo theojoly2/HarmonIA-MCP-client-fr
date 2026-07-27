@@ -76,7 +76,10 @@ class SearchApp extends AppBase {
         if (wrapper) wrapper.style.transition = 'none';
         this._skipNextTransition = true;
         if (!showTags) this._observeResize();
-        if (this.resultsHtml) this._animateResults();
+        if (this.resultsHtml) {
+            const resultsContainer = this.container.querySelector('#results-container');
+            if (resultsContainer) resultsContainer.classList.add('results-visible');
+        }
         // Stage 1: center title + search bar only.
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
@@ -316,9 +319,7 @@ class SearchApp extends AppBase {
             const resultsContainer = this.container.querySelector('#results-container');
             if (resultsContainer) {
                 resultsContainer.innerHTML = this.resultsHtml;
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(() => this._animateResults());
-                });
+                this._animateResults();
             }
             this._applyCentering();
 
@@ -418,10 +419,15 @@ class SearchApp extends AppBase {
     }
 
     _animateResults() {
-        const items = this.container.querySelectorAll('.result-item');
+        const container = this.container.querySelector('#results-container');
+        if (!container) return;
+        container.classList.remove('results-visible');
+        const items = container.querySelectorAll('.result-item');
         items.forEach((el, i) => {
-            el.classList.remove('visible');
-            setTimeout(() => el.classList.add('visible'), i * 80);
+            el.style.animationDelay = `${i * 80}ms`;
+        });
+        requestAnimationFrame(() => {
+            container.classList.add('results-visible');
         });
     }
 

@@ -126,7 +126,7 @@ h1 .title-glow { font-size: clamp(1.25rem, 2.5vw, 2.25rem); }
 }
 
 .result-item { opacity: 0; }
-.result-item.visible { animation: fadeSlideUp 0.35s ease forwards; }
+#results-container.results-visible .result-item { animation: fadeSlideUp 0.35s ease forwards; }
 .results-hiding { animation: fadeSlideDown 0.2s ease forwards; }
 
 #results-header { opacity: 0; animation: fadeIn 0.4s ease 0.1s forwards; }
