@@ -134,8 +134,7 @@ class HistoryPanel {
         });
         menu.querySelector(".history-menu-delete").addEventListener("click", (e) => {
             e.stopPropagation();
-            this._closeMenu();
-            this._deleteModel(modelName);
+            this._showDeleteConfirm(menu, modelName);
         });
 
         // Close on next click anywhere
@@ -154,6 +153,34 @@ class HistoryPanel {
             this._activeMenu.remove();
             this._activeMenu = null;
         }
+    }
+
+    _showDeleteConfirm(menu, modelName) {
+        menu.innerHTML = `
+            <div class="history-menu-text">Supprimer « ${this._escape(modelName)} » ?</div>
+            <button type="button" class="history-menu-item history-menu-confirm-delete">Confirmer</button>
+            <button type="button" class="history-menu-item history-menu-cancel">Annuler</button>
+        `;
+        menu.querySelector(".history-menu-confirm-delete").addEventListener("click", async (e) => {
+            e.stopPropagation();
+            this._closeMenu();
+            try {
+                const encodedName = encodeURIComponent(modelName);
+                const res = await fetch(`api/models/${encodedName}`, {
+                    method: "DELETE",
+                    credentials: "same-origin",
+                });
+                if (!res.ok) throw new Error("delete_failed");
+                await this.load();
+            } catch (err) {
+                console.error("Delete model error", err);
+                alert("Impossible de supprimer le modèle.");
+            }
+        });
+        menu.querySelector(".history-menu-cancel").addEventListener("click", (e) => {
+            e.stopPropagation();
+            this._closeMenu();
+        });
     }
 
     _startInlineRename(nameEl, modelName) {

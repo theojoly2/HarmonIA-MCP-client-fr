@@ -567,7 +567,20 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
 .history-menu-item:hover {
     background: #f3f4f6;
 }
-.history-menu-delete:hover {
+.history-menu-delete:hover,
+.history-menu-confirm-delete:hover {
     color: #dc2626;
     background: #fef2f2;
+}
+.history-menu-text {
+    padding: 0.45rem 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #6b7280;
+    border-bottom: 1px solid #f3f4f6;
+    margin-bottom: 0.2rem;
+    max-width: 220px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
