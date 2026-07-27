@@ -99,6 +99,20 @@ const AuthManager = (() => {
         emitLogout();
     }
 
+    async function changePassword(password) {
+        const res = await fetch("api/auth/change-password", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ password }),
+        });
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.detail || `Erreur ${res.status}`);
+        }
+        return await res.json();
+    }
+
     function showModal() {
         if (!modal) {
             modal = new AuthModal();
@@ -108,6 +122,13 @@ const AuthManager = (() => {
 
     function hideModal() {
         if (modal) modal.close();
+    }
+
+    function showChangePassword() {
+        if (!modal) {
+            modal = new AuthModal();
+        }
+        modal.open("change-password");
     }
 
     return {
@@ -124,6 +145,8 @@ const AuthManager = (() => {
         logout,
         showModal,
         hideModal,
+        showChangePassword,
+        changePassword,
     };
 })();
 
@@ -139,41 +162,92 @@ class AuthModal {
     constructor() {
         this.overlay = document.createElement("div");
         this.overlay.className = "auth-overlay hidden";
-        this.overlay.innerHTML = `
-            <div class="auth-modal">
-                <div class="auth-modal-header">
-                    <h2 class="auth-modal-title">SemantiQ</h2>
-                    <p class="auth-modal-subtitle">Connectez-vous pour enregistrer vos modèles.</p>
-                </div>
-                <div class="auth-tabs">
-                    <button type="button" class="auth-tab active" data-tab="login">Connexion</button>
-                    <button type="button" class="auth-tab" data-tab="register">Inscription</button>
-                </div>
-                <form class="auth-form" id="auth-form">
-                    <div class="auth-field">
-                        <label for="auth-username">Nom d'utilisateur</label>
-                        <input type="text" id="auth-username" autocomplete="username" required
-                               pattern="^[a-zA-Z0-9_\-]+$" maxlength="64"
-                               placeholder="votre_nom">
-                    </div>
-                    <div class="auth-field">
-                        <label for="auth-password">Mot de passe</label>
-                        <input type="password" id="auth-password" autocomplete="current-password" required
-                               minlength="4" maxlength="128" placeholder="••••••••">
-                    </div>
-                    <div class="auth-error hidden" id="auth-error"></div>
-                    <button type="submit" class="auth-submit" id="auth-submit">Se connecter</button>
-                </form>
-                <button type="button" class="auth-close" id="auth-close" title="Fermer">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                </button>
-            </div>
-        `;
+        this.overlay.innerHTML = this._buildHtml("login");
         document.body.appendChild(this.overlay);
         this._bindEvents();
         this._currentTab = "login";
+    }
+
+    _buildHtml(tab) {
+        const isLogin = tab === "login";
+        const isRegister = tab === "register";
+        const isChangePassword = tab === "change-password";
+        let title = "SemantiQ";
+        let subtitle = "Connectez-vous pour enregistrer vos modèles.";
+        let submitText = "Se connecter";
+        let usernameVisible = true;
+        let tabsVisible = true;
+        let closeVisible = true;
+        if (isRegister) {
+            submitText = "Créer un compte";
+        } else if (isChangePassword) {
+            title = "Modifier le mot de passe";
+            subtitle = "Choisissez un nouveau mot de passe.";
+            submitText = "Enregistrer";
+            usernameVisible = false;
+            tabsVisible = false;
+            closeVisible = true;
+        }
+
+        const tabsHtml = tabsVisible ? `
+            <div class="auth-tabs">
+                <button type="button" class="auth-tab ${isLogin ? "active" : ""}" data-tab="login">Connexion</button>
+                <button type="button" class="auth-tab ${isRegister ? "active" : ""}" data-tab="register">Inscription</button>
+            </div>
+        ` : "";
+
+        const usernameField = usernameVisible ? `
+            <div class="auth-field">
+                <label for="auth-username">Nom d'utilisateur</label>
+                <input type="text" id="auth-username" autocomplete="username" required
+                       pattern="^[a-zA-Z0-9_\-]+$" maxlength="64"
+                       placeholder="votre_nom">
+            </div>
+        ` : "";
+
+        const passwordField = isChangePassword ? `
+            <div class="auth-field">
+                <label for="auth-password">Nouveau mot de passe</label>
+                <input type="password" id="auth-password" autocomplete="new-password" required
+                       minlength="4" maxlength="128" placeholder="••••••••">
+            </div>
+            <div class="auth-field">
+                <label for="auth-password-confirm">Confirmer le mot de passe</label>
+                <input type="password" id="auth-password-confirm" autocomplete="new-password" required
+                       minlength="4" maxlength="128" placeholder="••••••••">
+            </div>
+        ` : `
+            <div class="auth-field">
+                <label for="auth-password">Mot de passe</label>
+                <input type="password" id="auth-password" autocomplete="current-password" required
+                       minlength="4" maxlength="128" placeholder="••••••••">
+            </div>
+        `;
+
+        const closeBtnHtml = closeVisible ? `
+            <button type="button" class="auth-close" id="auth-close" title="Fermer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        ` : "";
+
+        return `
+            <div class="auth-modal" data-mode="${tab}">
+                <div class="auth-modal-header">
+                    <h2 class="auth-modal-title">${title}</h2>
+                    <p class="auth-modal-subtitle">${subtitle}</p>
+                </div>
+                ${tabsHtml}
+                <form class="auth-form" id="auth-form">
+                    ${usernameField}
+                    ${passwordField}
+                    <div class="auth-error hidden" id="auth-error"></div>
+                    <button type="submit" class="auth-submit" id="auth-submit">${submitText}</button>
+                </form>
+                ${closeBtnHtml}
+            </div>
+        `;
     }
 
     _bindEvents() {
@@ -186,7 +260,9 @@ class AuthModal {
         form.addEventListener("submit", (e) => this._onSubmit(e));
 
         const closeBtn = this.overlay.querySelector("#auth-close");
-        closeBtn.addEventListener("click", () => this.close());
+        if (closeBtn) {
+            closeBtn.addEventListener("click", () => this.close());
+        }
 
         this.overlay.addEventListener("click", (e) => {
             if (e.target === this.overlay) this.close();
@@ -194,13 +270,15 @@ class AuthModal {
     }
 
     _switchTab(tab) {
+        const modal = this.overlay.querySelector(".auth-modal");
+        modal.innerHTML = this._buildInnerHtml(tab);
         this._currentTab = tab;
-        this.overlay.querySelectorAll(".auth-tab").forEach((btn) => {
-            btn.classList.toggle("active", btn.dataset.tab === tab);
-        });
-        const submit = this.overlay.querySelector("#auth-submit");
-        submit.textContent = tab === "login" ? "Se connecter" : "Créer un compte";
-        this._setError("");
+        this._bindEvents();
+    }
+
+    _buildInnerHtml(tab) {
+        // Same content as _buildHtml but without the outer .auth-modal wrapper.
+        return this._buildHtml(tab).replace(/<div class="auth-modal"[^>]*>/, "").replace(/<\/div>\s*$/, "").trim();
     }
 
     _setError(msg) {
@@ -211,14 +289,28 @@ class AuthModal {
 
     async _onSubmit(e) {
         e.preventDefault();
-        const username = this.overlay.querySelector("#auth-username").value.trim();
-        const password = this.overlay.querySelector("#auth-password").value;
         this._setError("");
         const submit = this.overlay.querySelector("#auth-submit");
         submit.disabled = true;
-        submit.textContent = this._currentTab === "login" ? "Connexion..." : "Inscription...";
+        const originalText = submit.textContent;
+        submit.textContent = "Enregistrement...";
 
         try {
+            if (this._currentTab === "change-password") {
+                const password = this.overlay.querySelector("#auth-password").value;
+                const confirm = this.overlay.querySelector("#auth-password-confirm").value;
+                if (password !== confirm) {
+                    throw new Error("Les mots de passe ne correspondent pas.");
+                }
+                await AuthManager.changePassword(password);
+                this.close();
+                return;
+            }
+
+            const username = this.overlay.querySelector("#auth-username").value.trim();
+            const password = this.overlay.querySelector("#auth-password").value;
+            submit.textContent = this._currentTab === "login" ? "Connexion..." : "Inscription...";
+
             if (this._currentTab === "login") {
                 await AuthManager.login(username, password);
             } else {
@@ -232,13 +324,23 @@ class AuthModal {
             this._setError(msg || "Une erreur est survenue.");
         } finally {
             submit.disabled = false;
-            submit.textContent = this._currentTab === "login" ? "Se connecter" : "Créer un compte";
+            submit.textContent = originalText;
         }
     }
 
-    open() {
+    open(tab = "login") {
+        this._currentTab = tab;
+        const modal = this.overlay.querySelector(".auth-modal");
+        if (modal) {
+            modal.innerHTML = this._buildInnerHtml(tab);
+            this._bindEvents();
+        }
         this.overlay.classList.remove("hidden");
-        setTimeout(() => this.overlay.querySelector("#auth-username")?.focus(), 50);
+        if (tab !== "change-password") {
+            setTimeout(() => this.overlay.querySelector("#auth-username")?.focus(), 50);
+        } else {
+            setTimeout(() => this.overlay.querySelector("#auth-password")?.focus(), 50);
+        }
     }
 
     close() {

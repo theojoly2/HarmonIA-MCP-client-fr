@@ -68,3 +68,14 @@ def get_user_by_username(username: str) -> Optional[dict]:
 
 def user_exists(username: str) -> bool:
     return get_user_by_username(username) is not None
+
+
+def update_user_password(user_id: int, password: str) -> None:
+    salt, pwd_hash = hash_password(password)
+    conn = _get_conn()
+    conn.execute(
+        "UPDATE users SET password_hash = ?, salt = ? WHERE id = ?",
+        (pwd_hash, salt, user_id),
+    )
+    conn.commit()
+    conn.close()

@@ -1,4 +1,4 @@
-"""Authentication router: register, login, logout, current user."""
+"""Authentication router: register, login, logout, current user, change password."""
 
 import json
 
@@ -12,7 +12,7 @@ from api.services.auth_service import (
     SESSION_MAX_AGE_DAYS,
     verify_password,
 )
-from api.services.user_store import create_user, get_user_by_username
+from api.services.user_store import create_user, get_user_by_username, update_user_password
 
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -20,6 +20,10 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 class AuthBody(BaseModel):
     username: str = Field(..., min_length=2, max_length=64, pattern=r"^[a-zA-Z0-9_\-]+$")
+    password: str = Field(..., min_length=4, max_length=128)
+
+
+class ChangePasswordBody(BaseModel):
     password: str = Field(..., min_length=4, max_length=128)
 
 
@@ -90,3 +94,15 @@ async def me(request: Request):
         clear_session_cookie(Response())
         return Response(status_code=401, content=json.dumps({"detail": "user_not_found"}))
     return {"id": user["id"], "username": user["username"]}
+
+
+@router.post("/change-password")
+async def change_password(request: Request, body: ChangePasswordBody):
+    username = get_session_cookie(request)
+    if not username:
+        return Response(status_code=401, content=json.dumps({"detail": "not_authenticated"}))
+    user = get_user_by_username(username)
+    if not user:
+        return Response(status_code=401, content=json.dumps({"detail": "user_not_found"}))
+    update_user_password(user["id"], body.password)
+    return {"ok": True}

@@ -380,14 +380,62 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
     border-color: #111827;
 }
 .shell-action-btn.primary:hover { background: #1f2937; }
-.shell-user-label {
+.shell-user-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 9999px;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    color: #374151;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.shell-user-menu-btn:hover { border-color: #111827; color: #111827; background: #f9fafb; }
+.user-menu-dropdown {
+    position: fixed;
+    z-index: 300;
+    min-width: 220px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12);
+    padding: 0.35rem;
+    display: flex;
+    flex-direction: column;
+    animation: fadeIn 0.12s ease;
+}
+.user-menu-header {
+    padding: 0.55rem 0.75rem 0.45rem;
     font-size: 0.85rem;
     font-weight: 700;
     color: #111827;
-    padding: 0.35rem 0.5rem;
-    background: #f3f4f6;
-    border-radius: 0.5rem;
+    border-bottom: 1px solid #f3f4f6;
+    margin-bottom: 0.2rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
+.user-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #374151;
+    text-align: left;
+    border: none;
+    border-radius: 0.5rem;
+    background: transparent;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.user-menu-item:hover { background: #f3f4f6; }
+.user-menu-logout { color: #dc2626; }
+.user-menu-logout:hover { background: #fef2f2; }
 .history-toggle {
     display: inline-flex;
     align-items: center;

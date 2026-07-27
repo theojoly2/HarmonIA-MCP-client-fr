@@ -61,23 +61,22 @@ class Shell {
                 if (this.historyPanel) this.historyPanel.toggle();
             });
 
-            const userLabel = document.createElement('span');
-            userLabel.className = 'shell-user-label';
-            userLabel.textContent = user.username;
-
-            const logoutBtn = document.createElement('button');
-            logoutBtn.className = 'shell-action-btn';
-            logoutBtn.textContent = 'Déconnexion';
-            logoutBtn.addEventListener('click', async () => {
-                if (!this.authManager) return;
-                await this.authManager.logout();
-                if (this.historyPanel) this.historyPanel.close();
-                this.renderAuthActions(null);
+            const userMenuBtn = document.createElement('button');
+            userMenuBtn.className = 'shell-user-menu-btn';
+            userMenuBtn.title = 'Menu utilisateur';
+            userMenuBtn.setAttribute('aria-haspopup', 'true');
+            userMenuBtn.innerHTML = `
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            `;
+            userMenuBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._toggleUserMenu(userMenuBtn, user);
             });
 
             this.actionsArea.appendChild(historyBtn);
-            this.actionsArea.appendChild(userLabel);
-            this.actionsArea.appendChild(logoutBtn);
+            this.actionsArea.appendChild(userMenuBtn);
         } else {
             const loginBtn = document.createElement('button');
             loginBtn.className = 'shell-action-btn primary';
@@ -87,6 +86,62 @@ class Shell {
             });
             this.actionsArea.appendChild(loginBtn);
         }
+    }
+
+    _toggleUserMenu(button, user) {
+        const existing = document.querySelector('#user-menu-dropdown');
+        if (existing) {
+            existing.remove();
+            return;
+        }
+
+        const menu = document.createElement('div');
+        menu.id = 'user-menu-dropdown';
+        menu.className = 'user-menu-dropdown';
+        menu.innerHTML = `
+            <div class="user-menu-header">${this._escape(user.username)}</div>
+            <button type="button" class="user-menu-item" id="user-menu-change-password">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                </svg>
+                Modifier le mot de passe
+            </button>
+            <button type="button" class="user-menu-item user-menu-logout" id="user-menu-logout">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                </svg>
+                Déconnexion
+            </button>
+        `;
+
+        document.body.appendChild(menu);
+        const rect = button.getBoundingClientRect();
+        menu.style.top = `${rect.bottom + 6}px`;
+        menu.style.right = `${document.documentElement.clientWidth - rect.right}px`;
+
+        menu.querySelector('#user-menu-change-password').addEventListener('click', () => {
+            menu.remove();
+            if (this.authManager) this.authManager.showChangePassword();
+        });
+        menu.querySelector('#user-menu-logout').addEventListener('click', async () => {
+            menu.remove();
+            if (!this.authManager) return;
+            await this.authManager.logout();
+            if (this.historyPanel) this.historyPanel.close();
+            this.renderAuthActions(null);
+        });
+
+        const closeMenu = (e) => {
+            if (!menu.contains(e.target) && e.target !== button) {
+                menu.remove();
+                document.removeEventListener('click', closeMenu);
+            }
+        };
+        document.addEventListener('click', closeMenu);
+    }
+
+    _escape(text) {
+        return (text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
     addAppButton(appClass) {
