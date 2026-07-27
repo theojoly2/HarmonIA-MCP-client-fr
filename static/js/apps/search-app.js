@@ -302,6 +302,15 @@ class SearchApp extends AppBase {
         this._setLoading(true);
         this._startTimer();
         this._applyCentering();
+        // Clear previous results immediately so stale content is not shown during loading.
+        const resultsContainer = this.container.querySelector('#results-container');
+        if (resultsContainer) {
+            resultsContainer.innerHTML = '';
+            resultsContainer.classList.remove('results-hiding');
+            resultsContainer.style.display = '';
+            resultsContainer.style.visibility = '';
+        }
+        this.resultsHtml = '';
         try {
             const data = await ApiClient.postSearch(this.query, this.selectedTags, 20);
             this.resultsHtml = data.results_html || '';
