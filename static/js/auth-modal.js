@@ -205,7 +205,24 @@ class AuthModal {
             </div>
         ` : "";
 
-        const passwordField = isChangePassword ? `
+        const passwordField = isLogin ? `
+            <div class="auth-field">
+                <label for="auth-password">Mot de passe</label>
+                <input type="password" id="auth-password" autocomplete="current-password" required
+                       minlength="4" maxlength="128" placeholder="••••••••">
+            </div>
+        ` : (isRegister ? `
+            <div class="auth-field">
+                <label for="auth-password">Mot de passe</label>
+                <input type="password" id="auth-password" autocomplete="new-password" required
+                       minlength="4" maxlength="128" placeholder="••••••••">
+            </div>
+            <div class="auth-field">
+                <label for="auth-password-confirm">Confirmer le mot de passe</label>
+                <input type="password" id="auth-password-confirm" autocomplete="new-password" required
+                       minlength="4" maxlength="128" placeholder="••••••••">
+            </div>
+        ` : `
             <div class="auth-field">
                 <label for="auth-password">Ancien mot de passe</label>
                 <input type="password" id="auth-password" autocomplete="current-password" required
@@ -221,18 +238,7 @@ class AuthModal {
                 <input type="password" id="auth-password-confirm" autocomplete="new-password" required
                        minlength="4" maxlength="128" placeholder="••••••••">
             </div>
-        ` : `
-            <div class="auth-field">
-                <label for="auth-password">Mot de passe</label>
-                <input type="password" id="auth-password" autocomplete="new-password" required
-                       minlength="4" maxlength="128" placeholder="••••••••">
-            </div>
-            <div class="auth-field">
-                <label for="auth-password-confirm">Confirmer le mot de passe</label>
-                <input type="password" id="auth-password-confirm" autocomplete="new-password" required
-                       minlength="4" maxlength="128" placeholder="••••••••">
-            </div>
-        `;
+        `);
 
         const closeBtnHtml = closeVisible ? `
             <button type="button" class="auth-close" id="auth-close" title="Fermer">
