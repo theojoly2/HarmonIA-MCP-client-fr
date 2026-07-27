@@ -27,6 +27,9 @@ class SearchApp extends AppBase {
     }
 
     async render(container) {
+        // Reset animation flags for a fresh intro whenever SearchApp is mounted from scratch.
+        this._firstTagAnimation = true;
+        this._introAnimating = false;
         this.container = container;
         const showTags = this._firstTagAnimation;
         if (showTags) {

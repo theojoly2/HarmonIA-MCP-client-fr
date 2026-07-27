@@ -34,22 +34,25 @@ class WindowManager {
         return instanceId;
     }
 
-    async _mountTab(instance) {
+    _mountTab(instance) {
         AppState.saveInstanceState(instance.instanceId);
         this.shellElement.innerHTML = '';
         const container = document.createElement('div');
         container.className = 'app-container h-full w-full';
         container.dataset.instanceId = instance.instanceId;
         this.shellElement.appendChild(container);
-        await instance.mount(container);
-        requestAnimationFrame(() => {
+        return new Promise(async (resolve) => {
+            await instance.mount(container);
             requestAnimationFrame(() => {
-                AppState.restoreInstanceState(instance.instanceId);
+                requestAnimationFrame(() => {
+                    AppState.restoreInstanceState(instance.instanceId);
+                    resolve();
+                });
             });
         });
     }
 
-    async _mountFloating(instance, props) {
+    _mountFloating(instance, props) {
         AppState.saveInstanceState(instance.instanceId);
         const { width = 800, height = 600, offsetX = 0, offsetY = 0 } = props;
         let resizeAnchorSaved = false;
@@ -85,12 +88,17 @@ class WindowManager {
         // Position and force layout so the body has its final size before mounting the app.
         UiUtils.centerWindow(floatWin.win, offsetX, offsetY);
         void floatWin.win.offsetHeight;
-        await instance.mount(body);
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => AppState.restoreInstanceState(instance.instanceId));
+        return new Promise(async (resolve) => {
+            await instance.mount(body);
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    AppState.restoreInstanceState(instance.instanceId);
+                    resolve();
+                });
+            });
+            this.floatWindows.set(instance.instanceId, floatWin);
+            this._bringToFront(instance.instanceId);
         });
-        this.floatWindows.set(instance.instanceId, floatWin);
-        this._bringToFront(instance.instanceId);
     }
 
     _mountSplit(instance, props) {
@@ -102,7 +110,7 @@ class WindowManager {
             this.splitManager.setTree(tree);
             this.splitManager.registerRenderer(instance.instanceId, (pane) => instance.mount(pane));
             AppState.restoreInstanceState(instance.instanceId);
-            return;
+            return Promise.resolve();
         }
         if (targetInstanceId) {
             this.splitManager.splitLeaf(targetInstanceId, direction, { type: 'pane', instanceId: instance.instanceId });
@@ -121,6 +129,7 @@ class WindowManager {
             });
         });
         this.splitManager.render();
+        return Promise.resolve();
     }
 
     _collectLeaves(node, out = []) {
@@ -181,19 +190,18 @@ class WindowManager {
         }
     }
 
-    switchTab(instanceId) {
+    async switchTab(instanceId) {
         const instance = AppState.getInstance(instanceId);
         if (!instance) return;
         const record = AppState.getRecord(instanceId);
         if (record) record.mode = 'tab';
         this.shellElement.innerHTML = '';
         AppState.saveInstanceState(instanceId);
-        this._mountTab(instance);
+        await this._mountTab(instance);
         AppState.setActiveInstance(instanceId);
     }
 
-
-    moveToFloat(instanceId, props = {}) {
+    async moveToFloat(instanceId, props = {}) {
         const instance = AppState.getInstance(instanceId);
         if (!instance) return;
         const record = AppState.getRecord(instanceId);
@@ -205,10 +213,10 @@ class WindowManager {
             this.shellElement.innerHTML = '';
         }
         record.mode = 'float';
-        this._mountFloating(instance, props);
+        await this._mountFloating(instance, props);
     }
 
-    moveToSplit(instanceId, props = {}) {
+    async moveToSplit(instanceId, props = {}) {
         const instance = AppState.getInstance(instanceId);
         if (!instance) return;
         const record = AppState.getRecord(instanceId);
@@ -223,7 +231,7 @@ class WindowManager {
             this.shellElement.innerHTML = '';
         }
         record.mode = 'split';
-        this._mountSplit(instance, props);
+        await this._mountSplit(instance, props);
     }
 
     renderSplit() {

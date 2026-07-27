@@ -335,15 +335,13 @@ class HistoryPanel {
                 inst.query = query;
                 inst.selectedTags = tags;
                 inst._skipHistorySave = true;
+                inst.tagsHtml = '';
                 if (existingSearch.mode === "tab") {
-                    windowManager.switchTab(existingSearch.instanceId);
-                    inst.render(inst.container || shell.getContentArea().querySelector(".app-container"));
+                    await windowManager.switchTab(existingSearch.instanceId);
                 } else if (existingSearch.mode === "float") {
-                    windowManager.moveToFloat(existingSearch.instanceId);
-                    inst.render(inst.container);
+                    await windowManager.moveToFloat(existingSearch.instanceId);
                 } else if (existingSearch.mode === "split") {
                     windowManager.renderSplit();
-                    inst.render(inst.container);
                 }
                 requestAnimationFrame(() => inst._runSearch());
                 return;
