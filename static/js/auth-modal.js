@@ -205,14 +205,14 @@ class AuthModal {
             </div>
         ` : "";
 
-        const passwordField = (isChangePassword || isRegister) ? `
+        const passwordField = isChangePassword ? `
             <div class="auth-field">
-                <label for="auth-password">${isChangePassword ? "Ancien mot de passe" : "Mot de passe"}</label>
-                <input type="password" id="auth-password" autocomplete="${isChangePassword ? "current-password" : "new-password"}" required
+                <label for="auth-password">Ancien mot de passe</label>
+                <input type="password" id="auth-password" autocomplete="current-password" required
                        minlength="4" maxlength="128" placeholder="••••••••">
             </div>
             <div class="auth-field">
-                <label for="auth-password-new">${isChangePassword ? "Nouveau mot de passe" : "Mot de passe"}</label>
+                <label for="auth-password-new">Nouveau mot de passe</label>
                 <input type="password" id="auth-password-new" autocomplete="new-password" required
                        minlength="4" maxlength="128" placeholder="••••••••">
             </div>
@@ -224,7 +224,12 @@ class AuthModal {
         ` : `
             <div class="auth-field">
                 <label for="auth-password">Mot de passe</label>
-                <input type="password" id="auth-password" autocomplete="current-password" required
+                <input type="password" id="auth-password" autocomplete="new-password" required
+                       minlength="4" maxlength="128" placeholder="••••••••">
+            </div>
+            <div class="auth-field">
+                <label for="auth-password-confirm">Confirmer le mot de passe</label>
+                <input type="password" id="auth-password-confirm" autocomplete="new-password" required
                        minlength="4" maxlength="128" placeholder="••••••••">
             </div>
         `;
@@ -315,7 +320,7 @@ class AuthModal {
 
             if (this._currentTab === "register") {
                 const username = this.overlay.querySelector("#auth-username").value.trim();
-                const password = this.overlay.querySelector("#auth-password-new").value;
+                const password = this.overlay.querySelector("#auth-password").value;
                 const confirm = this.overlay.querySelector("#auth-password-confirm").value;
                 if (password !== confirm) {
                     throw new Error("Les mots de passe ne correspondent pas.");
@@ -353,6 +358,7 @@ class AuthModal {
         this.overlay.classList.remove("hidden");
         const firstInput = tab === "login" ? "#auth-username" : "#auth-password";
         setTimeout(() => this.overlay.querySelector(firstInput)?.focus(), 50);
+
     }
 
     close() {
