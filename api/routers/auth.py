@@ -24,6 +24,7 @@ class AuthBody(BaseModel):
 
 
 class ChangePasswordBody(BaseModel):
+    old_password: str = Field(..., min_length=4, max_length=128)
     password: str = Field(..., min_length=4, max_length=128)
 
 
@@ -104,5 +105,7 @@ async def change_password(request: Request, body: ChangePasswordBody):
     user = get_user_by_username(username)
     if not user:
         return Response(status_code=401, content=json.dumps({"detail": "user_not_found"}))
+    if not verify_password(body.old_password, user["salt"], user["password_hash"]):
+        return Response(status_code=401, content=json.dumps({"detail": "invalid_old_password"}))
     update_user_password(user["id"], body.password)
     return {"ok": True}

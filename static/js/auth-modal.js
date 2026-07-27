@@ -99,12 +99,12 @@ const AuthManager = (() => {
         emitLogout();
     }
 
-    async function changePassword(password) {
+    async function changePassword(oldPassword, password) {
         const res = await fetch("api/auth/change-password", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "same-origin",
-            body: JSON.stringify({ password }),
+            body: JSON.stringify({ old_password: oldPassword, password }),
         });
         if (!res.ok) {
             const data = await res.json().catch(() => ({}));
@@ -182,7 +182,7 @@ class AuthModal {
             submitText = "Créer un compte";
         } else if (isChangePassword) {
             title = "Modifier le mot de passe";
-            subtitle = "Choisissez un nouveau mot de passe.";
+            subtitle = "Entrez votre ancien mot de passe puis choisissez un nouveau.";
             submitText = "Enregistrer";
             usernameVisible = false;
             tabsVisible = false;
@@ -205,10 +205,15 @@ class AuthModal {
             </div>
         ` : "";
 
-        const passwordField = isChangePassword ? `
+        const passwordField = (isChangePassword || isRegister) ? `
             <div class="auth-field">
-                <label for="auth-password">Nouveau mot de passe</label>
-                <input type="password" id="auth-password" autocomplete="new-password" required
+                <label for="auth-password">${isChangePassword ? "Ancien mot de passe" : "Mot de passe"}</label>
+                <input type="password" id="auth-password" autocomplete="${isChangePassword ? "current-password" : "new-password"}" required
+                       minlength="4" maxlength="128" placeholder="••••••••">
+            </div>
+            <div class="auth-field">
+                <label for="auth-password-new">${isChangePassword ? "Nouveau mot de passe" : "Mot de passe"}</label>
+                <input type="password" id="auth-password-new" autocomplete="new-password" required
                        minlength="4" maxlength="128" placeholder="••••••••">
             </div>
             <div class="auth-field">
@@ -297,30 +302,40 @@ class AuthModal {
 
         try {
             if (this._currentTab === "change-password") {
-                const password = this.overlay.querySelector("#auth-password").value;
+                const oldPassword = this.overlay.querySelector("#auth-password").value;
+                const password = this.overlay.querySelector("#auth-password-new").value;
+                const confirm = this.overlay.querySelector("#auth-password-confirm").value;
+                if (password !== confirm) {
+                    throw new Error("Les nouveaux mots de passe ne correspondent pas.");
+                }
+                await AuthManager.changePassword(oldPassword, password);
+                this.close();
+                return;
+            }
+
+            if (this._currentTab === "register") {
+                const username = this.overlay.querySelector("#auth-username").value.trim();
+                const password = this.overlay.querySelector("#auth-password-new").value;
                 const confirm = this.overlay.querySelector("#auth-password-confirm").value;
                 if (password !== confirm) {
                     throw new Error("Les mots de passe ne correspondent pas.");
                 }
-                await AuthManager.changePassword(password);
+                submit.textContent = "Inscription...";
+                await AuthManager.register(username, password);
                 this.close();
                 return;
             }
 
             const username = this.overlay.querySelector("#auth-username").value.trim();
             const password = this.overlay.querySelector("#auth-password").value;
-            submit.textContent = this._currentTab === "login" ? "Connexion..." : "Inscription...";
-
-            if (this._currentTab === "login") {
-                await AuthManager.login(username, password);
-            } else {
-                await AuthManager.register(username, password);
-            }
+            submit.textContent = "Connexion...";
+            await AuthManager.login(username, password);
             this.close();
         } catch (err) {
             let msg = err.message;
             if (msg === "username_exists") msg = "Ce nom d'utilisateur est déjà pris.";
             else if (msg === "invalid_credentials") msg = "Identifiants incorrects.";
+            else if (msg === "invalid_old_password") msg = "Ancien mot de passe incorrect.";
             this._setError(msg || "Une erreur est survenue.");
         } finally {
             submit.disabled = false;
@@ -336,11 +351,8 @@ class AuthModal {
             this._bindEvents();
         }
         this.overlay.classList.remove("hidden");
-        if (tab !== "change-password") {
-            setTimeout(() => this.overlay.querySelector("#auth-username")?.focus(), 50);
-        } else {
-            setTimeout(() => this.overlay.querySelector("#auth-password")?.focus(), 50);
-        }
+        const firstInput = tab === "login" ? "#auth-username" : "#auth-password";
+        setTimeout(() => this.overlay.querySelector(firstInput)?.focus(), 50);
     }
 
     close() {
