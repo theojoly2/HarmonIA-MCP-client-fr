@@ -48,8 +48,12 @@ def init_search_history_db():
             """
         )
     elif not _column_exists(conn, "search_history", "last_opened_at"):
+        import datetime
+        conn.execute("ALTER TABLE search_history ADD COLUMN last_opened_at TIMESTAMP")
+        default_ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
         conn.execute(
-            "ALTER TABLE search_history ADD COLUMN last_opened_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+            "UPDATE search_history SET last_opened_at = ? WHERE last_opened_at IS NULL",
+            (default_ts,),
         )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_search_history_username ON search_history(username)"
