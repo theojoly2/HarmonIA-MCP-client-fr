@@ -335,7 +335,6 @@ class HistoryPanel {
                 inst.query = query;
                 inst.selectedTags = tags;
                 inst._skipHistorySave = true;
-                inst.tagsHtml = '';
                 if (existingSearch.mode === "tab") {
                     await windowManager.switchTab(existingSearch.instanceId);
                 } else if (existingSearch.mode === "float") {
