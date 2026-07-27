@@ -96,6 +96,15 @@ const ApiClient = (() => {
         return res.json();
     }
 
+    async function touchSearch(searchId) {
+        const res = await fetch(apiUrl(`searches/${searchId}/open`), {
+            method: "POST",
+            credentials: "same-origin",
+        });
+        if (!res.ok) throw new Error(`Touch search failed: ${res.status}`);
+        return res.json();
+    }
+
     async function me() {
         const res = await fetch(apiUrl("auth/me"), { credentials: "same-origin" });
         if (!res.ok) throw new Error("not_authenticated");
@@ -158,6 +167,7 @@ const ApiClient = (() => {
         saveSearch,
         getSearches,
         deleteSearch,
+        touchSearch,
         me,
         login,
         register,

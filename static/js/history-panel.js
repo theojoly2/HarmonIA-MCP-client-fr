@@ -72,10 +72,14 @@ class HistoryPanel {
                     kind: "search",
                     name: s.query,
                     source_format: (s.tags || "").split(",").filter(Boolean).join(", ") || "recherche",
-                    sortKey: new Date(s.created_at).getTime() / 1000,
+                    last_opened_at: new Date(s.last_opened_at || s.created_at).getTime() / 1000,
                 }));
             }
-            this.items = [...models, ...searches].sort((a, b) => b.sortKey - a.sortKey);
+                this.items = [...models, ...searches].sort((a, b) => {
+                    const ta = a.last_opened_at || a.sortKey || 0;
+                    const tb = b.last_opened_at || b.sortKey || 0;
+                    return tb - ta;
+                });
         } catch (err) {
             console.error("History load error", err);
             this.items = [];
@@ -113,7 +117,7 @@ class HistoryPanel {
             `;
             li.addEventListener("click", (e) => {
                 if (e.target.closest(".history-action-more, .history-menu")) return;
-                if (isSearch) this._runSearch(itemName, (item.tags || "").split(",").filter(Boolean));
+                if (isSearch) this._runSearch(itemName, (item.tags || "").split(",").filter(Boolean), item.id);
                 else this._openModel(itemName);
             });
             const moreBtn = li.querySelector(".history-action-more");
@@ -304,8 +308,15 @@ class HistoryPanel {
         }
     }
 
-    _runSearch(query, tags) {
+    async _runSearch(query, tags, searchId) {
         this.close();
+        if (searchId) {
+            try {
+                await ApiClient.touchSearch(searchId);
+            } catch (err) {
+                console.error("Touch search error", err);
+            }
+        }
         const existingSearch = AppState.listInstances().find((i) => i.appId === "search" && i.mode === "tab");
         if (existingSearch) {
             const inst = AppState.getInstance(existingSearch.instanceId);
@@ -313,6 +324,7 @@ class HistoryPanel {
                 inst.query = query;
                 inst.selectedTags = tags;
                 inst.render(inst.container || document.createElement("div"));
+                inst._runSearch();
                 return;
             }
         }

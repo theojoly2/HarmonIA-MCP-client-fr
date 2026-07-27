@@ -7,7 +7,12 @@ from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel, Field
 
 from api.routers.auth import require_user
-from api.services.search_history_store import delete_search, list_searches, save_search
+from api.services.search_history_store import (
+    delete_search,
+    list_searches,
+    save_search,
+    touch_search,
+)
 
 
 router = APIRouter(prefix="/api/searches", tags=["searches"])
@@ -24,6 +29,7 @@ class SearchHistoryItem(BaseModel):
     query: str
     tags: str
     created_at: str
+    last_opened_at: str
 
 
 @router.get("")
@@ -34,6 +40,14 @@ async def get_searches(username: str = Depends(require_user)):
 @router.post("", response_model=SearchHistoryItem)
 async def add_search(body: SaveSearchBody, username: str = Depends(require_user)):
     item = save_search(username, body.query, body.tags)
+    return item
+
+
+@router.post("/{search_id}/open", response_model=SearchHistoryItem)
+async def open_search(search_id: int, username: str = Depends(require_user)):
+    item = touch_search(username, search_id)
+    if not item:
+        return Response(status_code=404, content=json.dumps({"detail": "search_not_found"}))
     return item
 
 

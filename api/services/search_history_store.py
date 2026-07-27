@@ -28,7 +28,8 @@ def init_search_history_db():
             username TEXT NOT NULL,
             query TEXT NOT NULL,
             tags TEXT DEFAULT '',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_opened_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
@@ -59,16 +60,31 @@ def list_searches(username: str, limit: int = 200) -> list[dict]:
     conn = _get_conn()
     rows = conn.execute(
         """
-        SELECT id, username, query, tags, created_at
+        SELECT id, username, query, tags, created_at, last_opened_at
         FROM search_history
         WHERE username = ?
-        ORDER BY created_at DESC
+        ORDER BY last_opened_at DESC, created_at DESC
         LIMIT ?
         """,
         (username, limit),
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def touch_search(username: str, search_id: int) -> dict | None:
+    conn = _get_conn()
+    conn.execute(
+        "UPDATE search_history SET last_opened_at = CURRENT_TIMESTAMP WHERE id = ? AND username = ?",
+        (search_id, username),
+    )
+    conn.commit()
+    row = conn.execute(
+        "SELECT id, username, query, tags, created_at, last_opened_at FROM search_history WHERE id = ?",
+        (search_id,),
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
 
 
 def delete_search(username: str, search_id: int) -> None:
