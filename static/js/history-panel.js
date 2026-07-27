@@ -293,6 +293,18 @@ class HistoryPanel {
     async _openModel(modelName) {
         try {
             const encodedName = encodeURIComponent(modelName);
+
+            // Update the model's last_opened_at first and wait for completion so
+            // the subsequent list request reflects the new ordering immediately.
+            try {
+                await fetch(`api/models/${encodedName}/touch`, {
+                    method: "POST",
+                    credentials: "same-origin",
+                });
+            } catch (err) {
+                console.error("Touch model error", err);
+            }
+
             const res = await fetch(`api/models/${encodedName}/open`, {
                 method: "POST",
                 credentials: "same-origin",
@@ -300,13 +312,6 @@ class HistoryPanel {
             if (!res.ok) throw new Error("open_failed");
             const svgText = await res.text();
             const fileName = res.headers.get("X-Model-Name") || modelName;
-
-            // Update the model's last_opened_at immediately in the background
-            // so the history panel re-sorts before we re-render it below.
-            const touchPromise = fetch(`api/models/${encodedName}/touch`, {
-                method: "POST",
-                credentials: "same-origin",
-            }).catch((err) => console.error("Touch model error", err));
 
             // Replace current Vision instance (tab) with this model
             const existingVision = AppState.listInstances().find((i) => i.appId === "vision" && i.mode === "tab");
@@ -320,7 +325,7 @@ class HistoryPanel {
                 mainClassName: "",
             });
             this.close();
-            await touchPromise;
+
             await this.load();
         } catch (err) {
             console.error("Open model error", err);
