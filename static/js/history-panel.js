@@ -317,20 +317,24 @@ class HistoryPanel {
                 console.error("Touch search error", err);
             }
         }
-        const existingSearch = AppState.listInstances().find((i) => i.appId === "search" && i.mode === "tab");
+        const existingSearch = AppState.listInstances().find((i) => i.appId === "search");
         if (existingSearch) {
             const inst = AppState.getInstance(existingSearch.instanceId);
-            if (inst && inst.query !== undefined) {
+            if (inst) {
                 inst.query = query;
                 inst.selectedTags = tags;
-                const record = AppState.getRecord(existingSearch.instanceId);
-                if (record && record.mode === "tab") {
-                    const container = shell.getContentArea().querySelector(".app-container");
-                    if (container) {
-                        inst.mount(container).then(() => inst._runSearch());
-                        return;
-                    }
+                if (existingSearch.mode === "tab") {
+                    windowManager.switchTab(existingSearch.instanceId);
+                    inst.render(inst.container || shell.getContentArea().querySelector(".app-container"));
+                } else if (existingSearch.mode === "float") {
+                    windowManager.moveToFloat(existingSearch.instanceId);
+                    inst.render(inst.container);
+                } else if (existingSearch.mode === "split") {
+                    windowManager.renderSplit();
+                    inst.render(inst.container);
                 }
+                requestAnimationFrame(() => inst._runSearch());
+                return;
             }
         }
         windowManager.open("search", { mode: "tab", query, tags });
