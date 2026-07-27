@@ -7,10 +7,25 @@ import os
 import secrets
 import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Optional
 
 
-SESSION_SECRET = os.getenv("SESSION_SECRET") or secrets.token_urlsafe(32)
+def _load_session_secret() -> str:
+    secret = os.getenv("SESSION_SECRET", "")
+    if secret:
+        return secret
+    # Fallback to a stable secret stored in the project data directory
+    secret_file = Path(__file__).resolve().parent.parent.parent / "data" / ".session_secret"
+    secret_file.parent.mkdir(parents=True, exist_ok=True)
+    if secret_file.exists():
+        return secret_file.read_text().strip()
+    secret = secrets.token_urlsafe(32)
+    secret_file.write_text(secret)
+    return secret
+
+
+SESSION_SECRET = _load_session_secret()
 SESSION_COOKIE = "semantiq_session"
 SESSION_MAX_AGE_DAYS = 7
 
