@@ -316,7 +316,9 @@ class SearchApp extends AppBase {
             const resultsContainer = this.container.querySelector('#results-container');
             if (resultsContainer) {
                 resultsContainer.innerHTML = this.resultsHtml;
-                this._animateResults();
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => this._animateResults());
+                });
             }
             this._applyCentering();
 
