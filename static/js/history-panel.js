@@ -301,6 +301,13 @@ class HistoryPanel {
             const svgText = await res.text();
             const fileName = res.headers.get("X-Model-Name") || modelName;
 
+            // Update the model's last_opened_at immediately in the background
+            // so the history panel re-sorts before we re-render it below.
+            const touchPromise = fetch(`api/models/${encodedName}/touch`, {
+                method: "POST",
+                credentials: "same-origin",
+            }).catch((err) => console.error("Touch model error", err));
+
             // Replace current Vision instance (tab) with this model
             const existingVision = AppState.listInstances().find((i) => i.appId === "vision" && i.mode === "tab");
             if (existingVision) {
@@ -313,6 +320,8 @@ class HistoryPanel {
                 mainClassName: "",
             });
             this.close();
+            await touchPromise;
+            await this.load();
         } catch (err) {
             console.error("Open model error", err);
             alert("Impossible d'ouvrir le modèle.");
