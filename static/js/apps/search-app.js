@@ -181,10 +181,7 @@ class SearchApp extends AppBase {
 
                 this._setLoading(true);
                 this._startTimer();
-                // Start move up while halo appears, so both run together (60ms frame)
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(() => this._applyCentering());
-                });
+                this._applyCentering();
                 this._runSearch();
             };
 
