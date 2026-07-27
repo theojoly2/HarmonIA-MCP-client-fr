@@ -49,7 +49,7 @@ def save_search(username: str, query: str, tags: list[str]) -> dict:
     inserted_id = cur.lastrowid
     conn.commit()
     row = conn.execute(
-        "SELECT id, username, query, tags, created_at FROM search_history WHERE id = ?",
+        "SELECT id, username, query, tags, created_at, last_opened_at FROM search_history WHERE id = ?",
         (inserted_id,),
     ).fetchone()
     conn.close()
