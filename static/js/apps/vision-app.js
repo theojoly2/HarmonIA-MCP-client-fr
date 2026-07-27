@@ -139,8 +139,8 @@ class VisionApp extends AppBase {
             this.mainClassName = match ? match[1] : '';
             this._showViewer();
 
-            // Persist model to user history only when the user is currently logged in.
-            // If not logged in, the import is discarded once the Vision instance is closed.
+            // Persist model to user history when logged in.
+            // If not logged in, store the import as pending only while this Vision instance stays open.
             if (AuthManager.isLoggedIn()) {
                 try {
                     await ApiClient.importAndSaveModel(file, file.name);
@@ -148,6 +148,8 @@ class VisionApp extends AppBase {
                 } catch (err) {
                     console.error('Model save error', err);
                 }
+            } else {
+                AuthManager.setPendingImport(file, file.name, this.svgText);
             }
         } catch (err) {
             console.error('Vision import error', err);

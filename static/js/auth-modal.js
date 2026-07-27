@@ -6,6 +6,7 @@
 
 const AuthManager = (() => {
     let currentUser = null;
+    let pendingImport = null; // { file, fileName, svgText }
     let modal = null;
     let onLoginCallbacks = [];
     let onLogoutCallbacks = [];
@@ -27,6 +28,18 @@ const AuthManager = (() => {
 
     function isLoggedIn() {
         return !!currentUser;
+    }
+
+    function setPendingImport(file, fileName, svgText) {
+        pendingImport = { file, fileName, svgText };
+    }
+
+    function getPendingImport() {
+        return pendingImport;
+    }
+
+    function clearPendingImport() {
+        pendingImport = null;
     }
 
     function onLogin(cb) {
@@ -101,6 +114,9 @@ const AuthManager = (() => {
         init,
         getUser,
         isLoggedIn,
+        setPendingImport,
+        getPendingImport,
+        clearPendingImport,
         onLogin,
         onLogout,
         register,

@@ -80,7 +80,7 @@ class HistoryPanel {
             li.dataset.modelName = modelName;
             li.innerHTML = `
                 <div class="history-item-info">
-                    <span class="history-item-name" title="Cliquer pour renommer">${this._escape(modelName)}</span>
+                    <span class="history-item-name">${this._escape(modelName)}</span>
                 </div>
                 <button type="button" class="history-action history-action-more" title="Actions" aria-haspopup="true">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -486,7 +486,7 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
     padding: 0.75rem 0.75rem;
     border-radius: 0.75rem;
     margin-bottom: 0.35rem;
-    cursor: default;
+    cursor: pointer;
     transition: background 0.15s;
 }
 .history-item:hover { background: #f9fafb; }

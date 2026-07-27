@@ -58,8 +58,32 @@
 
     shell.renderAuthActions(AuthManager.getUser());
 
+    // Persist a pending import only if its Vision instance is still open when login happens.
+    function isPendingImportStillOpen() {
+        const pending = AuthManager.getPendingImport();
+        if (!pending || !pending.svgText) return false;
+        const instances = AppState.listInstances();
+        return instances.some((i) => i.appId === "vision" && AppState.getInstance(i.instanceId)?.svgText === pending.svgText);
+    }
+
+    async function flushPendingImport() {
+        if (!isPendingImportStillOpen()) {
+            AuthManager.clearPendingImport();
+            return;
+        }
+        const pending = AuthManager.getPendingImport();
+        try {
+            await ApiClient.importAndSaveModel(pending.file, pending.fileName);
+            AuthManager.clearPendingImport();
+            historyPanel.load();
+        } catch (err) {
+            console.error("Flush pending import error", err);
+        }
+    }
+
     AuthManager.onLogin(async (user) => {
         shell.renderAuthActions(user);
+        await flushPendingImport();
         historyPanel.load();
     });
 
