@@ -36,15 +36,15 @@ class HistoryPanel {
         this.emptyEl = this.panel.querySelector("#history-empty");
         this.panel.querySelector("#history-close").addEventListener("click", () => this.close());
 
-        // Close when clicking outside the panel.
+        // Close when clicking outside the panel (ignore history menus floating in body).
         this._outsideClickHandler = (e) => {
             if (!this.isOpen) return;
             const target = e.target;
-            if (!this.panel.contains(target) && !target.closest("#history-toggle")) {
-                this.close();
-            }
+            if (this.panel.contains(target)) return;
+            if (target.closest("#history-toggle")) return;
+            if (target.closest(".history-menu")) return;
+            this.close();
         };
-        // Use capture so we catch clicks before they reach other handlers.
         document.addEventListener("click", this._outsideClickHandler, true);
     }
 
@@ -89,14 +89,10 @@ class HistoryPanel {
                 </button>
             `;
             li.addEventListener("click", (e) => {
-                if (e.target.closest(".history-action-more, .history-menu, .history-item-name")) return;
+                if (e.target.closest(".history-action-more, .history-menu")) return;
                 this._openModel(modelName);
             });
             const nameEl = li.querySelector(".history-item-name");
-            nameEl.addEventListener("click", (e) => {
-                e.stopPropagation();
-                this._startInlineRename(nameEl, modelName);
-            });
             const moreBtn = li.querySelector(".history-action-more");
             moreBtn.addEventListener("click", (e) => {
                 e.stopPropagation();

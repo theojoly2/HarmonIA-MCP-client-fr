@@ -504,14 +504,6 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    cursor: text;
-    border-radius: 0.35rem;
-    padding: 0.15rem 0.25rem;
-    margin-left: -0.25rem;
-    transition: background 0.15s;
-}
-.history-item-name:hover {
-    background: #f3f4f6;
 }
 .history-item-rename-input {
     width: 100%;
