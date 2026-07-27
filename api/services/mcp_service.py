@@ -1,6 +1,6 @@
 import asyncio
 import base64
-from typing import Any
+from typing import Any, Optional
 
 from fastmcp import Client
 
