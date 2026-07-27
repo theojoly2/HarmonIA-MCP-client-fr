@@ -73,12 +73,12 @@ def save_search(username: str, query: str, tags: list[str]) -> dict:
     ).fetchone()
     conn.close()
     item = dict(row)
-        if isinstance(item.get("last_opened_at"), str):
-            try:
-                item["last_opened_at"] = int(datetime.fromisoformat(item["last_opened_at"]).timestamp() * 1000)
-            except Exception:
-                import time
-                item["last_opened_at"] = int(time.time() * 1000)
+    if isinstance(item.get("last_opened_at"), str):
+        try:
+            item["last_opened_at"] = int(datetime.fromisoformat(item["last_opened_at"]).timestamp() * 1000)
+        except Exception:
+            import time
+            item["last_opened_at"] = int(time.time() * 1000)
     return item
 
 
