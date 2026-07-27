@@ -323,9 +323,14 @@ class HistoryPanel {
             if (inst && inst.query !== undefined) {
                 inst.query = query;
                 inst.selectedTags = tags;
-                inst.render(inst.container || document.createElement("div"));
-                inst._runSearch();
-                return;
+                const record = AppState.getRecord(existingSearch.instanceId);
+                if (record && record.mode === "tab") {
+                    const container = shell.getContentArea().querySelector(".app-container");
+                    if (container) {
+                        inst.mount(container).then(() => inst._runSearch());
+                        return;
+                    }
+                }
             }
         }
         windowManager.open("search", { mode: "tab", query, tags });
