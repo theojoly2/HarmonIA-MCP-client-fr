@@ -33,6 +33,11 @@ def init_search_history_db():
         )
         """
     )
+    # Migrate existing tables that were created before last_opened_at existed.
+    try:
+        conn.execute("ALTER TABLE search_history ADD COLUMN last_opened_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    except sqlite3.OperationalError:
+        pass
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_search_history_username ON search_history(username)"
     )
