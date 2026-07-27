@@ -13,8 +13,8 @@ class SearchApp extends AppBase {
 
     constructor(instanceId, props = {}) {
         super(instanceId, props);
-        this.query = "";
-        this.selectedTags = [];
+        this.query = props.query || "";
+        this.selectedTags = props.tags || [];
         this.results = [];
         this.tagsHtml = "";
         this.loading = false;
@@ -309,6 +309,16 @@ class SearchApp extends AppBase {
                 this._animateResults();
             }
             this._applyCentering();
+
+            // Persist search query to user history when logged in.
+            if (AuthManager.isLoggedIn()) {
+                try {
+                    await ApiClient.saveSearch(this.query, this.selectedTags);
+                    if (window.historyPanel) window.historyPanel.load();
+                } catch (err) {
+                    console.error('Save search error', err);
+                }
+            }
         } catch (e) {
             console.error('Erreur recherche', e);
             const resultsContainer = this.container.querySelector('#results-container');

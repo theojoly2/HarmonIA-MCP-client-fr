@@ -50,41 +50,60 @@ class HistoryPanel {
 
     async load() {
         if (!AuthManager.isLoggedIn()) {
-            this.models = [];
+            this.items = [];
             this._render();
             return;
         }
         try {
-            const res = await fetch("api/models", { credentials: "same-origin" });
-            if (!res.ok) throw new Error("fetch_failed");
-            const data = await res.json();
-            this.models = (data.models || []).sort((a, b) => {
-                const ta = a.last_opened_at || 0;
-                const tb = b.last_opened_at || 0;
-                return tb - ta;
-            });
+            const [modelsRes, searchesRes] = await Promise.all([
+                fetch("api/models", { credentials: "same-origin" }),
+                fetch("api/searches", { credentials: "same-origin" }),
+            ]);
+            let models = [];
+            let searches = [];
+            if (modelsRes.ok) {
+                const data = await modelsRes.json();
+                models = (data.models || []).map((m) => ({ ...m, kind: "model", sortKey: m.last_opened_at || 0 }));
+            }
+            if (searchesRes.ok) {
+                const data = await searchesRes.json();
+                searches = (data.searches || []).map((s) => ({
+                    ...s,
+                    kind: "search",
+                    name: s.query,
+                    source_format: (s.tags || "").split(",").filter(Boolean).join(", ") || "recherche",
+                    sortKey: new Date(s.created_at).getTime() / 1000,
+                }));
+            }
+            this.items = [...models, ...searches].sort((a, b) => b.sortKey - a.sortKey);
         } catch (err) {
             console.error("History load error", err);
-            this.models = [];
+            this.items = [];
         }
         this._render();
     }
 
     _render() {
         this.listEl.innerHTML = "";
-        if (!this.models.length) {
+        if (!this.items.length) {
             this.emptyEl.classList.remove("hidden");
             return;
         }
         this.emptyEl.classList.add("hidden");
-        this.models.forEach((model) => {
-            const modelName = model.name || model.id || "";
+        this.items.forEach((item) => {
+            const isSearch = item.kind === "search";
+            const itemName = item.name || "";
             const li = document.createElement("li");
-            li.className = "history-item";
-            li.dataset.modelName = modelName;
+            li.className = `history-item history-item-${item.kind}`;
+            li.dataset.itemName = itemName;
+            li.dataset.itemKind = item.kind;
+            if (isSearch) li.dataset.searchId = item.id;
             li.innerHTML = `
+                <div class="history-item-icon">
+                    ${isSearch ? this._searchIcon() : this._visionIcon()}
+                </div>
                 <div class="history-item-info">
-                    <span class="history-item-name">${this._escape(modelName)}</span>
+                    <span class="history-item-name">${this._escape(itemName)}</span>
                 </div>
                 <button type="button" class="history-action history-action-more" title="Actions" aria-haspopup="true">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -94,16 +113,29 @@ class HistoryPanel {
             `;
             li.addEventListener("click", (e) => {
                 if (e.target.closest(".history-action-more, .history-menu")) return;
-                this._openModel(modelName);
+                if (isSearch) this._runSearch(itemName, (item.tags || "").split(",").filter(Boolean));
+                else this._openModel(itemName);
             });
-            const nameEl = li.querySelector(".history-item-name");
             const moreBtn = li.querySelector(".history-action-more");
             moreBtn.addEventListener("click", (e) => {
                 e.stopPropagation();
-                this._showMenu(e.currentTarget, modelName);
+                this._showMenu(e.currentTarget, item);
             });
             this.listEl.appendChild(li);
         });
+    }
+
+    _searchIcon() {
+        return `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+        </svg>`;
+    }
+
+    _visionIcon() {
+        return `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+        </svg>`;
     }
 
     _escape(str) {
@@ -114,31 +146,36 @@ class HistoryPanel {
             .replace(/\u003e/g, "&gt;");
     }
 
-    _showMenu(anchorBtn, modelName) {
+    _showMenu(anchorBtn, item) {
         // Remove any existing menu
         this._closeMenu();
+        const isSearch = item.kind === "search";
         const menu = document.createElement("div");
         menu.className = "history-menu";
-        menu.innerHTML = `
-            <button type="button" class="history-menu-item history-menu-rename">Renommer</button>
-            <button type="button" class="history-menu-item history-menu-delete">Supprimer</button>
-        `;
+        menu.innerHTML = isSearch
+            ? `<button type="button" class="history-menu-item history-menu-delete">Supprimer</button>`
+            : `
+                <button type="button" class="history-menu-item history-menu-rename">Renommer</button>
+                <button type="button" class="history-menu-item history-menu-delete">Supprimer</button>
+            `;
         const rect = anchorBtn.getBoundingClientRect();
         menu.style.top = `${rect.bottom + 4}px`;
         menu.style.right = `${document.body.clientWidth - rect.right}px`;
         document.body.appendChild(menu);
         this._activeMenu = menu;
 
-        menu.querySelector(".history-menu-rename").addEventListener("click", (e) => {
-            e.stopPropagation();
-            this._closeMenu();
-            const li = this.listEl.querySelector(`li[data-model-name="${CSS.escape(modelName)}"]`) || anchorBtn.closest(".history-item");
-            const nameEl = li?.querySelector(".history-item-name");
-            if (nameEl) this._startInlineRename(nameEl, modelName);
-        });
+        if (!isSearch) {
+            menu.querySelector(".history-menu-rename").addEventListener("click", (e) => {
+                e.stopPropagation();
+                this._closeMenu();
+                const li = this.listEl.querySelector(`li[data-item-name="${CSS.escape(item.name)}"][data-item-kind="model"]`) || anchorBtn.closest(".history-item");
+                const nameEl = li?.querySelector(".history-item-name");
+                if (nameEl) this._startInlineRename(nameEl, item.name);
+            });
+        }
         menu.querySelector(".history-menu-delete").addEventListener("click", (e) => {
             e.stopPropagation();
-            this._showDeleteConfirm(menu, modelName);
+            this._showDeleteConfirm(menu, item);
         });
 
         // Close on next click anywhere
@@ -159,9 +196,11 @@ class HistoryPanel {
         }
     }
 
-    _showDeleteConfirm(menu, modelName) {
+    _showDeleteConfirm(menu, item) {
+        const isSearch = item.kind === "search";
+        const label = isSearch ? "recherche" : "modèle";
         menu.innerHTML = `
-            <div class="history-menu-text">Supprimer « ${this._escape(modelName)} » ?</div>
+            <div class="history-menu-text">Supprimer cette ${label} ?</div>
             <button type="button" class="history-menu-item history-menu-cancel">Annuler</button>
             <button type="button" class="history-menu-item history-menu-confirm-delete">Supprimer</button>
         `;
@@ -169,16 +208,20 @@ class HistoryPanel {
             e.stopPropagation();
             this._closeMenu();
             try {
-                const encodedName = encodeURIComponent(modelName);
-                const res = await fetch(`api/models/${encodedName}`, {
-                    method: "DELETE",
-                    credentials: "same-origin",
-                });
-                if (!res.ok) throw new Error("delete_failed");
+                if (isSearch) {
+                    await ApiClient.deleteSearch(item.id);
+                } else {
+                    const encodedName = encodeURIComponent(item.name);
+                    const res = await fetch(`api/models/${encodedName}`, {
+                        method: "DELETE",
+                        credentials: "same-origin",
+                    });
+                    if (!res.ok) throw new Error("delete_failed");
+                }
                 await this.load();
             } catch (err) {
-                console.error("Delete model error", err);
-                alert("Impossible de supprimer le modèle.");
+                console.error("Delete history item error", err);
+                alert(`Impossible de supprimer ${isSearch ? "la recherche" : "le modèle"}.`);
             }
         });
         menu.querySelector(".history-menu-cancel").addEventListener("click", (e) => {
@@ -259,6 +302,21 @@ class HistoryPanel {
             console.error("Open model error", err);
             alert("Impossible d'ouvrir le modèle.");
         }
+    }
+
+    _runSearch(query, tags) {
+        this.close();
+        const existingSearch = AppState.listInstances().find((i) => i.appId === "search" && i.mode === "tab");
+        if (existingSearch) {
+            const inst = AppState.getInstance(existingSearch.instanceId);
+            if (inst && inst.query !== undefined) {
+                inst.query = query;
+                inst.selectedTags = tags;
+                inst.render(inst.container || document.createElement("div"));
+                return;
+            }
+        }
+        windowManager.open("search", { mode: "tab", query, tags });
     }
 
 

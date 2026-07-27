@@ -67,6 +67,35 @@ const ApiClient = (() => {
         return res.json();
     }
 
+    async function saveSearch(query, tags = []) {
+        const res = await fetch(apiUrl("searches"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ query, tags }),
+        });
+        if (!res.ok) {
+            if (res.status === 401) throw new Error("not_authenticated");
+            throw new Error(`Save search failed: ${res.status}`);
+        }
+        return res.json();
+    }
+
+    async function getSearches() {
+        const res = await fetch(apiUrl("searches"), { credentials: "same-origin" });
+        if (!res.ok) throw new Error(`Searches list failed: ${res.status}`);
+        return res.json();
+    }
+
+    async function deleteSearch(searchId) {
+        const res = await fetch(apiUrl(`searches/${searchId}`), {
+            method: "DELETE",
+            credentials: "same-origin",
+        });
+        if (!res.ok) throw new Error(`Delete search failed: ${res.status}`);
+        return res.json();
+    }
+
     async function me() {
         const res = await fetch(apiUrl("auth/me"), { credentials: "same-origin" });
         if (!res.ok) throw new Error("not_authenticated");
@@ -126,6 +155,9 @@ const ApiClient = (() => {
         importVisionFile,
         importAndSaveModel,
         getModels,
+        saveSearch,
+        getSearches,
+        deleteSearch,
         me,
         login,
         register,
