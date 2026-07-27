@@ -38,10 +38,70 @@ const ApiClient = (() => {
         formData.append("file", file);
         const res = await fetch(apiUrl("vision/import"), {
             method: "POST",
+            credentials: "same-origin",
             body: formData,
         });
         if (!res.ok) throw new Error(`Vision import failed: ${res.status}`);
         return res.text();
+    }
+
+    async function importAndSaveModel(file, name) {
+        const formData = new FormData();
+        formData.append("file", file);
+        if (name) formData.append("name", name);
+        const res = await fetch(apiUrl("models/import"), {
+            method: "POST",
+            credentials: "same-origin",
+            body: formData,
+        });
+        if (!res.ok) {
+            if (res.status === 401) throw new Error("not_authenticated");
+            throw new Error(`Model import failed: ${res.status}`);
+        }
+        return res.json();
+    }
+
+    async function getModels() {
+        const res = await fetch(apiUrl("models"), { credentials: "same-origin" });
+        if (!res.ok) throw new Error(`Models list failed: ${res.status}`);
+        return res.json();
+    }
+
+    async function me() {
+        const res = await fetch(apiUrl("auth/me"), { credentials: "same-origin" });
+        if (!res.ok) throw new Error("not_authenticated");
+        return res.json();
+    }
+
+    async function login(username, password) {
+        const res = await fetch(apiUrl("auth/login"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ username, password }),
+        });
+        if (!res.ok) throw new Error(`Login failed: ${res.status}`);
+        return res.json();
+    }
+
+    async function register(username, password) {
+        const res = await fetch(apiUrl("auth/register"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ username, password }),
+        });
+        if (!res.ok) throw new Error(`Register failed: ${res.status}`);
+        return res.json();
+    }
+
+    async function logout() {
+        const res = await fetch(apiUrl("auth/logout"), {
+            method: "POST",
+            credentials: "same-origin",
+        });
+        if (!res.ok) throw new Error(`Logout failed: ${res.status}`);
+        return res.json();
     }
 
     async function streamChat(documentId, userMessage, history = []) {
@@ -64,6 +124,12 @@ const ApiClient = (() => {
         getDocumentFileUrl,
         getDocumentVisualizeUrl,
         importVisionFile,
+        importAndSaveModel,
+        getModels,
+        me,
+        login,
+        register,
+        logout,
         streamChat,
     };
 })();

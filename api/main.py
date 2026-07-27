@@ -7,7 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from api.routers import search, documents, vision, chat
+from api.routers import search, documents, vision, chat, auth, models
+
+
+from api.services.user_store import init_db
 
 
 def create_app() -> FastAPI:
@@ -28,6 +31,10 @@ def create_app() -> FastAPI:
     except Exception as exc:
         print(f"[PlantUML] Could not start auto-installation: {exc}", flush=True)
 
+    init_db()
+
+    app.include_router(auth.router)
+    app.include_router(models.router)
     app.include_router(search.router)
     app.include_router(documents.router)
     app.include_router(vision.router)

@@ -1,0 +1,68 @@
+"""SQLite persistence for users."""
+
+import os
+import sqlite3
+from pathlib import Path
+from typing import Optional
+
+from api.services.auth_service import hash_password
+
+
+DB_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+DB_PATH = DB_DIR / "users.db"
+
+
+def _get_conn() -> sqlite3.Connection:
+    DB_DIR.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db():
+    conn = _get_conn()
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash BLOB NOT NULL,
+            salt BLOB NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    conn.commit()
+    conn.close()
+
+
+def create_user(username: str, password: str) -> dict:
+    salt, pwd_hash = hash_password(password)
+    conn = _get_conn()
+    try:
+        cur = conn.execute(
+            "INSERT INTO users (username, password_hash, salt) VALUES (?, ?, ?)",
+            (username, pwd_hash, salt),
+        )
+        conn.commit()
+        return {"id": cur.lastrowid, "username": username}
+    except sqlite3.IntegrityError:
+        raise ValueError("username_exists")
+    finally:
+        conn.close()
+
+
+def get_user_by_username(username: str) -> Optional[dict]:
+    conn = _get_conn()
+    row = conn.execute(
+        "SELECT id, username, password_hash, salt, created_at FROM users WHERE username = ?",
+        (username,),
+    ).fetchone()
+    conn.close()
+    if row is None:
+        return None
+    return dict(row)
+
+
+def user_exists(username: str) -> bool:
+    return get_user_by_username(username) is not None

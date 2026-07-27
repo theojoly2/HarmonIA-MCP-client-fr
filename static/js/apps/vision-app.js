@@ -138,6 +138,18 @@ class VisionApp extends AppBase {
             const match = this.svgText.match(/data-main-class="([^"]*)"/);
             this.mainClassName = match ? match[1] : '';
             this._showViewer();
+
+            // Persist model to user history when logged in; otherwise keep pending import.
+            if (AuthManager.isLoggedIn()) {
+                try {
+                    await ApiClient.importAndSaveModel(file, file.name);
+                    if (window.historyPanel) window.historyPanel.load();
+                } catch (err) {
+                    console.error('Model save error', err);
+                }
+            } else {
+                AuthManager.setPendingImport(file, file.name, this.svgText);
+            }
         } catch (err) {
             console.error('Vision import error', err);
             this._setLoading(false);

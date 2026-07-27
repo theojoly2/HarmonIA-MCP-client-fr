@@ -13,13 +13,51 @@ class Shell {
 
     _init() {
         this.container.innerHTML = `
-            <div id="global-header" class="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200 px-4 sm:px-6 py-3 flex items-center flex-shrink-0">
+            <div id="global-header" class="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200 px-4 sm:px-6 py-3 flex items-center justify-between flex-shrink-0">
                 <div class="flex items-center gap-2" id="tab-bar"></div>
+                <div class="flex items-center gap-2" id="shell-actions"></div>
             </div>
             <div id="shell-content" class="flex-1 relative overflow-hidden"></div>
         `;
         this.tabBar = this.container.querySelector('#tab-bar');
+        this.actionsArea = this.container.querySelector('#shell-actions');
         this.contentArea = this.container.querySelector('#shell-content');
+    }
+
+    renderAuthActions(user) {
+        this.actionsArea.innerHTML = '';
+        if (user) {
+            const historyBtn = document.createElement('button');
+            historyBtn.id = 'history-toggle';
+            historyBtn.className = 'history-toggle';
+            historyBtn.title = 'Historique des modèles';
+            historyBtn.innerHTML = `
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span>Historique</span>
+            `;
+            historyBtn.addEventListener('click', () => EventBus.emit('toggle-history'));
+
+            const userLabel = document.createElement('span');
+            userLabel.className = 'shell-user-label';
+            userLabel.textContent = user.username;
+
+            const logoutBtn = document.createElement('button');
+            logoutBtn.className = 'shell-action-btn';
+            logoutBtn.textContent = 'Déconnexion';
+            logoutBtn.addEventListener('click', () => EventBus.emit('logout'));
+
+            this.actionsArea.appendChild(historyBtn);
+            this.actionsArea.appendChild(userLabel);
+            this.actionsArea.appendChild(logoutBtn);
+        } else {
+            const loginBtn = document.createElement('button');
+            loginBtn.className = 'shell-action-btn primary';
+            loginBtn.textContent = 'Connexion';
+            loginBtn.addEventListener('click', () => EventBus.emit('show-auth'));
+            this.actionsArea.appendChild(loginBtn);
+        }
     }
 
     getContentArea() {

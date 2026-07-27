@@ -10,6 +10,9 @@
     AppState.registerApp(PreviewApp);
     AppState.registerApp(ChatApp);
 
+    // Auth state + pending import manager
+    await AuthManager.init();
+
     // Create shell
     const appShell = document.getElementById('app-shell');
     const splitRoot = document.createElement('div');
@@ -17,6 +20,9 @@
 
     const shell = new Shell(appShell, null);
     const contentArea = shell.getContentArea();
+
+    // History panel attached to the shell content area
+    const historyPanel = new HistoryPanel(contentArea);
 
     // Split manager for shell content
     const splitManager = new SplitManager(contentArea, {
@@ -38,6 +44,8 @@
 
     // Window manager
     const windowManager = new WindowManager(contentArea, splitManager);
+    window.historyPanel = historyPanel;
+    window.windowManager = windowManager;
 
     // Wire shell buttons to window manager
     shell.windowManager = windowManager;
@@ -45,6 +53,47 @@
     // Add tab buttons
     shell.addAppButton(SearchApp);
     shell.addAppButton(VisionApp);
+
+    shell.renderAuthActions(AuthManager.getUser());
+
+    // Handle pending import after login
+    async function flushPendingImport() {
+        const pending = AuthManager.getPendingImport();
+        if (!pending || !pending.file) return;
+        try {
+            await ApiClient.importAndSaveModel(pending.file, pending.fileName);
+            AuthManager.clearPendingImport();
+            historyPanel.load();
+        } catch (err) {
+            console.error("Flush pending import error", err);
+        }
+    }
+
+    AuthManager.onLogin(async (user) => {
+        shell.renderAuthActions(user);
+        await flushPendingImport();
+        historyPanel.load();
+    });
+
+    EventBus.on('show-auth', () => AuthManager.showModal());
+    EventBus.on('logout', async () => {
+        await AuthManager.logout();
+        shell.renderAuthActions(null);
+        historyPanel.close();
+    });
+    EventBus.on('toggle-history', () => {
+        if (!AuthManager.isLoggedIn()) {
+            AuthManager.showModal();
+            return;
+        }
+        historyPanel.toggle();
+    });
+
+    // Auth modal: show when not authenticated, but allow browsing search without login.
+    // Wait until the initial search tab is mounted so the UI is not empty behind the modal.
+    if (!AuthManager.isLoggedIn()) {
+        setTimeout(() => AuthManager.showModal(), 0);
+    }
 
     // Event bus handlers
     EventBus.on('open-preview', ({ docId, documentId, name }) => {
