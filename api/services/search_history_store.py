@@ -19,25 +19,38 @@ def _get_conn() -> sqlite3.Connection:
     return conn
 
 
+def _table_exists(conn: sqlite3.Connection, name: str) -> bool:
+    cur = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+        (name,),
+    )
+    return cur.fetchone() is not None
+
+
+def _column_exists(conn: sqlite3.Connection, table: str, column: str) -> bool:
+    cur = conn.execute(f"PRAGMA table_info({table})")
+    return any(row[1] == column for row in cur.fetchall())
+
+
 def init_search_history_db():
     conn = _get_conn()
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS search_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT NOT NULL,
-            query TEXT NOT NULL,
-            tags TEXT DEFAULT '',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            last_opened_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    if not _table_exists(conn, "search_history"):
+        conn.execute(
+            """
+            CREATE TABLE search_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL,
+                query TEXT NOT NULL,
+                tags TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_opened_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
         )
-        """
-    )
-    # Migrate existing tables that were created before last_opened_at existed.
-    try:
-        conn.execute("ALTER TABLE search_history ADD COLUMN last_opened_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-    except sqlite3.OperationalError:
-        pass
+    elif not _column_exists(conn, "search_history", "last_opened_at"):
+        conn.execute(
+            "ALTER TABLE search_history ADD COLUMN last_opened_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+        )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_search_history_username ON search_history(username)"
     )
