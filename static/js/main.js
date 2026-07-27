@@ -58,22 +58,8 @@
 
     shell.renderAuthActions(AuthManager.getUser());
 
-    // Handle pending import after login
-    async function flushPendingImport() {
-        const pending = AuthManager.getPendingImport();
-        if (!pending || !pending.file) return;
-        try {
-            await ApiClient.importAndSaveModel(pending.file, pending.fileName);
-            AuthManager.clearPendingImport();
-            historyPanel.load();
-        } catch (err) {
-            console.error("Flush pending import error", err);
-        }
-    }
-
     AuthManager.onLogin(async (user) => {
         shell.renderAuthActions(user);
-        await flushPendingImport();
         historyPanel.load();
     });
 
