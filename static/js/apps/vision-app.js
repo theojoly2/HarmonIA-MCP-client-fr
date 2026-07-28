@@ -204,14 +204,16 @@ class VisionApp extends AppBase {
                 onTransform: (state) => { this.viewerState = state; }
             });
         }
-        // New import: center diagram. Window switching: restore exact position/zoom.
+        this.viewer.setSvg(this.svgText, this.mainClassName);
+        // New import/open from history/preview: center diagram after it becomes visible.
         if (this._centerOnNextShow) {
-            this.viewer.setSvg(this.svgText, this.mainClassName);
-            // Reset the view as if the user clicked the reset button (centers the new diagram).
-            this.viewer.resetZoom();
-            this._centerOnNextShow = false;
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    this.viewer.resetZoom();
+                    this._centerOnNextShow = false;
+                });
+            });
         } else {
-            this.viewer.setSvg(this.svgText, this.mainClassName);
             this.viewer.restoreState(this.viewerState);
         }
         this._setLoading(false);

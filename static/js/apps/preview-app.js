@@ -34,8 +34,8 @@ class PreviewApp extends AppBase {
             <div class="preview-app h-full w-full flex flex-col relative bg-white">
                 <div id="preview-svg-viewer" class="flex-1 relative"></div>
                 <button type="button" id="preview-expand" class="absolute top-3 right-3 z-20 p-2 rounded-full bg-white border border-gray-200 text-gray-600 hover:text-black hover:border-gray-400 shadow-sm transition-colors" title="Ouvrir dans Vision">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                        <path d="M15 3h6v6M14 10l7-7M3 15v6h6M10 14l-7 7M21 15v6h-6M14 20l7-7M3 9V3h6M10 10l-7-7"></path>
                     </svg>
                 </button>
                 <div id="preview-loading" class="absolute inset-0 flex items-center justify-center text-gray-500 z-10 bg-white/80 backdrop-blur-sm transition-opacity duration-300">
