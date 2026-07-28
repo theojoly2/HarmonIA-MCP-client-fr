@@ -477,19 +477,50 @@ class VisionApp extends AppBase {
             return;
         }
         const classOptions = classes.map((c) => `<option value="${this._escape(c)}">${this._escape(c)}</option>`).join('');
+        const predefinedTypes = [
+            'string',
+            'integer',
+            'boolean',
+            'decimal',
+            'date',
+            'dateTime',
+            'uri',
+            'anyURI',
+        ];
+        const typeOptions = [
+            '<option value="">— Sélectionner —</option>',
+            ...predefinedTypes.map((t) => `<option value="${this._escape(t)}">${this._escape(t)}</option>`),
+            '<option value="__other__">Autre…</option>',
+        ].join('');
         const fields = [
             { id: 'attr-class', label: 'Classe', type: 'select', options: classOptions, required: true },
             { id: 'attr-label', label: "Nom de l'attribut", required: true },
             { id: 'attr-definition', label: 'Définition', type: 'textarea' },
             { id: 'attr-uri', label: 'URI', required: true },
-            { id: 'attr-type', label: 'Type (optionnel)' },
+            { id: 'attr-type', label: 'Type', type: 'select', options: typeOptions, required: true },
+            { id: 'attr-type-other', label: 'Type personnalisé', className: 'hidden', required: true },
             { id: 'attr-lower', label: 'Borne inférieure (optionnel)' },
             { id: 'attr-upper', label: 'Borne supérieure (optionnel)' },
             { id: 'attr-usage', label: "Note d'utilisation", type: 'textarea' },
         ];
+        const onOpen = (overlay) => {
+            const typeSelect = overlay.querySelector('#attr-type');
+            const otherWrapper = overlay.querySelector('#attr-type-other')?.closest('.mb-3');
+            if (typeSelect && otherWrapper) {
+                const update = () => {
+                    otherWrapper.classList.toggle('hidden', typeSelect.value !== '__other__');
+                };
+                typeSelect.addEventListener('change', update);
+                update();
+            }
+        };
         this._showDialog("Ajouter un attribut", fields, async (values) => {
             try {
                 this._setLoading(true);
+                let attrType = values['attr-type'];
+                if (attrType === '__other__') {
+                    attrType = values['attr-type-other'];
+                }
                 const res = await fetch(`api/models/${encodeURIComponent(this.fileName)}/add-attribute`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -500,7 +531,7 @@ class VisionApp extends AppBase {
                         attr_definition: values['attr-definition'] || '',
                         attr_uri: values['attr-uri'] || '',
                         attr_usage_note: values['attr-usage'] || '',
-                        attr_type: values['attr-type'] || '',
+                        attr_type: attrType || '',
                         lower_bounds: values['attr-lower'] || '',
                         upper_bounds: values['attr-upper'] || '',
                     }),
@@ -514,7 +545,7 @@ class VisionApp extends AppBase {
             } finally {
                 this._setLoading(false);
             }
-        });
+        }, onOpen);
     }
 
     _showAddConnectorDialog() {
@@ -584,12 +615,12 @@ class VisionApp extends AppBase {
         }
     }
 
-    _showDialog(title, fields, onSubmit) {
+    _showDialog(title, fields, onSubmit, onOpen) {
         const overlay = document.createElement('div');
         overlay.className = 'auth-overlay';
         const optionsHtml = (opts) => opts || '';
         const inputsHtml = fields.map((f) => {
-            const label = `<label class="block text-sm font-semibold text-gray-700 mb-1" for="${f.id}">${this._escape(f.label)}${f.required ? ' *' : ''}</label>`;
+            const label = `<label class="block text-sm font-semibold text-gray-700 mb-1 ${this._escape(f.labelClass || '')}" for="${f.id}">${this._escape(f.label)}${f.required ? ' *' : ''}</label>`;
             let input;
             if (f.type === 'textarea') {
                 input = `<textarea id="${f.id}" class="w-full rounded-lg border border-gray-300 p-2 text-sm focus:border-black outline-none" rows="3" ${f.required ? 'required' : ''}>${this._escape(f.value || '')}</textarea>`;
@@ -598,7 +629,7 @@ class VisionApp extends AppBase {
             } else {
                 input = `<input type="text" id="${f.id}" value="${this._escape(f.value || '')}" class="w-full rounded-lg border border-gray-300 p-2 text-sm focus:border-black outline-none" ${f.required ? 'required' : ''}>`;
             }
-            return `<div class="mb-3">${label}${input}</div>`;
+            return `<div class="mb-3 ${this._escape(f.className || '')}">${label}${input}</div>`;
         }).join('');
         overlay.innerHTML = `
             <div class="auth-modal" style="max-height: 80vh; overflow-y: auto;">
@@ -616,6 +647,10 @@ class VisionApp extends AppBase {
             </div>
         `;
         document.body.appendChild(overlay);
+
+        if (onOpen) {
+            onOpen(overlay);
+        }
 
         const close = () => overlay.remove();
         overlay.querySelector('#dialog-close').addEventListener('click', close);
