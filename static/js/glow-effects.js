@@ -47,9 +47,12 @@ const GlowEffects = (() => {
 
     function getGlowSize(target) {
         if (target.id === 'submit-btn') return '30px';
+        if (target.id === 'login-btn') return '30px';
         if (target.classList.contains('title-glow')) return '55px';
         if (target.closest('.tag-label')) return '30px';
         if (target.classList.contains('chat-send-btn')) return '30px';
+        if (target.classList.contains('shell-tag-style')) return '40px';
+        if (target.classList.contains('shell-submit-style')) return '30px';
         return '55px';
     }
 

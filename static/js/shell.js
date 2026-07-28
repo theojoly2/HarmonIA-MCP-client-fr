@@ -49,7 +49,7 @@ class Shell {
         if (user) {
             const historyBtn = document.createElement('button');
             historyBtn.id = 'history-toggle';
-            historyBtn.className = 'history-toggle shell-glow';
+            historyBtn.className = 'history-toggle shell-tag-style shell-glow';
             historyBtn.title = 'Historique des modèles';
             historyBtn.innerHTML = `
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -62,7 +62,7 @@ class Shell {
             });
 
             const userMenuBtn = document.createElement('button');
-            userMenuBtn.className = 'shell-user-menu-btn shell-glow';
+            userMenuBtn.className = 'shell-user-menu-btn shell-tag-style shell-glow';
             userMenuBtn.title = 'Menu utilisateur';
             userMenuBtn.setAttribute('aria-haspopup', 'true');
             userMenuBtn.innerHTML = `
@@ -79,7 +79,8 @@ class Shell {
             this.actionsArea.appendChild(userMenuBtn);
         } else {
             const loginBtn = document.createElement('button');
-            loginBtn.className = 'shell-action-btn primary shell-glow';
+            loginBtn.id = 'login-btn';
+            loginBtn.className = 'shell-submit-style shell-glow';
             loginBtn.textContent = 'Connexion';
             loginBtn.addEventListener('click', () => {
                 if (this.authManager) this.authManager.showModal();
@@ -146,7 +147,7 @@ class Shell {
 
     addAppButton(appClass) {
         const btn = document.createElement('button');
-        btn.className = 'nav-tab shell-glow';
+        btn.className = 'nav-tab shell-tag-style shell-glow';
         btn.dataset.appId = appClass.id;
         const icon = appClass.iconSvg || '';
         btn.innerHTML = `${icon} <span>${appClass.title}</span>`;

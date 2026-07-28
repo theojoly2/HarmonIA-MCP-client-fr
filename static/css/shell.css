@@ -15,18 +15,23 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.5rem 1rem;
+    padding: 0.45rem 0.9rem;
     border-radius: 9999px;
     font-size: 0.9rem;
     font-weight: 600;
-    color: #6b7280;
-    background: transparent;
-    border: 1px solid transparent;
-    transition: all 0.2s ease;
+    color: #374151;
+    background: #ffffff;
+    border: 2px solid #e5e7eb;
     cursor: pointer;
+    background-image: radial-gradient(circle var(--glow-size, 0px) at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(0,0,0,0.12) 0%, transparent 100%);
+    transition: border-color 0.2s, background-color 0.2s, --glow-size 0.25s ease;
 }
-.nav-tab:hover { color: #111827; background: #f3f4f6; }
-.nav-tab.active { color: #111827; background: #111827; color: white; }
+.nav-tab:hover { border-color: #d1d5db; }
+.nav-tab.active {
+    background: #111827;
+    color: #ffffff;
+    border-color: #111827;
+}
 
 /* === Floating windows === */
 .floating-window {
@@ -381,6 +386,38 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
 }
 .shell-action-btn.primary:hover { background: #1f2937; }
 
+.shell-tag-style {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border-radius: 9999px;
+    border: 2px solid #e5e7eb;
+    background: #ffffff;
+    color: #374151;
+    cursor: pointer;
+    background-image: radial-gradient(circle var(--glow-size, 0px) at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(0,0,0,0.12) 0%, transparent 100%);
+    transition: border-color 0.2s, background-color 0.2s, --glow-size 0.25s ease;
+}
+.shell-tag-style:hover { border-color: #d1d5db; }
+
+.shell-submit-style {
+    padding: 0.45rem 0.9rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    border-radius: 9999px;
+    border: none;
+    background: #111827;
+    color: #ffffff;
+    cursor: pointer;
+    background-image: radial-gradient(circle var(--glow-size, 0px) at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255,255,255,0.25) 0%, transparent 100%);
+    transition: background-color 0.2s, --glow-size 0.25s ease;
+}
+.shell-submit-style:hover { background: #1f2937; }
+
 .shell-glow {
     position: relative;
     overflow: hidden;
@@ -401,24 +438,7 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
     position: relative;
     z-index: 1;
 }
-#global-header .shell-glow:hover {
-    color: #111827;
-    background: #f3f4f6;
-}
-.shell-user-menu-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: 9999px;
-    border: 1px solid #e5e7eb;
-    background: #ffffff;
-    color: #374151;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-.shell-user-menu-btn:hover { border-color: #111827; color: #111827; background: #f9fafb; }
+
 .user-menu-dropdown {
     position: fixed;
     z-index: 300;
@@ -461,21 +481,7 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
 .user-menu-item:hover { background: #f3f4f6; }
 .user-menu-logout { color: #dc2626; }
 .user-menu-logout:hover { background: #fef2f2; }
-.history-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.45rem 0.9rem;
-    font-size: 0.85rem;
-    font-weight: 600;
-    border-radius: 9999px;
-    border: 1px solid #e5e7eb;
-    background: #ffffff;
-    color: #374151;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-.history-toggle:hover { border-color: #111827; color: #111827; }
+
 
 /* === Shell overlay area === */
 #shell-overlays {
