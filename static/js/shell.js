@@ -80,7 +80,7 @@ class Shell {
         } else {
             const loginBtn = document.createElement('button');
             loginBtn.id = 'login-btn';
-            loginBtn.className = 'shell-submit-style shell-glow';
+            loginBtn.className = 'shell-submit-style';
             loginBtn.textContent = 'Connexion';
             loginBtn.addEventListener('click', () => {
                 if (this.authManager) this.authManager.showModal();

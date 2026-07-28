@@ -66,7 +66,7 @@ const GlowEffects = (() => {
     }
 
     function scanAndBind() {
-        document.querySelectorAll('.interactive-title, .title-glow, #submit-btn, .chat-send-btn').forEach(el => {
+        document.querySelectorAll('.interactive-title, .title-glow, #submit-btn, .chat-send-btn, #login-btn').forEach(el => {
             bindDynamicElement(el);
         });
         // Shell buttons (with .shell-glow marker class for explicit selection)
