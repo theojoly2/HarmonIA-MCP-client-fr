@@ -295,43 +295,43 @@ class HistoryPanel {
         const fileName = modelName;
         const match = /data-main-class="([^"]*)"/;
 
-        // Open Vision immediately in loading state so the user sees immediate feedback.
-        const existingVision = AppState.listInstances().find((i) => i.appId === "vision" && i.mode === "tab");
-        if (existingVision) {
-            AppState.removeInstance(existingVision.instanceId);
-        }
-        const placeholderVision = AppState.createInstance("vision", {
-            mode: "tab",
-            fileName,
-            svgText: "",
-            mainClassName: "",
-            loading: true,
-        });
-        await windowManager._mountTab(placeholderVision.instance);
-        AppState.setActiveInstance(placeholderVision.instanceId);
         this.close();
 
         try {
+            let svgText;
+            let returnedName;
             try {
-                await fetch(`api/models/${encodedName}/touch`, {
-                    method: "POST",
-                    credentials: "same-origin",
-                });
+                ({ svgText, modelName: returnedName } = await ApiClient.getModelSvg(modelName));
             } catch (err) {
-                console.error("Touch model error", err);
+                console.error("Fetch model SVG error", err);
+                alert("Impossible d'ouvrir le modèle : " + (err.message || err));
+                return;
             }
 
-            const { svgText, modelName } = await ApiClient.getModelSvg(modelName);
+            // Update last-opened time in the background (non-blocking).
+            fetch(`api/models/${encodedName}/touch`, {
+                method: "POST",
+                credentials: "same-origin",
+            }).catch((err) => console.error("Touch model error", err));
 
-            placeholderVision.instance.svgText = svgText;
-            placeholderVision.instance.fileName = modelName;
-            placeholderVision.instance.mainClassName = (svgText.match(match) || ["", ""])[1];
-            await windowManager._mountTab(placeholderVision.instance);
+            const existingVision = AppState.listInstances().find((i) => i.appId === "vision" && i.mode === "tab");
+            if (existingVision) {
+                AppState.removeInstance(existingVision.instanceId);
+            }
+            const visionInstance = AppState.createInstance("vision", {
+                mode: "tab",
+                fileName: returnedName || fileName,
+                svgText,
+                mainClassName: (svgText.match(match) || ["", ""])[1],
+                loading: true,
+            });
+            await windowManager._mountTab(visionInstance.instance);
+            AppState.setActiveInstance(visionInstance.instanceId);
 
             await this.load();
         } catch (err) {
             console.error("Open model error", err);
-            alert("Impossible d'ouvrir le modèle.");
+            alert("Impossible d'ouvrir le modèle : " + (err.message || err));
         }
     }
 
