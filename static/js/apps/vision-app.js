@@ -689,6 +689,16 @@ class VisionApp extends AppBase {
         });
     }
 
+    _syncEditDialogScroll(win) {
+        const body = win.querySelector('.window-body');
+        if (!body) return;
+        const scrollArea = body.querySelector('.vision-edit-body');
+        if (scrollArea) {
+            scrollArea.style.maxHeight = (body.clientHeight) + 'px';
+        }
+        body.style.height = (win.clientHeight - (win.querySelector('.window-header')?.offsetHeight || 40) - (win.querySelector('.resize-handle')?.offsetHeight || 0)) + 'px';
+    }
+
     async _reloadSvgFromServer() {
         const encodedName = encodeURIComponent(this.fileName);
         const res = await fetch(`api/models/${encodedName}/open`, {
@@ -710,13 +720,14 @@ class VisionApp extends AppBase {
         const floatWin = UiUtils.createFloatingWindow({
             title,
             width: 420,
-            height: 'auto',
+            height: 520,
             onClose: () => {},
             onFocus: () => {},
+            onResize: () => { this._syncEditDialogScroll(floatWin.win); },
+            onResizeEnd: () => { this._syncEditDialogScroll(floatWin.win); }
         });
         floatWin.win.classList.add('vision-edit-float');
-        floatWin.win.style.height = 'auto';
-        floatWin.win.style.minHeight = '200px';
+        floatWin.win.style.minHeight = '260px';
         floatWin.win.style.maxHeight = '85vh';
         const root = document.getElementById('floating-root') || document.body;
         root.appendChild(floatWin.win);
@@ -729,6 +740,9 @@ class VisionApp extends AppBase {
         UiUtils.clampWindowPosition(floatWin.win);
 
         const body = floatWin.body;
+        body.style.display = 'flex';
+        body.style.flexDirection = 'column';
+        body.style.overflow = 'hidden';
         const optionsHtml = (opts) => opts || '';
         const inputsHtml = fields.map((f) => {
             const label = `<label class="block text-sm font-semibold text-gray-700 mb-1 ${this._escape(f.labelClass || '')}" for="${f.id}">${this._escape(f.label)}${f.required ? ' *' : ''}</label>`;
@@ -743,7 +757,7 @@ class VisionApp extends AppBase {
             return `<div class="mb-3 ${this._escape(f.className || '')}">${label}${input}</div>`;
         }).join('');
         body.innerHTML = `
-            <div class="vision-edit-body" style="max-height: calc(85vh - 4rem); overflow-y: auto; padding: 1.25rem;">
+            <div class="vision-edit-body" style="flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 1.25rem;">
                 <form id="vision-edit-form">
                     ${inputsHtml}
                     <div class="vision-edit-error hidden" id="dialog-error"></div>
@@ -751,6 +765,7 @@ class VisionApp extends AppBase {
                 </form>
             </div>
         `;
+        requestAnimationFrame(() => this._syncEditDialogScroll(floatWin.win));
 
         const form = body.querySelector('#vision-edit-form');
         const submitBtn = body.querySelector('.vision-edit-submit');
