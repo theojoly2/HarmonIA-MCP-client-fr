@@ -491,11 +491,11 @@ class VisionApp extends AppBase {
     _showAddClassDialog() {
         VisionApp._closeOpenEditDialogs();
         const fields = [
-            { id: 'cls-title', label: 'Nom de la classe', required: true },
-            { id: 'cls-definition', label: 'Définition', type: 'textarea' },
-            { id: 'cls-usage', label: "Note d'utilisation", type: 'textarea' },
-            { id: 'cls-uri', label: 'URI (optionnel)' },
-            { id: 'cls-package', label: 'Package (optionnel)' },
+            { id: 'cls-title', label: 'Nom de la classe', required: true, help: 'Nom unique qui identifie la classe dans le modèle.' },
+            { id: 'cls-definition', label: 'Définition', type: 'textarea', help: 'Description claire du rôle et du sens de cette classe.' },
+            { id: 'cls-usage', label: "Note d'utilisation", type: 'textarea', help: 'Conseils ou contraintes pratiques pour utiliser cette classe.' },
+            { id: 'cls-uri', label: 'URI (optionnel)', help: 'Identifiant permanent (URL) permettant de référencer cette classe.' },
+            { id: 'cls-package', label: 'Package (optionnel)', help: 'Groupe logique auquel rattacher cette classe (ex. Admin, Produit).' },
         ];
         this._showFloatingDialog('Ajouter une classe', fields, async (values, overlay) => {
             overlay.querySelector('.vision-edit-submit').disabled = true;
@@ -553,15 +553,15 @@ class VisionApp extends AppBase {
             '<option value="__other__">Autre…</option>',
         ].join('');
         const fields = [
-            { id: 'attr-class', label: 'Classe', type: 'select', options: classOptions, required: true },
-            { id: 'attr-label', label: "Nom de l'attribut", required: true },
-            { id: 'attr-definition', label: 'Définition', type: 'textarea' },
-            { id: 'attr-uri', label: 'URI', required: true },
-            { id: 'attr-type', label: 'Type', type: 'select', options: typeOptions, required: true },
-            { id: 'attr-type-other', label: 'Type personnalisé', className: 'hidden', requiredWhenVisible: true },
-            { id: 'attr-lower', label: 'Borne inférieure (optionnel)' },
-            { id: 'attr-upper', label: 'Borne supérieure (optionnel)' },
-            { id: 'attr-usage', label: "Note d'utilisation", type: 'textarea' },
+            { id: 'attr-class', label: 'Classe', type: 'select', options: classOptions, required: true, help: 'Classe à laquelle rattacher cet attribut.' },
+            { id: 'attr-label', label: "Nom de l'attribut", required: true, help: "Nom de la propriété (ex. nom, dateNaissance, montant)." },
+            { id: 'attr-definition', label: 'Définition', type: 'textarea', help: 'Description du contenu et du rôle de cet attribut.' },
+            { id: 'attr-uri', label: 'URI', required: true, help: "Identifiant de l'attribut, souvent une URL du vocabulaire utilisé." },
+            { id: 'attr-type', label: 'Type', type: 'select', options: typeOptions, required: true, help: "Type de données attendu pour la valeur de l'attribut." },
+            { id: 'attr-type-other', label: 'Type personnalisé', className: 'hidden', requiredWhenVisible: true, help: 'Précisez un type non présent dans la liste prédéfinie.' },
+            { id: 'attr-lower', label: 'Borne inférieure (optionnel)', help: 'Nombre minimal de valeurs autorisées (ex. 0, 1).' },
+            { id: 'attr-upper', label: 'Borne supérieure (optionnel)', help: 'Nombre maximal de valeurs autorisées (ex. 1, *, 5).' },
+            { id: 'attr-usage', label: "Note d'utilisation", type: 'textarea', help: 'Précisions sur le format, les règles de saisie ou les contraintes.' },
         ];
         const onOpen = (overlay) => {
             const typeSelect = overlay.querySelector('#attr-type');
@@ -638,17 +638,17 @@ class VisionApp extends AppBase {
             '<option value="*">*</option>',
         ].join('');
         const fields = [
-            { id: 'conn-source', label: 'Classe source', type: 'select', options: classOptions, required: true },
-            { id: 'conn-target', label: 'Classe cible', type: 'select', options: classOptions, required: true },
-            { id: 'conn-label', label: 'Nom de la relation', required: true },
-            { id: 'conn-definition', label: 'Définition', type: 'textarea' },
-            { id: 'conn-uri', label: 'URI', required: true },
-            { id: 'conn-type', label: 'Type de relation', type: 'select', options: relationshipOptions, required: true },
-            { id: 'conn-lb', label: 'Multiplicité source (optionnel)', type: 'select', options: multiplicityOptions },
-            { id: 'conn-rb', label: 'Multiplicité cible (optionnel)', type: 'select', options: multiplicityOptions },
-            { id: 'conn-lt', label: 'Rôle source (optionnel)' },
-            { id: 'conn-rt', label: 'Rôle cible (optionnel)' },
-            { id: 'conn-usage', label: "Note d'utilisation", type: 'textarea' },
+            { id: 'conn-source', label: 'Classe source', type: 'select', options: classOptions, required: true, help: 'Classe de départ de la relation (peut être identique à la cible).' },
+            { id: 'conn-target', label: 'Classe cible', type: 'select', options: classOptions, required: true, help: 'Classe d\'arrivée de la relation.' },
+            { id: 'conn-label', label: 'Nom de la relation', required: true, help: 'Nom lisible décrivant le lien entre les deux classes (ex. possède, appartient à).' },
+            { id: 'conn-definition', label: 'Définition', type: 'textarea', help: 'Description du sens et des règles métier de la relation.' },
+            { id: 'conn-uri', label: 'URI', required: true, help: 'Identifiant permanent de la relation, souvent une URL.' },
+            { id: 'conn-type', label: 'Type de relation', type: 'select', options: relationshipOptions, required: true, help: 'Nature sémantique du lien (Association, Agrégation, Composition…).' },
+            { id: 'conn-lb', label: 'Multiplicité source (optionnel)', type: 'select', options: multiplicityOptions, help: "Nombre d'instances de la classe source liées à une cible." },
+            { id: 'conn-rb', label: 'Multiplicité cible (optionnel)', type: 'select', options: multiplicityOptions, help: "Nombre d'instances de la classe cible liées à une source." },
+            { id: 'conn-lt', label: 'Rôle source (optionnel)', help: 'Nom du rôle joué par la classe source dans la relation.' },
+            { id: 'conn-rt', label: 'Rôle cible (optionnel)', help: 'Nom du rôle joué par la classe cible dans la relation.' },
+            { id: 'conn-usage', label: "Note d'utilisation", type: 'textarea', help: 'Précisions sur les conditions d\'utilisation ou les contraintes.' },
         ];
         this._showFloatingDialog('Ajouter une relation', fields, async (values, overlay) => {
             overlay.querySelector('.vision-edit-submit').disabled = true;
@@ -744,8 +744,9 @@ class VisionApp extends AppBase {
         body.style.flexDirection = 'column';
         body.style.overflow = 'hidden';
         const optionsHtml = (opts) => opts || '';
+        const infoIcon = (help) => help ? `<span class="vision-field-help" title="${this._escape(help)}">i</span>` : '';
         const inputsHtml = fields.map((f) => {
-            const label = `<label class="block text-sm font-semibold text-gray-700 mb-1 ${this._escape(f.labelClass || '')}" for="${f.id}">${this._escape(f.label)}${f.required ? ' *' : ''}</label>`;
+            const label = `<label class="block text-sm font-semibold text-gray-700 mb-1 ${this._escape(f.labelClass || '')}" for="${f.id}"><span class="flex items-center gap-1.5">${this._escape(f.label)}${f.required ? ' *' : ''}${infoIcon(f.help)}</span></label>`;
             let input;
             if (f.type === 'textarea') {
                 input = `<textarea id="${f.id}" class="w-full rounded-lg border border-gray-300 p-2 text-sm focus:border-black outline-none" rows="3" ${f.required ? 'required' : ''}>${this._escape(f.value || '')}</textarea>`;

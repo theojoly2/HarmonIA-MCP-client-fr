@@ -96,6 +96,27 @@
 .vision-edit-label {
     pointer-events: none;
 }
+.vision-field-help {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 9999px;
+    background: #e5e7eb;
+    color: #374151;
+    font-size: 0.65rem;
+    font-weight: 800;
+    font-family: ui-serif, Georgia, serif;
+    line-height: 1;
+    cursor: help;
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
+}
+.vision-field-help:hover {
+    background: #111827;
+    color: #ffffff;
+}
 .vision-edit-btn-disabled,
 .vision-edit-btn:disabled {
     opacity: 0.5;
