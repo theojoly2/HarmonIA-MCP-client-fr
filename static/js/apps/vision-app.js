@@ -72,7 +72,7 @@ class VisionApp extends AppBase {
                         </svg>
                         <span class="text-sm font-medium">Génération de la modélisation...</span>
                     </div>
-                    <div id="vision-edit-actions" class="hidden absolute top-1/2 right-3 z-20 flex flex-col gap-3" style="transform: translateY(-50%);">
+                    <div id="vision-edit-actions" class="hidden absolute right-3 z-20 flex flex-col gap-3" style="top: calc(50% - (2.75rem + 0.75rem)); transform: translateY(-50%);">
                         <button type="button" id="vision-add-class" class="vision-edit-btn" title="Ajouter une classe">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                                 <rect x="3" y="5" width="18" height="14" rx="2"></rect>
