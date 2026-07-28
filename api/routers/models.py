@@ -38,20 +38,36 @@ class RenameBody(BaseModel):
 
 
 class ClassEditBody(BaseModel):
-    class_name: str
+    title: str
+    definition: str = ""
+    usage_note: str = ""
     package: Optional[str] = None
+    uri: Optional[str] = None
 
 
 class AttributeEditBody(BaseModel):
     class_name: str
-    attribute_name: str
-    attribute_type: Optional[str] = None
+    attr_label: str
+    attr_definition: str = ""
+    attr_uri: str
+    attr_usage_note: str = ""
+    attr_type: Optional[str] = None
+    lower_bounds: str = ""
+    upper_bounds: str = ""
 
 
 class ConnectorEditBody(BaseModel):
-    source_class: str
-    target_class: str
-    connector_type: Optional[str] = "Association"
+    source_name: str
+    target_name: str
+    rel_label: str
+    rel_definition: str = ""
+    rel_uri: str
+    relationship: str = "Association"
+    lb: str = ""
+    rb: str = ""
+    lt: str = ""
+    rt: str = ""
+    rel_usage_note: str = ""
 
 
 @router.get("")
@@ -176,8 +192,11 @@ async def add_class_route(model_name: str, body: ClassEditBody, username: str = 
     result = await add_class(
         username,
         model_name,
-        class_name=body.class_name.strip(),
+        title=body.title.strip(),
+        definition=body.definition.strip(),
+        usage_note=body.usage_note.strip(),
         package=(body.package or "").strip() or None,
+        uri=(body.uri or "").strip() or None,
     )
     return result
 
@@ -188,8 +207,13 @@ async def add_attribute_route(model_name: str, body: AttributeEditBody, username
         username,
         model_name,
         class_name=body.class_name.strip(),
-        attribute_name=body.attribute_name.strip(),
-        attribute_type=(body.attribute_type or "").strip() or None,
+        attr_label=body.attr_label.strip(),
+        attr_definition=body.attr_definition.strip(),
+        attr_uri=body.attr_uri.strip(),
+        attr_usage_note=body.attr_usage_note.strip(),
+        attr_type=(body.attr_type or "").strip() or None,
+        lower_bounds=body.lower_bounds.strip(),
+        upper_bounds=body.upper_bounds.strip(),
     )
     return result
 
@@ -199,9 +223,17 @@ async def add_connector_route(model_name: str, body: ConnectorEditBody, username
     result = await add_connector(
         username,
         model_name,
-        source_class=body.source_class.strip(),
-        target_class=body.target_class.strip(),
-        connector_type=(body.connector_type or "Association").strip(),
+        source_name=body.source_name.strip(),
+        target_name=body.target_name.strip(),
+        rel_label=body.rel_label.strip(),
+        rel_definition=body.rel_definition.strip(),
+        rel_uri=body.rel_uri.strip(),
+        relationship=(body.relationship or "Association").strip(),
+        lb=body.lb.strip(),
+        rb=body.rb.strip(),
+        lt=body.lt.strip(),
+        rt=body.rt.strip(),
+        rel_usage_note=body.rel_usage_note.strip(),
     )
     return result
 
