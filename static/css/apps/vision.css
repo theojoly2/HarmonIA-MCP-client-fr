@@ -23,6 +23,10 @@
     padding-bottom: 0 !important;
     min-height: auto !important;
 }
+.vision-loading-layout #vision-home .vision-import-hidden,
+.vision-loading-layout #vision-import-container {
+    display: none !important;
+}
 .vision-loading-layout #vision-viewer {
     flex: 1 1 0%;
     display: flex;
