@@ -284,6 +284,9 @@ class VisionApp extends AppBase {
         const home = this.container.querySelector('#vision-home');
         const importContainer = this.container.querySelector('#vision-import-container');
         const viewer = this.container.querySelector('#vision-viewer');
+        const app = this.container.querySelector('.vision-app');
+
+        if (app) app.classList.remove('vision-loading-layout');
 
         if (!home || !viewer || viewer.classList.contains('hidden')) {
             this._finalizeHomeAndCenter(true);
@@ -339,6 +342,8 @@ class VisionApp extends AppBase {
             this.svgText = '';
             this.fileName = '';
             this.mainClassName = '';
+            this.loading = false;
+            this.viewerState = { scale: 1, x: 0, y: 0 };
             if (this.viewer) {
                 this.viewer.destroy();
                 this.viewer = null;
@@ -396,7 +401,6 @@ class VisionApp extends AppBase {
         this._centerOnNextShow = !sameSvg;
         if (this.container) {
             this.render(this.container);
-            this._updateHomeVisibility();
         }
     }
 
