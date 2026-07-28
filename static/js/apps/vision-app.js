@@ -110,21 +110,21 @@ class VisionApp extends AppBase {
     _showLoadingState() {
         const home = this.container.querySelector('#vision-home');
         const importContainer = this.container.querySelector('#vision-import-container');
+        const dropZone = this.container.querySelector('#vision-drop-zone');
         const viewer = this.container.querySelector('#vision-viewer');
         if (!home || !importContainer || !viewer) return;
 
-        // Lock final compact state synchronously so no later style/observer can animate it away.
+        importContainer.style.display = 'none';
+        if (dropZone) dropZone.style.display = 'none';
         home.style.transition = 'none';
         home.style.paddingTop = '0px';
         home.classList.add('vision-top');
-        importContainer.classList.add('vision-import-hidden');
         viewer.classList.remove('hidden');
         viewer.style.transition = 'none';
         viewer.style.opacity = '1';
         void home.offsetHeight;
         void viewer.offsetHeight;
 
-        // Guard against any pending home transition that may still be running.
         if (this._homeTimeout) {
             clearTimeout(this._homeTimeout);
             this._homeTimeout = null;
@@ -135,23 +135,6 @@ class VisionApp extends AppBase {
         }
 
         this._setLoading(true);
-
-        // Keep re-applying the compact layout for a few frames in case observers override it.
-        let frames = 0;
-        const lock = () => {
-            if (!this.container || frames++ > 5) return;
-            if (!home.classList.contains('vision-top')) {
-                home.style.transition = 'none';
-                home.style.paddingTop = '0px';
-                home.classList.add('vision-top');
-            }
-            if (viewer.classList.contains('hidden')) {
-                viewer.classList.remove('hidden');
-                viewer.style.opacity = '1';
-            }
-            requestAnimationFrame(lock);
-        };
-        requestAnimationFrame(lock);
     }
 
     _bindEvents() {
