@@ -412,28 +412,18 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
     font-weight: 700;
     border-radius: 9999px;
     border: none;
-    background: #111827;
+    background-color: #111827;
     color: #ffffff;
     cursor: pointer;
-    isolation: isolate;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    white-space: nowrap;
+    background-image: radial-gradient(circle var(--glow-size, 0px) at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255,255,255,0.6) 0%, transparent 100%);
+    transition: --glow-size 0.3s ease, background-color 0.4s ease;
 }
-.shell-submit-style::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    z-index: 0;
-    pointer-events: none;
-    background: radial-gradient(circle var(--glow-size, 0px) at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255,255,255,0.35) 0%, transparent 100%);
-    opacity: 1;
-    transition: --glow-size 0.25s ease;
-}
-.shell-submit-style > * {
-    position: relative;
-    z-index: 1;
-}
-.shell-submit-style:hover { background: #1f2937; }
-.shell-submit-style:hover::before { --glow-size: 30px; }
+.shell-submit-style:hover { background-color: #1f2937; }
 
 .shell-glow {
     position: relative;
