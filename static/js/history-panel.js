@@ -305,6 +305,7 @@ class HistoryPanel {
             fileName,
             svgText: "",
             mainClassName: "",
+            loading: true,
         });
         await windowManager._mountTab(placeholderVision.instance);
         AppState.setActiveInstance(placeholderVision.instanceId);

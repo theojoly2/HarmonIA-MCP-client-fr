@@ -16,6 +16,7 @@ class VisionApp extends AppBase {
         this.fileName = props.fileName || '';
         this.svgText = props.svgText || '';
         this.mainClassName = props.mainClassName || '';
+        this.loading = props.loading || false;
         // New imports/opened models should always start centered/scaled to fit.
         this.viewerState = { scale: 1, x: 0, y: 0 };
         this.viewer = null;
@@ -66,11 +67,14 @@ class VisionApp extends AppBase {
             </div>
         `;
         this._bindEvents();
-        if (this.svgText) {
-            // Defer viewer creation until container layout is settled
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => this._showViewer());
-            });
+        if (this.loading || this.svgText) {
+            // Show the viewer area immediately, with the loading spinner if needed.
+            this._enterLoadingMode();
+            if (this.svgText) {
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => this._showViewer());
+                });
+            }
         } else {
             const home = this.container.querySelector('#vision-home');
             if (home) home.style.transition = 'none';
