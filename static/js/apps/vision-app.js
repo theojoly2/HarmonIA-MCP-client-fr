@@ -67,14 +67,25 @@ class VisionApp extends AppBase {
             </div>
         `;
         this._bindEvents();
-        if (this.loading || this.svgText) {
-            // Show the viewer area immediately, with the loading spinner if needed.
-            this._enterLoadingMode();
+        if (this.loading) {
+            // Loading state (e.g. opened from history): show the compact viewer with spinner immediately,
+            // without animating the home panel down from the centered position.
+            this._showLoadingState();
             if (this.svgText) {
                 requestAnimationFrame(() => {
                     requestAnimationFrame(() => this._showViewer());
                 });
             }
+        } else if (this.svgText) {
+            // Normal import: glide the title up from the centered home position.
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => this._enterLoadingMode());
+            });
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => this._showViewer());
+                });
+            });
         } else {
             const home = this.container.querySelector('#vision-home');
             if (home) home.style.transition = 'none';
@@ -94,6 +105,22 @@ class VisionApp extends AppBase {
             });
         });
         }
+    }
+
+    _showLoadingState() {
+        const home = this.container.querySelector('#vision-home');
+        const importContainer = this.container.querySelector('#vision-import-container');
+        const viewer = this.container.querySelector('#vision-viewer');
+        if (!home || !importContainer || !viewer) return;
+
+        home.classList.add('vision-top');
+        home.style.transition = 'none';
+        home.style.paddingTop = '0px';
+        importContainer.classList.add('vision-import-hidden');
+        viewer.classList.remove('hidden');
+        viewer.style.transition = 'none';
+        viewer.style.opacity = '1';
+        this._setLoading(true);
     }
 
     _bindEvents() {
