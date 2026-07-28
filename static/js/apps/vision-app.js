@@ -720,7 +720,7 @@ class VisionApp extends AppBase {
         floatWin.win.style.maxHeight = '85vh';
         const root = document.getElementById('floating-root') || document.body;
         root.appendChild(floatWin.win);
-        UiUtils.centerWindow(floatWin.win);
+        UiUtils.centerWindow(floatWin.win, 0, -120);
 
         const body = floatWin.body;
         const optionsHtml = (opts) => opts || '';
