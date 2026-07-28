@@ -498,7 +498,7 @@ class VisionApp extends AppBase {
             { id: 'attr-definition', label: 'Définition', type: 'textarea' },
             { id: 'attr-uri', label: 'URI', required: true },
             { id: 'attr-type', label: 'Type', type: 'select', options: typeOptions, required: true },
-            { id: 'attr-type-other', label: 'Type personnalisé', className: 'hidden', required: true },
+            { id: 'attr-type-other', label: 'Type personnalisé', className: 'hidden', requiredWhenVisible: true },
             { id: 'attr-lower', label: 'Borne inférieure (optionnel)' },
             { id: 'attr-upper', label: 'Borne supérieure (optionnel)' },
             { id: 'attr-usage', label: "Note d'utilisation", type: 'textarea' },
@@ -563,6 +563,14 @@ class VisionApp extends AppBase {
             'Dependency',
         ];
         const relationshipOptions = relationshipTypes.map((t) => `<option value="${this._escape(t)}"${t === 'Association' ? ' selected' : ''}>${this._escape(t)}</option>`).join('');
+        const multiplicityOptions = [
+            '<option value="">—</option>',
+            '<option value="0..1">0..1</option>',
+            '<option value="1">1</option>',
+            '<option value="0..*">0..*</option>',
+            '<option value="1..*">1..*</option>',
+            '<option value="*">*</option>',
+        ].join('');
         const fields = [
             { id: 'conn-source', label: 'Classe source', type: 'select', options: classOptions, required: true },
             { id: 'conn-target', label: 'Classe cible', type: 'select', options: classOptions, required: true },
@@ -570,8 +578,8 @@ class VisionApp extends AppBase {
             { id: 'conn-definition', label: 'Définition', type: 'textarea' },
             { id: 'conn-uri', label: 'URI', required: true },
             { id: 'conn-type', label: 'Type de relation', type: 'select', options: relationshipOptions, required: true },
-            { id: 'conn-lb', label: 'Multiplicité source (optionnel)' },
-            { id: 'conn-rb', label: 'Multiplicité cible (optionnel)' },
+            { id: 'conn-lb', label: 'Multiplicité source (optionnel)', type: 'select', options: multiplicityOptions },
+            { id: 'conn-rb', label: 'Multiplicité cible (optionnel)', type: 'select', options: multiplicityOptions },
             { id: 'conn-lt', label: 'Rôle source (optionnel)' },
             { id: 'conn-rt', label: 'Rôle cible (optionnel)' },
             { id: 'conn-usage', label: "Note d'utilisation", type: 'textarea' },
@@ -666,6 +674,21 @@ class VisionApp extends AppBase {
         const form = overlay.querySelector('#vision-edit-form');
         form.addEventListener('submit', (e) => {
             e.preventDefault();
+            // Dynamically toggle required attributes for conditional fields
+            fields.forEach((f) => {
+                if (f.requiredWhenVisible) {
+                    const wrapper = overlay.querySelector(`#${f.id}`)?.closest('.mb-3');
+                    const el = overlay.querySelector(`#${f.id}`);
+                    if (wrapper && el) {
+                        const visible = !wrapper.classList.contains('hidden');
+                        if (visible) {
+                            el.setAttribute('required', '');
+                        } else {
+                            el.removeAttribute('required');
+                        }
+                    }
+                }
+            });
             if (!form.checkValidity()) {
                 form.reportValidity();
                 return;
