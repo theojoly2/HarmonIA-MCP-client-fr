@@ -300,18 +300,10 @@ class VisionApp extends AppBase {
                 onTransform: (state) => { this.viewerState = state; }
             });
         }
-        this.viewer.setSvg(this.svgText, this.mainClassName);
-        // New import/open from history/preview: center diagram after it becomes visible.
-        if (this._centerOnNextShow) {
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    this.viewer.resetZoom();
-                    this._centerOnNextShow = false;
-                });
-            });
-        } else {
-            this.viewer.restoreState(this.viewerState);
-        }
+        // Always center/reset the view whenever a new SVG is displayed so the diagram
+        // appears correctly centered after import, history open, or preview expand.
+        this.viewerState = { scale: 1, x: 0, y: 0 };
+        this.viewer.setSvgAndRestore(this.svgText, this.mainClassName, null);
         this._setLoading(false);
         if (viewer) viewer.style.opacity = '1';
         if (editActions) {

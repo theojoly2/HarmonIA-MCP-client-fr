@@ -121,14 +121,9 @@ class PreviewApp extends AppBase {
                     onTransform: (state) => { this.viewerState = state; }
                 });
             }
-            // First-time preview: center the diagram. Reopen: keep exact position/zoom.
-            const isFirstOpen = !this.viewerState || (this.viewerState.scale === 1 && this.viewerState.x === 0 && this.viewerState.y === 0);
-            if (isFirstOpen) {
-                this.viewer.setSvgAndRestore(this.svgText, mainClassName, null);
-            } else {
-                this.viewer.setSvg(this.svgText, mainClassName);
-                this.viewer.restoreState(this.viewerState);
-            }
+            // Always reinitialize the view so the preview diagram is centered and fully visible.
+            this.viewerState = { scale: 1, x: 0, y: 0 };
+            this.viewer.setSvgAndRestore(this.svgText, mainClassName, null);
             if (loading) loading.classList.add('hidden');
         } catch (err) {
             console.error('Preview load error', err);
