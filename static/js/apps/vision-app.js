@@ -113,14 +113,45 @@ class VisionApp extends AppBase {
         const viewer = this.container.querySelector('#vision-viewer');
         if (!home || !importContainer || !viewer) return;
 
-        home.classList.add('vision-top');
+        // Lock final compact state synchronously so no later style/observer can animate it away.
         home.style.transition = 'none';
         home.style.paddingTop = '0px';
+        home.classList.add('vision-top');
         importContainer.classList.add('vision-import-hidden');
         viewer.classList.remove('hidden');
         viewer.style.transition = 'none';
         viewer.style.opacity = '1';
+        void home.offsetHeight;
+        void viewer.offsetHeight;
+
+        // Guard against any pending home transition that may still be running.
+        if (this._homeTimeout) {
+            clearTimeout(this._homeTimeout);
+            this._homeTimeout = null;
+        }
+        if (this._loadingTimeout) {
+            clearTimeout(this._loadingTimeout);
+            this._loadingTimeout = null;
+        }
+
         this._setLoading(true);
+
+        // Keep re-applying the compact layout for a few frames in case observers override it.
+        let frames = 0;
+        const lock = () => {
+            if (!this.container || frames++ > 5) return;
+            if (!home.classList.contains('vision-top')) {
+                home.style.transition = 'none';
+                home.style.paddingTop = '0px';
+                home.classList.add('vision-top');
+            }
+            if (viewer.classList.contains('hidden')) {
+                viewer.classList.remove('hidden');
+                viewer.style.opacity = '1';
+            }
+            requestAnimationFrame(lock);
+        };
+        requestAnimationFrame(lock);
     }
 
     _bindEvents() {
