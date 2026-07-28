@@ -371,7 +371,11 @@ class VisionApp extends AppBase {
 
         // Fade in the import container so it is fully visible when the title reaches center.
         if (importContainer) {
+            const dropZone = importContainer.querySelector('#vision-drop-zone');
             setTimeout(() => {
+                if (dropZone) {
+                    dropZone.style.display = '';
+                }
                 void importContainer.offsetHeight;
                 importContainer.style.transition = 'opacity 0.55s ease, transform 0.55s cubic-bezier(0.16, 1, 0.3, 1)';
                 requestAnimationFrame(() => {
