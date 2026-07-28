@@ -62,7 +62,7 @@ class Shell {
             });
 
             const userMenuBtn = document.createElement('button');
-            userMenuBtn.className = 'shell-user-menu-btn shell-tag-style shell-glow';
+            userMenuBtn.className = 'shell-tag-style shell-glow shell-round-btn';
             userMenuBtn.title = 'Menu utilisateur';
             userMenuBtn.setAttribute('aria-haspopup', 'true');
             userMenuBtn.innerHTML = `
