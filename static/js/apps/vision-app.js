@@ -275,7 +275,7 @@ class VisionApp extends AppBase {
         // Reveal the viewer area and fade it in as the title glides up.
         viewer.classList.remove('hidden');
         viewer.style.transition = 'none';
-        viewer.style.opacity = '1';
+        viewer.style.opacity = '0';
         void viewer.offsetHeight;
         this._setLoading(true);
 
@@ -305,7 +305,10 @@ class VisionApp extends AppBase {
         // Returning from another tab: restore the saved pan/zoom.
         const finalize = () => {
             this._setLoading(false);
-            if (viewer) viewer.style.opacity = '1';
+            if (viewer) {
+                viewer.style.transition = 'opacity 0.35s ease';
+                viewer.style.opacity = '1';
+            }
             if (editActions) {
                 editActions.classList.remove('hidden');
                 this._updateEditButtonStates();
