@@ -737,7 +737,7 @@ class VisionApp extends AppBase {
             return `<div class="mb-3 ${this._escape(f.className || '')}">${label}${input}</div>`;
         }).join('');
         body.innerHTML = `
-            <div class="vision-edit-body" style="max-height: calc(85vh - 4rem); overflow-y: auto;">
+            <div class="vision-edit-body" style="max-height: calc(85vh - 4rem); overflow-y: auto; padding: 1.25rem;">
                 <form id="vision-edit-form">
                     ${inputsHtml}
                     <div class="vision-edit-error hidden" id="dialog-error"></div>
