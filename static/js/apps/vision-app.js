@@ -718,7 +718,8 @@ class VisionApp extends AppBase {
         floatWin.win.style.height = 'auto';
         floatWin.win.style.minHeight = '200px';
         floatWin.win.style.maxHeight = '85vh';
-        this.floatingRoot.appendChild(floatWin.win);
+        const root = document.getElementById('floating-root') || document.body;
+        root.appendChild(floatWin.win);
         UiUtils.centerWindow(floatWin.win);
 
         const body = floatWin.body;
