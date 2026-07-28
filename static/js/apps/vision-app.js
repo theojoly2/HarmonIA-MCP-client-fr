@@ -16,6 +16,7 @@ class VisionApp extends AppBase {
         this.fileName = props.fileName || '';
         this.svgText = props.svgText || '';
         this.mainClassName = props.mainClassName || '';
+        // New imports/opened models should always start centered/scaled to fit.
         this.viewerState = { scale: 1, x: 0, y: 0 };
         this.viewer = null;
         this._centerOnNextShow = true;
@@ -323,9 +324,11 @@ class VisionApp extends AppBase {
         this.fileName = state.fileName || '';
         this.svgText = state.svgText || '';
         this.mainClassName = state.mainClassName || '';
-        this.viewerState = state.viewerState || { scale: 1, x: 0, y: 0 };
-        // Restoring from a saved state is a window switch, not a new import.
-        this._centerOnNextShow = false;
+        // Only keep the previous pan/zoom if this is the exact same SVG being
+        // restored (e.g. tab switch). A new file from history/preview must reset.
+        const sameSvg = this.svgText === (state.svgText || '');
+        this.viewerState = sameSvg ? (state.viewerState || { scale: 1, x: 0, y: 0 }) : { scale: 1, x: 0, y: 0 };
+        this._centerOnNextShow = !sameSvg;
         if (this.container) {
             this.render(this.container);
             this._updateHomeVisibility();
