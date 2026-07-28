@@ -64,8 +64,26 @@ class PreviewApp extends AppBase {
         expandBtn.addEventListener('click', () => this._openInVision());
     }
 
-    _openInVision() {
+    async _openInVision() {
         if (!this.svgText) return;
+        if (!AuthManager.isLoggedIn()) {
+            AuthManager.showModal();
+            return;
+        }
+        // Fetch the original file bytes so we can persist the model like a normal Vision import.
+        try {
+            const fileRes = await fetch(ApiClient.getDocumentFileUrl(this.docId));
+            if (!fileRes.ok) throw new Error(`file_fetch_failed:${fileRes.status}`);
+            const blob = await fileRes.blob();
+            const file = new File([blob], this.docName, { type: blob.type || "application/octet-stream" });
+            await ApiClient.importAndSaveModel(file, this.docName);
+            if (window.historyPanel) window.historyPanel.load();
+        } catch (err) {
+            console.error("Persist preview model error", err);
+            alert("Impossible d'enregistrer le modèle dans l'historique.");
+            return;
+        }
+
         const existingVision = AppState.listInstances().find((i) => i.appId === "vision" && i.mode === "tab");
         if (existingVision) {
             AppState.removeInstance(existingVision.instanceId);
@@ -78,6 +96,7 @@ class PreviewApp extends AppBase {
             svgText: this.svgText,
             mainClassName,
         });
+        windowManager.close(this.instanceId);
     }
 
     async _load() {
