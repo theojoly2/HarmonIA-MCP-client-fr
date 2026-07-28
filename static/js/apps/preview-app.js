@@ -129,7 +129,11 @@ class PreviewApp extends AppBase {
                 this.viewer.setSvg(this.svgText, mainClassName);
                 this.viewer.restoreState(this.viewerState);
             }
-            if (loading) loading.classList.add('hidden');
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    if (loading) loading.classList.add('hidden');
+                });
+            });
         } catch (err) {
             console.error('Preview load error', err);
             if (loading) loading.innerHTML = `<div class="text-red-500 text-sm">Erreur de chargement du diagramme.</div>`;
