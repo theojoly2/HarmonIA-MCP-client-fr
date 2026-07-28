@@ -35,10 +35,8 @@ class PreviewApp extends AppBase {
                 <div id="preview-svg-viewer" class="flex-1 relative"></div>
                 <button type="button" id="preview-expand" class="absolute top-3 right-3 z-20 p-2 rounded-full bg-white border border-gray-200 text-gray-600 hover:text-black hover:border-gray-400 shadow-sm transition-colors" title="Ouvrir dans Vision">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-                        <path d="M3 9V3h6M9 9L3 3"></path>
                         <path d="M21 9V3h-6M15 9l6-6"></path>
                         <path d="M3 15v6h6M9 15l-6 6"></path>
-                        <path d="M21 15v6h-6M15 15l6 6"></path>
                     </svg>
                 </button>
                 <div id="preview-loading" class="absolute inset-0 flex items-center justify-center text-gray-500 z-10 bg-white/80 backdrop-blur-sm transition-opacity duration-300">
