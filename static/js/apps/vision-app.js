@@ -443,7 +443,9 @@ class VisionApp extends AppBase {
             { id: 'cls-uri', label: 'URI (optionnel)' },
             { id: 'cls-package', label: 'Package (optionnel)' },
         ];
-        this._showDialog('Ajouter une classe', fields, async (values) => {
+        this._showDialog('Ajouter une classe', fields, async (values, overlay) => {
+            overlay.querySelector('.auth-submit').disabled = true;
+            overlay.querySelector('.auth-submit').textContent = 'Enregistrement...';
             try {
                 this._setLoading(true);
                 const res = await fetch(`api/models/${encodeURIComponent(this.fileName)}/add-class`, {
@@ -466,6 +468,10 @@ class VisionApp extends AppBase {
                 alert(err.message || "Impossible d'ajouter la classe.");
             } finally {
                 this._setLoading(false);
+                if (overlay.parentNode) {
+                    overlay.querySelector('.auth-submit').disabled = false;
+                    overlay.querySelector('.auth-submit').textContent = 'Enregistrer';
+                }
             }
         });
     }
@@ -514,7 +520,9 @@ class VisionApp extends AppBase {
                 update();
             }
         };
-        this._showDialog("Ajouter un attribut", fields, async (values) => {
+        this._showDialog("Ajouter un attribut", fields, async (values, overlay) => {
+            overlay.querySelector('.auth-submit').disabled = true;
+            overlay.querySelector('.auth-submit').textContent = 'Enregistrement...';
             try {
                 this._setLoading(true);
                 let attrType = values['attr-type'];
@@ -544,6 +552,10 @@ class VisionApp extends AppBase {
                 alert(err.message || "Impossible d'ajouter l'attribut.");
             } finally {
                 this._setLoading(false);
+                if (overlay.parentNode) {
+                    overlay.querySelector('.auth-submit').disabled = false;
+                    overlay.querySelector('.auth-submit').textContent = 'Enregistrer';
+                }
             }
         }, onOpen);
     }
@@ -584,7 +596,9 @@ class VisionApp extends AppBase {
             { id: 'conn-rt', label: 'Rôle cible (optionnel)' },
             { id: 'conn-usage', label: "Note d'utilisation", type: 'textarea' },
         ];
-        this._showDialog('Ajouter une relation', fields, async (values) => {
+        this._showDialog('Ajouter une relation', fields, async (values, overlay) => {
+            overlay.querySelector('.auth-submit').disabled = true;
+            overlay.querySelector('.auth-submit').textContent = 'Enregistrement...';
             try {
                 this._setLoading(true);
                 const res = await fetch(`api/models/${encodeURIComponent(this.fileName)}/add-connector`, {
@@ -613,6 +627,10 @@ class VisionApp extends AppBase {
                 alert(err.message || "Impossible d'ajouter la relation.");
             } finally {
                 this._setLoading(false);
+                if (overlay.parentNode) {
+                    overlay.querySelector('.auth-submit').disabled = false;
+                    overlay.querySelector('.auth-submit').textContent = 'Enregistrer';
+                }
             }
         });
     }
@@ -698,7 +716,7 @@ class VisionApp extends AppBase {
                 const el = overlay.querySelector(`#${f.id}`);
                 values[f.id] = el ? el.value.trim() : '';
             });
-            Promise.resolve(onSubmit(values)).then(close).catch((err) => {
+            Promise.resolve(onSubmit(values, overlay)).then(close).catch((err) => {
                 const errorEl = overlay.querySelector('#dialog-error');
                 if (errorEl) {
                     errorEl.textContent = err.message || 'Une erreur est survenue.';
