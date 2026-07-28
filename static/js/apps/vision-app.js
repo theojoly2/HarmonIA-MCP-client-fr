@@ -66,23 +66,27 @@ class VisionApp extends AppBase {
                     <div id="vision-edit-actions" class="hidden absolute top-3 right-3 z-20 flex flex-col gap-3">
                         <button type="button" id="vision-add-class" class="vision-edit-btn" title="Ajouter une classe">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-                                <rect x="4" y="4" width="16" height="16" rx="3"></rect>
-                                <path d="M12 8v8M8 12h8"></path>
+                                <rect x="3" y="5" width="18" height="14" rx="2"></rect>
+                                <path d="M12 9v6M9 12h6"></path>
                             </svg>
+                            <span class="vision-edit-label">Classe</span>
                         </button>
                         <button type="button" id="vision-add-attr" class="vision-edit-btn" title="Ajouter un attribut">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-                                <rect x="4" y="6" width="16" height="12" rx="2"></rect>
-                                <path d="M9 12h6M12 9v6"></path>
-                                <circle cx="17" cy="7" r="1.5" fill="currentColor"></circle>
+                                <rect x="3" y="5" width="18" height="14" rx="2"></rect>
+                                <path d="M8 10h8M8 14h5"></path>
+                                <circle cx="18" cy="14" r="1.5" fill="currentColor"></circle>
                             </svg>
+                            <span class="vision-edit-label">Attribut</span>
                         </button>
                         <button type="button" id="vision-add-connector" class="vision-edit-btn" title="Ajouter une relation">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-                                <rect x="4" y="8" width="7" height="8" rx="2"></rect>
-                                <rect x="13" y="8" width="7" height="8" rx="2"></rect>
-                                <path d="M11 12h2"></path>
+                                <rect x="3" y="8" width="7" height="8" rx="2"></rect>
+                                <rect x="14" y="8" width="7" height="8" rx="2"></rect>
+                                <path d="M10 12h4"></path>
+                                <path d="M17 8v-2M17 18v-2M7 8V6M7 18v-2" opacity="0.5"></path>
                             </svg>
+                            <span class="vision-edit-label">Relation</span>
                         </button>
                     </div>
                 </div>

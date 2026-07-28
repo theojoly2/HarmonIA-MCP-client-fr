@@ -67,18 +67,24 @@
 .drop-zone.drag-over { border-color: #111827; background: #f3f4f6; }
 
 .vision-edit-btn {
-    width: 2.75rem;
+    width: auto;
+    min-width: 7rem;
     height: 2.75rem;
+    padding: 0 0.75rem;
     border-radius: 9999px;
     background: rgba(255, 255, 255, 0.95);
     border: 1px solid #e5e7eb;
     color: #374151;
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
+    gap: 0.5rem;
     box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     cursor: pointer;
     transition: all 0.15s ease;
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
 }
 .vision-edit-btn:hover {
     background: #111827;
@@ -87,9 +93,12 @@
     transform: translateY(-2px);
     box-shadow: 0 6px 12px rgba(0,0,0,0.15);
 }
+.vision-edit-label {
+    pointer-events: none;
+}
 .vision-edit-btn-disabled,
 .vision-edit-btn:disabled {
-    opacity: 0.45;
+    opacity: 0.5;
     cursor: not-allowed;
     background: #f3f4f6;
     border-color: #e5e7eb;
