@@ -15,8 +15,8 @@ from api.services.mcp_service import (
     get_model_mcp,
     list_models_mcp,
     rename_model_mcp,
-    save_model,
-    touch_model,
+    touch_model_mcp,
+    upload_model_mcp,
 )
 
 
