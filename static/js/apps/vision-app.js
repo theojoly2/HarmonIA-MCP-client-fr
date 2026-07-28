@@ -28,12 +28,12 @@ class VisionApp extends AppBase {
     }
 
     static _closeOpenEditDialogs() {
-        const openDialogs = document.querySelectorAll('.vision-edit-overlay');
+        const openDialogs = document.querySelectorAll('.vision-edit-float');
         openDialogs.forEach((dialog) => dialog.remove());
     }
 
     static _hasOpenEditDialog() {
-        return document.querySelectorAll('.vision-edit-overlay').length > 0;
+        return document.querySelectorAll('.vision-edit-float').length > 0;
     }
 
     render(container) {
@@ -704,8 +704,24 @@ class VisionApp extends AppBase {
     }
 
     _showFloatingDialog(title, fields, onSubmit, onOpen) {
-        const overlay = document.createElement('div');
-        overlay.className = 'vision-edit-overlay';
+        // Close any existing edit dialog first (only one floating edit window at a time).
+        VisionApp._closeOpenEditDialogs();
+
+        const floatWin = UiUtils.createFloatingWindow({
+            title,
+            width: 420,
+            height: 'auto',
+            onClose: () => {},
+            onFocus: () => {},
+        });
+        floatWin.win.classList.add('vision-edit-float');
+        floatWin.win.style.height = 'auto';
+        floatWin.win.style.minHeight = '200px';
+        floatWin.win.style.maxHeight = '85vh';
+        this.floatingRoot.appendChild(floatWin.win);
+        UiUtils.centerWindow(floatWin.win);
+
+        const body = floatWin.body;
         const optionsHtml = (opts) => opts || '';
         const inputsHtml = fields.map((f) => {
             const label = `<label class="block text-sm font-semibold text-gray-700 mb-1 ${this._escape(f.labelClass || '')}" for="${f.id}">${this._escape(f.label)}${f.required ? ' *' : ''}</label>`;
@@ -719,38 +735,34 @@ class VisionApp extends AppBase {
             }
             return `<div class="mb-3 ${this._escape(f.className || '')}">${label}${input}</div>`;
         }).join('');
-        overlay.innerHTML = `
-            <div class="vision-edit-modal" style="max-height: 80vh; overflow-y: auto;">
-                <div class="vision-edit-modal-header">
-                    <h2 class="vision-edit-modal-title">${this._escape(title)}</h2>
-                </div>
+        body.innerHTML = `
+            <div class="vision-edit-body" style="max-height: calc(85vh - 4rem); overflow-y: auto;">
                 <form id="vision-edit-form">
                     ${inputsHtml}
                     <div class="vision-edit-error hidden" id="dialog-error"></div>
                     <button type="submit" class="vision-edit-submit">Enregistrer</button>
                 </form>
-                <button type="button" class="vision-edit-close" id="dialog-close" title="Fermer">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                </button>
             </div>
         `;
-        document.body.appendChild(overlay);
+
+        const form = body.querySelector('#vision-edit-form');
+        const submitBtn = body.querySelector('.vision-edit-submit');
 
         if (onOpen) {
-            onOpen(overlay);
+            onOpen(body);
         }
 
-        const close = () => overlay.remove();
-        overlay.querySelector('#dialog-close').addEventListener('click', close);
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-        const form = overlay.querySelector('#vision-edit-form');
+        const close = () => floatWin.win.remove();
+        const closeBtn = floatWin.win.querySelector('.window-close');
+        if (closeBtn) closeBtn.addEventListener('click', close);
+
         form.addEventListener('submit', (e) => {
             e.preventDefault();
             // Dynamically toggle required attributes for conditional fields
             fields.forEach((f) => {
                 if (f.requiredWhenVisible) {
-                    const wrapper = overlay.querySelector(`#${f.id}`)?.closest('.mb-3');
-                    const el = overlay.querySelector(`#${f.id}`);
+                    const wrapper = body.querySelector(`#${f.id}`)?.closest('.mb-3');
+                    const el = body.querySelector(`#${f.id}`);
                     if (wrapper && el) {
                         const visible = !wrapper.classList.contains('hidden');
                         if (visible) {
@@ -767,11 +779,15 @@ class VisionApp extends AppBase {
             }
             const values = {};
             fields.forEach((f) => {
-                const el = overlay.querySelector(`#${f.id}`);
+                const el = body.querySelector(`#${f.id}`);
                 values[f.id] = el ? el.value.trim() : '';
             });
-            Promise.resolve(onSubmit(values, overlay)).then(close).catch((err) => {
-                const errorEl = overlay.querySelector('#dialog-error');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Enregistrement...';
+            Promise.resolve(onSubmit(values, body)).then(close).catch((err) => {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Enregistrer';
+                const errorEl = body.querySelector('#dialog-error');
                 if (errorEl) {
                     errorEl.textContent = err.message || 'Une erreur est survenue.';
                     errorEl.classList.remove('hidden');

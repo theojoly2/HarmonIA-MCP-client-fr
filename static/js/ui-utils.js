@@ -135,7 +135,11 @@ const UiUtils = (() => {
         const win = document.createElement('div');
         win.className = 'floating-window';
         win.style.width = width + 'px';
-        win.style.height = height + 'px';
+        if (height && height !== 'auto') {
+            win.style.height = height + 'px';
+        } else if (height === 'auto') {
+            win.style.height = 'auto';
+        }
         win.style.top = '50%';
         win.style.left = '50%';
         win.style.transform = 'translate(-50%, -50%)';
