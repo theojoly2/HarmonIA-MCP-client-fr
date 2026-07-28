@@ -63,15 +63,26 @@ class VisionApp extends AppBase {
                         </svg>
                         <span class="text-sm font-medium">Génération de la modélisation...</span>
                     </div>
-                    <div id="vision-edit-actions" class="hidden absolute top-3 right-3 z-20 flex flex-col gap-2">
+                    <div id="vision-edit-actions" class="hidden absolute top-3 right-3 z-20 flex flex-col gap-3">
                         <button type="button" id="vision-add-class" class="vision-edit-btn" title="Ajouter une classe">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M12 8v8M8 12h8"></path></svg>
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                                <rect x="4" y="4" width="16" height="16" rx="3"></rect>
+                                <path d="M12 8v8M8 12h8"></path>
+                            </svg>
                         </button>
                         <button type="button" id="vision-add-attr" class="vision-edit-btn" title="Ajouter un attribut">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M12 8v8M8 12h8"></path><circle cx="17" cy="7" r="1" fill="currentColor"></circle></svg>
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                                <rect x="4" y="6" width="16" height="12" rx="2"></rect>
+                                <path d="M9 12h6M12 9v6"></path>
+                                <circle cx="17" cy="7" r="1.5" fill="currentColor"></circle>
+                            </svg>
                         </button>
                         <button type="button" id="vision-add-connector" class="vision-edit-btn" title="Ajouter une relation">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                                <rect x="4" y="8" width="7" height="8" rx="2"></rect>
+                                <rect x="13" y="8" width="7" height="8" rx="2"></rect>
+                                <path d="M11 12h2"></path>
+                            </svg>
                         </button>
                     </div>
                 </div>
