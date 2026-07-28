@@ -123,20 +123,25 @@ class VisionApp extends AppBase {
             this._loadingTimeout = null;
         }
 
-        // Hide import UI but leave it in the DOM so the home button works later.
+        // Compact title at the top, viewer below, spinner centered in the viewer.
         importContainer.classList.add('vision-import-hidden');
         if (dropZone) dropZone.style.display = '';
-
         home.classList.add('vision-top');
         home.style.transition = 'none';
         home.style.paddingTop = '0px';
         home.style.paddingBottom = '0px';
         home.style.marginBottom = '0px';
         home.style.minHeight = 'auto';
+        home.style.position = 'relative';
+        home.style.zIndex = '25';
+
+        const app = this.container.querySelector('.vision-app');
+        if (app) app.classList.add('vision-loading-layout');
 
         viewer.classList.remove('hidden');
         viewer.style.transition = 'none';
         viewer.style.opacity = '1';
+        viewer.style.display = 'flex';
 
         void home.offsetHeight;
         void viewer.offsetHeight;
@@ -250,6 +255,8 @@ class VisionApp extends AppBase {
     _showViewer() {
         const viewerContainer = this.container.querySelector('#vision-svg-viewer');
         const viewer = this.container.querySelector('#vision-viewer');
+        const app = this.container.querySelector('.vision-app');
+        if (app) app.classList.remove('vision-loading-layout');
 
         if (!this.viewer) {
             this.viewer = new SvgViewer(viewerContainer, {
