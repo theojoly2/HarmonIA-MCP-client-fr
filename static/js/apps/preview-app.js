@@ -33,6 +33,11 @@ class PreviewApp extends AppBase {
         container.innerHTML = `
             <div class="preview-app h-full w-full flex flex-col relative bg-white">
                 <div id="preview-svg-viewer" class="flex-1 relative"></div>
+                <button type="button" id="preview-expand" class="absolute top-3 right-3 z-20 p-2 rounded-full bg-white border border-gray-200 text-gray-600 hover:text-black hover:border-gray-400 shadow-sm transition-colors" title="Ouvrir dans Vision">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                    </svg>
+                </button>
                 <div id="preview-loading" class="absolute inset-0 flex items-center justify-center text-gray-500 z-10 bg-white/80 backdrop-blur-sm transition-opacity duration-300">
                     <svg class="animate-spin h-8 w-8 text-gray-400 mr-3" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -43,6 +48,7 @@ class PreviewApp extends AppBase {
             </div>
         `;
         this.setTitle(`Aperçu: ${this.docName}`);
+        this._bindEvents();
         this._load();
     }
 
@@ -50,6 +56,28 @@ class PreviewApp extends AppBase {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    _bindEvents() {
+        const expandBtn = this.container.querySelector('#preview-expand');
+        if (!expandBtn) return;
+        expandBtn.addEventListener('click', () => this._openInVision());
+    }
+
+    _openInVision() {
+        if (!this.svgText) return;
+        const existingVision = AppState.listInstances().find((i) => i.appId === "vision" && i.mode === "tab");
+        if (existingVision) {
+            AppState.removeInstance(existingVision.instanceId);
+        }
+        const match = this.svgText.match(/data-main-class="([^"]*)"/);
+        const mainClassName = match ? match[1] : '';
+        windowManager.open("vision", {
+            mode: "tab",
+            fileName: this.docName,
+            svgText: this.svgText,
+            mainClassName,
+        });
     }
 
     async _load() {
