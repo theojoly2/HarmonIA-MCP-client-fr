@@ -113,3 +113,85 @@
     transform: none;
     box-shadow: none;
 }
+
+/* === Floating edit dialogs (class / attribute / connector) === */
+.vision-edit-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: opacity 0.25s ease;
+}
+
+.vision-edit-modal {
+    position: relative;
+    width: min(420px, 90vw);
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 1.5rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.18);
+    padding: 2rem 2rem 2.25rem;
+    animation: fadeIn 0.3s ease;
+}
+
+.vision-edit-modal-header {
+    text-align: center;
+    margin-bottom: 1.25rem;
+}
+
+.vision-edit-modal-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    color: #111827;
+    margin: 0 0 0.35rem;
+}
+
+.vision-edit-submit {
+    width: 100%;
+    padding: 0.8rem 1rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #ffffff;
+    background: #111827;
+    border: none;
+    border-radius: 9999px;
+    cursor: pointer;
+    transition: transform 0.15s, background 0.2s;
+}
+.vision-edit-submit:hover { background: #1f2937; }
+.vision-edit-submit:active { transform: scale(0.98); }
+.vision-edit-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.vision-edit-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 9999px;
+    border: none;
+    background: transparent;
+    color: #9ca3af;
+    cursor: pointer;
+    transition: color 0.2s, background 0.2s;
+}
+.vision-edit-close:hover { color: #111827; background: #f3f4f6; }
+
+.vision-edit-error {
+    margin-bottom: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: 0.5rem;
+    background: #fef2f2;
+    color: #b91c1c;
+    font-size: 0.85rem;
+    font-weight: 600;
+}

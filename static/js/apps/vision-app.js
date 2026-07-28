@@ -27,6 +27,15 @@ class VisionApp extends AppBase {
         this._skipNextTransition = false;
     }
 
+    static _closeOpenEditDialogs() {
+        const openDialogs = document.querySelectorAll('.vision-edit-overlay');
+        openDialogs.forEach((dialog) => dialog.remove());
+    }
+
+    static _hasOpenEditDialog() {
+        return document.querySelectorAll('.vision-edit-overlay').length > 0;
+    }
+
     render(container) {
         // Any previous viewer is tied to a DOM container that will be replaced;
         // discard the reference so a fresh viewer is created for the new container.
@@ -480,6 +489,7 @@ class VisionApp extends AppBase {
     }
 
     _showAddClassDialog() {
+        VisionApp._closeOpenEditDialogs();
         const fields = [
             { id: 'cls-title', label: 'Nom de la classe', required: true },
             { id: 'cls-definition', label: 'Définition', type: 'textarea' },
@@ -487,9 +497,9 @@ class VisionApp extends AppBase {
             { id: 'cls-uri', label: 'URI (optionnel)' },
             { id: 'cls-package', label: 'Package (optionnel)' },
         ];
-        this._showDialog('Ajouter une classe', fields, async (values, overlay) => {
-            overlay.querySelector('.auth-submit').disabled = true;
-            overlay.querySelector('.auth-submit').textContent = 'Enregistrement...';
+        this._showFloatingDialog('Ajouter une classe', fields, async (values, overlay) => {
+            overlay.querySelector('.vision-edit-submit').disabled = true;
+            overlay.querySelector('.vision-edit-submit').textContent = 'Enregistrement...';
             try {
                 this._setLoading(true);
                 const res = await fetch(`api/models/${encodeURIComponent(this.fileName)}/add-class`, {
@@ -513,14 +523,15 @@ class VisionApp extends AppBase {
             } finally {
                 this._setLoading(false);
                 if (overlay.parentNode) {
-                    overlay.querySelector('.auth-submit').disabled = false;
-                    overlay.querySelector('.auth-submit').textContent = 'Enregistrer';
+                    overlay.querySelector('.vision-edit-submit').disabled = false;
+                    overlay.querySelector('.vision-edit-submit').textContent = 'Enregistrer';
                 }
             }
         });
     }
 
     _showAddAttributeDialog() {
+        VisionApp._closeOpenEditDialogs();
         const classes = this._extractClassNames();
         if (!classes.length) {
             return;
@@ -563,9 +574,9 @@ class VisionApp extends AppBase {
                 update();
             }
         };
-        this._showDialog("Ajouter un attribut", fields, async (values, overlay) => {
-            overlay.querySelector('.auth-submit').disabled = true;
-            overlay.querySelector('.auth-submit').textContent = 'Enregistrement...';
+        this._showFloatingDialog("Ajouter un attribut", fields, async (values, overlay) => {
+            overlay.querySelector('.vision-edit-submit').disabled = true;
+            overlay.querySelector('.vision-edit-submit').textContent = 'Enregistrement...';
             try {
                 this._setLoading(true);
                 let attrType = values['attr-type'];
@@ -596,14 +607,15 @@ class VisionApp extends AppBase {
             } finally {
                 this._setLoading(false);
                 if (overlay.parentNode) {
-                    overlay.querySelector('.auth-submit').disabled = false;
-                    overlay.querySelector('.auth-submit').textContent = 'Enregistrer';
+                    overlay.querySelector('.vision-edit-submit').disabled = false;
+                    overlay.querySelector('.vision-edit-submit').textContent = 'Enregistrer';
                 }
             }
         }, onOpen);
     }
 
     _showAddConnectorDialog() {
+        VisionApp._closeOpenEditDialogs();
         const classes = this._extractClassNames();
         if (!classes.length) {
             return;
@@ -638,9 +650,9 @@ class VisionApp extends AppBase {
             { id: 'conn-rt', label: 'Rôle cible (optionnel)' },
             { id: 'conn-usage', label: "Note d'utilisation", type: 'textarea' },
         ];
-        this._showDialog('Ajouter une relation', fields, async (values, overlay) => {
-            overlay.querySelector('.auth-submit').disabled = true;
-            overlay.querySelector('.auth-submit').textContent = 'Enregistrement...';
+        this._showFloatingDialog('Ajouter une relation', fields, async (values, overlay) => {
+            overlay.querySelector('.vision-edit-submit').disabled = true;
+            overlay.querySelector('.vision-edit-submit').textContent = 'Enregistrement...';
             try {
                 this._setLoading(true);
                 const res = await fetch(`api/models/${encodeURIComponent(this.fileName)}/add-connector`, {
@@ -670,8 +682,8 @@ class VisionApp extends AppBase {
             } finally {
                 this._setLoading(false);
                 if (overlay.parentNode) {
-                    overlay.querySelector('.auth-submit').disabled = false;
-                    overlay.querySelector('.auth-submit').textContent = 'Enregistrer';
+                    overlay.querySelector('.vision-edit-submit').disabled = false;
+                    overlay.querySelector('.vision-edit-submit').textContent = 'Enregistrer';
                 }
             }
         });
@@ -691,9 +703,9 @@ class VisionApp extends AppBase {
         }
     }
 
-    _showDialog(title, fields, onSubmit, onOpen) {
+    _showFloatingDialog(title, fields, onSubmit, onOpen) {
         const overlay = document.createElement('div');
-        overlay.className = 'auth-overlay';
+        overlay.className = 'vision-edit-overlay';
         const optionsHtml = (opts) => opts || '';
         const inputsHtml = fields.map((f) => {
             const label = `<label class="block text-sm font-semibold text-gray-700 mb-1 ${this._escape(f.labelClass || '')}" for="${f.id}">${this._escape(f.label)}${f.required ? ' *' : ''}</label>`;
@@ -708,16 +720,16 @@ class VisionApp extends AppBase {
             return `<div class="mb-3 ${this._escape(f.className || '')}">${label}${input}</div>`;
         }).join('');
         overlay.innerHTML = `
-            <div class="auth-modal" style="max-height: 80vh; overflow-y: auto;">
-                <div class="auth-modal-header">
-                    <h2 class="auth-modal-title">${this._escape(title)}</h2>
+            <div class="vision-edit-modal" style="max-height: 80vh; overflow-y: auto;">
+                <div class="vision-edit-modal-header">
+                    <h2 class="vision-edit-modal-title">${this._escape(title)}</h2>
                 </div>
                 <form id="vision-edit-form">
                     ${inputsHtml}
-                    <div class="auth-error hidden" id="dialog-error"></div>
-                    <button type="submit" class="auth-submit">Enregistrer</button>
+                    <div class="vision-edit-error hidden" id="dialog-error"></div>
+                    <button type="submit" class="vision-edit-submit">Enregistrer</button>
                 </form>
-                <button type="button" class="auth-close" id="dialog-close" title="Fermer">
+                <button type="button" class="vision-edit-close" id="dialog-close" title="Fermer">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
