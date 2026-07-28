@@ -637,6 +637,10 @@ class VisionApp extends AppBase {
         });
     }
 
+    _escape(text) {
+        return (text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
     _setLoading(isLoading) {
         const el = this.container.querySelector('#vision-loading');
         if (el) el.classList.toggle('hidden', !isLoading);
