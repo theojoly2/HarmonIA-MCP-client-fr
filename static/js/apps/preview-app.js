@@ -71,7 +71,23 @@ class PreviewApp extends AppBase {
             AuthManager.showModal();
             return;
         }
-        // Fetch the original file bytes so we can persist the model like a normal Vision import.
+        const match = this.svgText.match(/data-main-class="([^"]*)"/);
+        const mainClassName = match ? match[1] : '';
+
+        // Open Vision immediately so the user sees a reaction without waiting for the network.
+        const existingVision = AppState.listInstances().find((i) => i.appId === "vision" && i.mode === "tab");
+        if (existingVision) {
+            AppState.removeInstance(existingVision.instanceId);
+        }
+        windowManager.open("vision", {
+            mode: "tab",
+            fileName: this.docName,
+            svgText: this.svgText,
+            mainClassName,
+        });
+        windowManager.close(this.instanceId);
+
+        // Persist the model in the background and refresh the history panel.
         try {
             const fileRes = await fetch(ApiClient.getDocumentFileUrl(this.docId));
             if (!fileRes.ok) throw new Error(`file_fetch_failed:${fileRes.status}`);
@@ -81,23 +97,7 @@ class PreviewApp extends AppBase {
             if (window.historyPanel) window.historyPanel.load();
         } catch (err) {
             console.error("Persist preview model error", err);
-            alert("Impossible d'enregistrer le modèle dans l'historique.");
-            return;
         }
-
-        const existingVision = AppState.listInstances().find((i) => i.appId === "vision" && i.mode === "tab");
-        if (existingVision) {
-            AppState.removeInstance(existingVision.instanceId);
-        }
-        const match = this.svgText.match(/data-main-class="([^"]*)"/);
-        const mainClassName = match ? match[1] : '';
-        windowManager.open("vision", {
-            mode: "tab",
-            fileName: this.docName,
-            svgText: this.svgText,
-            mainClassName,
-        });
-        windowManager.close(this.instanceId);
     }
 
     async _load() {

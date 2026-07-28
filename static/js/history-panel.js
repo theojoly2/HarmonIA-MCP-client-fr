@@ -291,11 +291,26 @@ class HistoryPanel {
     }
 
     async _openModel(modelName) {
-        try {
-            const encodedName = encodeURIComponent(modelName);
+        const encodedName = encodeURIComponent(modelName);
+        const fileName = modelName;
+        const match = /data-main-class="([^"]*)"/;
 
-            // Update the model's last_opened_at first and wait for completion so
-            // the subsequent list request reflects the new ordering immediately.
+        // Open Vision immediately in loading state so the user sees immediate feedback.
+        const existingVision = AppState.listInstances().find((i) => i.appId === "vision" && i.mode === "tab");
+        if (existingVision) {
+            AppState.removeInstance(existingVision.instanceId);
+        }
+        const placeholderVision = AppState.createInstance("vision", {
+            mode: "tab",
+            fileName,
+            svgText: "",
+            mainClassName: "",
+        });
+        await windowManager._mountTab(placeholderVision.instance);
+        AppState.setActiveInstance(placeholderVision.instanceId);
+        this.close();
+
+        try {
             try {
                 await fetch(`api/models/${encodedName}/touch`, {
                     method: "POST",
@@ -311,20 +326,10 @@ class HistoryPanel {
             });
             if (!res.ok) throw new Error("open_failed");
             const svgText = await res.text();
-            const fileName = res.headers.get("X-Model-Name") || modelName;
 
-            // Replace current Vision instance (tab) with this model
-            const existingVision = AppState.listInstances().find((i) => i.appId === "vision" && i.mode === "tab");
-            if (existingVision) {
-                AppState.removeInstance(existingVision.instanceId);
-            }
-            windowManager.open("vision", {
-                mode: "tab",
-                fileName,
-                svgText,
-                mainClassName: "",
-            });
-            this.close();
+            placeholderVision.instance.svgText = svgText;
+            placeholderVision.instance.mainClassName = (svgText.match(match) || ["", ""])[1];
+            await windowManager._mountTab(placeholderVision.instance);
 
             await this.load();
         } catch (err) {
