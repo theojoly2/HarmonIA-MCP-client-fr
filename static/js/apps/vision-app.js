@@ -114,17 +114,6 @@ class VisionApp extends AppBase {
         const viewer = this.container.querySelector('#vision-viewer');
         if (!home || !importContainer || !viewer) return;
 
-        importContainer.style.display = 'none';
-        if (dropZone) dropZone.style.display = 'none';
-        home.style.transition = 'none';
-        home.style.paddingTop = '0px';
-        home.classList.add('vision-top');
-        viewer.classList.remove('hidden');
-        viewer.style.transition = 'none';
-        viewer.style.opacity = '1';
-        void home.offsetHeight;
-        void viewer.offsetHeight;
-
         if (this._homeTimeout) {
             clearTimeout(this._homeTimeout);
             this._homeTimeout = null;
@@ -133,6 +122,24 @@ class VisionApp extends AppBase {
             clearTimeout(this._loadingTimeout);
             this._loadingTimeout = null;
         }
+
+        // Hide import UI but leave it in the DOM so the home button works later.
+        importContainer.classList.add('vision-import-hidden');
+        if (dropZone) dropZone.style.display = '';
+
+        home.classList.add('vision-top');
+        home.style.transition = 'none';
+        home.style.paddingTop = '0px';
+        home.style.paddingBottom = '0px';
+        home.style.marginBottom = '0px';
+        home.style.minHeight = 'auto';
+
+        viewer.classList.remove('hidden');
+        viewer.style.transition = 'none';
+        viewer.style.opacity = '1';
+
+        void home.offsetHeight;
+        void viewer.offsetHeight;
 
         this._setLoading(true);
     }
@@ -284,6 +291,7 @@ class VisionApp extends AppBase {
         // Stage the import container hidden so it can fade in later.
         if (importContainer) {
             importContainer.classList.remove('vision-import-hidden');
+            importContainer.style.display = '';
             importContainer.style.transition = 'none';
             importContainer.style.opacity = '0';
             importContainer.style.transform = 'translateY(-16px)';
@@ -330,6 +338,9 @@ class VisionApp extends AppBase {
             }
             this._updateHomeVisibility(true);
             this.setTitle(this.constructor.title);
+            if (importContainer) {
+                importContainer.style.display = '';
+            }
         }, 700);
     }
 
