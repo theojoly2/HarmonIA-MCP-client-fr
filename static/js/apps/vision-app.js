@@ -255,6 +255,7 @@ class VisionApp extends AppBase {
     _enterLoadingMode() {
         const home = this.container.querySelector('#vision-home');
         const importContainer = this.container.querySelector('#vision-import-container');
+        const dropZone = this.container.querySelector('#vision-drop-zone');
         const viewer = this.container.querySelector('#vision-viewer');
         if (!home || !importContainer || !viewer) return;
 
@@ -269,14 +270,13 @@ class VisionApp extends AppBase {
         home.style.transition = 'padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1)';
         home.style.paddingTop = '0px';
         importContainer.classList.add('vision-import-hidden');
+        if (dropZone) dropZone.style.display = 'none';
 
         // Reveal the viewer area and fade it in as the title glides up.
         viewer.classList.remove('hidden');
         viewer.style.transition = 'none';
-        viewer.style.opacity = '0';
-        void viewer.offsetHeight;
-        viewer.style.transition = 'opacity 0.55s ease';
         viewer.style.opacity = '1';
+        void viewer.offsetHeight;
         this._setLoading(true);
 
         // Lock the compact viewer state once the upward glide finishes.
@@ -395,6 +395,8 @@ class VisionApp extends AppBase {
             if (importContainer) {
                 importContainer.style.display = '';
             }
+            const dropZone = this.container.querySelector('#vision-drop-zone');
+            if (dropZone) dropZone.style.display = '';
         }, 700);
     }
 
