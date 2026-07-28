@@ -321,14 +321,10 @@ class HistoryPanel {
                 console.error("Touch model error", err);
             }
 
-            const res = await fetch(`api/models/${encodedName}/open`, {
-                method: "POST",
-                credentials: "same-origin",
-            });
-            if (!res.ok) throw new Error("open_failed");
-            const svgText = await res.text();
+            const { svgText, modelName } = await ApiClient.getModelSvg(modelName);
 
             placeholderVision.instance.svgText = svgText;
+            placeholderVision.instance.fileName = modelName;
             placeholderVision.instance.mainClassName = (svgText.match(match) || ["", ""])[1];
             await windowManager._mountTab(placeholderVision.instance);
 

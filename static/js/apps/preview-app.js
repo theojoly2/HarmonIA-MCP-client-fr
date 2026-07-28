@@ -79,12 +79,18 @@ class PreviewApp extends AppBase {
         if (existingVision) {
             AppState.removeInstance(existingVision.instanceId);
         }
-        windowManager.open("vision", {
+        const existingVision = AppState.listInstances().find((i) => i.appId === "vision" && i.mode === "tab");
+        if (existingVision) {
+            AppState.removeInstance(existingVision.instanceId);
+        }
+        const visionInstance = AppState.createInstance("vision", {
             mode: "tab",
             fileName: this.docName,
             svgText: this.svgText,
             mainClassName,
         });
+        await windowManager._mountTab(visionInstance.instance);
+        AppState.setActiveInstance(visionInstance.instanceId);
         windowManager.close(this.instanceId);
 
         // Persist the model in the background and refresh the history panel.

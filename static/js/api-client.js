@@ -61,6 +61,15 @@ const ApiClient = (() => {
         return res.json();
     }
 
+    async function getModelSvg(name) {
+        const res = await fetch(apiUrl(`models/${encodeURIComponent(name)}/open`), {
+            method: "POST",
+            credentials: "same-origin",
+        });
+        if (!res.ok) throw new Error(`Model open failed: ${res.status}`);
+        return { svgText: await res.text(), modelName: res.headers.get("X-Model-Name") || name };
+    }
+
     async function getModels() {
         const res = await fetch(apiUrl("models"), { credentials: "same-origin" });
         if (!res.ok) throw new Error(`Models list failed: ${res.status}`);
@@ -163,6 +172,7 @@ const ApiClient = (() => {
         getDocumentVisualizeUrl,
         importVisionFile,
         importAndSaveModel,
+        getModelSvg,
         getModels,
         saveSearch,
         getSearches,
