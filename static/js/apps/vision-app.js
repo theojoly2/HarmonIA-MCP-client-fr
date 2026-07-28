@@ -290,7 +290,10 @@ class VisionApp extends AppBase {
         }
         this._setLoading(false);
         if (viewer) viewer.style.opacity = '1';
-        if (editActions) editActions.classList.remove('hidden');
+        if (editActions) {
+            editActions.classList.remove('hidden');
+            this._updateEditButtonStates();
+        }
         this.setTitle(`Vision: ${this.fileName}`);
     }
 
@@ -433,6 +436,32 @@ class VisionApp extends AppBase {
         if (addClassBtn) addClassBtn.addEventListener('click', () => this._showAddClassDialog());
         if (addAttrBtn) addAttrBtn.addEventListener('click', () => this._showAddAttributeDialog());
         if (addConnectorBtn) addConnectorBtn.addEventListener('click', () => this._showAddConnectorDialog());
+        this._updateEditButtonStates();
+    }
+
+    _updateEditButtonStates() {
+        const addClassBtn = this.container.querySelector('#vision-add-class');
+        const addAttrBtn = this.container.querySelector('#vision-add-attr');
+        const addConnectorBtn = this.container.querySelector('#vision-add-connector');
+        const classes = this._extractClassNames();
+        const disabledClass = 'vision-edit-btn-disabled';
+        if (addClassBtn) {
+            addClassBtn.disabled = false;
+            addClassBtn.classList.remove(disabledClass);
+            addClassBtn.title = 'Ajouter une classe';
+        }
+        if (addAttrBtn) {
+            const noClasses = classes.length === 0;
+            addAttrBtn.disabled = noClasses;
+            addAttrBtn.classList.toggle(disabledClass, noClasses);
+            addAttrBtn.title = noClasses ? 'Aucune classe disponible' : 'Ajouter un attribut';
+        }
+        if (addConnectorBtn) {
+            const noClasses = classes.length === 0;
+            addConnectorBtn.disabled = noClasses;
+            addConnectorBtn.classList.toggle(disabledClass, noClasses);
+            addConnectorBtn.title = noClasses ? 'Aucune classe disponible' : 'Ajouter une relation';
+        }
     }
 
     _showAddClassDialog() {
@@ -479,7 +508,6 @@ class VisionApp extends AppBase {
     _showAddAttributeDialog() {
         const classes = this._extractClassNames();
         if (!classes.length) {
-            alert('Aucune classe disponible dans le diagramme.');
             return;
         }
         const classOptions = classes.map((c) => `<option value="${this._escape(c)}">${this._escape(c)}</option>`).join('');
@@ -562,8 +590,7 @@ class VisionApp extends AppBase {
 
     _showAddConnectorDialog() {
         const classes = this._extractClassNames();
-        if (classes.length < 2) {
-            alert('Il faut au moins 2 classes dans le diagramme pour créer une relation.');
+        if (!classes.length) {
             return;
         }
         const classOptions = classes.map((c) => `<option value="${this._escape(c)}">${this._escape(c)}</option>`).join('');
