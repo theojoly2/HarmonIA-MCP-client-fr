@@ -33,6 +33,12 @@ class PreviewApp extends AppBase {
         container.innerHTML = `
             <div class="preview-app h-full w-full flex flex-col relative bg-white">
                 <div id="preview-svg-viewer" class="flex-1 relative"></div>
+                <button type="button" id="preview-expand" class="absolute top-3 right-3 z-20 p-2 rounded-full bg-white border border-gray-200 text-gray-600 hover:text-black hover:border-gray-400 shadow-sm transition-colors" title="Ouvrir dans Vision">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                        <path d="M21 9V3h-6M15 9l6-6"></path>
+                        <path d="M3 15v6h6M9 15l-6 6"></path>
+                    </svg>
+                </button>
                 <div id="preview-loading" class="absolute inset-0 flex items-center justify-center text-gray-500 z-10 bg-white/80 backdrop-blur-sm transition-opacity duration-300">
                     <svg class="animate-spin h-8 w-8 text-gray-400 mr-3" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -43,6 +49,7 @@ class PreviewApp extends AppBase {
             </div>
         `;
         this.setTitle(`Aperçu: ${this.docName}`);
+        this._bindEvents();
         this._load();
     }
 
@@ -50,6 +57,47 @@ class PreviewApp extends AppBase {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    _bindEvents() {
+        const expandBtn = this.container.querySelector('#preview-expand');
+        if (!expandBtn) return;
+        expandBtn.addEventListener('click', () => this._openInVision());
+    }
+
+    async _openInVision() {
+        if (!this.svgText) return;
+        if (!AuthManager.isLoggedIn()) {
+            AuthManager.showModal();
+            return;
+        }
+        const match = this.svgText.match(/data-main-class="([^"]*)"/);
+        const mainClassName = match ? match[1] : '';
+
+        // Open Vision immediately so the user sees a reaction without waiting for the network.
+        const existingVision = AppState.listInstances().find((i) => i.appId === "vision" && i.mode === "tab");
+        if (existingVision) {
+            AppState.removeInstance(existingVision.instanceId);
+        }
+        windowManager.open("vision", {
+            mode: "tab",
+            fileName: this.docName,
+            svgText: this.svgText,
+            mainClassName,
+        });
+        windowManager.close(this.instanceId);
+
+        // Persist the model in the background and refresh the history panel.
+        try {
+            const fileRes = await fetch(ApiClient.getDocumentFileUrl(this.docId));
+            if (!fileRes.ok) throw new Error(`file_fetch_failed:${fileRes.status}`);
+            const blob = await fileRes.blob();
+            const file = new File([blob], this.docName, { type: blob.type || "application/octet-stream" });
+            await ApiClient.importAndSaveModel(file, this.docName);
+            if (window.historyPanel) window.historyPanel.load();
+        } catch (err) {
+            console.error("Persist preview model error", err);
+        }
     }
 
     async _load() {

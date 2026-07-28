@@ -13,8 +13,8 @@ class SearchApp extends AppBase {
 
     constructor(instanceId, props = {}) {
         super(instanceId, props);
-        this.query = "";
-        this.selectedTags = [];
+        this.query = props.query || "";
+        this.selectedTags = props.tags || [];
         this.results = [];
         this.tagsHtml = "";
         this.loading = false;
@@ -23,6 +23,7 @@ class SearchApp extends AppBase {
         this._skipNextTransition = false;
         this._firstTagAnimation = true;
         this._introAnimating = false;
+        this._skipHistorySave = !!props.fromHistory;
     }
 
     async render(container) {
@@ -75,7 +76,10 @@ class SearchApp extends AppBase {
         if (wrapper) wrapper.style.transition = 'none';
         this._skipNextTransition = true;
         if (!showTags) this._observeResize();
-        if (this.resultsHtml) this._animateResults();
+        if (this.resultsHtml) {
+            const resultsContainer = this.container.querySelector('#results-container');
+            if (resultsContainer) resultsContainer.classList.add('results-visible');
+        }
         // Stage 1: center title + search bar only.
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
@@ -170,20 +174,7 @@ class SearchApp extends AppBase {
                 this.selectedTags = Array.from(tagsContainer.querySelectorAll('input[name="t"]:checked')).map(cb => cb.value);
                 this._updateHomeModeClass();
 
-                // Clear previous results immediately as soon as loading starts
-                if (resultsContainer) {
-                    resultsContainer.innerHTML = '';
-                    resultsContainer.classList.remove('results-hiding');
-                    resultsContainer.style.display = '';
-                    resultsContainer.style.visibility = '';
-                }
-
-                this._setLoading(true);
-                this._startTimer();
-                // Start move up while halo appears, so both run together (60ms frame)
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(() => this._applyCentering());
-                });
+                // _runSearch handles loading state, timer and centering.
                 this._runSearch();
             };
 
@@ -298,17 +289,41 @@ class SearchApp extends AppBase {
 
     async _runSearch() {
         if (!this.query) return;
+        this._setLoading(true);
+        this._startTimer();
+        this._setLoading(true);
+        this._applyCentering();
+        // Clear previous results immediately so stale content is not shown during loading.
+        const resultsContainer = this.container.querySelector('#results-container');
+        if (resultsContainer) {
+            resultsContainer.innerHTML = '';
+            resultsContainer.classList.remove('results-hiding', 'results-visible');
+        }
+        this.resultsHtml = '';
         try {
             const data = await ApiClient.postSearch(this.query, this.selectedTags, 20);
             this.resultsHtml = data.results_html || '';
             this.tagsHtml = data.tags_html || this.tagsHtml;
             this._renderTagsFromHtml(this.tagsHtml);
+            this._setLoading(false);
+            this._stopTimer();
             const resultsContainer = this.container.querySelector('#results-container');
             if (resultsContainer) {
                 resultsContainer.innerHTML = this.resultsHtml;
                 this._animateResults();
             }
             this._applyCentering();
+
+            // Persist search query to user history when logged in.
+            if (AuthManager.isLoggedIn() && !this._skipHistorySave) {
+                try {
+                    await ApiClient.saveSearch(this.query, this.selectedTags);
+                    if (window.historyPanel) window.historyPanel.load();
+                } catch (err) {
+                    console.error('Save search error', err);
+                }
+            }
+            this._skipHistorySave = false;
         } catch (e) {
             console.error('Erreur recherche', e);
             const resultsContainer = this.container.querySelector('#results-container');
@@ -317,7 +332,6 @@ class SearchApp extends AppBase {
                     ⏳ Délai dépassé (Timeout). Veuillez relancer la recherche.
                 </div>`;
             }
-        } finally {
             this._setLoading(false);
             this._stopTimer();
         }
@@ -395,10 +409,15 @@ class SearchApp extends AppBase {
     }
 
     _animateResults() {
-        const items = this.container.querySelectorAll('.result-item');
+        const container = this.container.querySelector('#results-container');
+        if (!container) return;
+        container.classList.remove('results-visible');
+        const items = container.querySelectorAll('.result-item');
         items.forEach((el, i) => {
-            el.classList.remove('visible');
-            setTimeout(() => el.classList.add('visible'), i * 80);
+            el.style.animationDelay = `${i * 80}ms`;
+        });
+        requestAnimationFrame(() => {
+            container.classList.add('results-visible');
         });
     }
 

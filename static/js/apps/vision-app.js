@@ -16,6 +16,8 @@ class VisionApp extends AppBase {
         this.fileName = props.fileName || '';
         this.svgText = props.svgText || '';
         this.mainClassName = props.mainClassName || '';
+        this.loading = props.loading || false;
+        // New imports/opened models should always start centered/scaled to fit.
         this.viewerState = { scale: 1, x: 0, y: 0 };
         this.viewer = null;
         this._centerOnNextShow = true;
@@ -65,10 +67,24 @@ class VisionApp extends AppBase {
             </div>
         `;
         this._bindEvents();
-        if (this.svgText) {
-            // Defer viewer creation until container layout is settled
+        if (this.loading) {
+            // Loading state (e.g. opened from history): show the compact viewer with spinner immediately,
+            // without animating the home panel down from the centered position.
+            this._showLoadingState();
+            if (this.svgText) {
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => this._showViewer());
+                });
+            }
+        } else if (this.svgText) {
+            // Normal import: glide the title up from the centered home position.
             requestAnimationFrame(() => {
-                requestAnimationFrame(() => this._showViewer());
+                requestAnimationFrame(() => this._enterLoadingMode());
+            });
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => this._showViewer());
+                });
             });
         } else {
             const home = this.container.querySelector('#vision-home');
@@ -89,6 +105,48 @@ class VisionApp extends AppBase {
             });
         });
         }
+    }
+
+    _showLoadingState() {
+        const home = this.container.querySelector('#vision-home');
+        const importContainer = this.container.querySelector('#vision-import-container');
+        const dropZone = this.container.querySelector('#vision-drop-zone');
+        const viewer = this.container.querySelector('#vision-viewer');
+        if (!home || !importContainer || !viewer) return;
+
+        if (this._homeTimeout) {
+            clearTimeout(this._homeTimeout);
+            this._homeTimeout = null;
+        }
+        if (this._loadingTimeout) {
+            clearTimeout(this._loadingTimeout);
+            this._loadingTimeout = null;
+        }
+
+        // Compact title at the top, viewer below, spinner centered in the viewer.
+        importContainer.classList.add('vision-import-hidden');
+        if (dropZone) dropZone.style.display = '';
+        home.classList.add('vision-top');
+        home.style.transition = 'none';
+        home.style.paddingTop = '0px';
+        home.style.paddingBottom = '0px';
+        home.style.marginBottom = '0px';
+        home.style.minHeight = 'auto';
+        home.style.position = 'relative';
+        home.style.zIndex = '25';
+
+        const app = this.container.querySelector('.vision-app');
+        if (app) app.classList.add('vision-loading-layout');
+
+        viewer.classList.remove('hidden');
+        viewer.style.transition = 'none';
+        viewer.style.opacity = '1';
+        viewer.style.display = 'flex';
+
+        void home.offsetHeight;
+        void viewer.offsetHeight;
+
+        this._setLoading(true);
     }
 
     _bindEvents() {
@@ -138,6 +196,19 @@ class VisionApp extends AppBase {
             const match = this.svgText.match(/data-main-class="([^"]*)"/);
             this.mainClassName = match ? match[1] : '';
             this._showViewer();
+
+            // Persist model to user history when logged in.
+            // If not logged in, store the import as pending only while this Vision instance stays open.
+            if (AuthManager.isLoggedIn()) {
+                try {
+                    await ApiClient.importAndSaveModel(file, file.name);
+                    if (window.historyPanel) window.historyPanel.load();
+                } catch (err) {
+                    console.error('Model save error', err);
+                }
+            } else {
+                AuthManager.setPendingImport(file, file.name, this.svgText);
+            }
         } catch (err) {
             console.error('Vision import error', err);
             this._setLoading(false);
@@ -184,20 +255,24 @@ class VisionApp extends AppBase {
     _showViewer() {
         const viewerContainer = this.container.querySelector('#vision-svg-viewer');
         const viewer = this.container.querySelector('#vision-viewer');
+        const app = this.container.querySelector('.vision-app');
+        if (app) app.classList.remove('vision-loading-layout');
 
         if (!this.viewer) {
             this.viewer = new SvgViewer(viewerContainer, {
                 onTransform: (state) => { this.viewerState = state; }
             });
         }
-        // New import: center diagram. Window switching: restore exact position/zoom.
+        this.viewer.setSvg(this.svgText, this.mainClassName);
+        // New import/open from history/preview: center diagram after it becomes visible.
         if (this._centerOnNextShow) {
-            this.viewer.setSvg(this.svgText, this.mainClassName);
-            // Reset the view as if the user clicked the reset button (centers the new diagram).
-            this.viewer.resetZoom();
-            this._centerOnNextShow = false;
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    this.viewer.resetZoom();
+                    this._centerOnNextShow = false;
+                });
+            });
         } else {
-            this.viewer.setSvg(this.svgText, this.mainClassName);
             this.viewer.restoreState(this.viewerState);
         }
         this._setLoading(false);
@@ -223,6 +298,7 @@ class VisionApp extends AppBase {
         // Stage the import container hidden so it can fade in later.
         if (importContainer) {
             importContainer.classList.remove('vision-import-hidden');
+            importContainer.style.display = '';
             importContainer.style.transition = 'none';
             importContainer.style.opacity = '0';
             importContainer.style.transform = 'translateY(-16px)';
@@ -269,6 +345,9 @@ class VisionApp extends AppBase {
             }
             this._updateHomeVisibility(true);
             this.setTitle(this.constructor.title);
+            if (importContainer) {
+                importContainer.style.display = '';
+            }
         }, 700);
     }
 
@@ -310,9 +389,11 @@ class VisionApp extends AppBase {
         this.fileName = state.fileName || '';
         this.svgText = state.svgText || '';
         this.mainClassName = state.mainClassName || '';
-        this.viewerState = state.viewerState || { scale: 1, x: 0, y: 0 };
-        // Restoring from a saved state is a window switch, not a new import.
-        this._centerOnNextShow = false;
+        // Only keep the previous pan/zoom if this is the exact same SVG being
+        // restored (e.g. tab switch). A new file from history/preview must reset.
+        const sameSvg = this.svgText === (state.svgText || '');
+        this.viewerState = sameSvg ? (state.viewerState || { scale: 1, x: 0, y: 0 }) : { scale: 1, x: 0, y: 0 };
+        this._centerOnNextShow = !sameSvg;
         if (this.container) {
             this.render(this.container);
             this._updateHomeVisibility();
