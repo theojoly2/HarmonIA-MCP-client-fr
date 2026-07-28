@@ -79,10 +79,6 @@ class PreviewApp extends AppBase {
         if (existingVision) {
             AppState.removeInstance(existingVision.instanceId);
         }
-        const existingVision = AppState.listInstances().find((i) => i.appId === "vision" && i.mode === "tab");
-        if (existingVision) {
-            AppState.removeInstance(existingVision.instanceId);
-        }
         const visionInstance = AppState.createInstance("vision", {
             mode: "tab",
             fileName: this.docName,
