@@ -555,13 +555,21 @@ class VisionApp extends AppBase {
             return;
         }
         const classOptions = classes.map((c) => `<option value="${this._escape(c)}">${this._escape(c)}</option>`).join('');
+        const relationshipTypes = [
+            'Association',
+            'Aggregation',
+            'Composition',
+            'Generalization',
+            'Dependency',
+        ];
+        const relationshipOptions = relationshipTypes.map((t) => `<option value="${this._escape(t)}"${t === 'Association' ? ' selected' : ''}>${this._escape(t)}</option>`).join('');
         const fields = [
             { id: 'conn-source', label: 'Classe source', type: 'select', options: classOptions, required: true },
             { id: 'conn-target', label: 'Classe cible', type: 'select', options: classOptions, required: true },
             { id: 'conn-label', label: 'Nom de la relation', required: true },
             { id: 'conn-definition', label: 'Définition', type: 'textarea' },
             { id: 'conn-uri', label: 'URI', required: true },
-            { id: 'conn-type', label: 'Type de relation', required: true, value: 'Association' },
+            { id: 'conn-type', label: 'Type de relation', type: 'select', options: relationshipOptions, required: true },
             { id: 'conn-lb', label: 'Multiplicité source (optionnel)' },
             { id: 'conn-rb', label: 'Multiplicité cible (optionnel)' },
             { id: 'conn-lt', label: 'Rôle source (optionnel)' },
@@ -655,8 +663,13 @@ class VisionApp extends AppBase {
         const close = () => overlay.remove();
         overlay.querySelector('#dialog-close').addEventListener('click', close);
         overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-        overlay.querySelector('#vision-edit-form').addEventListener('submit', (e) => {
+        const form = overlay.querySelector('#vision-edit-form');
+        form.addEventListener('submit', (e) => {
             e.preventDefault();
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
             const values = {};
             fields.forEach((f) => {
                 const el = overlay.querySelector(`#${f.id}`);
