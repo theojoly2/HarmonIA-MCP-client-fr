@@ -33,15 +33,15 @@ const ApiClient = (() => {
         return apiUrl(`documents/${encodeURIComponent(documentId)}/visualize`);
     }
 
-    async function importVisionFile(file) {
+    async function importModéliseurFile(file) {
         const formData = new FormData();
         formData.append("file", file);
-        const res = await fetch(apiUrl("vision/import"), {
+        const res = await fetch(apiUrl("modeler/import"), {
             method: "POST",
             credentials: "same-origin",
             body: formData,
         });
-        if (!res.ok) throw new Error(`Vision import failed: ${res.status}`);
+        if (!res.ok) throw new Error(`Modéliseur import failed: ${res.status}`);
         return res.text();
     }
 
@@ -170,7 +170,7 @@ const ApiClient = (() => {
         getTags,
         getDocumentFileUrl,
         getDocumentVisualizeUrl,
-        importVisionFile,
+        importModéliseurFile,
         importAndSaveModel,
         getModelSvg,
         getModels,

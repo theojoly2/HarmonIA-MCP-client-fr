@@ -1,7 +1,7 @@
 /**
  * SvgViewer
  * Composant réutilisable de zoom/pan pour diagrammes SVG.
- * Peut être utilisé par VisionApp, PreviewApp, ou toute future app.
+ * Peut être utilisé par ModelerApp, PreviewApp, ou toute future app.
  */
 
 class SvgViewer {

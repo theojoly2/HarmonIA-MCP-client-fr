@@ -1,14 +1,14 @@
-.vision-app { background: #ffffff; display: flex; flex-direction: column; height: 100%; }
-.vision-home {
+.modeler-app { background: #ffffff; display: flex; flex-direction: column; height: 100%; }
+.modeler-home {
     justify-content: flex-start;
     padding-top: 0;
     padding-bottom: 0;
     transition: padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.45s ease;
     flex-shrink: 0;
 }
-.vision-home.hidden { display: none; }
+.modeler-home.hidden { display: none; }
 
-.vision-top {
+.modeler-top {
     justify-content: flex-start;
     padding-top: 0;
     padding-bottom: 0;
@@ -18,22 +18,22 @@
     min-height: auto !important;
 }
 
-.vision-loading-layout #vision-home {
+.modeler-loading-layout #modeler-home {
     padding-top: 0 !important;
     padding-bottom: 0 !important;
     min-height: auto !important;
 }
-.vision-loading-layout #vision-home .vision-import-hidden,
-.vision-loading-layout #vision-import-container {
+.modeler-loading-layout #modeler-home .modeler-import-hidden,
+.modeler-loading-layout #modeler-import-container {
     display: none !important;
 }
-.vision-loading-layout #vision-viewer {
+.modeler-loading-layout #modeler-viewer {
     flex: 1 1 0%;
     display: flex;
     flex-direction: column;
 }
 
-#vision-viewer {
+#modeler-viewer {
     flex: 1 1 0%;
     min-height: 0;
     opacity: 0;
@@ -41,12 +41,12 @@
     position: relative;
 }
 
-#vision-viewer:not(.hidden) {
+#modeler-viewer:not(.hidden) {
     display: flex;
     flex-direction: column;
 }
 
-.vision-import-hidden {
+.modeler-import-hidden {
     opacity: 0;
     transform: translateY(-20px);
     max-height: 0;
@@ -66,7 +66,7 @@
 }
 .drop-zone.drag-over { border-color: #111827; background: #f3f4f6; }
 
-.vision-edit-btn {
+.modeler-edit-btn {
     width: auto;
     min-width: 7rem;
     height: 2.75rem;
@@ -86,17 +86,17 @@
     font-weight: 600;
     white-space: nowrap;
 }
-.vision-edit-btn:hover {
+.modeler-edit-btn:hover {
     background: #111827;
     border-color: #111827;
     color: #ffffff;
     transform: translateY(-2px);
     box-shadow: 0 6px 12px rgba(0,0,0,0.15);
 }
-.vision-edit-label {
+.modeler-edit-label {
     pointer-events: none;
 }
-.vision-field-help {
+.modeler-field-help {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -113,12 +113,12 @@
     flex-shrink: 0;
     transition: background 0.15s, color 0.15s;
 }
-.vision-field-help:hover {
+.modeler-field-help:hover {
     background: #111827;
     color: #ffffff;
 }
-.vision-edit-btn-disabled,
-.vision-edit-btn:disabled {
+.modeler-edit-btn-disabled,
+.modeler-edit-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
     background: #f3f4f6;
@@ -127,7 +127,7 @@
     transform: none;
     box-shadow: none;
 }
-.vision-edit-btn:disabled:hover {
+.modeler-edit-btn:disabled:hover {
     background: #f3f4f6;
     border-color: #e5e7eb;
     color: #9ca3af;
@@ -136,7 +136,7 @@
 }
 
 /* === Floating edit dialogs (class / attribute / connector) === */
-.vision-edit-overlay {
+.modeler-edit-overlay {
     position: fixed;
     inset: 0;
     z-index: 200;
@@ -149,7 +149,7 @@
     transition: opacity 0.25s ease;
 }
 
-.vision-edit-modal {
+.modeler-edit-modal {
     position: relative;
     width: min(420px, 90vw);
     background: #ffffff;
@@ -160,12 +160,12 @@
     animation: fadeIn 0.3s ease;
 }
 
-.vision-edit-modal-header {
+.modeler-edit-modal-header {
     text-align: center;
     margin-bottom: 1.25rem;
 }
 
-.vision-edit-modal-title {
+.modeler-edit-modal-title {
     font-size: 1.5rem;
     font-weight: 800;
     letter-spacing: -0.025em;
@@ -173,7 +173,7 @@
     margin: 0 0 0.35rem;
 }
 
-.vision-edit-submit {
+.modeler-edit-submit {
     width: 100%;
     padding: 0.8rem 1rem;
     font-size: 0.95rem;
@@ -185,11 +185,11 @@
     cursor: pointer;
     transition: transform 0.15s, background 0.2s;
 }
-.vision-edit-submit:hover { background: #1f2937; }
-.vision-edit-submit:active { transform: scale(0.98); }
-.vision-edit-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+.modeler-edit-submit:hover { background: #1f2937; }
+.modeler-edit-submit:active { transform: scale(0.98); }
+.modeler-edit-submit:disabled { opacity: 0.6; cursor: not-allowed; }
 
-.vision-edit-close {
+.modeler-edit-close {
     position: absolute;
     top: 1rem;
     right: 1rem;
@@ -205,9 +205,9 @@
     cursor: pointer;
     transition: color 0.2s, background 0.2s;
 }
-.vision-edit-close:hover { color: #111827; background: #f3f4f6; }
+.modeler-edit-close:hover { color: #111827; background: #f3f4f6; }
 
-.vision-edit-error {
+.modeler-edit-error {
     margin-bottom: 0.75rem;
     padding: 0.6rem 0.75rem;
     border-radius: 0.5rem;

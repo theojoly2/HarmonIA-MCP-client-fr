@@ -28,12 +28,12 @@ class ModelerApp extends AppBase {
     }
 
     static _closeOpenEditDialogs() {
-        const openDialogs = document.querySelectorAll('.vision-edit-float');
+        const openDialogs = document.querySelectorAll('.modeler-edit-float');
         openDialogs.forEach((dialog) => dialog.remove());
     }
 
     static _hasOpenEditDialog() {
-        return document.querySelectorAll('.vision-edit-float').length > 0;
+        return document.querySelectorAll('.modeler-edit-float').length > 0;
     }
 
     render(container) {
@@ -42,60 +42,60 @@ class ModelerApp extends AppBase {
         this.viewer = null;
         this.container = container;
         container.innerHTML = `
-            <div class="vision-app h-full flex flex-col relative">
-                <div id="vision-home" class="vision-home px-4 sm:px-6 flex flex-col items-center text-center z-20 bg-white">
+            <div class="modeler-app h-full flex flex-col relative">
+                <div id="modeler-home" class="modeler-home px-4 sm:px-6 flex flex-col items-center text-center z-20 bg-white">
                     <h1 class="font-bold tracking-tight text-center text-black mb-2 mt-2">
-                        <button type="button" class="interactive-title bg-transparent border-0 p-0" title="Retour à l'accueil Vision">
-                            <span class="title-glow">Vision Sémantique</span>
+                        <button type="button" class="interactive-title bg-transparent border-0 p-0" title="Retour à l'accueil Modéliseur">
+                            <span class="title-glow">Modéliseur Sémantique</span>
                         </button>
                     </h1>
-                    <div id="vision-import-container" class="w-full max-w-md">
+                    <div id="modeler-import-container" class="w-full max-w-md">
                         <p class="text-base font-medium mb-6 text-center max-w-md mx-auto text-gray-500">
                             Importez un fichier (TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML) pour le visualiser sous forme de diagramme.
                         </p>
-                        <label id="vision-drop-zone" class="drop-zone flex flex-col items-center justify-center w-full max-w-md mx-auto py-10 px-6 cursor-pointer hover:border-gray-400">
+                        <label id="modeler-drop-zone" class="drop-zone flex flex-col items-center justify-center w-full max-w-md mx-auto py-10 px-6 cursor-pointer hover:border-gray-400">
                             <svg class="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
                             </svg>
                             <span class="text-sm font-semibold text-gray-700">Glissez-déposez un fichier ici</span>
                             <span class="text-xs text-gray-400 mt-1">ou cliquez pour parcourir</span>
-                            <input type="file" id="vision-file-input" class="hidden" accept=".ttl,.xml,.xmi,.json,.jsonld,.sql,.txt,.html,.htm,.csv">
+                            <input type="file" id="modeler-file-input" class="hidden" accept=".ttl,.xml,.xmi,.json,.jsonld,.sql,.txt,.html,.htm,.csv">
                         </label>
                     </div>
                 </div>
-                <div id="vision-viewer" class="hidden flex-1 min-h-0 opacity-0 transition-opacity duration-300 relative">
-                    <div id="vision-svg-viewer" class="h-full w-full"></div>
-                    <div id="vision-loading" class="hidden absolute inset-0 flex items-center justify-center text-gray-500 z-10 bg-white/80 backdrop-blur-sm transition-opacity duration-300">
+                <div id="modeler-viewer" class="hidden flex-1 min-h-0 opacity-0 transition-opacity duration-300 relative">
+                    <div id="modeler-svg-viewer" class="h-full w-full"></div>
+                    <div id="modeler-loading" class="hidden absolute inset-0 flex items-center justify-center text-gray-500 z-10 bg-white/80 backdrop-blur-sm transition-opacity duration-300">
                         <svg class="animate-spin h-8 w-8 text-gray-400 mr-3" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
                         <span class="text-sm font-medium">Génération de la modélisation...</span>
                     </div>
-                    <div id="vision-edit-actions" class="hidden absolute right-3 z-20 flex flex-col gap-3" style="top: calc(50% - (2.75rem + 0.75rem)); transform: translateY(-50%);">
-                        <button type="button" id="vision-add-class" class="vision-edit-btn" title="Ajouter une classe">
+                    <div id="modeler-edit-actions" class="hidden absolute right-3 z-20 flex flex-col gap-3" style="top: calc(50% - (2.75rem + 0.75rem)); transform: translateY(-50%);">
+                        <button type="button" id="modeler-add-class" class="modeler-edit-btn" title="Ajouter une classe">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                                 <rect x="3" y="5" width="18" height="14" rx="2"></rect>
                                 <path d="M12 9v6M9 12h6"></path>
                             </svg>
-                            <span class="vision-edit-label">Classe</span>
+                            <span class="modeler-edit-label">Classe</span>
                         </button>
-                        <button type="button" id="vision-add-attr" class="vision-edit-btn" title="Ajouter un attribut">
+                        <button type="button" id="modeler-add-attr" class="modeler-edit-btn" title="Ajouter un attribut">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                                 <rect x="3" y="5" width="18" height="14" rx="2"></rect>
                                 <path d="M8 10h8M8 14h5"></path>
                                 <circle cx="18" cy="14" r="1.5" fill="currentColor"></circle>
                             </svg>
-                            <span class="vision-edit-label">Attribut</span>
+                            <span class="modeler-edit-label">Attribut</span>
                         </button>
-                        <button type="button" id="vision-add-connector" class="vision-edit-btn" title="Ajouter une relation">
+                        <button type="button" id="modeler-add-connector" class="modeler-edit-btn" title="Ajouter une relation">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                                 <rect x="3" y="8" width="7" height="8" rx="2"></rect>
                                 <rect x="14" y="8" width="7" height="8" rx="2"></rect>
                                 <path d="M10 12h4"></path>
                                 <path d="M17 8v-2M17 18v-2M7 8V6M7 18v-2" opacity="0.5"></path>
                             </svg>
-                            <span class="vision-edit-label">Relation</span>
+                            <span class="modeler-edit-label">Relation</span>
                         </button>
                     </div>
                 </div>
@@ -122,7 +122,7 @@ class ModelerApp extends AppBase {
                 });
             });
         } else {
-            const home = this.container.querySelector('#vision-home');
+            const home = this.container.querySelector('#modeler-home');
             if (home) home.style.transition = 'none';
             this._skipNextTransition = true;
         this._observeResize();
@@ -143,10 +143,10 @@ class ModelerApp extends AppBase {
     }
 
     _showLoadingState() {
-        const home = this.container.querySelector('#vision-home');
-        const importContainer = this.container.querySelector('#vision-import-container');
-        const dropZone = this.container.querySelector('#vision-drop-zone');
-        const viewer = this.container.querySelector('#vision-viewer');
+        const home = this.container.querySelector('#modeler-home');
+        const importContainer = this.container.querySelector('#modeler-import-container');
+        const dropZone = this.container.querySelector('#modeler-drop-zone');
+        const viewer = this.container.querySelector('#modeler-viewer');
         if (!home || !importContainer || !viewer) return;
 
         if (this._homeTimeout) {
@@ -159,9 +159,9 @@ class ModelerApp extends AppBase {
         }
 
         // Compact title at the top, viewer below, spinner centered in the viewer.
-        importContainer.classList.add('vision-import-hidden');
+        importContainer.classList.add('modeler-import-hidden');
         if (dropZone) dropZone.style.display = '';
-        home.classList.add('vision-top');
+        home.classList.add('modeler-top');
         home.style.transition = 'none';
         home.style.paddingTop = '0px';
         home.style.paddingBottom = '0px';
@@ -170,8 +170,8 @@ class ModelerApp extends AppBase {
         home.style.position = 'relative';
         home.style.zIndex = '25';
 
-        const app = this.container.querySelector('.vision-app');
-        if (app) app.classList.add('vision-loading-layout');
+        const app = this.container.querySelector('.modeler-app');
+        if (app) app.classList.add('modeler-loading-layout');
 
         viewer.classList.remove('hidden');
         viewer.style.transition = 'none';
@@ -185,12 +185,12 @@ class ModelerApp extends AppBase {
     }
 
     _bindEvents() {
-        const dropZone = this.container.querySelector('#vision-drop-zone');
-        const fileInput = this.container.querySelector('#vision-file-input');
-        const titleBtn = this.container.querySelector('#vision-home .interactive-title');
+        const dropZone = this.container.querySelector('#modeler-drop-zone');
+        const fileInput = this.container.querySelector('#modeler-file-input');
+        const titleBtn = this.container.querySelector('#modeler-home .interactive-title');
 
         if (titleBtn) {
-            titleBtn.addEventListener('click', () => this._showVisionHome());
+            titleBtn.addEventListener('click', () => this._showModéliseurHome());
         }
 
         if (!dropZone || !fileInput) return;
@@ -228,13 +228,13 @@ class ModelerApp extends AppBase {
         // Switch to viewer area and show spinner while keeping the import UI visible briefly
         this._enterLoadingMode();
         try {
-            this.svgText = await ApiClient.importVisionFile(file);
+            this.svgText = await ApiClient.importModéliseurFile(file);
             const match = this.svgText.match(/data-main-class="([^"]*)"/);
             this.mainClassName = match ? match[1] : '';
             this._showViewer();
 
             // Persist model to user history when logged in.
-            // If not logged in, store the import as pending only while this Vision instance stays open.
+            // If not logged in, store the import as pending only while this Modéliseur instance stays open.
             if (AuthManager.isLoggedIn()) {
                 try {
                     await ApiClient.importAndSaveModel(file, file.name);
@@ -246,30 +246,30 @@ class ModelerApp extends AppBase {
                 AuthManager.setPendingImport(file, file.name, this.svgText);
             }
         } catch (err) {
-            console.error('Vision import error', err);
+            console.error('Modéliseur import error', err);
             this._setLoading(false);
             this._showError(err.message);
         }
     }
 
     _enterLoadingMode() {
-        const home = this.container.querySelector('#vision-home');
-        const importContainer = this.container.querySelector('#vision-import-container');
-        const dropZone = this.container.querySelector('#vision-drop-zone');
-        const viewer = this.container.querySelector('#vision-viewer');
+        const home = this.container.querySelector('#modeler-home');
+        const importContainer = this.container.querySelector('#modeler-import-container');
+        const dropZone = this.container.querySelector('#modeler-drop-zone');
+        const viewer = this.container.querySelector('#modeler-viewer');
         if (!home || !importContainer || !viewer) return;
 
         // Get current centered padding and animate it to 0 (compact header) as the import begins.
         const startPadding = parseFloat(getComputedStyle(home).paddingTop) || 0;
         home.style.transition = 'none';
         home.style.paddingTop = startPadding + 'px';
-        home.classList.remove('vision-top');
+        home.classList.remove('modeler-top');
         void home.offsetHeight;
 
         // Animate the title upward while the import UI collapses.
         home.style.transition = 'padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1)';
         home.style.paddingTop = '0px';
-        importContainer.classList.add('vision-import-hidden');
+        importContainer.classList.add('modeler-import-hidden');
         if (dropZone) dropZone.style.display = 'none';
 
         // Reveal the viewer area and fade it in as the title glides up.
@@ -282,18 +282,18 @@ class ModelerApp extends AppBase {
         // Lock the compact viewer state once the upward glide finishes.
         if (this._loadingTimeout) clearTimeout(this._loadingTimeout);
         this._loadingTimeout = setTimeout(() => {
-            home.classList.add('vision-top');
+            home.classList.add('modeler-top');
             home.style.transition = '';
             home.style.paddingTop = '';
         }, 550);
     }
 
     _showViewer() {
-        const viewerContainer = this.container.querySelector('#vision-svg-viewer');
-        const viewer = this.container.querySelector('#vision-viewer');
-        const app = this.container.querySelector('.vision-app');
-        const editActions = this.container.querySelector('#vision-edit-actions');
-        if (app) app.classList.remove('vision-loading-layout');
+        const viewerContainer = this.container.querySelector('#modeler-svg-viewer');
+        const viewer = this.container.querySelector('#modeler-viewer');
+        const app = this.container.querySelector('.modeler-app');
+        const editActions = this.container.querySelector('#modeler-edit-actions');
+        if (app) app.classList.remove('modeler-loading-layout');
 
         if (!this.viewer) {
             this.viewer = new SvgViewer(viewerContainer, {
@@ -313,7 +313,7 @@ class ModelerApp extends AppBase {
                 editActions.classList.remove('hidden');
                 this._updateEditButtonStates();
             }
-            this.setTitle(`Vision: ${this.fileName}`);
+            this.setTitle(`Modéliseur: ${this.fileName}`);
         };
         if (this._centerOnNextShow) {
             this.viewer.resetZoom();
@@ -325,13 +325,13 @@ class ModelerApp extends AppBase {
         }
     }
 
-    _showVisionHome() {
-        const home = this.container.querySelector('#vision-home');
-        const importContainer = this.container.querySelector('#vision-import-container');
-        const viewer = this.container.querySelector('#vision-viewer');
-        const app = this.container.querySelector('.vision-app');
+    _showModéliseurHome() {
+        const home = this.container.querySelector('#modeler-home');
+        const importContainer = this.container.querySelector('#modeler-import-container');
+        const viewer = this.container.querySelector('#modeler-viewer');
+        const app = this.container.querySelector('.modeler-app');
 
-        if (app) app.classList.remove('vision-loading-layout');
+        if (app) app.classList.remove('modeler-loading-layout');
 
         if (!home || !viewer || viewer.classList.contains('hidden')) {
             this._finalizeHomeAndCenter(true);
@@ -345,7 +345,7 @@ class ModelerApp extends AppBase {
 
         // Stage the import container hidden so it can fade in later.
         if (importContainer) {
-            importContainer.classList.remove('vision-import-hidden');
+            importContainer.classList.remove('modeler-import-hidden');
             importContainer.style.display = '';
             importContainer.style.transition = 'none';
             importContainer.style.opacity = '0';
@@ -353,7 +353,7 @@ class ModelerApp extends AppBase {
         }
 
         // Remove compact class and reset padding so we can animate from the current viewer layout.
-        home.classList.remove('vision-top');
+        home.classList.remove('modeler-top');
 
         // Start the title/diagram descent using paddingTop in the normal flex flow.
         home.style.transition = 'none';
@@ -371,7 +371,7 @@ class ModelerApp extends AppBase {
 
         // Fade in the import container so it is fully visible when the title reaches center.
         if (importContainer) {
-            const dropZone = importContainer.querySelector('#vision-drop-zone');
+            const dropZone = importContainer.querySelector('#modeler-drop-zone');
             setTimeout(() => {
                 if (dropZone) {
                     dropZone.style.display = '';
@@ -402,7 +402,7 @@ class ModelerApp extends AppBase {
             if (importContainer) {
                 importContainer.style.display = '';
             }
-            const dropZone = this.container.querySelector('#vision-drop-zone');
+            const dropZone = this.container.querySelector('#modeler-drop-zone');
             if (dropZone) dropZone.style.display = '';
         }, 700);
     }
@@ -464,9 +464,9 @@ class ModelerApp extends AppBase {
     }
 
     _bindEditEvents() {
-        const addClassBtn = this.container.querySelector('#vision-add-class');
-        const addAttrBtn = this.container.querySelector('#vision-add-attr');
-        const addConnectorBtn = this.container.querySelector('#vision-add-connector');
+        const addClassBtn = this.container.querySelector('#modeler-add-class');
+        const addAttrBtn = this.container.querySelector('#modeler-add-attr');
+        const addConnectorBtn = this.container.querySelector('#modeler-add-connector');
         if (addClassBtn) addClassBtn.addEventListener('click', () => this._showAddClassDialog());
         if (addAttrBtn) addAttrBtn.addEventListener('click', () => this._showAddAttributeDialog());
         if (addConnectorBtn) addConnectorBtn.addEventListener('click', () => this._showAddConnectorDialog());
@@ -474,11 +474,11 @@ class ModelerApp extends AppBase {
     }
 
     _updateEditButtonStates() {
-        const addClassBtn = this.container.querySelector('#vision-add-class');
-        const addAttrBtn = this.container.querySelector('#vision-add-attr');
-        const addConnectorBtn = this.container.querySelector('#vision-add-connector');
+        const addClassBtn = this.container.querySelector('#modeler-add-class');
+        const addAttrBtn = this.container.querySelector('#modeler-add-attr');
+        const addConnectorBtn = this.container.querySelector('#modeler-add-connector');
         const classes = this._extractClassNames();
-        const disabledClass = 'vision-edit-btn-disabled';
+        const disabledClass = 'modeler-edit-btn-disabled';
         if (addClassBtn) {
             addClassBtn.disabled = false;
             addClassBtn.classList.remove(disabledClass);
@@ -499,7 +499,7 @@ class ModelerApp extends AppBase {
     }
 
     _showAddClassDialog() {
-        VisionApp._closeOpenEditDialogs();
+        ModelerApp._closeOpenEditDialogs();
         const fields = [
             { id: 'cls-title', label: 'Nom de la classe', required: true, help: 'Nom unique qui identifie la classe dans le modèle.' },
             { id: 'cls-definition', label: 'Définition', type: 'textarea', help: 'Description claire du rôle et du sens de cette classe.' },
@@ -508,8 +508,8 @@ class ModelerApp extends AppBase {
             { id: 'cls-package', label: 'Package (optionnel)', help: 'Groupe logique auquel rattacher cette classe (ex. Admin, Produit).' },
         ];
         this._showFloatingDialog('Ajouter une classe', fields, async (values, overlay) => {
-            overlay.querySelector('.vision-edit-submit').disabled = true;
-            overlay.querySelector('.vision-edit-submit').textContent = 'Enregistrement...';
+            overlay.querySelector('.modeler-edit-submit').disabled = true;
+            overlay.querySelector('.modeler-edit-submit').textContent = 'Enregistrement...';
             try {
                 this._setLoading(true);
                 const res = await fetch(`api/models/${encodeURIComponent(this.fileName)}/add-class`, {
@@ -533,15 +533,15 @@ class ModelerApp extends AppBase {
             } finally {
                 this._setLoading(false);
                 if (overlay.parentNode) {
-                    overlay.querySelector('.vision-edit-submit').disabled = false;
-                    overlay.querySelector('.vision-edit-submit').textContent = 'Enregistrer';
+                    overlay.querySelector('.modeler-edit-submit').disabled = false;
+                    overlay.querySelector('.modeler-edit-submit').textContent = 'Enregistrer';
                 }
             }
         });
     }
 
     _showAddAttributeDialog() {
-        VisionApp._closeOpenEditDialogs();
+        ModelerApp._closeOpenEditDialogs();
         const classes = this._extractClassNames();
         if (!classes.length) {
             return;
@@ -585,8 +585,8 @@ class ModelerApp extends AppBase {
             }
         };
         this._showFloatingDialog("Ajouter un attribut", fields, async (values, overlay) => {
-            overlay.querySelector('.vision-edit-submit').disabled = true;
-            overlay.querySelector('.vision-edit-submit').textContent = 'Enregistrement...';
+            overlay.querySelector('.modeler-edit-submit').disabled = true;
+            overlay.querySelector('.modeler-edit-submit').textContent = 'Enregistrement...';
             try {
                 this._setLoading(true);
                 let attrType = values['attr-type'];
@@ -617,15 +617,15 @@ class ModelerApp extends AppBase {
             } finally {
                 this._setLoading(false);
                 if (overlay.parentNode) {
-                    overlay.querySelector('.vision-edit-submit').disabled = false;
-                    overlay.querySelector('.vision-edit-submit').textContent = 'Enregistrer';
+                    overlay.querySelector('.modeler-edit-submit').disabled = false;
+                    overlay.querySelector('.modeler-edit-submit').textContent = 'Enregistrer';
                 }
             }
         }, onOpen);
     }
 
     _showAddConnectorDialog() {
-        VisionApp._closeOpenEditDialogs();
+        ModelerApp._closeOpenEditDialogs();
         const classes = this._extractClassNames();
         if (!classes.length) {
             return;
@@ -661,8 +661,8 @@ class ModelerApp extends AppBase {
             { id: 'conn-usage', label: "Note d'utilisation", type: 'textarea', help: 'Précisions sur les conditions d\'utilisation ou les contraintes.' },
         ];
         this._showFloatingDialog('Ajouter une relation', fields, async (values, overlay) => {
-            overlay.querySelector('.vision-edit-submit').disabled = true;
-            overlay.querySelector('.vision-edit-submit').textContent = 'Enregistrement...';
+            overlay.querySelector('.modeler-edit-submit').disabled = true;
+            overlay.querySelector('.modeler-edit-submit').textContent = 'Enregistrement...';
             try {
                 this._setLoading(true);
                 const res = await fetch(`api/models/${encodeURIComponent(this.fileName)}/add-connector`, {
@@ -692,8 +692,8 @@ class ModelerApp extends AppBase {
             } finally {
                 this._setLoading(false);
                 if (overlay.parentNode) {
-                    overlay.querySelector('.vision-edit-submit').disabled = false;
-                    overlay.querySelector('.vision-edit-submit').textContent = 'Enregistrer';
+                    overlay.querySelector('.modeler-edit-submit').disabled = false;
+                    overlay.querySelector('.modeler-edit-submit').textContent = 'Enregistrer';
                 }
             }
         });
@@ -702,7 +702,7 @@ class ModelerApp extends AppBase {
     _syncEditDialogScroll(win) {
         const body = win.querySelector('.window-body');
         if (!body) return;
-        const scrollArea = body.querySelector('.vision-edit-body');
+        const scrollArea = body.querySelector('.modeler-edit-body');
         if (scrollArea) {
             scrollArea.style.maxHeight = (body.clientHeight) + 'px';
         }
@@ -725,7 +725,7 @@ class ModelerApp extends AppBase {
 
     _showFloatingDialog(title, fields, onSubmit, onOpen) {
         // Close any existing edit dialog first (only one floating edit window at a time).
-        VisionApp._closeOpenEditDialogs();
+        ModelerApp._closeOpenEditDialogs();
 
         const floatWin = UiUtils.createFloatingWindow({
             title,
@@ -736,7 +736,7 @@ class ModelerApp extends AppBase {
             onResize: () => { this._syncEditDialogScroll(floatWin.win); },
             onResizeEnd: () => { this._syncEditDialogScroll(floatWin.win); }
         });
-        floatWin.win.classList.add('vision-edit-float');
+        floatWin.win.classList.add('modeler-edit-float');
         floatWin.win.style.minHeight = '260px';
         floatWin.win.style.maxHeight = '85vh';
         const root = document.getElementById('floating-root') || document.body;
@@ -754,7 +754,7 @@ class ModelerApp extends AppBase {
         body.style.flexDirection = 'column';
         body.style.overflow = 'hidden';
         const optionsHtml = (opts) => opts || '';
-        const infoIcon = (help) => help ? `<span class="vision-field-help" title="${this._escape(help)}">i</span>` : '';
+        const infoIcon = (help) => help ? `<span class="modeler-field-help" title="${this._escape(help)}">i</span>` : '';
         const inputsHtml = fields.map((f) => {
             const label = `<label class="block text-sm font-semibold text-gray-700 mb-1 ${this._escape(f.labelClass || '')}" for="${f.id}"><span class="flex items-center gap-1.5">${this._escape(f.label)}${f.required ? ' *' : ''}${infoIcon(f.help)}</span></label>`;
             let input;
@@ -768,18 +768,18 @@ class ModelerApp extends AppBase {
             return `<div class="mb-3 ${this._escape(f.className || '')}">${label}${input}</div>`;
         }).join('');
         body.innerHTML = `
-            <div class="vision-edit-body" style="flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 1.25rem;">
-                <form id="vision-edit-form">
+            <div class="modeler-edit-body" style="flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 1.25rem;">
+                <form id="modeler-edit-form">
                     ${inputsHtml}
-                    <div class="vision-edit-error hidden" id="dialog-error"></div>
-                    <button type="submit" class="vision-edit-submit">Enregistrer</button>
+                    <div class="modeler-edit-error hidden" id="dialog-error"></div>
+                    <button type="submit" class="modeler-edit-submit">Enregistrer</button>
                 </form>
             </div>
         `;
         requestAnimationFrame(() => this._syncEditDialogScroll(floatWin.win));
 
-        const form = body.querySelector('#vision-edit-form');
-        const submitBtn = body.querySelector('.vision-edit-submit');
+        const form = body.querySelector('#modeler-edit-form');
+        const submitBtn = body.querySelector('.modeler-edit-submit');
 
         if (onOpen) {
             onOpen(body);
@@ -834,12 +834,12 @@ class ModelerApp extends AppBase {
     }
 
     _setLoading(isLoading) {
-        const el = this.container.querySelector('#vision-loading');
+        const el = this.container.querySelector('#modeler-loading');
         if (el) el.classList.toggle('hidden', !isLoading);
     }
 
     _showError(message) {
-        const viewer = this.container.querySelector('#vision-viewer');
+        const viewer = this.container.querySelector('#modeler-viewer');
         if (viewer) {
             viewer.classList.remove('hidden');
             viewer.innerHTML = `<div class="text-red-500 text-sm p-4 flex items-center justify-center h-full">Erreur d'import : ${message}</div>`;
@@ -882,16 +882,16 @@ class ModelerApp extends AppBase {
     }
 
     _updateHomeVisibility(skipTransition) {
-        const home = this.container.querySelector('#vision-home');
-        const importContainer = this.container.querySelector('#vision-import-container');
-        const viewer = this.container.querySelector('#vision-viewer');
+        const home = this.container.querySelector('#modeler-home');
+        const importContainer = this.container.querySelector('#modeler-import-container');
+        const viewer = this.container.querySelector('#modeler-viewer');
         if (!home || !importContainer || !viewer) return;
 
         if (this.svgText) {
             // Viewer mode: compact header, hidden import UI
-            home.classList.add('vision-top');
+            home.classList.add('modeler-top');
             home.style.paddingTop = '0px';
-            importContainer.classList.add('vision-import-hidden');
+            importContainer.classList.add('modeler-import-hidden');
             viewer.classList.remove('hidden');
             viewer.style.opacity = '1';
             viewer.style.transition = '';
@@ -900,7 +900,7 @@ class ModelerApp extends AppBase {
             // Measure the children directly so the current padding does not influence it.
             const was = home.style.transition;
             if (skipTransition || this._skipNextTransition) home.style.transition = 'none';
-            home.classList.remove('vision-top');
+            home.classList.remove('modeler-top');
             const contentHeight = this._measureHomeContentHeight(home);
             const available = Math.max(this.container.clientHeight, contentHeight);
             const offset = Math.max(0, (available - contentHeight) / 2);
@@ -909,7 +909,7 @@ class ModelerApp extends AppBase {
                 home.offsetHeight; // force reflow
                 home.style.transition = was;
             }
-            importContainer.classList.remove('vision-import-hidden');
+            importContainer.classList.remove('modeler-import-hidden');
             viewer.classList.add('hidden');
             viewer.style.opacity = '0';
             viewer.style.transition = '';
@@ -937,4 +937,4 @@ class ModelerApp extends AppBase {
     }
 }
 
-window.VisionApp = VisionApp;
+window.ModelerApp = ModelerApp;
