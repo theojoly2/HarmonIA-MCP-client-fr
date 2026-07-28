@@ -303,23 +303,23 @@ class VisionApp extends AppBase {
         this.viewer.setSvg(this.svgText, this.mainClassName);
         // New import/open from history/preview: center diagram after it becomes visible.
         // Returning from another tab: restore the saved pan/zoom.
+        const finalize = () => {
+            this._setLoading(false);
+            if (viewer) viewer.style.opacity = '1';
+            if (editActions) {
+                editActions.classList.remove('hidden');
+                this._updateEditButtonStates();
+            }
+            this.setTitle(`Vision: ${this.fileName}`);
+        };
         if (this._centerOnNextShow) {
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    this.viewer.resetZoom();
-                    this._centerOnNextShow = false;
-                });
-            });
+            this.viewer.resetZoom();
+            this._centerOnNextShow = false;
+            requestAnimationFrame(() => requestAnimationFrame(finalize));
         } else {
             this.viewer.restoreState(this.viewerState);
+            finalize();
         }
-        this._setLoading(false);
-        if (viewer) viewer.style.opacity = '1';
-        if (editActions) {
-            editActions.classList.remove('hidden');
-            this._updateEditButtonStates();
-        }
-        this.setTitle(`Vision: ${this.fileName}`);
     }
 
     _showVisionHome() {
