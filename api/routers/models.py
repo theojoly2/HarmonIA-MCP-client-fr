@@ -13,6 +13,9 @@ from pydantic import BaseModel
 from api.dependencies import generate_svg_for_bytes
 from api.routers.auth import require_user
 from api.services.model_store import (
+    add_attribute,
+    add_class,
+    add_connector,
     delete_model,
     get_model,
     list_models,
@@ -32,6 +35,23 @@ class ImportResponse(BaseModel):
 
 class RenameBody(BaseModel):
     name: str
+
+
+class ClassEditBody(BaseModel):
+    class_name: str
+    package: Optional[str] = None
+
+
+class AttributeEditBody(BaseModel):
+    class_name: str
+    attribute_name: str
+    attribute_type: Optional[str] = None
+
+
+class ConnectorEditBody(BaseModel):
+    source_class: str
+    target_class: str
+    connector_type: Optional[str] = "Association"
 
 
 @router.get("")
@@ -149,6 +169,41 @@ async def rename(model_name: str, body: RenameBody, username: str = Depends(requ
 async def remove(model_name: str, username: str = Depends(require_user)):
     await delete_model(username, model_name)
     return {"ok": True}
+
+
+@router.post("/{model_name}/add-class")
+async def add_class_route(model_name: str, body: ClassEditBody, username: str = Depends(require_user)):
+    result = await add_class(
+        username,
+        model_name,
+        class_name=body.class_name.strip(),
+        package=(body.package or "").strip() or None,
+    )
+    return result
+
+
+@router.post("/{model_name}/add-attribute")
+async def add_attribute_route(model_name: str, body: AttributeEditBody, username: str = Depends(require_user)):
+    result = await add_attribute(
+        username,
+        model_name,
+        class_name=body.class_name.strip(),
+        attribute_name=body.attribute_name.strip(),
+        attribute_type=(body.attribute_type or "").strip() or None,
+    )
+    return result
+
+
+@router.post("/{model_name}/add-connector")
+async def add_connector_route(model_name: str, body: ConnectorEditBody, username: str = Depends(require_user)):
+    result = await add_connector(
+        username,
+        model_name,
+        source_class=body.source_class.strip(),
+        target_class=body.target_class.strip(),
+        connector_type=(body.connector_type or "Association").strip(),
+    )
+    return result
 
 
 def base64_for_bytes(data: bytes) -> str:

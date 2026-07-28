@@ -8,12 +8,15 @@ import json
 from typing import Any, Optional
 
 from api.services.mcp_service import (
+    add_attribute_mcp,
+    add_class_mcp,
+    add_connector_mcp,
     delete_model_mcp,
     get_model_mcp,
     list_models_mcp,
     rename_model_mcp,
-    touch_model_mcp,
-    upload_model_mcp,
+    save_model,
+    touch_model,
 )
 
 
@@ -43,3 +46,15 @@ async def rename_model(username: str, old_name: str, new_name: str) -> dict[str,
 
 async def delete_model(username: str, name: str) -> None:
     await delete_model_mcp(username, name)
+
+
+async def add_class(username: str, name: str, **kwargs) -> dict[str, Any]:
+    return await add_class_mcp(username, name, **kwargs)
+
+
+async def add_attribute(username: str, name: str, **kwargs) -> dict[str, Any]:
+    return await add_attribute_mcp(username, name, **kwargs)
+
+
+async def add_connector(username: str, name: str, **kwargs) -> dict[str, Any]:
+    return await add_connector_mcp(username, name, **kwargs)
