@@ -81,13 +81,13 @@ class PreviewApp extends AppBase {
         }
         const modelerInstance = AppState.createInstance("modeler", {
             mode: "tab",
-            fileName: this.docName,
-            svgText: this.svgText,
-            mainClassName,
         });
         await windowManager._mountTab(modelerInstance.instance);
         AppState.setActiveInstance(modelerInstance.instanceId);
         windowManager.close(this.instanceId);
+        if (modelerInstance.instance.loadSvg) {
+            await modelerInstance.instance.loadSvg(this.svgText, this.docName, mainClassName);
+        }
 
         // Persist the model in the background and refresh the history panel.
         try {

@@ -320,13 +320,12 @@ class HistoryPanel {
             }
             const modelerInstance = AppState.createInstance("modeler", {
                 mode: "tab",
-                fileName: returnedName || fileName,
-                svgText,
-                mainClassName: (svgText.match(match) || ["", ""])[1],
-                loading: true,
             });
             await windowManager._mountTab(modelerInstance.instance);
             AppState.setActiveInstance(modelerInstance.instanceId);
+            if (modelerInstance.instance.loadSvg) {
+                await modelerInstance.instance.loadSvg(svgText, returnedName || fileName, (svgText.match(match) || ["", ""])[1]);
+            }
 
             await this.load();
         } catch (err) {

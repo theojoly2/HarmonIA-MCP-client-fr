@@ -212,26 +212,12 @@ class ModelerApp extends AppBase {
     }
 
     async _handleFile(file) {
-        this.fileName = file.name;
-        // Every new import must be centered.
-        this._centerOnNextShow = true;
-        this.viewerState = { scale: 1, x: 0, y: 0 };
-        // Cancel any pending return-to-home transition that would overwrite this import.
-        if (this._homeTimeout) {
-            clearTimeout(this._homeTimeout);
-            this._homeTimeout = null;
-        }
-        if (this.viewer) {
-            this.viewer.destroy();
-            this.viewer = null;
-        }
-        // Switch to viewer area and show spinner while keeping the import UI visible briefly
         this._enterLoadingMode();
         try {
             this.svgText = await ApiClient.importModéliseurFile(file);
             const match = this.svgText.match(/data-main-class="([^"]*)"/);
-            this.mainClassName = match ? match[1] : '';
-            this._showViewer();
+            const mainClassName = match ? match[1] : '';
+            await this.loadSvg(this.svgText, file.name, mainClassName);
 
             // Persist model to user history when logged in.
             // If not logged in, store the import as pending only while this Modéliseur instance stays open.
@@ -250,6 +236,25 @@ class ModelerApp extends AppBase {
             this._setLoading(false);
             this._showError(err.message);
         }
+    }
+
+    async loadSvg(svgText, fileName, mainClassName = '') {
+        // Every new import/open from history/preview must be centered.
+        this.svgText = svgText;
+        this.fileName = fileName;
+        this.mainClassName = mainClassName;
+        this._centerOnNextShow = true;
+        this.viewerState = { scale: 1, x: 0, y: 0 };
+        // Cancel any pending return-to-home transition that would overwrite this import.
+        if (this._homeTimeout) {
+            clearTimeout(this._homeTimeout);
+            this._homeTimeout = null;
+        }
+        if (this.viewer) {
+            this.viewer.destroy();
+            this.viewer = null;
+        }
+        this._showViewer();
     }
 
     _enterLoadingMode() {
