@@ -323,8 +323,9 @@ class HistoryPanel {
             });
             await windowManager._mountTab(modelerInstance.instance);
             AppState.setActiveInstance(modelerInstance.instanceId);
+            const displayName = returnedName || modelName;
             if (modelerInstance.instance.loadSvg) {
-                await modelerInstance.instance.loadSvg(svgText, returnedName || modelName, (svgText.match(match) || ["", ""])[1]);
+                await modelerInstance.instance.loadSvg(svgText, displayName, (svgText.match(match) || ["", ""])[1], modelName);
             }
 
             await this.load();

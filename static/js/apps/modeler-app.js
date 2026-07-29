@@ -14,6 +14,7 @@ class ModelerApp extends AppBase {
     constructor(instanceId, props = {}) {
         super(instanceId, props);
         this.fileName = props.fileName || '';
+        this.storedName = props.storedName || '';
         this.svgText = props.svgText || '';
         this.mainClassName = props.mainClassName || '';
         this.loading = props.loading || false;
@@ -308,13 +309,14 @@ class ModelerApp extends AppBase {
             this.svgText = await ApiClient.importModéliseurFile(file);
             const match = this.svgText.match(/data-main-class="([^"]*)"/);
             const mainClassName = match ? match[1] : '';
-            await this.loadSvg(this.svgText, file.name, mainClassName);
 
-            // Persist model to user history when logged in.
-            // If not logged in, store the import as pending only while this Modéliseur instance stays open.
+            let storedName = file.name;
+            let displayName = file.name;
             if (AuthManager.isLoggedIn()) {
                 try {
-                    await ApiClient.importAndSaveModel(file, file.name);
+                    const meta = await ApiClient.importAndSaveModel(file, file.name);
+                    storedName = meta.name || file.name;
+                    displayName = meta.display_name || file.name;
                     if (window.historyPanel) window.historyPanel.load();
                 } catch (err) {
                     console.error('Model save error', err);
@@ -322,6 +324,7 @@ class ModelerApp extends AppBase {
             } else {
                 AuthManager.setPendingImport(file, file.name, this.svgText);
             }
+            await this.loadSvg(this.svgText, displayName, mainClassName, storedName);
         } catch (err) {
             console.error('Modéliseur import error', err);
             this._setLoading(false);
@@ -329,10 +332,11 @@ class ModelerApp extends AppBase {
         }
     }
 
-    async loadSvg(svgText, fileName, mainClassName = '') {
+    async loadSvg(svgText, fileName, mainClassName = '', storedName = '') {
         // Every new import/open from history/preview must be centered.
         this.svgText = svgText;
         this.fileName = fileName;
+        this.storedName = storedName || fileName;
         this.mainClassName = mainClassName;
         this._centerOnNextShow = true;
         this.viewerState = { scale: 1, x: 0, y: 0 };
@@ -616,7 +620,7 @@ class ModelerApp extends AppBase {
             overlay.querySelector('.modeler-edit-submit').textContent = 'Enregistrement...';
             try {
                 this._setLoading(true);
-                const res = await fetch(`api/models/${encodeURIComponent(this.fileName)}/add-class`, {
+                const res = await fetch(`api/models/${encodeURIComponent(this.storedName || this.fileName)}/add-class`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'same-origin',
@@ -697,7 +701,7 @@ class ModelerApp extends AppBase {
                 if (attrType === '__other__') {
                     attrType = values['attr-type-other'];
                 }
-                const res = await fetch(`api/models/${encodeURIComponent(this.fileName)}/add-attribute`, {
+                const res = await fetch(`api/models/${encodeURIComponent(this.storedName || this.fileName)}/add-attribute`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'same-origin',
@@ -769,7 +773,7 @@ class ModelerApp extends AppBase {
             overlay.querySelector('.modeler-edit-submit').textContent = 'Enregistrement...';
             try {
                 this._setLoading(true);
-                const res = await fetch(`api/models/${encodeURIComponent(this.fileName)}/add-connector`, {
+                const res = await fetch(`api/models/${encodeURIComponent(this.storedName || this.fileName)}/add-connector`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'same-origin',
@@ -814,7 +818,7 @@ class ModelerApp extends AppBase {
     }
 
     async _reloadSvgFromServer() {
-        const encodedName = encodeURIComponent(this.fileName);
+        const encodedName = encodeURIComponent(this.storedName || this.fileName);
         const res = await fetch(`api/models/${encodedName}/open`, {
             method: 'POST',
             credentials: 'same-origin',
