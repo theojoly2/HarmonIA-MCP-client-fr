@@ -156,7 +156,9 @@ async def import_model(
     stored_data["source_filename"] = filename
     stored_data["source_bytes_b64"] = base64_for_bytes(file_bytes)
     stored_data["source_format"] = kind or "unknown"
-    stored_data["name"] = stored_name
+    # Keep the displayable model name inside the JSON; the technical file name
+    # is only used for the file path, never for package/ontology labels.
+    stored_data["name"] = display_name
 
     payload = await save_model(
         username=username,
@@ -187,7 +189,7 @@ async def create_empty_model(body: EmptyModelBody, username: str = Depends(requi
         "svg": svg_text,
         "source_filename": "",
         "source_format": "empty",
-        "name": stored_name,
+        "name": display_name,
     }
 
     payload = await save_model(
@@ -253,8 +255,18 @@ async def touch_model_route(model_name: str, username: str = Depends(require_use
 
 @router.patch("/{model_name}/rename")
 async def rename(model_name: str, body: RenameBody, username: str = Depends(require_user)):
-    meta = await rename_model(username, model_name, body.name.strip())
-    return meta
+    new_display_name = body.name.strip()
+    new_stored_name = _unique_model_name(new_display_name)
+    meta = await rename_model(username, model_name, new_stored_name)
+    # Rewrite the persisted JSON so the embedded model name stays the display name.
+    try:
+        model = await get_model(username, new_stored_name)
+        if isinstance(model, dict):
+            model["name"] = new_display_name
+            await save_model(username, new_stored_name, model)
+    except Exception:
+        pass
+    return {"ok": True, "name": new_stored_name, "display_name": new_display_name}
 
 
 @router.delete("/{model_name}")
