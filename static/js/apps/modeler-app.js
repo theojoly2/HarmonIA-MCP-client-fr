@@ -229,13 +229,14 @@ class ModelerApp extends AppBase {
             try {
                 const meta = await ApiClient.createEmptyModel(name.trim());
                 const modelName = meta.name || name.trim();
+                const displayName = meta.display_name || modelName;
                 const res = await fetch(`api/models/${encodeURIComponent(modelName)}/open`, {
                     method: 'POST',
                     credentials: 'same-origin',
                 });
                 if (!res.ok) throw new Error(`open_failed:${res.status}`);
                 const svgText = await res.text();
-                await this.loadSvg(svgText, modelName, '');
+                await this.loadSvg(svgText, displayName, '');
                 if (window.historyPanel) window.historyPanel.load();
             } catch (err) {
                 console.error('Create empty model error', err);

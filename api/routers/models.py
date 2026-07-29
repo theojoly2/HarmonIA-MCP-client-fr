@@ -43,6 +43,7 @@ router = APIRouter(prefix="/api/models", tags=["models"])
 
 class ImportResponse(BaseModel):
     name: str
+    display_name: str
     source_format: str
 
 
@@ -91,7 +92,9 @@ class ConnectorEditBody(BaseModel):
 async def get_models(username: str = Depends(require_user)):
     models = await list_models(username)
     for model in models:
-        model["name"] = _display_name(model.get("name", ""))
+        stored_name = model.get("name", "")
+        model["name"] = stored_name
+        model["display_name"] = _display_name(stored_name)
     return {"models": models}
 
 
@@ -159,7 +162,8 @@ async def import_model(
         model_data=stored_data,
     )
     return ImportResponse(
-        name=_display_name(payload.get("name", stored_name)),
+        name=stored_name,
+        display_name=_display_name(payload.get("name", stored_name)),
         source_format=payload.get("source_format", kind or "unknown"),
     )
 
@@ -190,7 +194,8 @@ async def create_empty_model(body: EmptyModelBody, username: str = Depends(requi
         model_data=stored_data,
     )
     return ImportResponse(
-        name=_display_name(payload.get("name", stored_name)),
+        name=stored_name,
+        display_name=_display_name(payload.get("name", stored_name)),
         source_format="empty",
     )
 

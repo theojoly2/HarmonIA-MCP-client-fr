@@ -70,6 +70,15 @@ const ApiClient = (() => {
         return { svgText: await res.text(), modelName: res.headers.get("X-Model-Name") || name };
     }
 
+    async function getModelSvg(name) {
+        const res = await fetch(apiUrl(`models/${encodeURIComponent(name)}/open`), {
+            method: "POST",
+            credentials: "same-origin",
+        });
+        if (!res.ok) throw new Error(`Model open failed: ${res.status}`);
+        return { svgText: await res.text(), modelName: res.headers.get("X-Model-Name") || name };
+    }
+
     async function createEmptyModel(name) {
         const res = await fetch(apiUrl("models/create-empty"), {
             method: "POST",

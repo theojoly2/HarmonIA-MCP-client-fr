@@ -107,10 +107,11 @@ class HistoryPanel {
         this.emptyEl.classList.add("hidden");
         this.items.forEach((item) => {
             const isSearch = item.kind === "search";
-            const itemName = item.name || "";
+            const storedName = item.name || "";
+            const displayName = item.display_name || storedName;
             const li = document.createElement("li");
             li.className = `history-item history-item-${item.kind}`;
-            li.dataset.itemName = itemName;
+            li.dataset.itemName = storedName;
             li.dataset.itemKind = item.kind;
             if (isSearch) li.dataset.searchId = item.id;
             li.innerHTML = `
@@ -118,7 +119,7 @@ class HistoryPanel {
                     ${isSearch ? this._searchIcon() : this._modelerIcon()}
                 </div>
                 <div class="history-item-info">
-                    <span class="history-item-name">${this._escape(itemName)}</span>
+                    <span class="history-item-name">${this._escape(displayName)}</span>
                 </div>
                 <button type="button" class="history-action history-action-more" title="Actions" aria-haspopup="true">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -128,8 +129,8 @@ class HistoryPanel {
             `;
             li.addEventListener("click", (e) => {
                 if (e.target.closest(".history-action-more, .history-menu")) return;
-                if (isSearch) this._runSearch(itemName, (item.tags || "").split(",").filter(Boolean), item.id);
-                else this._openModel(itemName);
+                if (isSearch) this._runSearch(storedName, (item.tags || "").split(",").filter(Boolean), item.id);
+                else this._openModel(storedName);
             });
             const moreBtn = li.querySelector(".history-action-more");
             moreBtn.addEventListener("click", (e) => {
@@ -292,7 +293,6 @@ class HistoryPanel {
 
     async _openModel(modelName) {
         const encodedName = encodeURIComponent(modelName);
-        const fileName = modelName;
         const match = /data-main-class="([^"]*)"/;
 
         this.close();
@@ -324,7 +324,7 @@ class HistoryPanel {
             await windowManager._mountTab(modelerInstance.instance);
             AppState.setActiveInstance(modelerInstance.instanceId);
             if (modelerInstance.instance.loadSvg) {
-                await modelerInstance.instance.loadSvg(svgText, returnedName || fileName, (svgText.match(match) || ["", ""])[1]);
+                await modelerInstance.instance.loadSvg(svgText, returnedName || modelName, (svgText.match(match) || ["", ""])[1]);
             }
 
             await this.load();
