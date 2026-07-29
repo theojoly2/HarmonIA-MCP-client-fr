@@ -70,6 +70,20 @@ const ApiClient = (() => {
         return { svgText: await res.text(), modelName: res.headers.get("X-Model-Name") || name };
     }
 
+    async function createEmptyModel(name) {
+        const res = await fetch(apiUrl("models/create-empty"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ name }),
+        });
+        if (!res.ok) {
+            if (res.status === 401) throw new Error("not_authenticated");
+            throw new Error(`Create empty model failed: ${res.status}`);
+        }
+        return res.json();
+    }
+
     async function getModels() {
         const res = await fetch(apiUrl("models"), { credentials: "same-origin" });
         if (!res.ok) throw new Error(`Models list failed: ${res.status}`);
@@ -173,6 +187,7 @@ const ApiClient = (() => {
         importModéliseurFile,
         importAndSaveModel,
         getModelSvg,
+        createEmptyModel,
         getModels,
         saveSearch,
         getSearches,

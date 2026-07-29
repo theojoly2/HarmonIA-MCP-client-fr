@@ -38,6 +38,10 @@ class RenameBody(BaseModel):
     name: str
 
 
+class EmptyModelBody(BaseModel):
+    name: str
+
+
 class ClassEditBody(BaseModel):
     title: str
     definition: str = ""
@@ -142,6 +146,36 @@ async def import_model(
     return ImportResponse(
         name=payload.get("name", display_name),
         source_format=payload.get("source_format", kind or "unknown"),
+    )
+
+
+@router.post("/create-empty", response_model=ImportResponse)
+async def create_empty_model(body: EmptyModelBody, username: str = Depends(require_user)):
+    """Create a brand-new empty model with an empty-class placeholder SVG."""
+    from data_model_utils import generate_visualisation
+    from io import BytesIO
+
+    display_name = body.name.strip() or "Nouveau modèle"
+    xmi = {"elements": [], "connectors": []}
+    svg_bytes = generate_visualisation(xmi)
+    svg_text = svg_bytes.getvalue().decode("utf-8", errors="replace")
+
+    stored_data = {
+        "xmi": xmi,
+        "svg": svg_text,
+        "source_filename": "",
+        "source_format": "empty",
+        "name": display_name,
+    }
+
+    payload = await save_model(
+        username=username,
+        name=display_name,
+        model_data=stored_data,
+    )
+    return ImportResponse(
+        name=payload.get("name", display_name),
+        source_format="empty",
     )
 
 

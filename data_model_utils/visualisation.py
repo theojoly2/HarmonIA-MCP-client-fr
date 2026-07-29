@@ -203,6 +203,13 @@ def get_image_bytes(
     plantuml_lines.append("left to right direction")
     plantuml_lines.append("hide empty members")
 
+    if not elements and not connectors:
+        # Empty model placeholder so the user sees something instead of a blank screen.
+        plantuml_lines.append('note "Modèle vide" as empty_placeholder')
+        plantuml_lines.append('note right of empty_placeholder')
+        plantuml_lines.append('  Cliquez sur "Classe" pour ajouter votre première classe.')
+        plantuml_lines.append('end note')
+
     id_to_alias: dict[str, str] = {}
     name_to_aliases: dict[str, list[str]] = defaultdict(list)
 

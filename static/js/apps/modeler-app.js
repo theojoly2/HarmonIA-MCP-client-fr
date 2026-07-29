@@ -50,9 +50,15 @@ class ModelerApp extends AppBase {
                         </button>
                     </h1>
                     <div id="modeler-import-container" class="w-full max-w-md">
-                        <p class="text-base font-medium mb-6 text-center max-w-md mx-auto text-gray-500">
+                        <p class="text-base font-medium mb-4 text-center max-w-md mx-auto text-gray-500">
                             Importez un fichier (TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML) pour le visualiser sous forme de diagramme.
                         </p>
+                        <button type="button" id="modeler-new-empty" class="w-full max-w-md mx-auto mb-5 py-3 px-6 rounded-full border border-gray-200 bg-white text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-900 hover:text-white hover:border-gray-900 transition-all flex items-center justify-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                                <path d="M12 5v14M5 12h14"></path>
+                            </svg>
+                            Nouveau modèle vide
+                        </button>
                         <label id="modeler-drop-zone" class="drop-zone flex flex-col items-center justify-center w-full max-w-md mx-auto py-10 px-6 cursor-pointer hover:border-gray-400">
                             <svg class="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
@@ -187,10 +193,15 @@ class ModelerApp extends AppBase {
     _bindEvents() {
         const dropZone = this.container.querySelector('#modeler-drop-zone');
         const fileInput = this.container.querySelector('#modeler-file-input');
+        const newEmptyBtn = this.container.querySelector('#modeler-new-empty');
         const titleBtn = this.container.querySelector('#modeler-home .interactive-title');
 
         if (titleBtn) {
             titleBtn.addEventListener('click', () => this._showModéliseurHome());
+        }
+
+        if (newEmptyBtn) {
+            newEmptyBtn.addEventListener('click', () => this._createEmptyModel());
         }
 
         if (!dropZone || !fileInput) return;
@@ -209,6 +220,32 @@ class ModelerApp extends AppBase {
             if (e.target.files.length) this._handleFile(e.target.files[0]);
         });
         this._bindEditEvents();
+    }
+
+    async _createEmptyModel() {
+        if (!AuthManager.isLoggedIn()) {
+            AuthManager.showModal();
+            return;
+        }
+        const name = prompt('Nom du nouveau modèle :', 'Nouveau modèle');
+        if (!name || !name.trim()) return;
+        this._enterLoadingMode();
+        try {
+            const meta = await ApiClient.createEmptyModel(name.trim());
+            const modelName = meta.name || name.trim();
+            const res = await fetch(`api/models/${encodeURIComponent(modelName)}/open`, {
+                method: 'POST',
+                credentials: 'same-origin',
+            });
+            if (!res.ok) throw new Error(`open_failed:${res.status}`);
+            const svgText = await res.text();
+            await this.loadSvg(svgText, modelName, '');
+            if (window.historyPanel) window.historyPanel.load();
+        } catch (err) {
+            console.error('Create empty model error', err);
+            this._setLoading(false);
+            this._showError(err.message);
+        }
     }
 
     async _handleFile(file) {
