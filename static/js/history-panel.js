@@ -186,7 +186,7 @@ class HistoryPanel {
                 this._closeMenu();
                 const li = this.listEl.querySelector(`li[data-item-name="${CSS.escape(item.name)}"][data-item-kind="model"]`) || anchorBtn.closest(".history-item");
                 const nameEl = li?.querySelector(".history-item-name");
-                if (nameEl) this._startInlineRename(nameEl, item.name);
+                if (nameEl) this._startInlineRename(nameEl, item.name, item.display_name || item.name);
             });
         }
         menu.querySelector(".history-menu-delete").addEventListener("click", (e) => {
@@ -246,11 +246,12 @@ class HistoryPanel {
         });
     }
 
-    _startInlineRename(nameEl, modelName) {
+    _startInlineRename(nameEl, modelName, displayName) {
         if (nameEl.querySelector("input")) return;
+        const initialName = displayName || modelName;
         const input = document.createElement("input");
         input.type = "text";
-        input.value = modelName;
+        input.value = initialName;
         input.className = "history-item-rename-input";
         nameEl.textContent = "";
         nameEl.appendChild(input);
@@ -260,8 +261,8 @@ class HistoryPanel {
         const finish = async (save) => {
             const newName = input.value.trim();
             input.remove();
-            if (!save || !newName || newName === modelName) {
-                nameEl.textContent = modelName;
+            if (!save || !newName || newName === initialName) {
+                nameEl.textContent = initialName;
                 return;
             }
             nameEl.textContent = newName;
@@ -278,7 +279,7 @@ class HistoryPanel {
                 this.load();
             } catch (err) {
                 console.error("Rename model error", err);
-                nameEl.textContent = modelName;
+                nameEl.textContent = initialName;
                 alert("Impossible de renommer le modèle.");
             }
         };
