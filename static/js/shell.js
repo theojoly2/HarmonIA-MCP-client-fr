@@ -149,7 +149,6 @@ class Shell {
         const btn = document.createElement('button');
         btn.className = 'nav-tab shell-tag-style shell-glow';
         btn.dataset.appId = appClass.id;
-        btn.dataset.icon = appClass.iconSvg || '';
         const icon = appClass.iconSvg || '';
         btn.innerHTML = `${icon} <span>${appClass.title}</span>`;
         btn.addEventListener('click', () => {
@@ -162,14 +161,6 @@ class Shell {
         });
         this.tabBar.appendChild(btn);
         return btn;
-    }
-
-    updateTabTitle(appId, title) {
-        const btn = this.tabBar.querySelector(`button[data-app-id="${CSS.escape(appId)}"]`);
-        if (!btn) return;
-        const icon = btn.dataset.icon || '';
-        const safeTitle = this._escape(title || '');
-        btn.innerHTML = `${icon} <span>${safeTitle}</span>`;
     }
 
     setActiveTab(appId) {

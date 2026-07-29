@@ -278,12 +278,16 @@ class HistoryPanel {
                 const result = await res.json().catch(() => ({}));
                 const newStoredName = result.name || modelName;
                 // If the renamed model is currently open in the Modeler, update its
-                // stored name so subsequent edits target the new technical file.
+                // stored name and refresh the SVG so the displayed package/model name
+                // matches the new display name.
                 AppState.listInstances().forEach((info) => {
                     if (info.appId !== "modeler") return;
                     const inst = AppState.getInstance(info.instanceId);
                     if (inst && inst.updateModelName && (inst.storedName === modelName || inst.fileName === initialName)) {
                         inst.updateModelName(newStoredName, newName);
+                        if (inst._reloadSvgFromServer) {
+                            inst._reloadSvgFromServer().catch((err) => console.error("Refresh SVG after rename error", err));
+                        }
                     }
                 });
                 // Keep displayed text; refresh list silently in background to sync ordering
