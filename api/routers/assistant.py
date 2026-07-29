@@ -326,7 +326,11 @@ async def assistant_stream_generator(
                                 history.add_assistant_message(report)
                                 yield _event("assistant_text", {"content": report})
                             yield _event("assistant_done", {"content": report})
-                            break
+                            return
+
+                    # After processing all tool calls, loop again to ask the LLM
+                    # what to do next with the tool results in context.
+                    continue
 
                 else:
                     history.add_assistant_message(content)

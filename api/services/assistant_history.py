@@ -180,6 +180,7 @@ class AssistantHistory:
                     tool_call_id=tool_call_id,
                 )
             )
+            self._append_recent_message("tool", llm_content if llm_content is not None else content)
         if track_trace:
             compact = self._compact_tool_observation(content, tool_name, arguments)
             self.last_tool_observations_compact.append(compact)
