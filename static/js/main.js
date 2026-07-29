@@ -9,6 +9,7 @@
     AppState.registerApp(ModelerApp);
     AppState.registerApp(PreviewApp);
     AppState.registerApp(ChatApp);
+    AppState.registerApp(AssistantApp);
 
     // Auth state + pending import manager
     await AuthManager.init();
@@ -55,6 +56,7 @@
     // Add tab buttons
     shell.addAppButton(SearchApp);
     shell.addAppButton(ModelerApp);
+    shell.addAppButton(AssistantApp);
 
     shell.renderAuthActions(AuthManager.getUser());
 

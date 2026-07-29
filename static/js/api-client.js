@@ -179,6 +179,55 @@ const ApiClient = (() => {
         return res.body.getReader();
     }
 
+    async function streamAssistant(session, userMessage, modelName, onEvent) {
+        const res = await fetch(apiUrl("assistant/stream"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ session, user_message: userMessage, model_name: modelName || "" }),
+        });
+        if (!res.ok || !res.body) throw new Error(`Assistant stream failed: ${res.status}`);
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+            for (const line of lines) {
+                if (!line.trim()) continue;
+                try {
+                    const event = JSON.parse(line);
+                    onEvent(event);
+                } catch (err) {
+                    console.error("Assistant event parse error", err, line);
+                }
+            }
+        }
+        if (buffer.trim()) {
+            try {
+                onEvent(JSON.parse(buffer));
+            } catch (err) {
+                console.error("Assistant trailing event parse error", err, buffer);
+            }
+        }
+    }
+
+    async function getAssistantSessions() {
+        const res = await fetch(apiUrl("assistant/sessions"), { credentials: "same-origin" });
+        if (!res.ok) throw new Error(`Assistant sessions failed: ${res.status}`);
+        return res.json();
+    }
+
+    async function getAssistantHistory(session) {
+        // History is loaded directly from the JSON persistence in the backend;
+        // for now the assistant app re-creates messages from display_messages.
+        // This helper can be extended if a dedicated endpoint is added.
+        return { messages: [] };
+    }
+
     return {
         postSearch,
         getTags,
@@ -198,6 +247,9 @@ const ApiClient = (() => {
         register,
         logout,
         streamChat,
+        streamAssistant,
+        getAssistantSessions,
+        getAssistantHistory,
     };
 })();
 
