@@ -237,7 +237,7 @@ class ModelerApp extends AppBase {
                 });
                 if (!res.ok) throw new Error(`open_failed:${res.status}`);
                 const svgText = await res.text();
-                await this.loadSvg(svgText, displayName, '');
+                await this.loadSvg(svgText, displayName, '', modelName);
                 if (window.historyPanel) window.historyPanel.load();
             } catch (err) {
                 console.error('Create empty model error', err);
