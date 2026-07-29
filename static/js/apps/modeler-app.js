@@ -51,13 +51,13 @@ class ModelerApp extends AppBase {
                     </h1>
                     <div id="modeler-import-container" class="w-full max-w-md">
                         <p class="text-base font-medium mb-4 text-center max-w-md mx-auto text-gray-500">
-                            Importez un fichier (TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML) pour le visualiser sous forme de diagramme.
+                            Créez un modèle de zéro, ou importez un fichier (TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML) pour le visualiser et le modifier.
                         </p>
-                        <button type="button" id="modeler-new-empty" class="w-full max-w-md mx-auto mb-5 py-3 px-6 rounded-full border border-gray-200 bg-white text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-900 hover:text-white hover:border-gray-900 transition-all flex items-center justify-center gap-2">
+                        <button type="button" id="modeler-new-empty" class="nav-tab shell-tag-style shell-glow w-full max-w-md mx-auto mb-5 py-3 px-6 rounded-full border border-gray-200 bg-white text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-900 hover:text-white hover:border-gray-900 transition-all flex items-center justify-center gap-2">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                                 <path d="M12 5v14M5 12h14"></path>
                             </svg>
-                            Nouveau modèle vide
+                            <span>Nouveau modèle</span>
                         </button>
                         <label id="modeler-drop-zone" class="drop-zone flex flex-col items-center justify-center w-full max-w-md mx-auto py-10 px-6 cursor-pointer hover:border-gray-400">
                             <svg class="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -227,25 +227,77 @@ class ModelerApp extends AppBase {
             AuthManager.showModal();
             return;
         }
-        const name = prompt('Nom du nouveau modèle :', 'Nouveau modèle');
-        if (!name || !name.trim()) return;
-        this._enterLoadingMode();
-        try {
-            const meta = await ApiClient.createEmptyModel(name.trim());
-            const modelName = meta.name || name.trim();
-            const res = await fetch(`api/models/${encodeURIComponent(modelName)}/open`, {
-                method: 'POST',
-                credentials: 'same-origin',
-            });
-            if (!res.ok) throw new Error(`open_failed:${res.status}`);
-            const svgText = await res.text();
-            await this.loadSvg(svgText, modelName, '');
-            if (window.historyPanel) window.historyPanel.load();
-        } catch (err) {
-            console.error('Create empty model error', err);
-            this._setLoading(false);
-            this._showError(err.message);
+        this._askNewModelName(async (name) => {
+            this._enterLoadingMode();
+            try {
+                const meta = await ApiClient.createEmptyModel(name.trim());
+                const modelName = meta.name || name.trim();
+                const res = await fetch(`api/models/${encodeURIComponent(modelName)}/open`, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                });
+                if (!res.ok) throw new Error(`open_failed:${res.status}`);
+                const svgText = await res.text();
+                await this.loadSvg(svgText, modelName, '');
+                if (window.historyPanel) window.historyPanel.load();
+            } catch (err) {
+                console.error('Create empty model error', err);
+                this._setLoading(false);
+                this._showError(err.message);
+            }
+        });
+    }
+
+    _askNewModelName(onConfirm) {
+        ModelerApp._closeOpenEditDialogs();
+        const floatWin = UiUtils.createFloatingWindow({
+            title: 'Nouveau modèle',
+            width: 380,
+            height: 'auto',
+            onClose: () => {},
+            onFocus: () => {},
+        });
+        floatWin.win.classList.add('modeler-edit-float');
+        const root = document.getElementById('floating-root') || document.body;
+        root.appendChild(floatWin.win);
+        UiUtils.centerWindow(floatWin.win, 0, -120);
+
+        const body = floatWin.body;
+        body.innerHTML = `
+            <div class="modeler-edit-body" style="padding: 1.25rem;">
+                <form id="modeler-name-form">
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-gray-700 mb-1" for="new-model-name">Nom du modèle *</label>
+                        <input type="text" id="new-model-name" value="Nouveau modèle" class="w-full rounded-lg border border-gray-300 p-2 text-sm focus:border-black outline-none" required autofocus>
+                    </div>
+                    <div class="modeler-edit-error hidden" id="name-dialog-error"></div>
+                    <button type="submit" class="modeler-edit-submit">Créer</button>
+                </form>
+            </div>
+        `;
+        const input = body.querySelector('#new-model-name');
+        if (input) {
+            input.select();
+            input.focus();
         }
+        const form = body.querySelector('#modeler-name-form');
+        const errorEl = body.querySelector('#name-dialog-error');
+        const close = () => floatWin.win.remove();
+        const closeBtn = floatWin.win.querySelector('.window-close');
+        if (closeBtn) closeBtn.addEventListener('click', close);
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const value = body.querySelector('#new-model-name')?.value.trim();
+            if (!value) {
+                if (errorEl) {
+                    errorEl.textContent = 'Veuillez saisir un nom pour le modèle.';
+                    errorEl.classList.remove('hidden');
+                }
+                return;
+            }
+            close();
+            onConfirm(value);
+        });
     }
 
     async _handleFile(file) {
