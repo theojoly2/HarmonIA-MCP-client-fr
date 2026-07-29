@@ -771,6 +771,7 @@ class ModelerApp extends AppBase {
             this.viewer.setSvg(this.svgText, this.mainClassName);
             this.viewer.restoreState(this.viewerState);
         }
+        this._updateEditButtonStates();
     }
 
     _showFloatingDialog(title, fields, onSubmit, onOpen) {
