@@ -148,6 +148,13 @@ class AssistantApp extends AppBase {
         return { wrapper, content: wrapper.querySelector('.message-content'), label: wrapper.querySelector('.thinking-label') };
     }
 
+    _movePlaceholderToEnd(placeholder) {
+        if (!placeholder || !placeholder.wrapper) return;
+        placeholder.wrapper.remove();
+        this.chatEl.appendChild(placeholder.wrapper);
+        this._scrollToBottom();
+    }
+
     _appendToolCalls(toolCalls) {
         const names = (toolCalls || [])
             .map((c) => c?.function?.name || c?.name || 'outil')
@@ -460,6 +467,7 @@ class AssistantApp extends AppBase {
                     }
                     if (event.kind === 'assistant_text') {
                         if (placeholder.label) placeholder.label.remove();
+                        this._movePlaceholderToEnd(placeholder);
                         if (placeholder.wrapper.style.display === 'none') {
                             placeholder.wrapper.style.display = '';
                         }
@@ -469,18 +477,12 @@ class AssistantApp extends AppBase {
                     }
                     if (event.kind === 'assistant_tool_calls') {
                         if (placeholder.label) placeholder.label.remove();
-                        if (placeholder.content && !placeholder.content.innerHTML.trim()) {
-                            placeholder.wrapper.style.display = 'none';
-                        }
                         this._appendToolCalls(event.tool_calls);
                         this.messages.push({ role: 'assistant_tool_calls', tool_calls: event.tool_calls });
                         return;
                     }
                     if (event.kind === 'tool_start') {
                         if (placeholder.label) placeholder.label.remove();
-                        if (placeholder.content && !placeholder.content.innerHTML.trim()) {
-                            placeholder.wrapper.style.display = 'none';
-                        }
                         if (event.name === 'retrieve_documents') {
                             toolStartEl = this._appendSearchCard(event.arguments?.search_terms || '', null);
                         } else {
