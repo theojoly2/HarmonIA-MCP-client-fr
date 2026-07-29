@@ -17,7 +17,7 @@ from pydantic import BaseModel
 
 from openai.types.chat import ChatCompletionSystemMessageParam
 
-from api.dependencies import _LLM_MODEL, llm_client
+from api.dependencies import _LLM_MODEL, llm_client, render_results
 from api.routers.auth import require_user
 from api.services.assistant_history import AssistantHistory
 from api.services.assistant_mcp_client import AssistantMCPClient
@@ -283,7 +283,28 @@ async def assistant_stream_generator(
                         tool_message = await mcp_client.call_tool(name, arguments)
                         parsed_tool = _safe_json_loads(tool_message) or {}
 
-                        yield _event("tool_result", {"name": name, "result": parsed_tool})
+                        display_payload: dict[str, Any] | None = None
+                        if name == "retrieve_documents":
+                            query_terms = arguments.get("search_terms", "")
+                            try:
+                                raw_rows = parsed_tool.get("result") if isinstance(parsed_tool, dict) else parsed_tool
+                                if not isinstance(raw_rows, list):
+                                    raw_rows = []
+                                search_rows: list[tuple[Any, ...]] = []
+                                for r in raw_rows:
+                                    if isinstance(r, (list, tuple)) and len(r) >= 3:
+                                        search_rows.append(tuple(r))
+                                rendered = render_results(search_rows, query=query_terms)
+                                display_payload = {
+                                    "type": "search",
+                                    "query": query_terms,
+                                    "results_html": rendered.get("results_html", ""),
+                                }
+                            except Exception as exc:
+                                display_payload = {"type": "search", "query": query_terms, "results_html": f"<div class=\"text-red-600 p-4\">Erreur rendu recherche: {exc}</div>"}
+
+
+                        yield _event("tool_result", {"name": name, "result": parsed_tool, "display": display_payload})
 
                         history.add_tool_message(
                             content=tool_message,
