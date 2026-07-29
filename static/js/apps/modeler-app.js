@@ -51,14 +51,8 @@ class ModelerApp extends AppBase {
                     </h1>
                     <div id="modeler-import-container" class="w-full max-w-md">
                         <p class="text-base font-medium mb-4 text-center max-w-md mx-auto text-gray-500">
-                            Créez un modèle de zéro, ou importez un fichier (TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML) pour le visualiser et le modifier.
+                            Importez un fichier (TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML) pour le visualiser et le modifier.
                         </p>
-                        <button type="button" id="modeler-new-empty" class="w-full max-w-md mx-auto mb-5 py-3 px-6 rounded-full text-white text-sm font-bold shadow-sm flex items-center justify-center gap-2 overflow-hidden whitespace-nowrap">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-                                <path d="M12 5v14M5 12h14"></path>
-                            </svg>
-                            <span class="btn-label">Nouveau modèle</span>
-                        </button>
                         <label id="modeler-drop-zone" class="drop-zone flex flex-col items-center justify-center w-full max-w-md mx-auto py-10 px-6 cursor-pointer hover:border-gray-400">
                             <svg class="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
@@ -67,6 +61,9 @@ class ModelerApp extends AppBase {
                             <span class="text-xs text-gray-400 mt-1">ou cliquez pour parcourir</span>
                             <input type="file" id="modeler-file-input" class="hidden" accept=".ttl,.xml,.xmi,.json,.jsonld,.sql,.txt,.html,.htm,.csv">
                         </label>
+                        <button type="button" id="modeler-new-empty" class="text-sm font-semibold text-gray-500 hover:text-gray-900 underline-offset-2 hover:underline transition-colors mt-4 flex items-center justify-center gap-1.5 mx-auto">
+                            ou créer un modèle vide pour partir de zéro
+                        </button>
                     </div>
                 </div>
                 <div id="modeler-viewer" class="hidden flex-1 min-h-0 opacity-0 transition-opacity duration-300 relative">

@@ -80,10 +80,9 @@ const GlowEffects = (() => {
             if (!span) return;
             bindDynamicElement(label, span);
         });
-        // Modeler "New model" button: glow is applied directly to the button itself
-        document.querySelectorAll('#modeler-new-empty').forEach(btn => {
-            bindDynamicElement(btn, btn);
-        });
+        // Modeler "New model" link: no glow effect needed (text-link style)
+        // (kept empty intentionally in case we want to add a hover effect later)
+
     }
 
     function init() {
