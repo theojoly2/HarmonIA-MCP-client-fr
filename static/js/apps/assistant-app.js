@@ -460,6 +460,9 @@ class AssistantApp extends AppBase {
                     }
                     if (event.kind === 'assistant_text') {
                         if (placeholder.label) placeholder.label.remove();
+                        if (placeholder.wrapper.style.display === 'none') {
+                            placeholder.wrapper.style.display = '';
+                        }
                         currentText += event.content || '';
                         streamBuffer += event.content || '';
                         return;
