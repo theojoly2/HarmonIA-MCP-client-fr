@@ -1,0 +1,223 @@
+.modeler-app { background: #ffffff; display: flex; flex-direction: column; height: 100%; }
+.modeler-home {
+    justify-content: flex-start;
+    padding-top: 0;
+    padding-bottom: 0;
+    transition: padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.45s ease;
+    flex-shrink: 0;
+}
+.modeler-home.hidden { display: none; }
+
+.modeler-top {
+    justify-content: flex-start;
+    padding-top: 0;
+    padding-bottom: 0;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 25;
+    min-height: auto !important;
+}
+
+.modeler-loading-layout #modeler-home {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    min-height: auto !important;
+}
+.modeler-loading-layout #modeler-home .modeler-import-hidden,
+.modeler-loading-layout #modeler-import-container {
+    display: none !important;
+}
+.modeler-loading-layout #modeler-viewer {
+    flex: 1 1 0%;
+    display: flex;
+    flex-direction: column;
+}
+
+#modeler-viewer {
+    flex: 1 1 0%;
+    min-height: 0;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+    position: relative;
+}
+
+#modeler-viewer:not(.hidden) {
+    display: flex;
+    flex-direction: column;
+}
+
+.modeler-import-hidden {
+    opacity: 0;
+    transform: translateY(-20px);
+    max-height: 0;
+    margin-bottom: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    pointer-events: none;
+    overflow: hidden;
+    display: none;
+}
+
+.drop-zone {
+    border: 2px dashed #d1d5db;
+    border-radius: 1.5rem;
+    background: #f9fafb;
+    transition: all 0.2s ease;
+}
+.drop-zone.drag-over { border-color: #111827; background: #f3f4f6; }
+
+.modeler-edit-btn {
+    width: auto;
+    min-width: 7rem;
+    height: 2.75rem;
+    padding: 0 0.75rem;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid #e5e7eb;
+    color: #374151;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.5rem;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.modeler-edit-btn:hover {
+    background: #111827;
+    border-color: #111827;
+    color: #ffffff;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+}
+.modeler-edit-label {
+    pointer-events: none;
+}
+#modeler-new-empty {
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+.modeler-field-help {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 9999px;
+    background: #e5e7eb;
+    color: #374151;
+    font-size: 0.65rem;
+    font-weight: 800;
+    font-family: ui-serif, Georgia, serif;
+    line-height: 1;
+    cursor: help;
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
+}
+.modeler-field-help:hover {
+    background: #111827;
+    color: #ffffff;
+}
+.modeler-edit-btn-disabled,
+.modeler-edit-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #f3f4f6;
+    border-color: #e5e7eb;
+    color: #9ca3af;
+    transform: none;
+    box-shadow: none;
+}
+.modeler-edit-btn:disabled:hover {
+    background: #f3f4f6;
+    border-color: #e5e7eb;
+    color: #9ca3af;
+    transform: none;
+    box-shadow: none;
+}
+
+/* === Floating edit dialogs (class / attribute / connector) === */
+.modeler-edit-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: opacity 0.25s ease;
+}
+
+.modeler-edit-modal {
+    position: relative;
+    width: min(420px, 90vw);
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 1.5rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.18);
+    padding: 2rem 2rem 2.25rem;
+    animation: fadeIn 0.3s ease;
+}
+
+.modeler-edit-modal-header {
+    text-align: center;
+    margin-bottom: 1.25rem;
+}
+
+.modeler-edit-modal-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    color: #111827;
+    margin: 0 0 0.35rem;
+}
+
+.modeler-edit-submit {
+    width: 100%;
+    padding: 0.8rem 1rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #ffffff;
+    background: #111827;
+    border: none;
+    border-radius: 9999px;
+    cursor: pointer;
+    transition: transform 0.15s, background 0.2s;
+}
+.modeler-edit-submit:hover { background: #1f2937; }
+.modeler-edit-submit:active { transform: scale(0.98); }
+.modeler-edit-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.modeler-edit-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 9999px;
+    border: none;
+    background: transparent;
+    color: #9ca3af;
+    cursor: pointer;
+    transition: color 0.2s, background 0.2s;
+}
+.modeler-edit-close:hover { color: #111827; background: #f3f4f6; }
+
+.modeler-edit-error {
+    margin-bottom: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: 0.5rem;
+    background: #fef2f2;
+    color: #b91c1c;
+    font-size: 0.85rem;
+    font-weight: 600;
+}

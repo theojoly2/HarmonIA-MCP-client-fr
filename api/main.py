@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from api.routers import search, documents, vision, chat, auth, models, searches
+from api.routers import search, documents, modeler, chat, auth, models, searches
 
 
 from api.services.user_store import init_db
@@ -38,7 +38,7 @@ def create_app() -> FastAPI:
     app.include_router(searches.router)
     app.include_router(search.router)
     app.include_router(documents.router)
-    app.include_router(vision.router)
+    app.include_router(modeler.router)
     app.include_router(chat.router)
 
     static_dir = Path(__file__).resolve().parent.parent / "static"

@@ -175,3 +175,36 @@ async def delete_model_mcp(user: str, name: str) -> None:
     except Exception as e:
         print(f"[MCP delete_model] {e}", flush=True)
         raise
+
+
+async def add_class_mcp(user: str, name: str, **kwargs) -> dict[str, Any]:
+    try:
+        data = await _mcp_call_tool("add_class", {"user": user, "name": name, **kwargs}, timeout=60.0)
+        if isinstance(data, dict) and "error" in data:
+            raise RuntimeError(data["error"])
+        return data or {"ok": True}
+    except Exception as e:
+        print(f"[MCP add_class] {e}", flush=True)
+        raise
+
+
+async def add_attribute_mcp(user: str, name: str, **kwargs) -> dict[str, Any]:
+    try:
+        data = await _mcp_call_tool("add_attribute", {"user": user, "name": name, **kwargs}, timeout=60.0)
+        if isinstance(data, dict) and "error" in data:
+            raise RuntimeError(data["error"])
+        return data or {"ok": True}
+    except Exception as e:
+        print(f"[MCP add_attribute] {e}", flush=True)
+        raise
+
+
+async def add_connector_mcp(user: str, name: str, **kwargs) -> dict[str, Any]:
+    try:
+        data = await _mcp_call_tool("add_connector", {"user": user, "name": name, **kwargs}, timeout=60.0)
+        if isinstance(data, dict) and "error" in data:
+            raise RuntimeError(data["error"])
+        return data or {"ok": True}
+    except Exception as e:
+        print(f"[MCP add_connector] {e}", flush=True)
+        raise

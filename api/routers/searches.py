@@ -29,7 +29,7 @@ class SearchHistoryItem(BaseModel):
     query: str
     tags: str
     created_at: str
-    last_opened_at: str
+    last_opened_at: int
 
 
 @router.get("")

@@ -32,8 +32,8 @@ class PreviewApp extends AppBase {
         this.container = container;
         container.innerHTML = `
             <div class="preview-app h-full w-full flex flex-col relative bg-white">
-                <div id="preview-svg-viewer" class="flex-1 relative"></div>
-                <button type="button" id="preview-expand" class="absolute top-3 right-3 z-20 p-2 rounded-full bg-white border border-gray-200 text-gray-600 hover:text-black hover:border-gray-400 shadow-sm transition-colors" title="Ouvrir dans Vision">
+                <div id="preview-svg-viewer" class="flex-1 relative opacity-0"></div>
+                <button type="button" id="preview-expand" class="absolute top-3 right-3 z-20 p-2 rounded-full bg-white border border-gray-200 text-gray-600 hover:text-black hover:border-gray-400 shadow-sm transition-colors" title="Ouvrir dans Modéliseur">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                         <path d="M21 9V3h-6M15 9l6-6"></path>
                         <path d="M3 15v6h6M9 15l-6 6"></path>
@@ -62,10 +62,10 @@ class PreviewApp extends AppBase {
     _bindEvents() {
         const expandBtn = this.container.querySelector('#preview-expand');
         if (!expandBtn) return;
-        expandBtn.addEventListener('click', () => this._openInVision());
+        expandBtn.addEventListener('click', () => this._openInModéliseur());
     }
 
-    async _openInVision() {
+    async _openInModéliseur() {
         if (!this.svgText) return;
         if (!AuthManager.isLoggedIn()) {
             AuthManager.showModal();
@@ -74,18 +74,20 @@ class PreviewApp extends AppBase {
         const match = this.svgText.match(/data-main-class="([^"]*)"/);
         const mainClassName = match ? match[1] : '';
 
-        // Open Vision immediately so the user sees a reaction without waiting for the network.
-        const existingVision = AppState.listInstances().find((i) => i.appId === "vision" && i.mode === "tab");
-        if (existingVision) {
-            AppState.removeInstance(existingVision.instanceId);
+        // Open Modéliseur immediately so the user sees a reaction without waiting for the network.
+        const existingModéliseur = AppState.listInstances().find((i) => i.appId === "modeler" && i.mode === "tab");
+        if (existingModéliseur) {
+            AppState.removeInstance(existingModéliseur.instanceId);
         }
-        windowManager.open("vision", {
+        const modelerInstance = AppState.createInstance("modeler", {
             mode: "tab",
-            fileName: this.docName,
-            svgText: this.svgText,
-            mainClassName,
         });
+        await windowManager._mountTab(modelerInstance.instance);
+        AppState.setActiveInstance(modelerInstance.instanceId);
         windowManager.close(this.instanceId);
+        if (modelerInstance.instance.loadSvg) {
+            await modelerInstance.instance.loadSvg(this.svgText, this.docName, mainClassName);
+        }
 
         // Persist the model in the background and refresh the history panel.
         try {
@@ -119,15 +121,33 @@ class PreviewApp extends AppBase {
                     onTransform: (state) => { this.viewerState = state; }
                 });
             }
-            // First-time preview: center the diagram. Reopen: keep exact position/zoom.
+            // Reopen from tab switch: keep pan/zoom. First preview: center the diagram.
             const isFirstOpen = !this.viewerState || (this.viewerState.scale === 1 && this.viewerState.x === 0 && this.viewerState.y === 0);
+            const finalize = () => {
+                if (loading) {
+                    loading.style.transition = 'opacity 0.35s ease';
+                    loading.style.opacity = '0';
+                    setTimeout(() => loading.classList.add('hidden'), 350);
+                }
+                const viewerEl = this.container.querySelector('#preview-svg-viewer');
+                if (viewerEl) {
+                    viewerEl.style.transition = 'opacity 0.35s ease';
+                    viewerEl.style.opacity = '1';
+                }
+            };
             if (isFirstOpen) {
-                this.viewer.setSvgAndRestore(this.svgText, mainClassName, null);
+                this.viewer.setSvg(this.svgText, mainClassName);
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        this.viewer.resetZoom();
+                        finalize();
+                    });
+                });
             } else {
                 this.viewer.setSvg(this.svgText, mainClassName);
                 this.viewer.restoreState(this.viewerState);
+                finalize();
             }
-            if (loading) loading.classList.add('hidden');
         } catch (err) {
             console.error('Preview load error', err);
             if (loading) loading.innerHTML = `<div class="text-red-500 text-sm">Erreur de chargement du diagramme.</div>`;

@@ -33,15 +33,15 @@ const ApiClient = (() => {
         return apiUrl(`documents/${encodeURIComponent(documentId)}/visualize`);
     }
 
-    async function importVisionFile(file) {
+    async function importModéliseurFile(file) {
         const formData = new FormData();
         formData.append("file", file);
-        const res = await fetch(apiUrl("vision/import"), {
+        const res = await fetch(apiUrl("modeler/import"), {
             method: "POST",
             credentials: "same-origin",
             body: formData,
         });
-        if (!res.ok) throw new Error(`Vision import failed: ${res.status}`);
+        if (!res.ok) throw new Error(`Modéliseur import failed: ${res.status}`);
         return res.text();
     }
 
@@ -57,6 +57,29 @@ const ApiClient = (() => {
         if (!res.ok) {
             if (res.status === 401) throw new Error("not_authenticated");
             throw new Error(`Model import failed: ${res.status}`);
+        }
+        return res.json();
+    }
+
+    async function getModelSvg(name) {
+        const res = await fetch(apiUrl(`models/${encodeURIComponent(name)}/open`), {
+            method: "POST",
+            credentials: "same-origin",
+        });
+        if (!res.ok) throw new Error(`Model open failed: ${res.status}`);
+        return { svgText: await res.text(), modelName: res.headers.get("X-Model-Name") || name };
+    }
+
+    async function createEmptyModel(name) {
+        const res = await fetch(apiUrl("models/create-empty"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ name }),
+        });
+        if (!res.ok) {
+            if (res.status === 401) throw new Error("not_authenticated");
+            throw new Error(`Create empty model failed: ${res.status}`);
         }
         return res.json();
     }
@@ -161,8 +184,10 @@ const ApiClient = (() => {
         getTags,
         getDocumentFileUrl,
         getDocumentVisualizeUrl,
-        importVisionFile,
+        importModéliseurFile,
         importAndSaveModel,
+        getModelSvg,
+        createEmptyModel,
         getModels,
         saveSearch,
         getSearches,

@@ -107,18 +107,19 @@ class HistoryPanel {
         this.emptyEl.classList.add("hidden");
         this.items.forEach((item) => {
             const isSearch = item.kind === "search";
-            const itemName = item.name || "";
+            const storedName = item.name || "";
+            const displayName = item.display_name || storedName;
             const li = document.createElement("li");
             li.className = `history-item history-item-${item.kind}`;
-            li.dataset.itemName = itemName;
+            li.dataset.itemName = storedName;
             li.dataset.itemKind = item.kind;
             if (isSearch) li.dataset.searchId = item.id;
             li.innerHTML = `
                 <div class="history-item-icon">
-                    ${isSearch ? this._searchIcon() : this._visionIcon()}
+                    ${isSearch ? this._searchIcon() : this._modelerIcon()}
                 </div>
                 <div class="history-item-info">
-                    <span class="history-item-name">${this._escape(itemName)}</span>
+                    <span class="history-item-name">${this._escape(displayName)}</span>
                 </div>
                 <button type="button" class="history-action history-action-more" title="Actions" aria-haspopup="true">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -128,8 +129,8 @@ class HistoryPanel {
             `;
             li.addEventListener("click", (e) => {
                 if (e.target.closest(".history-action-more, .history-menu")) return;
-                if (isSearch) this._runSearch(itemName, (item.tags || "").split(",").filter(Boolean), item.id);
-                else this._openModel(itemName);
+                if (isSearch) this._runSearch(storedName, (item.tags || "").split(",").filter(Boolean), item.id);
+                else this._openModel(storedName);
             });
             const moreBtn = li.querySelector(".history-action-more");
             moreBtn.addEventListener("click", (e) => {
@@ -146,7 +147,7 @@ class HistoryPanel {
         </svg>`;
     }
 
-    _visionIcon() {
+    _modelerIcon() {
         return `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
@@ -185,7 +186,7 @@ class HistoryPanel {
                 this._closeMenu();
                 const li = this.listEl.querySelector(`li[data-item-name="${CSS.escape(item.name)}"][data-item-kind="model"]`) || anchorBtn.closest(".history-item");
                 const nameEl = li?.querySelector(".history-item-name");
-                if (nameEl) this._startInlineRename(nameEl, item.name);
+                if (nameEl) this._startInlineRename(nameEl, item.name, item.display_name || item.name);
             });
         }
         menu.querySelector(".history-menu-delete").addEventListener("click", (e) => {
@@ -245,11 +246,12 @@ class HistoryPanel {
         });
     }
 
-    _startInlineRename(nameEl, modelName) {
+    _startInlineRename(nameEl, modelName, displayName) {
         if (nameEl.querySelector("input")) return;
+        const initialName = displayName || modelName;
         const input = document.createElement("input");
         input.type = "text";
-        input.value = modelName;
+        input.value = initialName;
         input.className = "history-item-rename-input";
         nameEl.textContent = "";
         nameEl.appendChild(input);
@@ -259,8 +261,8 @@ class HistoryPanel {
         const finish = async (save) => {
             const newName = input.value.trim();
             input.remove();
-            if (!save || !newName || newName === modelName) {
-                nameEl.textContent = modelName;
+            if (!save || !newName || newName === initialName) {
+                nameEl.textContent = initialName;
                 return;
             }
             nameEl.textContent = newName;
@@ -273,11 +275,26 @@ class HistoryPanel {
                     body: JSON.stringify({ name: newName }),
                 });
                 if (!res.ok) throw new Error("rename_failed");
+                const result = await res.json().catch(() => ({}));
+                const newStoredName = result.name || modelName;
+                // If the renamed model is currently open in the Modeler, update its
+                // stored name and refresh the SVG so the displayed package/model name
+                // matches the new display name.
+                AppState.listInstances().forEach((info) => {
+                    if (info.appId !== "modeler") return;
+                    const inst = AppState.getInstance(info.instanceId);
+                    if (inst && inst.updateModelName && (inst.storedName === modelName || inst.fileName === initialName)) {
+                        inst.updateModelName(newStoredName, newName);
+                        if (inst._reloadSvgFromServer) {
+                            inst._reloadSvgFromServer().catch((err) => console.error("Refresh SVG after rename error", err));
+                        }
+                    }
+                });
                 // Keep displayed text; refresh list silently in background to sync ordering
                 this.load();
             } catch (err) {
                 console.error("Rename model error", err);
-                nameEl.textContent = modelName;
+                nameEl.textContent = initialName;
                 alert("Impossible de renommer le modèle.");
             }
         };
@@ -292,50 +309,45 @@ class HistoryPanel {
 
     async _openModel(modelName) {
         const encodedName = encodeURIComponent(modelName);
-        const fileName = modelName;
         const match = /data-main-class="([^"]*)"/;
 
-        // Open Vision immediately in loading state so the user sees immediate feedback.
-        const existingVision = AppState.listInstances().find((i) => i.appId === "vision" && i.mode === "tab");
-        if (existingVision) {
-            AppState.removeInstance(existingVision.instanceId);
-        }
-        const placeholderVision = AppState.createInstance("vision", {
-            mode: "tab",
-            fileName,
-            svgText: "",
-            mainClassName: "",
-            loading: true,
-        });
-        await windowManager._mountTab(placeholderVision.instance);
-        AppState.setActiveInstance(placeholderVision.instanceId);
         this.close();
 
         try {
+            let svgText;
+            let returnedName;
             try {
-                await fetch(`api/models/${encodedName}/touch`, {
-                    method: "POST",
-                    credentials: "same-origin",
-                });
+                ({ svgText, modelName: returnedName } = await ApiClient.getModelSvg(modelName));
             } catch (err) {
-                console.error("Touch model error", err);
+                console.error("Fetch model SVG error", err);
+                alert("Impossible d'ouvrir le modèle : " + (err.message || err));
+                return;
             }
 
-            const res = await fetch(`api/models/${encodedName}/open`, {
+            // Update last-opened time in the background (non-blocking).
+            fetch(`api/models/${encodedName}/touch`, {
                 method: "POST",
                 credentials: "same-origin",
-            });
-            if (!res.ok) throw new Error("open_failed");
-            const svgText = await res.text();
+            }).catch((err) => console.error("Touch model error", err));
 
-            placeholderVision.instance.svgText = svgText;
-            placeholderVision.instance.mainClassName = (svgText.match(match) || ["", ""])[1];
-            await windowManager._mountTab(placeholderVision.instance);
+            const existingModéliseur = AppState.listInstances().find((i) => i.appId === "modeler" && i.mode === "tab");
+            if (existingModéliseur) {
+                AppState.removeInstance(existingModéliseur.instanceId);
+            }
+            const modelerInstance = AppState.createInstance("modeler", {
+                mode: "tab",
+            });
+            await windowManager._mountTab(modelerInstance.instance);
+            AppState.setActiveInstance(modelerInstance.instanceId);
+            const displayName = returnedName || modelName;
+            if (modelerInstance.instance.loadSvg) {
+                await modelerInstance.instance.loadSvg(svgText, displayName, (svgText.match(match) || ["", ""])[1], modelName);
+            }
 
             await this.load();
         } catch (err) {
             console.error("Open model error", err);
-            alert("Impossible d'ouvrir le modèle.");
+            alert("Impossible d'ouvrir le modèle : " + (err.message || err));
         }
     }
 

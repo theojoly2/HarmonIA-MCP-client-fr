@@ -47,6 +47,7 @@ const GlowEffects = (() => {
 
     function getGlowSize(target) {
         if (target.id === 'submit-btn') return '30px';
+        if (target.id === 'modeler-new-empty') return '30px';
         if (target.id === 'login-btn') return '30px';
         if (target.classList.contains('title-glow')) return '55px';
         if (target.closest('.tag-label')) return '30px';
@@ -79,6 +80,9 @@ const GlowEffects = (() => {
             if (!span) return;
             bindDynamicElement(label, span);
         });
+        // Modeler "New model" link: no glow effect needed (text-link style)
+        // (kept empty intentionally in case we want to add a hover effect later)
+
     }
 
     function init() {

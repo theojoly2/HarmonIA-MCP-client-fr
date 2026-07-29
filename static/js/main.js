@@ -6,7 +6,7 @@
 (async function() {
     // Register apps
     AppState.registerApp(SearchApp);
-    AppState.registerApp(VisionApp);
+    AppState.registerApp(ModelerApp);
     AppState.registerApp(PreviewApp);
     AppState.registerApp(ChatApp);
 
@@ -54,16 +54,16 @@
 
     // Add tab buttons
     shell.addAppButton(SearchApp);
-    shell.addAppButton(VisionApp);
+    shell.addAppButton(ModelerApp);
 
     shell.renderAuthActions(AuthManager.getUser());
 
-    // Persist a pending import only if its Vision instance is still open when login happens.
+    // Persist a pending import only if its Modéliseur instance is still open when login happens.
     function isPendingImportStillOpen() {
         const pending = AuthManager.getPendingImport();
         if (!pending || !pending.svgText) return false;
         const instances = AppState.listInstances();
-        return instances.some((i) => i.appId === "vision" && AppState.getInstance(i.instanceId)?.svgText === pending.svgText);
+        return instances.some((i) => i.appId === "modeler" && AppState.getInstance(i.instanceId)?.svgText === pending.svgText);
     }
 
     async function flushPendingImport() {
