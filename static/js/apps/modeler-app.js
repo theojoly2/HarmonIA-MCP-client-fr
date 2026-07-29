@@ -316,9 +316,15 @@ class ModelerApp extends AppBase {
             this.setTitle(`Modéliseur: ${this.fileName}`);
         };
         if (this._centerOnNextShow) {
-            this.viewer.resetZoom();
-            this._centerOnNextShow = false;
-            requestAnimationFrame(() => requestAnimationFrame(finalize));
+            // Wait two frames so the browser has rendered the SVG before we
+            // fade it in and center it. This avoids a visible flash/jump.
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    this.viewer.resetZoom();
+                    this._centerOnNextShow = false;
+                    finalize();
+                });
+            });
         } else {
             this.viewer.restoreState(this.viewerState);
             finalize();

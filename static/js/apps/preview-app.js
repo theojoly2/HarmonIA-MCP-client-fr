@@ -32,7 +32,7 @@ class PreviewApp extends AppBase {
         this.container = container;
         container.innerHTML = `
             <div class="preview-app h-full w-full flex flex-col relative bg-white">
-                <div id="preview-svg-viewer" class="flex-1 relative"></div>
+                <div id="preview-svg-viewer" class="flex-1 relative opacity-0"></div>
                 <button type="button" id="preview-expand" class="absolute top-3 right-3 z-20 p-2 rounded-full bg-white border border-gray-200 text-gray-600 hover:text-black hover:border-gray-400 shadow-sm transition-colors" title="Ouvrir dans Modéliseur">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                         <path d="M21 9V3h-6M15 9l6-6"></path>
@@ -123,17 +123,31 @@ class PreviewApp extends AppBase {
             }
             // Reopen from tab switch: keep pan/zoom. First preview: center the diagram.
             const isFirstOpen = !this.viewerState || (this.viewerState.scale === 1 && this.viewerState.x === 0 && this.viewerState.y === 0);
+            const finalize = () => {
+                if (loading) {
+                    loading.style.transition = 'opacity 0.35s ease';
+                    loading.style.opacity = '0';
+                    setTimeout(() => loading.classList.add('hidden'), 350);
+                }
+                const viewerEl = this.container.querySelector('#preview-svg-viewer');
+                if (viewerEl) {
+                    viewerEl.style.transition = 'opacity 0.35s ease';
+                    viewerEl.style.opacity = '1';
+                }
+            };
             if (isFirstOpen) {
-                this.viewer.setSvgAndRestore(this.svgText, mainClassName, null);
+                this.viewer.setSvg(this.svgText, mainClassName);
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        this.viewer.resetZoom();
+                        finalize();
+                    });
+                });
             } else {
                 this.viewer.setSvg(this.svgText, mainClassName);
                 this.viewer.restoreState(this.viewerState);
+                finalize();
             }
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    if (loading) loading.classList.add('hidden');
-                });
-            });
         } catch (err) {
             console.error('Preview load error', err);
             if (loading) loading.innerHTML = `<div class="text-red-500 text-sm">Erreur de chargement du diagramme.</div>`;
