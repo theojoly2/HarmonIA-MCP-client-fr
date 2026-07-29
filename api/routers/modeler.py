@@ -6,11 +6,11 @@ from fastapi.responses import HTMLResponse, Response
 
 from api.dependencies import generate_svg_for_bytes
 
-router = APIRouter(prefix="/api/vision", tags=["vision"])
+router = APIRouter(prefix="/api/modeler", tags=["modeler"])
 
 
 @router.post("/import")
-async def vision_import(file: UploadFile = File(...)):
+async def modeler_import(file: UploadFile = File(...)):
     try:
         file_bytes = await file.read()
         filename = file.filename or "document.txt"
