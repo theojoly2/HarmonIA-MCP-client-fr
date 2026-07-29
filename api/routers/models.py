@@ -6,6 +6,7 @@ resources/semantic_model/models/{user}/{name}.json.
 
 import json
 import re
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Request, Response, UploadFile, File, Form, Depends
@@ -24,6 +25,17 @@ from api.services.model_store import (
     save_model,
     touch_model,
 )
+
+
+def _unique_model_name(name: str) -> str:
+    """Append an invisible timestamp suffix so duplicate names never overwrite files."""
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
+    return f"{name}\u0001{timestamp}"
+
+
+def _display_name(stored_name: str) -> str:
+    """Strip the invisible timestamp suffix for UI display."""
+    return stored_name.split("\u0001", 1)[0]
 
 
 router = APIRouter(prefix="/api/models", tags=["models"])
@@ -78,6 +90,8 @@ class ConnectorEditBody(BaseModel):
 @router.get("")
 async def get_models(username: str = Depends(require_user)):
     models = await list_models(username)
+    for model in models:
+        model["name"] = _display_name(model.get("name", ""))
     return {"models": models}
 
 
@@ -91,6 +105,7 @@ async def import_model(
     file_bytes = await file.read()
     filename = file.filename or "model.txt"
     display_name = name or filename
+    stored_name = _unique_model_name(display_name)
 
     # Generate SVG to validate + extract model JSON
     from io import BytesIO
@@ -136,15 +151,15 @@ async def import_model(
     stored_data["source_filename"] = filename
     stored_data["source_bytes_b64"] = base64_for_bytes(file_bytes)
     stored_data["source_format"] = kind or "unknown"
-    stored_data["name"] = display_name
+    stored_data["name"] = stored_name
 
     payload = await save_model(
         username=username,
-        name=display_name,
+        name=stored_name,
         model_data=stored_data,
     )
     return ImportResponse(
-        name=payload.get("name", display_name),
+        name=_display_name(payload.get("name", stored_name)),
         source_format=payload.get("source_format", kind or "unknown"),
     )
 
@@ -156,6 +171,7 @@ async def create_empty_model(body: EmptyModelBody, username: str = Depends(requi
     from io import BytesIO
 
     display_name = body.name.strip() or "Nouveau modèle"
+    stored_name = _unique_model_name(display_name)
     xmi = {"elements": [], "connectors": []}
     svg_bytes = generate_visualisation(xmi)
     svg_text = svg_bytes.getvalue().decode("utf-8", errors="replace")
@@ -165,16 +181,16 @@ async def create_empty_model(body: EmptyModelBody, username: str = Depends(requi
         "svg": svg_text,
         "source_filename": "",
         "source_format": "empty",
-        "name": display_name,
+        "name": stored_name,
     }
 
     payload = await save_model(
         username=username,
-        name=display_name,
+        name=stored_name,
         model_data=stored_data,
     )
     return ImportResponse(
-        name=payload.get("name", display_name),
+        name=_display_name(payload.get("name", stored_name)),
         source_format="empty",
     )
 
@@ -218,7 +234,7 @@ async def open_model(model_name: str, username: str = Depends(require_user)):
     if main_class and "data-main-class=" not in svg:
         svg = svg.replace("<svg", f'<svg data-main-class="{main_class}"', 1)
     return Response(content=svg.encode("utf-8"), media_type="image/svg+xml", headers={
-        "X-Model-Name": model.get("name", ""),
+        "X-Model-Name": _display_name(model.get("name", "")),
     })
 
 
