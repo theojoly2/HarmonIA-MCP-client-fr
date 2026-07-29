@@ -980,6 +980,24 @@ class ModelerApp extends AppBase {
         }
     }
 
+    /**
+     * Update the stored file name and displayed name after a rename from history.
+     * This ensures subsequent edits target the new technical file name.
+     */
+    updateModelName(newStoredName, newDisplayName) {
+        if (!newStoredName) return;
+        this.storedName = newStoredName;
+        if (newDisplayName) {
+            this.fileName = newDisplayName;
+            const title = `Modéliseur: ${newDisplayName}`;
+            this.setTitle(title);
+            if (window.windowManager && window.windowManager.updateTitle) {
+                window.windowManager.updateTitle(this.instanceId, title);
+            }
+        }
+        AppState.saveInstanceState?.(this.instanceId);
+    }
+
     _measureHomeContentHeight(home) {
         let contentHeight = 0;
         for (const child of home.children) {

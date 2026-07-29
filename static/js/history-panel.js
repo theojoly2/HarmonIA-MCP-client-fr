@@ -275,6 +275,17 @@ class HistoryPanel {
                     body: JSON.stringify({ name: newName }),
                 });
                 if (!res.ok) throw new Error("rename_failed");
+                const result = await res.json().catch(() => ({}));
+                const newStoredName = result.name || modelName;
+                // If the renamed model is currently open in the Modeler, update its
+                // stored name so subsequent edits target the new technical file.
+                AppState.listInstances().forEach((info) => {
+                    if (info.appId !== "modeler") return;
+                    const inst = AppState.getInstance(info.instanceId);
+                    if (inst && inst.updateModelName && (inst.storedName === modelName || inst.fileName === initialName)) {
+                        inst.updateModelName(newStoredName, newName);
+                    }
+                });
                 // Keep displayed text; refresh list silently in background to sync ordering
                 this.load();
             } catch (err) {
