@@ -148,16 +148,17 @@ class AssistantApp extends AppBase {
         return { wrapper, content: wrapper.querySelector('.message-content'), label: wrapper.querySelector('.thinking-label') };
     }
 
-    _appendToolStart(name, args = {}) {
-        if (name === 'retrieve_documents') {
-            return this._appendSearchCard(args.search_terms || '', null);
-        }
+    _appendToolCalls(toolCalls) {
+        const names = (toolCalls || [])
+            .map((c) => c?.function?.name || c?.name || 'outil')
+            .filter(Boolean);
+        if (!names.length) return null;
         const div = document.createElement('div');
-        div.className = 'flex flex-col items-start gap-2 mb-4 max-w-[95%]';
+        div.className = 'assistant-tool-calls mb-4';
         div.innerHTML = `
-            <div class="flex items-center gap-2 px-3 py-2 rounded-full bg-blue-50 border border-blue-100 text-blue-800 text-xs font-semibold">
-                <span class="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></span>
-                Outil <span class="font-mono">${this._escape(name)}</span> en cours…
+            <div class="assistant-tool-calls-title">Appels d’outils planifiés</div>
+            <div class="assistant-tool-calls-list">
+                ${names.map((n) => `<span class="assistant-tool-call-name">${this._escape(n)}</span>`).join('')}
             </div>
         `;
         this.chatEl.appendChild(div);
@@ -165,19 +166,115 @@ class AssistantApp extends AppBase {
         return div;
     }
 
-    _appendToolResult(name, result, display) {
+    _createToolCard(name, args = {}) {
+        const id = 'assistant-tool-' + name + '-' + Date.now();
+        const div = document.createElement('div');
+        div.id = id;
+        div.className = 'assistant-tool-card mb-4';
+        div.dataset.toolName = name;
+        const argSummary = this._argsSummary(args);
+        div.innerHTML = `
+            <div class="assistant-tool-card-header">
+                <div class="assistant-tool-name">
+                    <span class="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse tool-status-dot"></span>
+                    <span class="font-mono">${this._escape(name)}</span>
+                </div>
+                ${argSummary ? `<div class="assistant-tool-args">${argSummary}</div>` : ''}
+            </div>
+            <div class="assistant-tool-card-body" style="display:none;">
+                <div class="assistant-tool-section">
+                    <div class="assistant-tool-section-title">Arguments</div>
+                    <pre>${this._escape(JSON.stringify(args, null, 2))}</pre>
+                </div>
+                <div class="assistant-tool-section assistant-tool-result-section" style="display:none;">
+                    <div class="assistant-tool-section-title">Résultat</div>
+                    <pre class="assistant-tool-result-content"></pre>
+                </div>
+            </div>
+        `;
+        this.chatEl.appendChild(div);
+        this._scrollToBottom();
+        return div;
+    }
+
+    _argsSummary(args) {
+        if (!args || typeof args !== 'object' || !Object.keys(args).length) return '';
+        const parts = Object.entries(args).slice(0, 3).map(([k, v]) => {
+            let val = v;
+            if (typeof val === 'string' && val.length > 40) val = val.slice(0, 40) + '…';
+            if (Array.isArray(val)) val = `[${val.length}]`;
+            if (typeof val === 'object') val = JSON.stringify(val).slice(0, 40);
+            return `${this._escape(k)}=${this._escape(String(val))}`;
+        });
+        let text = parts.join(', ');
+        if (Object.keys(args).length > 3) text += ', …';
+        return text;
+    }
+
+    _markToolRunning(card, isRunning) {
+        if (!card) return;
+        const dot = card.querySelector('.tool-status-dot');
+        if (dot) dot.classList.toggle('animate-pulse', isRunning);
+        card.classList.toggle('tool-running', isRunning);
+        card.classList.toggle('tool-done', !isRunning);
+    }
+
+    _fillToolResult(name, result, display) {
         if (display && display.type === 'search') {
             this._fillSearchCard(display.query || '', display.results_html || '');
             return null;
         }
-        const div = document.createElement('div');
-        div.className = 'flex flex-col items-start gap-1 mb-4 max-w-[95%]';
+        const cards = this.chatEl.querySelectorAll('[data-tool-name]');
+        let card = null;
+        for (let i = cards.length - 1; i >= 0; i--) {
+            if (cards[i].dataset.toolName === name && !cards[i].dataset.filled) {
+                card = cards[i];
+                break;
+            }
+        }
+        if (!card) {
+            card = this._createToolCard(name, {});
+        }
+        card.dataset.filled = 'true';
+        this._markToolRunning(card, false);
+        const body = card.querySelector('.assistant-tool-card-body');
+        const resultSection = card.querySelector('.assistant-tool-result-section');
+        const resultContent = card.querySelector('.assistant-tool-result-content');
         const summary = this._toolSummary(result);
+        const summaryText = summary ? ` ${summary}` : '';
+        const headerName = card.querySelector('.assistant-tool-name');
+        if (headerName) {
+            headerName.innerHTML = `
+                <span class="w-1.5 h-1.5 rounded-full bg-green-600 tool-status-dot"></span>
+                <span class="font-mono">${this._escape(name)}</span><span class="text-gray-500 font-normal ml-1">${summaryText}</span>
+            `;
+        }
+        if (body) body.style.display = 'block';
+        if (resultSection) resultSection.style.display = 'block';
+        if (resultContent) resultContent.textContent = JSON.stringify(result, null, 2);
+        this._scrollToBottom();
+        return card;
+    }
+
+    _renderPlan(result) {
+        if (!result || typeof result !== 'object') return null;
+        const parsed = (result.tool_results && typeof result.tool_results === 'object')
+            ? result.tool_results
+            : result;
+        const planText = parsed.final_plan || parsed.plan || parsed.content || parsed.text;
+        if (!planText) return null;
+        const div = document.createElement('div');
+        div.className = 'assistant-plan-card mb-4';
         div.innerHTML = `
-            <details class="assistant-tool-result bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-xs text-gray-700">
-                <summary class="cursor-pointer font-semibold select-none">Résultat de <span class="font-mono">${this._escape(name)}</span>${summary}</summary>
-                <pre class="mt-2 overflow-x-auto whitespace-pre-wrap">${this._escape(JSON.stringify(result, null, 2))}</pre>
-            </details>
+            <div class="assistant-plan-header">
+                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                </svg>
+                <span>Plan d’action proposé</span>
+            </div>
+            <div class="assistant-plan-body markdown-body">
+                ${this._markdown(String(planText))}
+            </div>
         `;
         this.chatEl.appendChild(div);
         this._scrollToBottom();
@@ -367,21 +464,38 @@ class AssistantApp extends AppBase {
                         streamBuffer += event.content || '';
                         return;
                     }
+                    if (event.kind === 'assistant_tool_calls') {
+                        if (placeholder.label) placeholder.label.remove();
+                        if (placeholder.content && !placeholder.content.innerHTML.trim()) {
+                            placeholder.wrapper.style.display = 'none';
+                        }
+                        this._appendToolCalls(event.tool_calls);
+                        this.messages.push({ role: 'assistant_tool_calls', tool_calls: event.tool_calls });
+                        return;
+                    }
                     if (event.kind === 'tool_start') {
                         if (placeholder.label) placeholder.label.remove();
                         if (placeholder.content && !placeholder.content.innerHTML.trim()) {
                             placeholder.wrapper.style.display = 'none';
                         }
-                        toolStartEl = this._appendToolStart(event.name, event.arguments || {});
-                        this.messages.push({ role: 'tool_start', name: event.name });
+                        if (event.name === 'retrieve_documents') {
+                            toolStartEl = this._appendSearchCard(event.arguments?.search_terms || '', null);
+                        } else {
+                            toolStartEl = this._createToolCard(event.name, event.arguments || {});
+                            this._markToolRunning(toolStartEl, true);
+                        }
+                        this.messages.push({ role: 'tool_start', name: event.name, arguments: event.arguments });
                         return;
                     }
                     if (event.kind === 'tool_result') {
-                        if (toolStartEl && event.display?.type !== 'search') {
-                            toolStartEl.remove();
-                            toolStartEl = null;
+                        if (event.name === 'plan_workflow_with_tools') {
+                            this._renderPlan(event.result);
                         }
-                        this._appendToolResult(event.name, event.result, event.display);
+                        if (event.name === 'retrieve_documents') {
+                            this._fillSearchCard(event.display?.query || '', event.display?.results_html || '');
+                        } else {
+                            this._fillToolResult(event.name, event.result, event.display);
+                        }
                         this.messages.push({ role: 'tool_result', name: event.name, result: event.result, display: event.display });
                         return;
                     }

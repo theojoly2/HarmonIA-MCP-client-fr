@@ -56,6 +56,144 @@
     scroll-margin-top: 2px;
 }
 
+/* === Tool calls summary === */
+.assistant-tool-calls {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    padding: 0.75rem 1rem;
+}
+
+.assistant-tool-calls-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+    margin-bottom: 0.5rem;
+}
+
+.assistant-tool-calls-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.assistant-tool-call-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: 9999px;
+    background: #e5e7eb;
+    color: #374151;
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+/* === Individual tool card === */
+.assistant-tool-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    max-width: 100%;
+    transition: border-color 0.2s;
+}
+
+.assistant-tool-card.tool-running {
+    border-color: #93c5fd;
+}
+
+.assistant-tool-card.tool-done {
+    border-color: #86efac;
+}
+
+.assistant-tool-card-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.75rem 1rem;
+    background: #f9fafb;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.assistant-tool-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+.assistant-tool-args {
+    font-size: 0.75rem;
+    color: #6b7280;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.assistant-tool-card-body {
+    padding: 0.75rem 1rem;
+}
+
+.assistant-tool-section + .assistant-tool-section {
+    margin-top: 0.75rem;
+}
+
+.assistant-tool-section-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #9ca3af;
+    margin-bottom: 0.35rem;
+}
+
+.assistant-tool-card-body pre {
+    background: #f3f4f6;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.8rem;
+    max-height: 16rem;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    margin: 0;
+}
+
+/* === Plan card === */
+.assistant-plan-card {
+    background: #ffffff;
+    border: 1px solid #93c5fd;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    max-width: 100%;
+    box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.08);
+}
+
+.assistant-plan-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: #eff6ff;
+    border-bottom: 1px solid #dbeafe;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #1d4ed8;
+}
+
+.assistant-plan-body {
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+    color: #1f2937;
+}
+
 /* === Search card inside assistant chat === */
 .assistant-search-card {
     background: #ffffff;
