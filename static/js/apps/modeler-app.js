@@ -247,44 +247,48 @@ class ModelerApp extends AppBase {
 
     _askNewModelName(onConfirm) {
         ModelerApp._closeOpenEditDialogs();
-        const floatWin = UiUtils.createFloatingWindow({
-            title: 'Nouveau modèle',
-            width: 380,
-            height: 'auto',
-            onClose: () => {},
-            onFocus: () => {},
-        });
-        floatWin.win.classList.add('modeler-edit-float');
-        const root = document.getElementById('floating-root') || document.body;
-        root.appendChild(floatWin.win);
-        UiUtils.centerWindow(floatWin.win, 0, -120);
-
-        const body = floatWin.body;
-        body.innerHTML = `
-            <div class="modeler-edit-body" style="padding: 1.25rem;">
-                <form id="modeler-name-form">
-                    <div class="mb-4">
-                        <label class="block text-sm font-semibold text-gray-700 mb-1" for="new-model-name">Nom du modèle *</label>
-                        <input type="text" id="new-model-name" value="Nouveau modèle" class="w-full rounded-lg border border-gray-300 p-2 text-sm focus:border-black outline-none" required autofocus>
+        const overlay = document.createElement('div');
+        overlay.className = 'auth-overlay';
+        overlay.innerHTML = `
+            <div class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="new-model-title">
+                <div class="auth-modal-header">
+                    <h2 id="new-model-title" class="auth-modal-title">Nouveau modèle</h2>
+                    <p class="auth-modal-subtitle">Choisissez un nom pour créer un modèle vide.</p>
+                </div>
+                <form class="auth-form" id="modeler-name-form">
+                    <div class="auth-field">
+                        <label for="new-model-name">Nom du modèle</label>
+                        <input type="text" id="new-model-name" value="Nouveau modèle" autocomplete="off" required autofocus>
                     </div>
-                    <div class="modeler-edit-error hidden" id="name-dialog-error"></div>
-                    <button type="submit" class="modeler-edit-submit">Créer</button>
+                    <div class="auth-error hidden" id="name-dialog-error"></div>
+                    <button type="submit" class="auth-submit" id="modeler-name-submit">Créer</button>
                 </form>
+                <button type="button" class="auth-close" id="modeler-name-close" title="Fermer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
             </div>
         `;
-        const input = body.querySelector('#new-model-name');
+        document.body.appendChild(overlay);
+
+        const input = overlay.querySelector('#new-model-name');
         if (input) {
             input.select();
             input.focus();
         }
-        const form = body.querySelector('#modeler-name-form');
-        const errorEl = body.querySelector('#name-dialog-error');
-        const close = () => floatWin.win.remove();
-        const closeBtn = floatWin.win.querySelector('.window-close');
+        const form = overlay.querySelector('#modeler-name-form');
+        const errorEl = overlay.querySelector('#name-dialog-error');
+        const closeBtn = overlay.querySelector('#modeler-name-close');
+        const close = () => overlay.remove();
+
         if (closeBtn) closeBtn.addEventListener('click', close);
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) close();
+        });
         form.addEventListener('submit', (e) => {
             e.preventDefault();
-            const value = body.querySelector('#new-model-name')?.value.trim();
+            const value = overlay.querySelector('#new-model-name')?.value.trim();
             if (!value) {
                 if (errorEl) {
                     errorEl.textContent = 'Veuillez saisir un nom pour le modèle.';
