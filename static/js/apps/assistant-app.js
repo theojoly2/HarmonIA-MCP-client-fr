@@ -148,7 +148,10 @@ class AssistantApp extends AppBase {
         return { wrapper, content: wrapper.querySelector('.message-content'), label: wrapper.querySelector('.thinking-label') };
     }
 
-    _appendToolStart(name) {
+    _appendToolStart(name, args = {}) {
+        if (name === 'retrieve_documents') {
+            return this._appendSearchCard(args.search_terms || '', null);
+        }
         const div = document.createElement('div');
         div.className = 'flex flex-col items-start gap-2 mb-4 max-w-[95%]';
         div.innerHTML = `
@@ -162,7 +165,11 @@ class AssistantApp extends AppBase {
         return div;
     }
 
-    _appendToolResult(name, result) {
+    _appendToolResult(name, result, display) {
+        if (display && display.type === 'search') {
+            this._fillSearchCard(display.query || '', display.results_html || '');
+            return null;
+        }
         const div = document.createElement('div');
         div.className = 'flex flex-col items-start gap-1 mb-4 max-w-[95%]';
         const summary = this._toolSummary(result);
@@ -175,6 +182,98 @@ class AssistantApp extends AppBase {
         this.chatEl.appendChild(div);
         this._scrollToBottom();
         return div;
+    }
+
+    _appendSearchCard(query, resultsHtml) {
+        const id = 'assistant-search-' + Date.now();
+        const div = document.createElement('div');
+        div.id = id;
+        div.className = 'assistant-search-card mb-6';
+        div.dataset.searchCard = 'true';
+        div.dataset.query = query;
+        const loadingVisible = resultsHtml ? 'style="display:none;"' : '';
+        const resultsVisible = resultsHtml ? '' : 'style="display:none;"';
+        div.innerHTML = `
+            <div class="assistant-search-header">
+                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                <span class="assistant-search-query">${this._escape(query)}</span>
+            </div>
+            <div class="assistant-search-loading" ${loadingVisible}>
+                <div class="flex items-center gap-2 text-xs font-bold tracking-widest uppercase text-gray-400">
+                    <span class="assistant-search-spinner"></span>
+                    <span>Recherche en cours</span>
+                </div>
+            </div>
+            <div class="assistant-search-results" ${resultsVisible}>
+                ${resultsHtml || ''}
+            </div>
+        `;
+        this.chatEl.appendChild(div);
+        this._bindSearchCardEvents(div);
+        this._scrollToBottom();
+        return div;
+    }
+
+    _fillSearchCard(query, resultsHtml) {
+        const cards = this.chatEl.querySelectorAll('[data-search-card="true"]');
+        // Find the most recent still-loading card for this query, or the most recent card.
+        let target = null;
+        for (let i = cards.length - 1; i >= 0; i--) {
+            const card = cards[i];
+            const loading = card.querySelector('.assistant-search-loading');
+            const isLoading = loading && loading.style.display !== 'none';
+            if (isLoading && (!query || card.dataset.query === query)) {
+                target = card;
+                break;
+            }
+        }
+        if (!target) {
+            // Fallback: create a finished card directly if no loading card found.
+            target = this._appendSearchCard(query, resultsHtml);
+            return target;
+        }
+        const loading = target.querySelector('.assistant-search-loading');
+        const results = target.querySelector('.assistant-search-results');
+        if (loading) loading.style.display = 'none';
+        if (results) {
+            results.innerHTML = resultsHtml || '<p class="text-gray-500 text-sm p-4">Aucun résultat.</p>';
+            results.style.display = 'block';
+            this._animateSearchResults(results);
+        }
+        target.dataset.query = query;
+        target.querySelector('.assistant-search-query').textContent = query;
+        this._scrollToBottom();
+        return target;
+    }
+
+    _animateSearchResults(container) {
+        container.classList.remove('results-visible');
+        const items = container.querySelectorAll('.result-item');
+        items.forEach((el) => { el.style.animationDelay = ''; });
+        requestAnimationFrame(() => {
+            items.forEach((el, i) => { el.style.animationDelay = `${i * 80}ms`; });
+            container.classList.add('results-visible');
+        });
+    }
+
+    _bindSearchCardEvents(card) {
+        const resultsContainer = card.querySelector('.assistant-search-results');
+        if (!resultsContainer) return;
+        resultsContainer.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-action]');
+            if (!btn) return;
+            const action = btn.dataset.action;
+            const docId = btn.dataset.docId;
+            const documentId = btn.dataset.documentId;
+            const name = btn.dataset.name;
+            if (action === 'preview') {
+                EventBus.emit('open-preview', { docId, documentId, name });
+            } else if (action === 'chat') {
+                EventBus.emit('open-chat', { documentId, name });
+            }
+        });
     }
 
     _sparkleSvg() {
@@ -273,17 +372,17 @@ class AssistantApp extends AppBase {
                         if (placeholder.content && !placeholder.content.innerHTML.trim()) {
                             placeholder.wrapper.style.display = 'none';
                         }
-                        toolStartEl = this._appendToolStart(event.name);
+                        toolStartEl = this._appendToolStart(event.name, event.arguments || {});
                         this.messages.push({ role: 'tool_start', name: event.name });
                         return;
                     }
                     if (event.kind === 'tool_result') {
-                        if (toolStartEl) {
+                        if (toolStartEl && event.display?.type !== 'search') {
                             toolStartEl.remove();
                             toolStartEl = null;
                         }
-                        this._appendToolResult(event.name, event.result);
-                        this.messages.push({ role: 'tool_result', name: event.name, result: event.result });
+                        this._appendToolResult(event.name, event.result, event.display);
+                        this.messages.push({ role: 'tool_result', name: event.name, result: event.result, display: event.display });
                         return;
                     }
                     if (event.kind === 'assistant_done') {

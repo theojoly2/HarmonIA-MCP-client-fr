@@ -55,3 +55,77 @@
 .user-msg-anchor {
     scroll-margin-top: 2px;
 }
+
+/* === Search card inside assistant chat === */
+.assistant-search-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 1rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+    overflow: hidden;
+    max-width: 100%;
+}
+
+.assistant-search-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #f3f4f6;
+    background: #fafafa;
+}
+
+.assistant-search-query {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #111827;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.assistant-search-loading {
+    padding: 2rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.assistant-search-spinner {
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid #e5e7eb;
+    border-top-color: #2563eb;
+    border-radius: 9999px;
+    animation: assistant-spin 1s linear infinite;
+}
+
+@keyframes assistant-spin {
+    to { transform: rotate(360deg); }
+}
+
+.assistant-search-results {
+    max-height: 32rem;
+    overflow-y: auto;
+    padding: 0;
+}
+
+.assistant-search-results .result-item {
+    padding: 1.5rem 1rem;
+    border-bottom: 1px solid #e5e7eb;
+    opacity: 0;
+    transform: translateY(12px);
+    animation: assistant-result-fade 0.45s ease forwards;
+}
+
+.assistant-search-results .result-item:last-child {
+    border-bottom: none;
+}
+
+.results-visible .result-item {
+    /* triggered by class on container */
+}
+
+@keyframes assistant-result-fade {
+    to { opacity: 1; transform: translateY(0); }
+}
