@@ -958,6 +958,7 @@ class ModelerApp extends AppBase {
     getState() {
         return {
             fileName: this.fileName,
+            storedName: this.storedName,
             svgText: this.svgText,
             mainClassName: this.mainClassName,
             viewerState: this.viewer ? this.viewer.getState() : this.viewerState,
@@ -966,6 +967,7 @@ class ModelerApp extends AppBase {
 
     setState(state) {
         this.fileName = state.fileName || '';
+        this.storedName = state.storedName || '';
         this.svgText = state.svgText || '';
         this.mainClassName = state.mainClassName || '';
         // Only keep the previous pan/zoom if this is the exact same SVG being

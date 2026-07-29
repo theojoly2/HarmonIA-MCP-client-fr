@@ -28,14 +28,16 @@ from api.services.model_store import (
 
 
 def _unique_model_name(name: str) -> str:
-    """Append an invisible timestamp suffix so duplicate names never overwrite files."""
+    """Append a timestamp suffix so duplicate names never overwrite files."""
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
-    return f"{name}\u0001{timestamp}"
+    return f"{name}__{timestamp}"
 
 
 def _display_name(stored_name: str) -> str:
-    """Strip the invisible timestamp suffix for UI display."""
-    return stored_name.split("\u0001", 1)[0]
+    """Strip the timestamp suffix for UI display."""
+    if "__" in stored_name:
+        return stored_name.rsplit("__", 1)[0]
+    return stored_name
 
 
 router = APIRouter(prefix="/api/models", tags=["models"])
