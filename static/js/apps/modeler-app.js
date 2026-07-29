@@ -53,11 +53,11 @@ class ModelerApp extends AppBase {
                         <p class="text-base font-medium mb-4 text-center max-w-md mx-auto text-gray-500">
                             Créez un modèle de zéro, ou importez un fichier (TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML) pour le visualiser et le modifier.
                         </p>
-                        <button type="button" id="modeler-new-empty" class="nav-tab shell-tag-style shell-glow w-full max-w-md mx-auto mb-5 py-3 px-6 rounded-full border border-gray-200 bg-white text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-900 hover:text-white hover:border-gray-900 transition-all flex items-center justify-center gap-2">
+                        <button type="button" id="modeler-new-empty" class="w-full max-w-md mx-auto mb-5 py-3 px-6 rounded-full bg-gray-900 text-white text-sm font-bold shadow-sm flex items-center justify-center gap-2 overflow-hidden whitespace-nowrap">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                                 <path d="M12 5v14M5 12h14"></path>
                             </svg>
-                            <span>Nouveau modèle</span>
+                            <span class="btn-label">Nouveau modèle</span>
                         </button>
                         <label id="modeler-drop-zone" class="drop-zone flex flex-col items-center justify-center w-full max-w-md mx-auto py-10 px-6 cursor-pointer hover:border-gray-400">
                             <svg class="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

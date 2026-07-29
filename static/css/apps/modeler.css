@@ -96,6 +96,16 @@
 .modeler-edit-label {
     pointer-events: none;
 }
+#modeler-new-empty {
+    position: relative;
+    background-color: #111827;
+    color: #ffffff;
+    border-radius: 9999px;
+    background-image: radial-gradient(circle var(--glow-size, 0px) at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255,255,255,0.6) 0%, transparent 100%);
+    transition: --glow-size 0.3s ease, background-color 0.4s ease, width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+#modeler-new-empty:hover { background-color: #1f2937; }
+#modeler-new-empty .btn-label { display: inline-block; }
 .modeler-field-help {
     display: inline-flex;
     align-items: center;

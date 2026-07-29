@@ -79,6 +79,12 @@ const GlowEffects = (() => {
             if (!span) return;
             bindDynamicElement(label, span);
         });
+        // Modeler "New model" button: update glow on its span while listening on the button
+        document.querySelectorAll('#modeler-new-empty').forEach(btn => {
+            const span = btn.querySelector('span');
+            if (!span) return;
+            bindDynamicElement(btn, span);
+        });
     }
 
     function init() {
