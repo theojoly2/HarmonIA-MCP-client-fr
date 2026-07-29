@@ -73,7 +73,12 @@ async def _create_completion_streaming(
     llm_messages: list[dict[str, str]],
     tools: list[dict[str, Any]],
     tool_choice: str = "auto",
-) -> dict[str, Any]:
+) -> AsyncGenerator[tuple[str, Any], None]:
+    """Stream assistant text in real-time and finish with tool calls summary.
+
+    Yields ("text", piece) for each text chunk and ("done", {"content": str,
+    "tool_calls": [...]}) at the end of the turn.
+    """
     stream = await llm_client.chat.completions.create(
         model=_LLM_MODEL,
         messages=llm_messages,
@@ -111,10 +116,12 @@ async def _create_completion_streaming(
                 or len(pending_text) >= 40
             )
             if should_flush:
-                assistant_text += pending_text
+                flushed = pending_text
                 pending_text = ""
+                assistant_text += flushed
                 streamed_any_text = True
                 last_flush = now
+                yield ("text", flushed)
 
         delta_tool_calls = getattr(delta, "tool_calls", None) or []
         for tc in delta_tool_calls:
@@ -136,8 +143,11 @@ async def _create_completion_streaming(
                     entry["function"]["arguments"] += fargs
 
     if pending_text:
-        assistant_text += pending_text
+        flushed = pending_text
+        pending_text = ""
+        assistant_text += flushed
         streamed_any_text = True
+        yield ("text", flushed)
 
     tool_calls: list[dict[str, Any]] = []
     for idx in sorted(tool_calls_buffer.keys()):
@@ -154,11 +164,14 @@ async def _create_completion_streaming(
                 }
             )
 
-    return {
-        "content": assistant_text,
-        "tool_calls": tool_calls,
-        "streamed_any_text": streamed_any_text,
-    }
+    yield (
+        "done",
+        {
+            "content": assistant_text,
+            "tool_calls": tool_calls,
+            "streamed_any_text": streamed_any_text,
+        },
+    )
 
 
 def _event(kind: str, payload: dict[str, Any]) -> str:
@@ -249,34 +262,30 @@ async def assistant_stream_generator(
                         current_model_prompt="",
                     )
                 ]
-                print(f"[Assistant loop {loop_count}] LLM messages count: {len(llm_messages)}")
-                for i, m in enumerate(llm_messages):
-                    role = m.get("role")
-                    content_preview = str(m.get("content", ""))[:120].replace('\n', ' ')
-                    print(f"[Assistant loop {loop_count}] msg {i}: role={role} content={content_preview}")
 
-                streamed = await _create_completion_streaming(
+                content = ""
+                tool_calls: list[dict[str, Any]] = []
+                streamed_any_text = False
+
+                async for stage, payload in _create_completion_streaming(
                     llm_messages=llm_messages,
                     tools=tool_schemas,
                     tool_choice="auto",
-                )
-
-                content = streamed.get("content", "") or ""
-                tool_calls = _normalize_tool_calls(streamed.get("tool_calls", []))
-                streamed_any_text = bool(streamed.get("streamed_any_text", False))
-                print(f"[Assistant loop {loop_count}] streamed content preview: {content[:200]}")
-                print(f"[Assistant loop {loop_count}] tool_calls: {[tc.get('function', {}).get('name') for tc in tool_calls]}")
-
-                if streamed_any_text:
-                    yield _event("assistant_text", {"content": content})
+                ):
+                    if stage == "text":
+                        streamed_any_text = True
+                        content += str(payload)
+                        yield _event("assistant_text", {"content": str(payload)})
+                    elif stage == "done":
+                        content = payload.get("content", "") or ""
+                        tool_calls = _normalize_tool_calls(payload.get("tool_calls", []))
+                        streamed_any_text = bool(payload.get("streamed_any_text", False))
 
                 if not content and not tool_calls:
-                    print(f"[Assistant loop {loop_count}] empty content and no tool calls -> break")
                     yield _event("assistant_done", {"content": ""})
                     break
 
                 if tool_calls:
-                    print(f"[Assistant loop {loop_count}] handling {len(tool_calls)} tool call(s)")
                     history.add_assistant_message(content, tool_calls=tool_calls)
                     yield _event("assistant_tool_calls", {"tool_calls": tool_calls})
 
@@ -288,12 +297,10 @@ async def assistant_stream_generator(
                         if not isinstance(arguments, dict):
                             arguments = {}
 
-                        print(f"[Assistant loop {loop_count}] tool_start name={name} args={arguments}")
                         yield _event("tool_start", {"name": name, "arguments": arguments})
 
                         tool_message = await mcp_client.call_tool(name, arguments)
                         parsed_tool = _safe_json_loads(tool_message) or {}
-                        print(f"[Assistant loop {loop_count}] tool_result name={name} preview={str(parsed_tool)[:200]}")
 
                         display_payload: dict[str, Any] | None = None
                         if name == "retrieve_documents":
@@ -342,11 +349,9 @@ async def assistant_stream_generator(
 
                     # After processing all tool calls, loop again to ask the LLM
                     # what to do next with the tool results in context.
-                    print(f"[Assistant loop {loop_count}] continue to next loop")
                     continue
 
                 else:
-                    print(f"[Assistant loop {loop_count}] no tool calls, assistant_done -> break")
                     history.add_assistant_message(content)
                     yield _event("assistant_done", {"content": content})
                     break

@@ -75,6 +75,21 @@ class AssistantApp extends AppBase {
         });
 
         container.querySelector('#assistant-new-session').addEventListener('click', () => this._newSession());
+
+        // Delegate clicks for embedded search result actions (preview / chat).
+        this.chatEl.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-action]');
+            if (!btn) return;
+            const action = btn.dataset.action;
+            const docId = btn.dataset.docId;
+            const documentId = btn.dataset.documentId;
+            const name = btn.dataset.name;
+            if (action === 'preview') {
+                EventBus.emit('open-preview', { docId, documentId, name });
+            } else if (action === 'chat') {
+                EventBus.emit('open-chat', { documentId, name });
+            }
+        });
     }
 
     _escape(text) {
@@ -310,12 +325,11 @@ class AssistantApp extends AppBase {
                     <span>Recherche en cours</span>
                 </div>
             </div>
-            <div class="assistant-search-results" ${resultsVisible}>
+            <div class="assistant-search-results markdown-body" ${resultsVisible}>
                 ${resultsHtml || ''}
             </div>
         `;
         this.chatEl.appendChild(div);
-        this._bindSearchCardEvents(div);
         this._scrollToBottom();
         return div;
     }
@@ -363,21 +377,7 @@ class AssistantApp extends AppBase {
     }
 
     _bindSearchCardEvents(card) {
-        const resultsContainer = card.querySelector('.assistant-search-results');
-        if (!resultsContainer) return;
-        resultsContainer.addEventListener('click', (e) => {
-            const btn = e.target.closest('[data-action]');
-            if (!btn) return;
-            const action = btn.dataset.action;
-            const docId = btn.dataset.docId;
-            const documentId = btn.dataset.documentId;
-            const name = btn.dataset.name;
-            if (action === 'preview') {
-                EventBus.emit('open-preview', { docId, documentId, name });
-            } else if (action === 'chat') {
-                EventBus.emit('open-chat', { documentId, name });
-            }
-        });
+        // Clicks are handled globally on this.chatEl; kept for compatibility.
     }
 
     _sparkleSvg() {
@@ -438,19 +438,7 @@ class AssistantApp extends AppBase {
         }, 1200);
 
         let currentText = '';
-        let displayedText = '';
-        let streamBuffer = '';
         let toolStartEl = null;
-
-        const typewriter = setInterval(() => {
-            if (streamBuffer.length > 0) {
-                const chunkSize = Math.min(1 + Math.floor(Math.random() * 4), streamBuffer.length);
-                displayedText += streamBuffer.slice(0, chunkSize);
-                streamBuffer = streamBuffer.slice(chunkSize);
-                if (placeholder.content) placeholder.content.innerHTML = this._markdown(displayedText);
-                this._scrollToBottom();
-            }
-        }, 20);
 
         try {
             await ApiClient.streamAssistant(
@@ -472,7 +460,10 @@ class AssistantApp extends AppBase {
                             placeholder.wrapper.style.display = '';
                         }
                         currentText += event.content || '';
-                        streamBuffer += event.content || '';
+                        if (placeholder.content) {
+                            placeholder.content.innerHTML = this._markdown(currentText);
+                        }
+                        this._scrollToBottom();
                         return;
                     }
                     if (event.kind === 'assistant_tool_calls') {
@@ -506,8 +497,9 @@ class AssistantApp extends AppBase {
                     }
                     if (event.kind === 'assistant_done') {
                         if (placeholder.label) placeholder.label.remove();
-                        if (event.content && !currentText) {
-                            streamBuffer += event.content;
+                        if (event.content && !currentText && placeholder.content) {
+                            currentText = event.content;
+                            placeholder.content.innerHTML = this._markdown(currentText);
                         }
                         return;
                     }
@@ -518,28 +510,18 @@ class AssistantApp extends AppBase {
                 }
             );
 
-            await new Promise((resolve) => {
-                const drain = setInterval(() => {
-                    if (streamBuffer.length === 0) {
-                        clearInterval(drain);
-                        resolve();
-                    }
-                }, 30);
-            });
         } catch (err) {
             console.error('Assistant stream error', err);
             if (placeholder.label) placeholder.label.remove();
-            placeholder.content.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(err.message)}</em>`;
+            if (placeholder.content) {
+                placeholder.content.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(err.message)}</em>`;
+            }
         } finally {
-            clearInterval(typewriter);
             clearInterval(loadingInterval);
             this.isStreaming = false;
 
-            if (placeholder.content) {
-                placeholder.content.innerHTML = this._markdown(displayedText + streamBuffer);
-            }
-            if (currentText || streamBuffer) {
-                this.messages.push({ role: 'assistant', content: currentText + streamBuffer });
+            if (currentText) {
+                this.messages.push({ role: 'assistant', content: currentText });
             }
 
             requestAnimationFrame(() => {
