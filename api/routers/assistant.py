@@ -15,6 +15,8 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from openai.types.chat import ChatCompletionSystemMessageParam
+
 from api.dependencies import _LLM_MODEL, llm_client
 from api.routers.auth import require_user
 from api.services.assistant_history import AssistantHistory
@@ -163,29 +165,59 @@ def _event(kind: str, payload: dict[str, Any]) -> str:
     return json.dumps({"kind": kind, **payload}, ensure_ascii=False) + "\n"
 
 
+def _slugify_session_name(text: str) -> str:
+    import re
+    slug = (
+        text.lower()
+        .strip()
+        .replace("'", " ")
+        .replace("-", " ")
+        .replace("_", " ")
+        .replace(".", " ")
+    )
+    slug = re.sub(r"[^a-z0-9\s]", "", slug)
+    slug = re.sub(r"\s+", "_", slug)
+    parts = slug.split("_")[:8]
+    slug = "_".join(parts)[:80]
+    if not slug:
+        from datetime import datetime
+        slug = datetime.now().strftime("session_%Y%m%d_%H%M%S")
+    return slug
+
+
 async def assistant_stream_generator(
     request: AssistantStreamRequest,
     username: str,
 ) -> AsyncGenerator[str, None]:
-    history = AssistantHistory(
-        user=username,
-        session=request.session,
-    )
     user_input = request.user_message.strip()
     if not user_input:
         yield _event("error", {"message": "Message vide."})
         return
 
+    session_name = request.session.strip() or _slugify_session_name(user_input)
+    is_new_session = not request.session.strip()
+
+    history = AssistantHistory(
+        user=username,
+        session=session_name,
+    )
+
     state = {
         "user": username,
-        "name": request.model_name or request.session,
+        "name": request.model_name or session_name,
         "package": "",
     }
 
     history.start_new_request(user_input)
     history.add_user_message(user_input, track_trace=False)
 
-    yield _event("user", {"content": user_input})
+    if is_new_session:
+        history.display_messages.insert(
+            0,
+            ChatCompletionSystemMessageParam(role="session_name", content=session_name),
+        )
+
+    yield _event("user", {"content": user_input, "session": session_name, "is_new_session": is_new_session})
 
     try:
         async with AssistantMCPClient(state) as mcp_client:

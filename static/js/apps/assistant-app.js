@@ -10,7 +10,7 @@ class AssistantApp extends AppBase {
 
     constructor(instanceId, props = {}) {
         super(instanceId, props);
-        this.session = props.session || 'default';
+        this.session = props.session || '';
         this.modelName = props.modelName || '';
         this.messages = [];
         this.isStreaming = false;
@@ -21,10 +21,7 @@ class AssistantApp extends AppBase {
         container.innerHTML = `
             <div class="assistant-app">
                 <div class="assistant-header">
-                    <div class="assistant-session">
-                        <label for="assistant-session">Session</label>
-                        <input type="text" id="assistant-session" value="${this._escape(this.session)}" autocomplete="off">
-                    </div>
+                    <div class="assistant-title">Assistant Sémantique</div>
                     <div class="assistant-model">
                         <label for="assistant-model">Modèle</label>
                         <input type="text" id="assistant-model" value="${this._escape(this.modelName)}" placeholder="Nom du modèle (optionnel)" autocomplete="off">
@@ -42,7 +39,6 @@ class AssistantApp extends AppBase {
         this.chatEl = container.querySelector('#assistant-chat');
         this.inputEl = container.querySelector('#assistant-input');
         this.sendBtn = container.querySelector('#assistant-send');
-        this.sessionInput = container.querySelector('#assistant-session');
         this.modelInput = container.querySelector('#assistant-model');
 
         this.sendBtn.addEventListener('click', () => this._send());
@@ -53,10 +49,6 @@ class AssistantApp extends AppBase {
             }
         });
         this.inputEl.addEventListener('input', () => this._toggleSend());
-        this.sessionInput.addEventListener('change', () => {
-            this.session = this.sessionInput.value.trim() || 'default';
-            this._loadHistory();
-        });
         this.modelInput.addEventListener('change', () => {
             this.modelName = this.modelInput.value.trim();
         });
@@ -78,15 +70,40 @@ class AssistantApp extends AppBase {
         this.sendBtn.disabled = !this.inputEl.value.trim() || this.isStreaming;
     }
 
+    _slugify(text) {
+        return text
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9\s]+/g, ' ')
+            .trim()
+            .split(/\s+/)
+            .slice(0, 8)
+            .join('_')
+            .substring(0, 80) || 'session';
+    }
+
     _newSession() {
-        const timestamp = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
-        this.session = `session-${timestamp}`;
-        this.sessionInput.value = this.session;
+        this.session = '';
         this.messages = [];
         this._renderMessages();
     }
 
+    _loadLocalHistory() {
+        // When no session name is chosen yet we just keep the in-memory messages
+        // until the first message is sent and a session is created server-side.
+        if (!this.session) {
+            return;
+        }
+        this._renderMessages();
+    }
+
     async _loadHistory() {
+        if (!this.session) {
+            this.messages = [];
+            this._renderMessages();
+            return;
+        }
         try {
             const data = await ApiClient.getAssistantSessions();
             const sessions = data.sessions || [];
@@ -178,7 +195,10 @@ class AssistantApp extends AppBase {
         const text = this.inputEl.value.trim();
         if (!text || this.isStreaming) return;
 
-        this.session = this.sessionInput.value.trim() || 'default';
+        // First message creates the session name from the user text.
+        if (!this.session) {
+            this.session = this._slugify(text);
+        }
         this.modelName = this.modelInput.value.trim();
 
         this.messages.push({ role: 'user', content: text });
