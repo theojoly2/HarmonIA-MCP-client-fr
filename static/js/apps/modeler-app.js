@@ -62,7 +62,7 @@ class ModelerApp extends AppBase {
                             <input type="file" id="modeler-file-input" class="hidden" accept=".ttl,.xml,.xmi,.json,.jsonld,.sql,.txt,.html,.htm,.csv">
                         </label>
                         <div class="text-base font-medium text-gray-500 text-center mt-4 mx-auto">
-                            ou <button type="button" id="modeler-new-empty" class="font-semibold text-gray-700 hover:text-gray-900 underline transition-colors">créer un modèle vide</button> pour partir de zéro.
+                            ou <button type="button" id="modeler-new-empty" class="font-semibold text-gray-700 hover:text-blue-600 underline transition-colors">créer un modèle vide</button> pour partir de zéro.
                         </div>
                     </div>
                 </div>
