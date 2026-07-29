@@ -45,7 +45,7 @@
     });
 
     // Window manager
-    const windowManager = new WindowManager(contentArea, splitManager);
+    const windowManager = new WindowManager(contentArea, splitManager, { shell });
     window.historyPanel = historyPanel;
     window.windowManager = windowManager;
 

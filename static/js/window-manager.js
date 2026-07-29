@@ -7,6 +7,7 @@ class WindowManager {
     constructor(shellElement, splitManager, options = {}) {
         this.shellElement = shellElement;
         this.splitManager = splitManager;
+        this.shell = options.shell || null;
         this.floatingRoot = document.createElement('div');
         this.floatingRoot.id = 'floating-root';
         document.body.appendChild(this.floatingRoot);
@@ -154,6 +155,10 @@ class WindowManager {
     updateTitle(instanceId, title) {
         const instance = AppState.getInstance(instanceId);
         if (instance) instance.setTitle(title);
+        const record = AppState.getRecord(instanceId);
+        if (record && this.shell && this.shell.updateTabTitle) {
+            this.shell.updateTabTitle(record.appId, title);
+        }
         const floatWin = this.floatWindows.get(instanceId);
         if (floatWin) {
             floatWin.setTitle(title);
