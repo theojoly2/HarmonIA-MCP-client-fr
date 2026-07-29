@@ -1,250 +1,57 @@
+/* === AssistantApp styles (inspired by floating ChatApp) === */
+
 .assistant-app {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    background: #f9fafb;
-}
-
-.assistant-header {
-    display: flex;
-    align-items: flex-end;
-    gap: 12px;
-    padding: 12px 16px;
     background: #ffffff;
-    border-bottom: 1px solid #e5e7eb;
-    flex-shrink: 0;
 }
 
-.assistant-title {
-    font-size: 16px;
-    font-weight: 600;
+.assistant-toolbar {
+    background: #ffffff;
+}
+
+.assistant-model-input {
+    background: #ffffff;
     color: #111827;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding-bottom: 2px;
 }
 
-.assistant-title::before {
-    content: '';
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    background: #2563eb;
-    border-radius: 9999px;
-}
-
-.assistant-model {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    flex: 1;
-}
-
-.assistant-model label {
-    font-size: 12px;
-    font-weight: 600;
-    color: #6b7280;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.assistant-model input {
-    padding: 6px 10px;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-    font-size: 14px;
-    background: #ffffff;
-    outline: none;
-}
-
-.assistant-model input:focus {
-    border-color: #2563eb;
-    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
-}
-
-.assistant-btn {
-    padding: 8px 14px;
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    border: 1px solid transparent;
-    transition: background 0.15s ease, border-color 0.15s ease;
-}
-
-.assistant-btn-primary {
-    background: #2563eb;
-    color: #ffffff;
-}
-
-.assistant-btn-primary:hover:not(:disabled) {
-    background: #1d4ed8;
-}
-
-.assistant-btn-primary:disabled {
-    background: #93c5fd;
-    cursor: not-allowed;
+.assistant-model-input:focus {
+    border-color: #111827;
 }
 
 .assistant-btn-secondary {
     background: #ffffff;
     color: #374151;
-    border-color: #d1d5db;
 }
 
 .assistant-btn-secondary:hover {
     background: #f3f4f6;
 }
 
-.assistant-chat {
-    flex: 1;
-    overflow-y: auto;
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.assistant-message {
-    display: flex;
-    max-width: 85%;
-}
-
-.assistant-message-user {
-    align-self: flex-end;
-}
-
-.assistant-message-assistant {
-    align-self: flex-start;
-}
-
-.assistant-message-tool,
-.assistant-message-thinking {
-    align-self: flex-start;
-    max-width: 95%;
-}
-
-.assistant-bubble {
-    padding: 10px 14px;
-    border-radius: 12px;
-    font-size: 14px;
-    line-height: 1.5;
-    word-wrap: break-word;
-}
-
-.assistant-bubble-user {
-    background: #2563eb;
-    color: #ffffff;
-    border-bottom-right-radius: 4px;
-}
-
-.assistant-bubble-user a {
-    color: #dbeafe;
-    text-decoration: underline;
-}
-
-.assistant-bubble-assistant {
-    background: #ffffff;
-    color: #111827;
-    border: 1px solid #e5e7eb;
-    border-bottom-left-radius: 4px;
-}
-
-.assistant-bubble-assistant pre {
-    background: #f3f4f6;
-    padding: 8px;
-    border-radius: 4px;
-    overflow-x: auto;
-}
-
-.assistant-bubble-assistant code {
-    background: #f3f4f6;
-    padding: 2px 4px;
-    border-radius: 4px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-}
-
-.assistant-thinking {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: #6b7280;
-    font-size: 13px;
-    font-style: italic;
-}
-
-.assistant-spinner {
-    width: 14px;
-    height: 14px;
-    border: 2px solid #d1d5db;
-    border-top-color: #2563eb;
-    border-radius: 50%;
-    animation: assistant-spin 0.8s linear infinite;
-}
-
-@keyframes assistant-spin {
-    to { transform: rotate(360deg); }
-}
-
-.assistant-tool-start {
-    background: #eff6ff;
-    color: #1e40af;
-    padding: 6px 10px;
-    border-radius: 6px;
-    font-size: 13px;
+.assistant-send-btn {
+    position: relative;
+    overflow: hidden;
+    background-image: radial-gradient(circle var(--glow-size, 0px) at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255,255,255,0.5) 0%, transparent 100%);
+    transition: --glow-size 0.3s ease;
 }
 
 .assistant-tool-result {
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    padding: 8px 12px;
-    font-size: 13px;
-    width: 100%;
-}
-
-.assistant-tool-result summary {
-    cursor: pointer;
-    color: #374151;
-    font-weight: 500;
+    max-width: 100%;
 }
 
 .assistant-tool-result pre {
-    margin-top: 8px;
     background: #f3f4f6;
-    padding: 8px;
-    border-radius: 4px;
-    overflow-x: auto;
-    max-height: 300px;
-    font-size: 12px;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.85em;
+    max-height: 16rem;
+    overflow-y: auto;
 }
 
-.assistant-input-area {
-    display: flex;
-    gap: 10px;
-    padding: 12px 16px;
-    background: #ffffff;
-    border-top: 1px solid #e5e7eb;
-    flex-shrink: 0;
+.assistant-tool-result summary {
+    list-style-position: outside;
+    padding-left: 0.25rem;
 }
 
-.assistant-input-area textarea {
-    flex: 1;
-    resize: none;
-    padding: 10px 12px;
-    border: 1px solid #d1d5db;
-    border-radius: 8px;
-    font-size: 14px;
-    font-family: inherit;
-    outline: none;
-}
-
-.assistant-input-area textarea:focus {
-    border-color: #2563eb;
-    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
-}
-
-.assistant-input-area button {
-    align-self: flex-end;
+/* Ensure user messages anchor correctly when scrolling */
+.user-msg-anchor {
+    scroll-margin-top: 2px;
 }
