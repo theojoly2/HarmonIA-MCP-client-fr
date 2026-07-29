@@ -47,6 +47,7 @@ const GlowEffects = (() => {
 
     function getGlowSize(target) {
         if (target.id === 'submit-btn') return '30px';
+        if (target.id === 'modeler-new-empty') return '30px';
         if (target.id === 'login-btn') return '30px';
         if (target.classList.contains('title-glow')) return '55px';
         if (target.closest('.tag-label')) return '30px';
