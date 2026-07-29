@@ -205,10 +205,11 @@ def get_image_bytes(
 
     if not elements and not connectors:
         # Empty model placeholder so the user sees something instead of a blank screen.
-        plantuml_lines.append('note "Modèle vide" as empty_placeholder')
-        plantuml_lines.append('note right of empty_placeholder')
-        plantuml_lines.append('  Cliquez sur "Classe" pour ajouter votre première classe.')
-        plantuml_lines.append('end note')
+        # Use a card-style note so it does not get parsed as a real class.
+        plantuml_lines.append('legend center')
+        plantuml_lines.append('  Modèle vide')
+        plantuml_lines.append('  Cliquez sur "Classe" pour commencer.')
+        plantuml_lines.append('end legend')
 
     id_to_alias: dict[str, str] = {}
     name_to_aliases: dict[str, list[str]] = defaultdict(list)

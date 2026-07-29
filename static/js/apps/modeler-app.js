@@ -476,11 +476,13 @@ class ModelerApp extends AppBase {
         const svg = doc.querySelector('svg');
         if (!svg) return [];
         const names = new Set();
+        const ignoredIds = new Set(['empty_placeholder']);
         svg.querySelectorAll('g.entity').forEach((g) => {
+            if (ignoredIds.has(g.getAttribute('id'))) return;
             const title = g.querySelector('text');
             if (!title) return;
             const label = (title.textContent || '').trim();
-            if (label && label !== 'Unnamed' && !label.startsWith('«')) {
+            if (label && label !== 'Unnamed' && !label.startsWith('«') && label !== 'Modèle vide') {
                 names.add(label);
             }
         });
