@@ -191,21 +191,28 @@ const ApiClient = (() => {
         const events = [];
         let flushScheduled = false;
 
+        const flushEvents = () => {
+            if (events.length === 0) return;
+            // Merge consecutive assistant_text chunks so text streams smoothly
+            // while tool/search/plan events are flushed immediately in the same frame.
+            let batch = events.shift();
+            while (events.length > 0 && events[0].kind === 'assistant_text' && batch.kind === 'assistant_text') {
+                const next = events.shift();
+                batch.content = (batch.content || '') + (next.content || '');
+            }
+            try {
+                onEvent(batch);
+            } catch (err) {
+                console.error("Assistant event handler error", err, batch);
+            }
+        };
+
         const scheduleFlush = () => {
             if (flushScheduled || events.length === 0) return;
             flushScheduled = true;
             requestAnimationFrame(() => {
                 flushScheduled = false;
-                // Process exactly one event per animation frame so the browser
-                // renders each tool step progressively without artificial delays.
-                const ev = events.shift();
-                if (ev) {
-                    try {
-                        onEvent(ev);
-                    } catch (err) {
-                        console.error("Assistant event handler error", err, ev);
-                    }
-                }
+                flushEvents();
                 if (events.length > 0) {
                     scheduleFlush();
                 }
@@ -251,14 +258,7 @@ const ApiClient = (() => {
         const drainRemaining = () => {
             if (events.length === 0) return;
             requestAnimationFrame(() => {
-                const ev = events.shift();
-                if (ev) {
-                    try {
-                        onEvent(ev);
-                    } catch (err) {
-                        console.error("Assistant event handler error", err, ev);
-                    }
-                }
+                flushEvents();
                 if (events.length > 0) {
                     drainRemaining();
                 }
