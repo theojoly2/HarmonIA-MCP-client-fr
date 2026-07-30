@@ -191,14 +191,19 @@ const ApiClient = (() => {
         const events = [];
         let flushScheduled = false;
 
+        const isMergeable = (ev) => ev.kind === 'assistant_text' || ev.kind === 'thinking';
+
         const flushEvents = () => {
             if (events.length === 0) return;
-            // Merge consecutive assistant_text chunks so text streams smoothly
-            // while tool/search/plan events are flushed immediately in the same frame.
+            // Merge consecutive text/thinking events so the text streams smoothly
+            // while structural events (tool_start, tool_result, plan card, search)
+            // are emitted immediately and therefore render progressively.
             let batch = events.shift();
-            while (events.length > 0 && events[0].kind === 'assistant_text' && batch.kind === 'assistant_text') {
+            while (events.length > 0 && isMergeable(events[0]) && isMergeable(batch)) {
                 const next = events.shift();
-                batch.content = (batch.content || '') + (next.content || '');
+                if (batch.kind === 'assistant_text' && next.kind === 'assistant_text') {
+                    batch.content = (batch.content || '') + (next.content || '');
+                }
             }
             try {
                 onEvent(batch);
@@ -212,7 +217,14 @@ const ApiClient = (() => {
             flushScheduled = true;
             requestAnimationFrame(() => {
                 flushScheduled = false;
-                flushEvents();
+                // Process as many mergeable events as possible in this frame,
+                // but stop at the first structural event so it renders right away.
+                while (events.length > 0 && isMergeable(events[0])) {
+                    flushEvents();
+                }
+                if (events.length > 0) {
+                    flushEvents();
+                }
                 if (events.length > 0) {
                     scheduleFlush();
                 }
