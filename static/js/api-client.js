@@ -190,33 +190,26 @@ const ApiClient = (() => {
 
         const events = [];
         let flushScheduled = false;
-        let lastFlushTime = 0;
-        const MIN_FLUSH_INTERVAL_MS = 80;
 
         const scheduleFlush = () => {
             if (flushScheduled || events.length === 0) return;
             flushScheduled = true;
-            const now = performance.now();
-            const delay = Math.max(0, MIN_FLUSH_INTERVAL_MS - (now - lastFlushTime));
-            setTimeout(() => {
-                requestAnimationFrame(() => {
-                    flushScheduled = false;
-                    lastFlushTime = performance.now();
-                    let batch = 0;
-                    while (events.length > 0 && batch < 5) {
-                        const ev = events.shift();
-                        batch++;
-                        try {
-                            onEvent(ev);
-                        } catch (err) {
-                            console.error("Assistant event handler error", err, ev);
-                        }
+            requestAnimationFrame(() => {
+                flushScheduled = false;
+                // Process exactly one event per animation frame so the browser
+                // renders each tool step progressively without artificial delays.
+                const ev = events.shift();
+                if (ev) {
+                    try {
+                        onEvent(ev);
+                    } catch (err) {
+                        console.error("Assistant event handler error", err, ev);
                     }
-                    if (events.length > 0) {
-                        scheduleFlush();
-                    }
-                });
-            }, delay);
+                }
+                if (events.length > 0) {
+                    scheduleFlush();
+                }
+            });
         };
 
         const reader = res.body.getReader();
@@ -254,29 +247,22 @@ const ApiClient = (() => {
             }
         }
 
-        // Flush any remaining events with the same pacing before resolving.
+        // Drain remaining events one per frame so the UI stays progressive.
         const drainRemaining = () => {
             if (events.length === 0) return;
-            const now = performance.now();
-            const delay = Math.max(0, MIN_FLUSH_INTERVAL_MS - (now - lastFlushTime));
-            setTimeout(() => {
-                requestAnimationFrame(() => {
-                    lastFlushTime = performance.now();
-                    let batch = 0;
-                    while (events.length > 0 && batch < 5) {
-                        const ev = events.shift();
-                        batch++;
-                        try {
-                            onEvent(ev);
-                        } catch (err) {
-                            console.error("Assistant event handler error", err, ev);
-                        }
+            requestAnimationFrame(() => {
+                const ev = events.shift();
+                if (ev) {
+                    try {
+                        onEvent(ev);
+                    } catch (err) {
+                        console.error("Assistant event handler error", err, ev);
                     }
-                    if (events.length > 0) {
-                        drainRemaining();
-                    }
-                });
-            }, delay);
+                }
+                if (events.length > 0) {
+                    drainRemaining();
+                }
+            });
         };
         drainRemaining();
     }

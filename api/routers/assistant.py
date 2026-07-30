@@ -353,10 +353,6 @@ async def assistant_stream_generator(
                         yield _event("tool_result", {"name": name, "result": parsed_tool, "display": display_payload})
                         await asyncio.sleep(0)
 
-                        # Visual pacing: give the browser time to render each completed
-                        # step before starting the next tool call.
-                        await asyncio.sleep(0.45)
-
                         history.add_tool_message(
                             content=tool_message,
                             tool_call_id=tool_call["id"],
