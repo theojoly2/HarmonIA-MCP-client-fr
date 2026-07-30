@@ -386,7 +386,7 @@ async def assistant_stream_generator(
 
                 else:
                     history.add_assistant_message(content)
-                    yield _event("assistant_done", {"content": content})
+                    yield _event("assistant_done", {"content": ""})
                     break
 
     except Exception as e:

@@ -672,36 +672,30 @@ class AssistantApp extends AppBase {
 
     _createTypewriter(onChunk) {
         let buffer = '';
-        let rafId = null;
-        let lastFrame = 0;
-        const FRAME_MS = 24;
+        let interval = null;
+        const SPEED_MS = 20;
         const CHUNK_SIZE = 3;
 
-        const pump = (now) => {
-            rafId = null;
-            if (buffer === '') return;
-            if (now - lastFrame < FRAME_MS) {
-                rafId = requestAnimationFrame(pump);
+        const tick = () => {
+            if (buffer === '') {
+                clearInterval(interval);
+                interval = null;
                 return;
             }
-            lastFrame = now;
             const chunk = buffer.slice(0, CHUNK_SIZE);
             buffer = buffer.slice(CHUNK_SIZE);
             onChunk(chunk);
-            if (buffer !== '') {
-                rafId = requestAnimationFrame(pump);
-            }
         };
 
         return {
             append: (text) => {
                 buffer += text;
-                if (!rafId) rafId = requestAnimationFrame(pump);
+                if (!interval) interval = setInterval(tick, SPEED_MS);
             },
             flush: () => {
-                if (rafId) {
-                    cancelAnimationFrame(rafId);
-                    rafId = null;
+                if (interval) {
+                    clearInterval(interval);
+                    interval = null;
                 }
                 while (buffer !== '') {
                     const chunk = buffer.slice(0, CHUNK_SIZE);
@@ -710,9 +704,9 @@ class AssistantApp extends AppBase {
                 }
             },
             stop: () => {
-                if (rafId) {
-                    cancelAnimationFrame(rafId);
-                    rafId = null;
+                if (interval) {
+                    clearInterval(interval);
+                    interval = null;
                 }
                 buffer = '';
             },
