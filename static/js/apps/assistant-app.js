@@ -161,7 +161,7 @@ class AssistantApp extends AppBase {
         return wrapper;
     }
 
-    async _ensureAssistantBubble() {
+    _ensureAssistantBubble() {
         // Create a new assistant message bubble if the last one is not an active assistant bubble.
         const last = this.chatEl.lastElementChild;
         if (last && last.dataset.role === 'assistant' && last.dataset.active === 'true') {
@@ -181,7 +181,6 @@ class AssistantApp extends AppBase {
         `;
         this.chatEl.appendChild(wrapper);
         this._scrollToBottom();
-        await this._paint();
         return wrapper.querySelector('.assistant-bubble-content');
     }
 
@@ -189,10 +188,6 @@ class AssistantApp extends AppBase {
         if (this.chatEl) {
             void this.chatEl.offsetHeight;
         }
-    }
-
-    _paint() {
-        return new Promise((resolve) => requestAnimationFrame(resolve));
     }
 
     _hideAllSparkles() {
@@ -539,6 +534,56 @@ class AssistantApp extends AppBase {
 
         let currentBubbleContent = null;
         let currentText = '';
+        let textBuffer = '';
+        let typewriterInterval = null;
+        const TYPEWRITER_MS = 18;
+
+        const flushTypewriter = () => {
+            if (!currentBubbleContent || textBuffer === '') return;
+            const chunkSize = Math.min(3, textBuffer.length);
+            currentText += textBuffer.slice(0, chunkSize);
+            textBuffer = textBuffer.slice(chunkSize);
+            currentBubbleContent.innerHTML = this._markdown(currentText);
+            this._forceReflow();
+            this._scrollToBottom();
+        };
+
+        const startTypewriter = () => {
+            if (typewriterInterval) return;
+            typewriterInterval = setInterval(() => {
+                if (textBuffer === '') {
+                    clearInterval(typewriterInterval);
+                    typewriterInterval = null;
+                    return;
+                }
+                flushTypewriter();
+            }, TYPEWRITER_MS);
+        };
+
+        const appendText = (chunk) => {
+            if (!currentBubbleContent) {
+                this._closeAssistantBubble();
+                currentBubbleContent = this._ensureAssistantBubble();
+            }
+            textBuffer += chunk;
+            startTypewriter();
+        };
+
+        const finalizeText = () => {
+            if (typewriterInterval) {
+                clearInterval(typewriterInterval);
+                typewriterInterval = null;
+            }
+            if (textBuffer) {
+                currentText += textBuffer;
+                textBuffer = '';
+            }
+            if (currentBubbleContent) {
+                currentBubbleContent.innerHTML = this._markdown(currentText);
+                this._forceReflow();
+                this._scrollToBottom();
+            }
+        };
 
         const removePlaceholder = () => {
             if (placeholder && placeholder.parentNode) {
@@ -566,24 +611,12 @@ class AssistantApp extends AppBase {
                     }
 
                     if (event.kind === 'assistant_text') {
-                        if (!currentBubbleContent) {
-                            this._closeAssistantBubble();
-                            currentBubbleContent = await this._ensureAssistantBubble();
-                        }
-                        const chunk = event.content || '';
-                        currentText += chunk;
-                        currentBubbleContent.innerHTML = this._markdown(currentText);
-                        this._forceReflow();
-                        this._scrollToBottom();
+                        appendText(event.content || '');
                         return;
                     }
 
                     if (event.kind === 'assistant_tool_calls') {
-                        // Hidden from the chat UI: do not show the "planned tool calls" summary.
-                        // Just close any active text bubble so the next assistant text starts fresh.
-                        if (currentBubbleContent && currentText) {
-                            currentBubbleContent.innerHTML = this._markdown(currentText);
-                        }
+                        finalizeText();
                         currentBubbleContent = null;
                         currentText = '';
                         this._closeAssistantBubble();
@@ -592,9 +625,7 @@ class AssistantApp extends AppBase {
                     }
 
                     if (event.kind === 'tool_start') {
-                        if (currentBubbleContent && currentText) {
-                            currentBubbleContent.innerHTML = this._markdown(currentText);
-                        }
+                        finalizeText();
                         currentBubbleContent = null;
                         currentText = '';
                         this._closeAssistantBubble();
@@ -609,6 +640,7 @@ class AssistantApp extends AppBase {
                     }
 
                     if (event.kind === 'tool_result') {
+                        finalizeText();
                         this._closeAssistantBubble();
                         if (event.name === 'plan_workflow_with_tools') {
                             this._renderPlan(event.result);
@@ -622,11 +654,7 @@ class AssistantApp extends AppBase {
                     }
 
                     if (event.kind === 'loop_done') {
-                        // End of one assistant loop: finalize any open assistant bubble so the
-                        // user sees the result of this iteration before the next loop starts.
-                        if (currentBubbleContent && currentText) {
-                            currentBubbleContent.innerHTML = this._markdown(currentText);
-                        }
+                        finalizeText();
                         currentBubbleContent = null;
                         currentText = '';
                         this._closeAssistantBubble();
@@ -634,21 +662,22 @@ class AssistantApp extends AppBase {
                     }
 
                     if (event.kind === 'assistant_done') {
-                        if (currentBubbleContent && currentText) {
-                            currentBubbleContent.innerHTML = this._markdown(currentText);
-                        }
+                        finalizeText();
                         if (event.content && !currentText) {
-                            const bubble = await this._ensureAssistantBubble();
-                            bubble.innerHTML = this._markdown(event.content);
+                            appendText(event.content);
+                            finalizeText();
                         }
+                        currentBubbleContent = null;
+                        currentText = '';
                         this._closeAssistantBubble();
                         this._scrollToBottom();
                         return;
                     }
 
                     if (event.kind === 'error') {
+                        finalizeText();
                         this._closeAssistantBubble();
-                        const bubble = await this._ensureAssistantBubble();
+                        const bubble = this._ensureAssistantBubble();
                         bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(event.message || '')}</em>`;
                         this._scrollToBottom();
                     }
@@ -658,16 +687,21 @@ class AssistantApp extends AppBase {
         } catch (err) {
             console.error('Assistant stream error', err);
             removePlaceholder();
-            const bubble = await this._ensureAssistantBubble();
+            finalizeText();
+            const bubble = this._ensureAssistantBubble();
             bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(err.message)}</em>`;
             this._scrollToBottom();
         } finally {
             clearInterval(loadingInterval);
+            if (typewriterInterval) {
+                clearInterval(typewriterInterval);
+                typewriterInterval = null;
+            }
             this.isStreaming = false;
             this._closeAssistantBubble();
 
-            if (currentText) {
-                this.messages.push({ role: 'assistant', content: currentText });
+            if (currentText || textBuffer) {
+                this.messages.push({ role: 'assistant', content: currentText + textBuffer });
             }
 
             requestAnimationFrame(() => {
