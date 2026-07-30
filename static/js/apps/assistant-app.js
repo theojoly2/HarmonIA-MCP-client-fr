@@ -586,12 +586,11 @@ class AssistantApp extends AppBase {
                         this._closeAssistantBubble();
                         if (event.name === 'retrieve_documents') {
                             this._appendSearchCard(event.arguments?.search_terms || '', null);
-                        } else {
+                        } else if (event.name !== 'plan_workflow_with_tools') {
                             const card = this._createToolCard(event.name, event.arguments || {});
                             this._markToolRunning(card, true);
                         }
                         this.messages.push({ role: 'tool_start', name: event.name, arguments: event.arguments });
-                        this._scrollToBottom();
                         return;
                     }
 
