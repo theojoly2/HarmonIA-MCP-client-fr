@@ -252,15 +252,6 @@ async def assistant_stream_generator(
 
                 yield _event("thinking", {})
 
-                # If a plan was already generated in this request, hide the planner
-                # so the LLM cannot loop on re-planning.
-                available_tool_schemas = tool_schemas
-                if plan_already_used:
-                    available_tool_schemas = [
-                        t for t in tool_schemas
-                        if t.get("function", {}).get("name") != "plan_workflow_with_tools"
-                    ]
-
                 llm_messages = [
                     {"role": msg["role"], "content": str(msg.get("content", ""))}
                     for msg in history.build_messages_for_llm(
@@ -275,7 +266,7 @@ async def assistant_stream_generator(
 
                 async for stage, payload in _create_completion_streaming(
                     llm_messages=llm_messages,
-                    tools=available_tool_schemas,
+                    tools=tool_schemas,
                     tool_choice="auto",
                 ):
                     if stage == "text":

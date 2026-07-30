@@ -290,12 +290,29 @@ class AssistantMCPClient:
         if not user_question:
             payload["tool_results"] = {"error": "Missing 'user_question'"}
             return payload
+
+        raw_observations = arguments.get("observations") or []
+        observations: list[Any] = []
+        for item in raw_observations if isinstance(raw_observations, list) else [raw_observations]:
+            if isinstance(item, dict):
+                observations.append(item)
+            elif isinstance(item, str):
+                parsed = _safe_json_loads(item)
+                if isinstance(parsed, dict):
+                    observations.append(parsed)
+                elif isinstance(parsed, list):
+                    observations.extend(parsed)
+                else:
+                    observations.append({"text": item})
+            else:
+                observations.append({"value": item})
+
         call_args = {
             "user": _normalize_str_arg(self.state.get("user"), default=""),
             "name": _normalize_str_arg(self.state.get("name"), default=""),
             "user_question": _normalize_str_arg(user_question),
             "allowed_executor_tools": sorted(EXPOSED_TOOLS),
-            "observations": _normalize_list_arg(arguments.get("observations")),
+            "observations": observations,
             "max_steps": _normalize_int_arg(arguments.get("max_steps"), default=5),
         }
         payload["tool_arguments"] = call_args
