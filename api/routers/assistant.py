@@ -276,10 +276,12 @@ async def assistant_stream_generator(
                         streamed_any_text = True
                         content += str(payload)
                         yield _event("assistant_text", {"content": str(payload)})
+                        await asyncio.sleep(0)
                     elif stage == "done":
                         content = payload.get("content", "") or ""
                         tool_calls = _normalize_tool_calls(payload.get("tool_calls", []))
                         streamed_any_text = bool(payload.get("streamed_any_text", False))
+                        await asyncio.sleep(0)
 
                 if not content and not tool_calls:
                     yield _event("assistant_done", {"content": ""})
@@ -298,6 +300,7 @@ async def assistant_stream_generator(
                             arguments = {}
 
                         yield _event("tool_start", {"name": name, "arguments": arguments})
+                        await asyncio.sleep(0)
 
                         tool_message = await mcp_client.call_tool(name, arguments)
                         parsed_tool = _safe_json_loads(tool_message) or {}
@@ -324,6 +327,7 @@ async def assistant_stream_generator(
 
 
                         yield _event("tool_result", {"name": name, "result": parsed_tool, "display": display_payload})
+                        await asyncio.sleep(0)
 
                         history.add_tool_message(
                             content=tool_message,
@@ -357,7 +361,10 @@ async def assistant_stream_generator(
                     break
 
     except Exception as e:
-        yield _event("error", {"message": str(e)})
+        import traceback
+        traceback.print_exc()
+        print(f"[Assistant stream error] {type(e).__name__}: {e}")
+        yield _event("error", {"message": f"{type(e).__name__}: {e}"})
         return
 
     history.finalize_current_request_summary()
