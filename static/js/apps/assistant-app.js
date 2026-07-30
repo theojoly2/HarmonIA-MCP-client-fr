@@ -313,8 +313,35 @@ class AssistantApp extends AppBase {
         const parsed = (result.tool_results && typeof result.tool_results === 'object')
             ? result.tool_results
             : result;
-        const planText = parsed.final_plan || parsed.plan || parsed.content || parsed.text;
-        if (!planText) return null;
+
+        const planSteps = parsed.plan_steps || [];
+        const toolsToCall = parsed.tools_to_call || [];
+        const notes = parsed.notes || '';
+
+        if (!Array.isArray(planSteps) || planSteps.length === 0) {
+            return null;
+        }
+
+        const stepsHtml = planSteps.map((step, index) => {
+            const tool = toolsToCall.find((t) => t.step_index === index);
+            const toolName = tool?.tool || '';
+            const toolBadge = toolName
+                ? `<span class="assistant-plan-tool-badge">${this._escape(toolName)}</span>`
+                : '';
+            const stepText = typeof step === 'string' ? step : (step.step || '');
+            const needsTool = typeof step === 'object' ? step.needs_tool : false;
+            return `
+                <li class="assistant-plan-step">
+                    <span class="assistant-plan-step-number">${index + 1}</span>
+                    <div class="assistant-plan-step-content">
+                        <div class="assistant-plan-step-text">${this._escape(stepText)}</div>
+                        ${toolBadge}
+                        ${needsTool ? '<span class="assistant-plan-uses-tool">nécessite un outil</span>' : ''}
+                    </div>
+                </li>
+            `;
+        }).join('');
+
         const div = document.createElement('div');
         div.className = 'assistant-plan-card mb-4';
         div.innerHTML = `
@@ -324,8 +351,11 @@ class AssistantApp extends AppBase {
                 </svg>
                 <span>Plan d’action proposé</span>
             </div>
-            <div class="assistant-plan-body markdown-body">
-                ${this._markdown(String(planText))}
+            <div class="assistant-plan-body">
+                <ol class="assistant-plan-steps">
+                    ${stepsHtml}
+                </ol>
+                ${notes ? `<div class="assistant-plan-notes">${this._escape(notes)}</div>` : ''}
             </div>
         `;
         this.chatEl.appendChild(div);

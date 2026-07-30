@@ -194,6 +194,82 @@
     color: #1f2937;
 }
 
+.assistant-plan-steps {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    counter-reset: plan-step;
+}
+
+.assistant-plan-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.assistant-plan-step:last-child {
+    border-bottom: none;
+}
+
+.assistant-plan-step-number {
+    flex-shrink: 0;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #2563eb;
+    color: #ffffff;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.assistant-plan-step-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    flex: 1;
+}
+
+.assistant-plan-step-text {
+    color: #1f2937;
+    line-height: 1.5;
+}
+
+.assistant-plan-tool-badge {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    padding: 0.2rem 0.55rem;
+    border-radius: 9999px;
+    background: #dbeafe;
+    color: #1d4ed8;
+    font-size: 0.7rem;
+    font-weight: 600;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.assistant-plan-uses-tool {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    font-size: 0.7rem;
+    color: #6b7280;
+    font-style: italic;
+}
+
+.assistant-plan-notes {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #e5e7eb;
+    color: #6b7280;
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
 /* === Search card inside assistant chat === */
 .assistant-search-card {
     background: #ffffff;
