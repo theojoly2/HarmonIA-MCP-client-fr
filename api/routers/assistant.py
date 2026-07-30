@@ -375,8 +375,10 @@ async def assistant_stream_generator(
                             yield _event("assistant_done", {"content": report})
                             return
 
-                    # After processing all tool calls, loop again to ask the LLM
-                    # what to do next with the tool results in context.
+                    # After processing all tool calls, signal loop completion so the UI
+                    # can render this iteration before the next LLM call starts.
+                    yield _event("loop_done", {"loop": loop_count})
+                    await asyncio.sleep(0)
                     continue
 
                 else:

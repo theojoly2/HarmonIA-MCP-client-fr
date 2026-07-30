@@ -616,6 +616,18 @@ class AssistantApp extends AppBase {
                         return;
                     }
 
+                    if (event.kind === 'loop_done') {
+                        // End of one assistant loop: finalize any open assistant bubble so the
+                        // user sees the result of this iteration before the next loop starts.
+                        if (currentBubbleContent && currentText) {
+                            currentBubbleContent.innerHTML = this._markdown(currentText);
+                        }
+                        currentBubbleContent = null;
+                        currentText = '';
+                        this._closeAssistantBubble();
+                        return;
+                    }
+
                     if (event.kind === 'assistant_done') {
                         if (currentBubbleContent && currentText) {
                             currentBubbleContent.innerHTML = this._markdown(currentText);
