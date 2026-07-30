@@ -196,6 +196,7 @@ class AssistantApp extends AppBase {
             const avatar = last.querySelector('.ai-avatar-wrapper');
             if (avatar) {
                 avatar.classList.remove('trigger-magic');
+                avatar.style.visibility = 'hidden';
             }
         }
     }
@@ -645,9 +646,7 @@ class AssistantApp extends AppBase {
             }
 
             requestAnimationFrame(() => {
-                const paddingBottom = Math.max(0, this.chatEl.clientHeight - 20);
-                this.chatEl.style.paddingBottom = paddingBottom + 'px';
-                this._scrollToBottom();
+                this.chatEl.style.paddingBottom = '0px';
             });
         }
     }
