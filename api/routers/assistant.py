@@ -170,6 +170,9 @@ def _event(kind: str, payload: dict[str, Any]) -> str:
     proxies / CDNs recognise that the response must be forwarded incrementally
     instead of being buffered/compressed (e.g. Brotli) until the stream ends.
     """
+    if kind.startswith(":"):
+        # SSE comment/heartbeat line.
+        return f"{kind}\n\n"
     data = json.dumps({"kind": kind, **payload}, ensure_ascii=False)
     return f"data: {data}\n\n"
 
@@ -244,11 +247,31 @@ async def assistant_stream_generator(
             ]
 
             loop_count = 0
-            max_loops = 10
+            max_loops = 6
             plan_already_used = False
+            heartbeat_task: asyncio.Task | None = None
+            stream_started_at = asyncio.get_event_loop().time()
+
+            async def _heartbeat(queue: asyncio.Queue[str]) -> None:
+                # Keep the reverse-proxy connection alive by sending SSE comments every ~15s.
+                while True:
+                    await asyncio.sleep(15)
+                    await queue.put(_event(":keep-alive", {}))
+
+            heartbeat_queue: asyncio.Queue[str] = asyncio.Queue()
+            heartbeat_task = asyncio.create_task(_heartbeat(heartbeat_queue))
+            last_heartbeat = asyncio.get_event_loop().time()
+
+            def _drain_heartbeat_queue() -> AsyncGenerator[str, None]:
+                nonlocal last_heartbeat
+                while not heartbeat_queue.empty():
+                    last_heartbeat = asyncio.get_event_loop().time()
+                    yield heartbeat_queue.get_nowait()
+
             while loop_count < max_loops:
                 loop_count += 1
-                print(f"[Assistant loop {loop_count}/{max_loops}] start, plan_used={plan_already_used}")
+                elapsed = asyncio.get_event_loop().time() - stream_started_at
+                print(f"[Assistant loop {loop_count}/{max_loops}] start, plan_used={plan_already_used}, elapsed={elapsed:.1f}s")
 
                 yield _event("thinking", {})
 
@@ -413,3 +436,13 @@ async def test_stream():
 @router.get("/sessions")
 async def list_assistant_sessions(username: str = Depends(require_user)):
     return {"sessions": AssistantHistory.list_sessions(username)}
+
+
+@router.get("/history")
+async def get_assistant_history(
+    session: str,
+    username: str = Depends(require_user),
+):
+    history = AssistantHistory(user=username, session=session)
+    messages = history.load_display_messages()
+    return {"session": session, "messages": messages}

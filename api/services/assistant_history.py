@@ -341,6 +341,34 @@ class AssistantHistory:
         if not self.system_messages:
             self._init_prompts(None, None)
 
+    def load_display_messages(self) -> list[dict[str, Any]]:
+        """Load only display messages for API history retrieval."""
+        if not self.user or not self.session:
+            return []
+        if self.display_fp.exists():
+            with open(self.display_fp, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data.get("display_messages", [])
+        return []
+
+    def load_llm_messages(self) -> None:
+        if not self.user or not self.session:
+            return
+        if self.llm_fp.exists():
+            with open(self.llm_fp, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                self.system_messages = data.get("system_messages", [])
+                self.conversation_summary = data.get("conversation_summary", [])
+                self.current_request_user_input = data.get("current_request_user_input", "")
+                self.current_request_trace = data.get("current_request_trace", [])
+                self.current_request_llm_messages = data.get("current_request_llm_messages", [])
+                self.last_two_messages_fullish = data.get("last_two_messages_fullish", [])
+                self.last_execution_plan_full = data.get("last_execution_plan_full", "")
+                self.retained_retrieve_documents = data.get("retained_retrieve_documents", [])
+                self.last_tool_observations_compact = data.get("last_tool_observations_compact", [])
+        if not self.system_messages:
+            self._init_prompts(None, None)
+
     def _append_recent_message(self, role: str, content: str) -> None:
         self.last_two_messages_fullish.append({"role": role, "content": self._truncate(content, 8000)})
         self.last_two_messages_fullish = self.last_two_messages_fullish[-6:]
