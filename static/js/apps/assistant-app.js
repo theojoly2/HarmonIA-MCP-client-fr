@@ -183,6 +183,12 @@ class AssistantApp extends AppBase {
         return wrapper.querySelector('.assistant-bubble-content');
     }
 
+    _forceReflow() {
+        if (this.chatEl) {
+            void this.chatEl.offsetHeight;
+        }
+    }
+
     _closeAssistantBubble() {
         const last = this.chatEl.lastElementChild;
         if (last && last.dataset.role === 'assistant' && last.dataset.active === 'true') {
@@ -465,6 +471,7 @@ class AssistantApp extends AppBase {
         const removePlaceholder = () => {
             if (placeholder && placeholder.parentNode) {
                 placeholder.remove();
+                this._forceReflow();
             }
         };
 
@@ -479,6 +486,12 @@ class AssistantApp extends AppBase {
                         return;
                     }
                     if (event.kind === 'thinking') {
+                        removePlaceholder();
+                        const bubble = this._ensureAssistantBubble();
+                        bubble.innerHTML = '<span class="assistant-chunk">.</span>';
+                        bubble.innerHTML = '';
+                        this._closeAssistantBubble();
+                        this._forceReflow();
                         return;
                     }
 
@@ -492,16 +505,8 @@ class AssistantApp extends AppBase {
                         }
                         const chunk = event.content || '';
                         currentText += chunk;
-                        // Stream incrementally: append a text node to avoid re-parsing the whole message each chunk.
-                        const node = document.createElement('span');
-                        node.className = 'assistant-chunk';
-                        node.textContent = chunk;
-                        currentBubbleContent.appendChild(node);
-                        // Periodically re-render markdown when chunk ends a sentence/paragraph or message is large.
-                        const shouldRender = /[\.\!\?\n]$/.test(chunk) || currentText.length > 300;
-                        if (shouldRender) {
-                            currentBubbleContent.innerHTML = this._markdown(currentText);
-                        }
+                        currentBubbleContent.innerHTML = this._markdown(currentText);
+                        this._forceReflow();
                         this._scrollToBottom();
                         return;
                     }

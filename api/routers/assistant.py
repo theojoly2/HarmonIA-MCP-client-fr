@@ -164,7 +164,14 @@ async def _create_completion_streaming(
 
 
 def _event(kind: str, payload: dict[str, Any]) -> str:
-    return json.dumps({"kind": kind, **payload}, ensure_ascii=False) + "\n"
+    """Format event for Server-Sent Events streaming.
+
+    Using the text/event-stream MIME type and the SSE wire format helps reverse
+    proxies / CDNs recognise that the response must be forwarded incrementally
+    instead of being buffered/compressed (e.g. Brotli) until the stream ends.
+    """
+    data = json.dumps({"kind": kind, **payload}, ensure_ascii=False)
+    return f"data: {data}\n\n"
 
 
 def _slugify_session_name(text: str) -> str:
@@ -382,7 +389,7 @@ async def stream_assistant_response(
 ):
     return StreamingResponse(
         assistant_stream_generator(request, username),
-        media_type="text/plain",
+        media_type="text/event-stream",
         headers={
             "X-Accel-Buffering": "no",
             "Cache-Control": "no-cache",
@@ -403,12 +410,11 @@ async def test_stream():
 
     return StreamingResponse(
         generator(),
-        media_type="text/plain",
+        media_type="text/event-stream",
         headers={
             "X-Accel-Buffering": "no",
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "Transfer-Encoding": "chunked",
         },
     )
 

@@ -187,6 +187,30 @@ const ApiClient = (() => {
             body: JSON.stringify({ session, user_message: userMessage, model_name: modelName || "" }),
         });
         if (!res.ok || !res.body) throw new Error(`Assistant stream failed: ${res.status}`);
+
+        const events = [];
+        let flushScheduled = false;
+        const scheduleFlush = () => {
+            if (flushScheduled || events.length === 0) return;
+            flushScheduled = true;
+            requestAnimationFrame(() => {
+                flushScheduled = false;
+                let batch = 0;
+                while (events.length > 0 && batch < 20) {
+                    const ev = events.shift();
+                    batch++;
+                    try {
+                        onEvent(ev);
+                    } catch (err) {
+                        console.error("Assistant event handler error", err, ev);
+                    }
+                }
+                if (events.length > 0) {
+                    scheduleFlush();
+                }
+            });
+        };
+
         const reader = res.body.getReader();
         const decoder = new TextDecoder("utf-8");
         let buffer = "";
@@ -194,24 +218,41 @@ const ApiClient = (() => {
             const { done, value } = await reader.read();
             if (done) break;
             buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop() || "";
-            for (const line of lines) {
-                if (!line.trim()) continue;
+            const rawLines = buffer.split("\n");
+            buffer = rawLines.pop() || "";
+
+            for (let i = 0; i < rawLines.length; i++) {
+                const rawLine = rawLines[i];
+                const line = rawLine.replace(/^data:\s*/, "").trim();
+                if (!line) continue;
+                if (line.startsWith("event:") || line.startsWith("id:") || line.startsWith(":")) continue;
                 try {
                     const event = JSON.parse(line);
-                    await onEvent(event);
-                    await new Promise((r) => setTimeout(r, 0));
+                    events.push(event);
+                    scheduleFlush();
                 } catch (err) {
                     console.error("Assistant event parse error", err, line);
                 }
             }
         }
-        if (buffer.trim()) {
+
+        // Drain remaining buffer.
+        const tail = buffer.replace(/^data:\s*/, "").trim();
+        if (tail) {
             try {
-                await onEvent(JSON.parse(buffer));
+                events.push(JSON.parse(tail));
             } catch (err) {
-                console.error("Assistant trailing event parse error", err, buffer);
+                console.error("Assistant trailing event parse error", err, tail);
+            }
+        }
+
+        // Flush any remaining events synchronously before resolving.
+        while (events.length > 0) {
+            const ev = events.shift();
+            try {
+                onEvent(ev);
+            } catch (err) {
+                console.error("Assistant event handler error", err, ev);
             }
         }
     }
