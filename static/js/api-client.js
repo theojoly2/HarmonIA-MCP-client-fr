@@ -188,6 +188,34 @@ const ApiClient = (() => {
         });
         if (!res.ok || !res.body) throw new Error(`Assistant stream failed: ${res.status}`);
 
+        const events = [];
+        let flushScheduled = false;
+        const frameDelay = 3000; // DEBUG: 3 seconds between each event to verify progressive rendering
+
+        const flushNextEvent = () => {
+            if (events.length === 0) return;
+            const ev = events.shift();
+            try {
+                onEvent(ev);
+            } catch (err) {
+                console.error("Assistant event handler error", err, ev);
+            }
+        };
+
+        const scheduleFlush = () => {
+            if (flushScheduled || events.length === 0) return;
+            flushScheduled = true;
+            setTimeout(() => {
+                requestAnimationFrame(() => {
+                    flushScheduled = false;
+                    flushNextEvent();
+                    if (events.length > 0) {
+                        scheduleFlush();
+                    }
+                });
+            }, frameDelay);
+        };
+
         const reader = res.body.getReader();
         const decoder = new TextDecoder("utf-8");
         let buffer = "";
@@ -205,7 +233,8 @@ const ApiClient = (() => {
                 if (line.startsWith("event:") || line.startsWith("id:") || line.startsWith(":")) continue;
                 try {
                     const event = JSON.parse(line);
-                    onEvent(event);
+                    events.push(event);
+                    scheduleFlush();
                 } catch (err) {
                     console.error("Assistant event parse error", err, line);
                 }
@@ -216,11 +245,24 @@ const ApiClient = (() => {
         const tail = buffer.replace(/^data:\s*/, "").trim();
         if (tail) {
             try {
-                onEvent(JSON.parse(tail));
+                events.push(JSON.parse(tail));
             } catch (err) {
                 console.error("Assistant trailing event parse error", err, tail);
             }
         }
+
+        const drainRemaining = () => {
+            if (events.length === 0) return;
+            setTimeout(() => {
+                requestAnimationFrame(() => {
+                    flushNextEvent();
+                    if (events.length > 0) {
+                        drainRemaining();
+                    }
+                });
+            }, frameDelay);
+        };
+        drainRemaining();
     }
 
     async function getAssistantSessions() {
