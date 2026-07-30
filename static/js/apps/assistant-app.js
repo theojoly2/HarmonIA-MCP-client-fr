@@ -532,57 +532,31 @@ class AssistantApp extends AppBase {
             }
         }, 1200);
 
-        let currentBubbleContent = null;
+        let currentBubble = null;
         let currentText = '';
-        let textBuffer = '';
-        let typewriterInterval = null;
-        const TYPEWRITER_MS = 18;
-
-        const flushTypewriter = () => {
-            if (!currentBubbleContent || textBuffer === '') return;
-            const chunkSize = Math.min(3, textBuffer.length);
-            currentText += textBuffer.slice(0, chunkSize);
-            textBuffer = textBuffer.slice(chunkSize);
-            currentBubbleContent.innerHTML = this._markdown(currentText);
-            this._forceReflow();
-            this._scrollToBottom();
-        };
-
-        const startTypewriter = () => {
-            if (typewriterInterval) return;
-            typewriterInterval = setInterval(() => {
-                if (textBuffer === '') {
-                    clearInterval(typewriterInterval);
-                    typewriterInterval = null;
-                    return;
-                }
-                flushTypewriter();
-            }, TYPEWRITER_MS);
-        };
-
-        const appendText = (chunk) => {
-            if (!currentBubbleContent) {
+        const typewriter = this._createTypewriter((chunk) => {
+            currentText += chunk;
+            if (!currentBubble) {
                 this._closeAssistantBubble();
-                currentBubbleContent = this._ensureAssistantBubble();
+                currentBubble = this._ensureAssistantBubble();
             }
-            textBuffer += chunk;
-            startTypewriter();
-        };
+            currentBubble.innerHTML = this._markdown(currentText);
+            this._forceReflow();
+        });
 
         const finalizeText = () => {
-            if (typewriterInterval) {
-                clearInterval(typewriterInterval);
-                typewriterInterval = null;
-            }
-            if (textBuffer) {
-                currentText += textBuffer;
-                textBuffer = '';
-            }
-            if (currentBubbleContent) {
-                currentBubbleContent.innerHTML = this._markdown(currentText);
+            typewriter.flush();
+            if (currentBubble) {
+                currentBubble.innerHTML = this._markdown(currentText);
                 this._forceReflow();
-                this._scrollToBottom();
             }
+        };
+
+        const resetBubble = () => {
+            finalizeText();
+            currentBubble = null;
+            currentText = '';
+            this._closeAssistantBubble();
         };
 
         const removePlaceholder = () => {
@@ -603,7 +577,6 @@ class AssistantApp extends AppBase {
                         return;
                     }
 
-                    // Any concrete event removes the "thinking" placeholder.
                     removePlaceholder();
 
                     if (event.kind === 'thinking') {
@@ -611,24 +584,18 @@ class AssistantApp extends AppBase {
                     }
 
                     if (event.kind === 'assistant_text') {
-                        appendText(event.content || '');
+                        typewriter.append(event.content || '');
                         return;
                     }
 
                     if (event.kind === 'assistant_tool_calls') {
-                        finalizeText();
-                        currentBubbleContent = null;
-                        currentText = '';
-                        this._closeAssistantBubble();
+                        resetBubble();
                         this.messages.push({ role: 'assistant_tool_calls', tool_calls: event.tool_calls });
                         return;
                     }
 
                     if (event.kind === 'tool_start') {
-                        finalizeText();
-                        currentBubbleContent = null;
-                        currentText = '';
-                        this._closeAssistantBubble();
+                        resetBubble();
                         if (event.name === 'retrieve_documents') {
                             this._appendSearchCard(event.arguments?.search_terms || '', null);
                         } else if (event.name !== 'plan_workflow_with_tools') {
@@ -640,8 +607,7 @@ class AssistantApp extends AppBase {
                     }
 
                     if (event.kind === 'tool_result') {
-                        finalizeText();
-                        this._closeAssistantBubble();
+                        resetBubble();
                         if (event.name === 'plan_workflow_with_tools') {
                             this._renderPlan(event.result);
                         } else if (event.name === 'retrieve_documents') {
@@ -654,32 +620,26 @@ class AssistantApp extends AppBase {
                     }
 
                     if (event.kind === 'loop_done') {
-                        finalizeText();
-                        currentBubbleContent = null;
-                        currentText = '';
-                        this._closeAssistantBubble();
+                        resetBubble();
                         return;
                     }
 
                     if (event.kind === 'assistant_done') {
-                        finalizeText();
+                        resetBubble();
                         if (event.content && !currentText) {
-                            appendText(event.content);
-                            finalizeText();
+                            typewriter.append(event.content);
+                            typewriter.flush();
+                            currentBubble = this._ensureAssistantBubble();
+                            currentBubble.innerHTML = this._markdown(currentText);
                         }
-                        currentBubbleContent = null;
-                        currentText = '';
                         this._closeAssistantBubble();
-                        this._scrollToBottom();
                         return;
                     }
 
                     if (event.kind === 'error') {
-                        finalizeText();
-                        this._closeAssistantBubble();
+                        resetBubble();
                         const bubble = this._ensureAssistantBubble();
                         bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(event.message || '')}</em>`;
-                        this._scrollToBottom();
                     }
                 }
             );
@@ -687,27 +647,69 @@ class AssistantApp extends AppBase {
         } catch (err) {
             console.error('Assistant stream error', err);
             removePlaceholder();
-            finalizeText();
+            typewriter.flush();
             const bubble = this._ensureAssistantBubble();
             bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(err.message)}</em>`;
-            this._scrollToBottom();
         } finally {
             clearInterval(loadingInterval);
-            if (typewriterInterval) {
-                clearInterval(typewriterInterval);
-                typewriterInterval = null;
-            }
+            typewriter.stop();
             this.isStreaming = false;
             this._closeAssistantBubble();
 
-            if (currentText || textBuffer) {
-                this.messages.push({ role: 'assistant', content: currentText + textBuffer });
+            if (currentText) {
+                this.messages.push({ role: 'assistant', content: currentText });
             }
 
             requestAnimationFrame(() => {
                 this.chatEl.style.paddingBottom = '0px';
             });
         }
+    }
+
+    _createTypewriter(onChunk) {
+        let buffer = '';
+        let interval = null;
+        const SPEED_MS = 16;
+        const CHUNK_SIZE = 2;
+
+        const flush = () => {
+            if (buffer === '') return;
+            const chunk = buffer.slice(0, CHUNK_SIZE);
+            buffer = buffer.slice(CHUNK_SIZE);
+            onChunk(chunk);
+        };
+
+        const ensureRunning = () => {
+            if (interval) return;
+            interval = setInterval(() => {
+                if (buffer === '') {
+                    clearInterval(interval);
+                    interval = null;
+                    return;
+                }
+                flush();
+            }, SPEED_MS);
+        };
+
+        return {
+            append: (text) => {
+                buffer += text;
+                ensureRunning();
+            },
+            flush: () => {
+                if (interval) {
+                    clearInterval(interval);
+                    interval = null;
+                }
+                while (buffer !== '') flush();
+            },
+            stop: () => {
+                if (interval) {
+                    clearInterval(interval);
+                    interval = null;
+                }
+            },
+        };
     }
 }
 

@@ -188,53 +188,20 @@ const ApiClient = (() => {
         });
         if (!res.ok || !res.body) throw new Error(`Assistant stream failed: ${res.status}`);
 
-        // Read events as they arrive and forward them individually.  A tiny pause
-        // after each event gives the browser time to paint, so tool cards, plan
-        // cards and text appear progressively instead of all at once at the end.
+        // Forward every SSE event to the app immediately.  The UI layer (AssistantApp)
+        // is responsible for rendering text progressively via its own typewriter, so we
+        // do not add any artificial delays or batching here.
         const reader = res.body.getReader();
         const decoder = new TextDecoder("utf-8");
         let buffer = "";
-        let textBuffer = "";
-        let textTimeout = null;
 
-        const flushText = () => {
-            textTimeout = null;
-            if (textBuffer === "") return;
-            const content = textBuffer;
-            textBuffer = "";
-            try {
-                onEvent({ kind: "assistant_text", content });
-            } catch (err) {
-                console.error("Assistant text handler error", err);
-            }
-        };
-
-        const scheduleTextFlush = () => {
-            if (textTimeout) return;
-            textTimeout = setTimeout(flushText, 40);
-        };
-
-        const yieldToBrowser = () => new Promise((resolve) => setTimeout(resolve, 30));
-
-        const handleLine = async (line) => {
+        const handleLine = (line) => {
             const ev = JSON.parse(line);
-            if (ev.kind === "assistant_text") {
-                textBuffer += ev.content || "";
-                scheduleTextFlush();
-                return;
-            }
-            // Non-text event: flush any pending text first, then dispatch.
-            if (textTimeout) {
-                clearTimeout(textTimeout);
-                textTimeout = null;
-            }
-            flushText();
             try {
                 onEvent(ev);
             } catch (err) {
                 console.error("Assistant event handler error", err, ev);
             }
-            await yieldToBrowser();
         };
 
         while (true) {
@@ -250,9 +217,9 @@ const ApiClient = (() => {
                 if (!line) continue;
                 if (line.startsWith("event:") || line.startsWith("id:") || line.startsWith(":")) continue;
                 try {
-                    await handleLine(line);
+                    handleLine(line);
                 } catch (err) {
-                    console.error("Assistant event parse/handler error", err, line);
+                    console.error("Assistant event parse error", err, line);
                 }
             }
         }
@@ -260,16 +227,11 @@ const ApiClient = (() => {
         const tail = buffer.replace(/^data:\s*/, "").trim();
         if (tail) {
             try {
-                await handleLine(tail);
+                handleLine(tail);
             } catch (err) {
-                console.error("Assistant trailing event parse/handler error", err, tail);
+                console.error("Assistant trailing event parse error", err, tail);
             }
         }
-        if (textTimeout) {
-            clearTimeout(textTimeout);
-            textTimeout = null;
-        }
-        flushText();
     }
 
     async function getAssistantSessions() {
