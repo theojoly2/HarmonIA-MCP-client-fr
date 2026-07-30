@@ -161,7 +161,7 @@ class AssistantApp extends AppBase {
         return wrapper;
     }
 
-    _ensureAssistantBubble() {
+    async _ensureAssistantBubble() {
         // Create a new assistant message bubble if the last one is not an active assistant bubble.
         const last = this.chatEl.lastElementChild;
         if (last && last.dataset.role === 'assistant' && last.dataset.active === 'true') {
@@ -181,6 +181,7 @@ class AssistantApp extends AppBase {
         `;
         this.chatEl.appendChild(wrapper);
         this._scrollToBottom();
+        await this._paint();
         return wrapper.querySelector('.assistant-bubble-content');
     }
 
@@ -188,6 +189,10 @@ class AssistantApp extends AppBase {
         if (this.chatEl) {
             void this.chatEl.offsetHeight;
         }
+    }
+
+    _paint() {
+        return new Promise((resolve) => requestAnimationFrame(resolve));
     }
 
     _hideAllSparkles() {
@@ -547,7 +552,7 @@ class AssistantApp extends AppBase {
                 this.session,
                 text,
                 this.modelName,
-                (event) => {
+                async (event) => {
                     if (event.kind === 'user') {
                         if (event.session) this.session = event.session;
                         return;
@@ -563,7 +568,7 @@ class AssistantApp extends AppBase {
                     if (event.kind === 'assistant_text') {
                         if (!currentBubbleContent) {
                             this._closeAssistantBubble();
-                            currentBubbleContent = this._ensureAssistantBubble();
+                            currentBubbleContent = await this._ensureAssistantBubble();
                         }
                         const chunk = event.content || '';
                         currentText += chunk;
@@ -633,7 +638,7 @@ class AssistantApp extends AppBase {
                             currentBubbleContent.innerHTML = this._markdown(currentText);
                         }
                         if (event.content && !currentText) {
-                            const bubble = this._ensureAssistantBubble();
+                            const bubble = await this._ensureAssistantBubble();
                             bubble.innerHTML = this._markdown(event.content);
                         }
                         this._closeAssistantBubble();
@@ -643,7 +648,7 @@ class AssistantApp extends AppBase {
 
                     if (event.kind === 'error') {
                         this._closeAssistantBubble();
-                        const bubble = this._ensureAssistantBubble();
+                        const bubble = await this._ensureAssistantBubble();
                         bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(event.message || '')}</em>`;
                         this._scrollToBottom();
                     }
@@ -653,7 +658,7 @@ class AssistantApp extends AppBase {
         } catch (err) {
             console.error('Assistant stream error', err);
             removePlaceholder();
-            const bubble = this._ensureAssistantBubble();
+            const bubble = await this._ensureAssistantBubble();
             bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(err.message)}</em>`;
             this._scrollToBottom();
         } finally {

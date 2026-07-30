@@ -188,47 +188,55 @@ const ApiClient = (() => {
         });
         if (!res.ok || !res.body) throw new Error(`Assistant stream failed: ${res.status}`);
 
-        // Read events as they arrive.  Merge consecutive text/thinking chunks so
-        // the assistant text streams smoothly, but yield back to the browser
-        // after every other event so tool cards / plan cards / search cards are
-        // painted progressively instead of all at once at the end.
-        let pending = null;
-
-        const flushPending = () => {
-            if (pending) {
-                const ev = pending;
-                pending = null;
-                try {
-                    onEvent(ev);
-                } catch (err) {
-                    console.error("Assistant event handler error", err, ev);
-                }
-            }
-        };
-
-        const handleEvent = async (raw) => {
-            if (!raw) return;
-            const ev = JSON.parse(raw);
-            if (ev.kind === 'assistant_text' || ev.kind === 'thinking') {
-                if (pending && pending.kind === ev.kind) {
-                    if (ev.kind === 'assistant_text') {
-                        pending.content = (pending.content || '') + (ev.content || '');
-                    }
-                    return;
-                }
-                flushPending();
-                pending = ev;
-                return;
-            }
-            flushPending();
-            onEvent(ev);
-            // Yield to the browser so structural events render as they arrive.
-            await new Promise((resolve) => requestAnimationFrame(resolve));
-        };
-
+        // Read events as they arrive and forward them individually.  A tiny pause
+        // after each event gives the browser time to paint, so tool cards, plan
+        // cards and text appear progressively instead of all at once at the end.
         const reader = res.body.getReader();
         const decoder = new TextDecoder("utf-8");
         let buffer = "";
+        let textBuffer = "";
+        let textTimeout = null;
+
+        const flushText = () => {
+            textTimeout = null;
+            if (textBuffer === "") return;
+            const content = textBuffer;
+            textBuffer = "";
+            try {
+                onEvent({ kind: "assistant_text", content });
+            } catch (err) {
+                console.error("Assistant text handler error", err);
+            }
+        };
+
+        const scheduleTextFlush = () => {
+            if (textTimeout) return;
+            textTimeout = setTimeout(flushText, 40);
+        };
+
+        const yieldToBrowser = () => new Promise((resolve) => setTimeout(resolve, 30));
+
+        const handleLine = async (line) => {
+            const ev = JSON.parse(line);
+            if (ev.kind === "assistant_text") {
+                textBuffer += ev.content || "";
+                scheduleTextFlush();
+                return;
+            }
+            // Non-text event: flush any pending text first, then dispatch.
+            if (textTimeout) {
+                clearTimeout(textTimeout);
+                textTimeout = null;
+            }
+            flushText();
+            try {
+                onEvent(ev);
+            } catch (err) {
+                console.error("Assistant event handler error", err, ev);
+            }
+            await yieldToBrowser();
+        };
+
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
@@ -242,7 +250,7 @@ const ApiClient = (() => {
                 if (!line) continue;
                 if (line.startsWith("event:") || line.startsWith("id:") || line.startsWith(":")) continue;
                 try {
-                    await handleEvent(line);
+                    await handleLine(line);
                 } catch (err) {
                     console.error("Assistant event parse/handler error", err, line);
                 }
@@ -252,12 +260,16 @@ const ApiClient = (() => {
         const tail = buffer.replace(/^data:\s*/, "").trim();
         if (tail) {
             try {
-                await handleEvent(tail);
+                await handleLine(tail);
             } catch (err) {
                 console.error("Assistant trailing event parse/handler error", err, tail);
             }
         }
-        flushPending();
+        if (textTimeout) {
+            clearTimeout(textTimeout);
+            textTimeout = null;
+        }
+        flushText();
     }
 
     async function getAssistantSessions() {
