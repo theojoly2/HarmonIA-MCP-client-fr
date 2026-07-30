@@ -597,9 +597,11 @@ class AssistantApp extends AppBase {
 
                     if (event.kind === 'tool_result') {
                         this._closeAssistantBubble();
-                        if (event.name === 'retrieve_documents') {
+                        if (event.name === 'plan_workflow_with_tools') {
+                            this._renderPlan(event.result);
+                        } else if (event.name === 'retrieve_documents') {
                             this._fillSearchCard(event.display?.query || '', event.display?.results_html || '');
-                        } else if (event.name !== 'plan_workflow_with_tools') {
+                        } else {
                             this._fillToolResult(event.name, event.result, event.display);
                         }
                         this.messages.push({ role: 'tool_result', name: event.name, result: event.result, display: event.display });
