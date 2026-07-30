@@ -108,20 +108,9 @@ async def _create_completion_streaming(
 
         text_piece = _extract_delta_content(delta)
         if text_piece:
-            pending_text += text_piece
-            now = asyncio.get_event_loop().time()
-            should_flush = (
-                (now - last_flush) >= flush_interval
-                or text_piece.endswith((" ", "\n", ".", ",", ":", ";", "!", "?"))
-                or len(pending_text) >= 40
-            )
-            if should_flush:
-                flushed = pending_text
-                pending_text = ""
-                assistant_text += flushed
-                streamed_any_text = True
-                last_flush = now
-                yield ("text", flushed)
+            assistant_text += text_piece
+            streamed_any_text = True
+            yield ("text", text_piece)
 
         delta_tool_calls = getattr(delta, "tool_calls", None) or []
         for tc in delta_tool_calls:
@@ -384,6 +373,29 @@ async def stream_assistant_response(
             "X-Accel-Buffering": "no",
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
+            "Transfer-Encoding": "chunked",
+        },
+    )
+
+
+@router.get("/test-stream")
+async def test_stream():
+    """Endpoint de test pour vérifier le streaming temps réel sans LLM."""
+    async def generator():
+        import asyncio
+        for i in range(5):
+            yield _event("assistant_text", {"content": f"chunk {i} "})
+            await asyncio.sleep(0.5)
+        yield _event("done", {})
+
+    return StreamingResponse(
+        generator(),
+        media_type="text/plain",
+        headers={
+            "X-Accel-Buffering": "no",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Transfer-Encoding": "chunked",
         },
     )
 

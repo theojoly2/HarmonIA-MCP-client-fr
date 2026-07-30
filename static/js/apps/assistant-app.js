@@ -455,7 +455,6 @@ class AssistantApp extends AppBase {
                     }
                     if (event.kind === 'assistant_text') {
                         if (placeholder.label) placeholder.label.remove();
-                        this._movePlaceholderToEnd(placeholder);
                         if (placeholder.wrapper.style.display === 'none') {
                             placeholder.wrapper.style.display = '';
                         }
@@ -469,8 +468,8 @@ class AssistantApp extends AppBase {
                     if (event.kind === 'assistant_tool_calls') {
                         if (placeholder.label) placeholder.label.remove();
                         this._appendToolCalls(event.tool_calls);
-                        this._movePlaceholderToEnd(placeholder);
                         this.messages.push({ role: 'assistant_tool_calls', tool_calls: event.tool_calls });
+                        this._scrollToBottom();
                         return;
                     }
                     if (event.kind === 'tool_start') {
@@ -481,8 +480,8 @@ class AssistantApp extends AppBase {
                             toolStartEl = this._createToolCard(event.name, event.arguments || {});
                             this._markToolRunning(toolStartEl, true);
                         }
-                        this._movePlaceholderToEnd(placeholder);
                         this.messages.push({ role: 'tool_start', name: event.name, arguments: event.arguments });
+                        this._scrollToBottom();
                         return;
                     }
                     if (event.kind === 'tool_result') {
@@ -494,8 +493,8 @@ class AssistantApp extends AppBase {
                         } else {
                             this._fillToolResult(event.name, event.result, event.display);
                         }
-                        this._movePlaceholderToEnd(placeholder);
                         this.messages.push({ role: 'tool_result', name: event.name, result: event.result, display: event.display });
+                        this._scrollToBottom();
                         return;
                     }
                     if (event.kind === 'assistant_done') {
@@ -504,11 +503,15 @@ class AssistantApp extends AppBase {
                             currentText = event.content;
                             placeholder.content.innerHTML = this._markdown(currentText);
                         }
+                        this._scrollToBottom();
                         return;
                     }
                     if (event.kind === 'error') {
                         if (placeholder.label) placeholder.label.remove();
-                        placeholder.content.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(event.message || '')}</em>`;
+                        if (placeholder.content) {
+                            placeholder.content.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(event.message || '')}</em>`;
+                        }
+                        this._scrollToBottom();
                     }
                 }
             );
