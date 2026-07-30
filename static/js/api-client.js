@@ -190,45 +190,30 @@ const ApiClient = (() => {
 
         const events = [];
         let flushScheduled = false;
+        const frameDelay = 80; // ms between each event so steps appear one by one
 
-        const isMergeable = (ev) => ev.kind === 'assistant_text' || ev.kind === 'thinking';
-
-        const flushEvents = () => {
+        const flushNextEvent = () => {
             if (events.length === 0) return;
-            // Merge consecutive text/thinking events so the text streams smoothly
-            // while structural events (tool_start, tool_result, plan card, search)
-            // are emitted immediately and therefore render progressively.
-            let batch = events.shift();
-            while (events.length > 0 && isMergeable(events[0]) && isMergeable(batch)) {
-                const next = events.shift();
-                if (batch.kind === 'assistant_text' && next.kind === 'assistant_text') {
-                    batch.content = (batch.content || '') + (next.content || '');
-                }
-            }
+            const ev = events.shift();
             try {
-                onEvent(batch);
+                onEvent(ev);
             } catch (err) {
-                console.error("Assistant event handler error", err, batch);
+                console.error("Assistant event handler error", err, ev);
             }
         };
 
         const scheduleFlush = () => {
             if (flushScheduled || events.length === 0) return;
             flushScheduled = true;
-            requestAnimationFrame(() => {
-                flushScheduled = false;
-                // Process as many mergeable events as possible in this frame,
-                // but stop at the first structural event so it renders right away.
-                while (events.length > 0 && isMergeable(events[0])) {
-                    flushEvents();
-                }
-                if (events.length > 0) {
-                    flushEvents();
-                }
-                if (events.length > 0) {
-                    scheduleFlush();
-                }
-            });
+            setTimeout(() => {
+                requestAnimationFrame(() => {
+                    flushScheduled = false;
+                    flushNextEvent();
+                    if (events.length > 0) {
+                        scheduleFlush();
+                    }
+                });
+            }, frameDelay);
         };
 
         const reader = res.body.getReader();
@@ -266,15 +251,17 @@ const ApiClient = (() => {
             }
         }
 
-        // Drain remaining events one per frame so the UI stays progressive.
+        // Drain remaining events one by one so the UI stays progressive.
         const drainRemaining = () => {
             if (events.length === 0) return;
-            requestAnimationFrame(() => {
-                flushEvents();
-                if (events.length > 0) {
-                    drainRemaining();
-                }
-            });
+            setTimeout(() => {
+                requestAnimationFrame(() => {
+                    flushNextEvent();
+                    if (events.length > 0) {
+                        drainRemaining();
+                    }
+                });
+            }, frameDelay);
         };
         drainRemaining();
     }
