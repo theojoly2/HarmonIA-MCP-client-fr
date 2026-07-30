@@ -534,14 +534,16 @@ class AssistantApp extends AppBase {
 
         let currentBubble = null;
         let currentText = '';
+
+        // Typewriter: append raw text to the DOM progressively, parse markdown only
+        // when finalizing, so the browser can paint smoothly.
         const typewriter = this._createTypewriter((chunk) => {
             currentText += chunk;
             if (!currentBubble) {
                 this._closeAssistantBubble();
                 currentBubble = this._ensureAssistantBubble();
             }
-            currentBubble.innerHTML = this._markdown(currentText);
-            this._forceReflow();
+            currentBubble.textContent = currentText;
         });
 
         const finalizeText = () => {
@@ -626,11 +628,13 @@ class AssistantApp extends AppBase {
 
                     if (event.kind === 'assistant_done') {
                         resetBubble();
-                        if (event.content && !currentText) {
-                            typewriter.append(event.content);
-                            typewriter.flush();
+                        // If the backend only sent the final message inside assistant_done
+                        // (no preceding assistant_text chunks), render it now.
+                        if (event.content && !currentText && !currentBubble) {
+                            currentText = event.content;
                             currentBubble = this._ensureAssistantBubble();
                             currentBubble.innerHTML = this._markdown(currentText);
+                            this._forceReflow();
                         }
                         this._closeAssistantBubble();
                         return;
@@ -668,46 +672,49 @@ class AssistantApp extends AppBase {
 
     _createTypewriter(onChunk) {
         let buffer = '';
-        let interval = null;
-        const SPEED_MS = 16;
-        const CHUNK_SIZE = 2;
+        let rafId = null;
+        let lastFrame = 0;
+        const FRAME_MS = 24;
+        const CHUNK_SIZE = 3;
 
-        const flush = () => {
+        const pump = (now) => {
+            rafId = null;
             if (buffer === '') return;
+            if (now - lastFrame < FRAME_MS) {
+                rafId = requestAnimationFrame(pump);
+                return;
+            }
+            lastFrame = now;
             const chunk = buffer.slice(0, CHUNK_SIZE);
             buffer = buffer.slice(CHUNK_SIZE);
             onChunk(chunk);
-        };
-
-        const ensureRunning = () => {
-            if (interval) return;
-            interval = setInterval(() => {
-                if (buffer === '') {
-                    clearInterval(interval);
-                    interval = null;
-                    return;
-                }
-                flush();
-            }, SPEED_MS);
+            if (buffer !== '') {
+                rafId = requestAnimationFrame(pump);
+            }
         };
 
         return {
             append: (text) => {
                 buffer += text;
-                ensureRunning();
+                if (!rafId) rafId = requestAnimationFrame(pump);
             },
             flush: () => {
-                if (interval) {
-                    clearInterval(interval);
-                    interval = null;
+                if (rafId) {
+                    cancelAnimationFrame(rafId);
+                    rafId = null;
                 }
-                while (buffer !== '') flush();
+                while (buffer !== '') {
+                    const chunk = buffer.slice(0, CHUNK_SIZE);
+                    buffer = buffer.slice(CHUNK_SIZE);
+                    onChunk(chunk);
+                }
             },
             stop: () => {
-                if (interval) {
-                    clearInterval(interval);
-                    interval = null;
+                if (rafId) {
+                    cancelAnimationFrame(rafId);
+                    rafId = null;
                 }
+                buffer = '';
             },
         };
     }
