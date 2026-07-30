@@ -494,9 +494,8 @@ class AssistantApp extends AppBase {
     }
 
     _scrollToBottom() {
-        requestAnimationFrame(() => {
-            this.chatEl.scrollTop = this.chatEl.scrollHeight;
-        });
+        // Scrolling is intentionally left to the user so they can read
+        // multi-step assistant/tool output without being pulled down.
     }
 
     async _send(text) {
@@ -598,16 +597,12 @@ class AssistantApp extends AppBase {
 
                     if (event.kind === 'tool_result') {
                         this._closeAssistantBubble();
-                        if (event.name === 'plan_workflow_with_tools') {
-                            // The plan itself is internal; only any assistant text following it is shown.
-                            // Keep the plan result out of the visible chat stream.
-                        } else if (event.name === 'retrieve_documents') {
+                        if (event.name === 'retrieve_documents') {
                             this._fillSearchCard(event.display?.query || '', event.display?.results_html || '');
-                        } else {
+                        } else if (event.name !== 'plan_workflow_with_tools') {
                             this._fillToolResult(event.name, event.result, event.display);
                         }
                         this.messages.push({ role: 'tool_result', name: event.name, result: event.result, display: event.display });
-                        this._scrollToBottom();
                         return;
                     }
 
