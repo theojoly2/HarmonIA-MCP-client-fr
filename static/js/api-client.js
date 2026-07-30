@@ -188,40 +188,42 @@ const ApiClient = (() => {
         });
         if (!res.ok || !res.body) throw new Error(`Assistant stream failed: ${res.status}`);
 
-        const events = [];
-        let flushScheduled = false;
+        // Read events as they arrive.  Merge consecutive text/thinking chunks so
+        // the assistant text streams smoothly, but yield back to the browser
+        // after every other event so tool cards / plan cards / search cards are
+        // painted progressively instead of all at once at the end.
+        let pending = null;
 
-        const isMergeable = (ev) => ev.kind === 'assistant_text' || ev.kind === 'thinking';
-
-        // Drain exactly one batch per animation frame so the browser renders
-        // each structural step (tool card, plan card, search card, final message)
-        // distinctly before the next event arrives.
-        const flushBatch = () => {
-            if (events.length === 0) return;
-            let batch = events.shift();
-            while (events.length > 0 && isMergeable(events[0]) && isMergeable(batch)) {
-                const next = events.shift();
-                if (batch.kind === 'assistant_text' && next.kind === 'assistant_text') {
-                    batch.content = (batch.content || '') + (next.content || '');
+        const flushPending = () => {
+            if (pending) {
+                const ev = pending;
+                pending = null;
+                try {
+                    onEvent(ev);
+                } catch (err) {
+                    console.error("Assistant event handler error", err, ev);
                 }
-            }
-            try {
-                onEvent(batch);
-            } catch (err) {
-                console.error("Assistant event handler error", err, batch);
             }
         };
 
-        const scheduleFlush = () => {
-            if (flushScheduled || events.length === 0) return;
-            flushScheduled = true;
-            requestAnimationFrame(() => {
-                flushScheduled = false;
-                flushBatch();
-                if (events.length > 0) {
-                    scheduleFlush();
+        const handleEvent = async (raw) => {
+            if (!raw) return;
+            const ev = JSON.parse(raw);
+            if (ev.kind === 'assistant_text' || ev.kind === 'thinking') {
+                if (pending && pending.kind === ev.kind) {
+                    if (ev.kind === 'assistant_text') {
+                        pending.content = (pending.content || '') + (ev.content || '');
+                    }
+                    return;
                 }
-            });
+                flushPending();
+                pending = ev;
+                return;
+            }
+            flushPending();
+            onEvent(ev);
+            // Yield to the browser so structural events render as they arrive.
+            await new Promise((resolve) => requestAnimationFrame(resolve));
         };
 
         const reader = res.body.getReader();
@@ -240,10 +242,9 @@ const ApiClient = (() => {
                 if (!line) continue;
                 if (line.startsWith("event:") || line.startsWith("id:") || line.startsWith(":")) continue;
                 try {
-                    events.push(JSON.parse(line));
-                    scheduleFlush();
+                    await handleEvent(line);
                 } catch (err) {
-                    console.error("Assistant event parse error", err, line);
+                    console.error("Assistant event parse/handler error", err, line);
                 }
             }
         }
@@ -251,22 +252,12 @@ const ApiClient = (() => {
         const tail = buffer.replace(/^data:\s*/, "").trim();
         if (tail) {
             try {
-                events.push(JSON.parse(tail));
+                await handleEvent(tail);
             } catch (err) {
-                console.error("Assistant trailing event parse error", err, tail);
+                console.error("Assistant trailing event parse/handler error", err, tail);
             }
         }
-
-        const drainRemaining = () => {
-            if (events.length === 0) return;
-            requestAnimationFrame(() => {
-                flushBatch();
-                if (events.length > 0) {
-                    drainRemaining();
-                }
-            });
-        };
-        drainRemaining();
+        flushPending();
     }
 
     async function getAssistantSessions() {

@@ -253,9 +253,9 @@ async def assistant_stream_generator(
             stream_started_at = asyncio.get_event_loop().time()
 
             async def _heartbeat(queue: asyncio.Queue[str]) -> None:
-                # Keep the reverse-proxy connection alive by sending SSE comments every ~15s.
+                # Keep the reverse-proxy connection alive by sending SSE comments every ~5s.
                 while True:
-                    await asyncio.sleep(15)
+                    await asyncio.sleep(5)
                     await queue.put(_event(":keep-alive", {}))
 
             heartbeat_queue: asyncio.Queue[str] = asyncio.Queue()
@@ -274,6 +274,8 @@ async def assistant_stream_generator(
                 print(f"[Assistant loop {loop_count}/{max_loops}] start, plan_used={plan_already_used}, elapsed={elapsed:.1f}s")
 
                 yield _event("thinking", {})
+                # Give the event loop a chance to flush the thinking event to the client.
+                await asyncio.sleep(0)
 
                 llm_messages = [
                     {"role": msg["role"], "content": str(msg.get("content", ""))}
@@ -310,6 +312,7 @@ async def assistant_stream_generator(
                 if tool_calls:
                     history.add_assistant_message(content, tool_calls=tool_calls)
                     yield _event("assistant_tool_calls", {"tool_calls": tool_calls})
+                    await asyncio.sleep(0)
 
                     for tool_call in tool_calls:
                         function = tool_call["function"]
@@ -395,6 +398,7 @@ async def assistant_stream_generator(
 
     history.finalize_current_request_summary()
     history.save()
+    await asyncio.sleep(0)
     yield _event("done", {})
 
 
