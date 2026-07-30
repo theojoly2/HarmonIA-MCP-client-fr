@@ -544,6 +544,7 @@ class AssistantApp extends AppBase {
                 currentBubble = this._ensureAssistantBubble();
             }
             currentBubble.textContent = currentText;
+            this.chatEl.scrollTop = this.chatEl.scrollHeight;
         });
 
         const finalizeText = () => {

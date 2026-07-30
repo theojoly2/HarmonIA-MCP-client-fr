@@ -188,12 +188,24 @@ const ApiClient = (() => {
         });
         if (!res.ok || !res.body) throw new Error(`Assistant stream failed: ${res.status}`);
 
-        // Forward every SSE event to the app as it arrives, then yield back to the
-        // browser so the DOM can paint before the next event is processed.  This keeps
-        // tool cards, plan cards and the typewriter text appearing progressively.
+        // Read SSE events one at a time and force the browser to paint after each
+        // event, so every assistant loop / tool card / text update is rendered
+        // before the next event is consumed.
         const reader = res.body.getReader();
         const decoder = new TextDecoder("utf-8");
         let buffer = "";
+
+        // Force a real browser paint. requestAnimationFrame alone is not enough when
+        // events arrive in a burst; the style->macro-task->paint sequence guarantees
+        // the DOM changes are visible before we continue reading the stream.
+        const forcePaint = () =>
+            new Promise((resolve) => {
+                requestAnimationFrame(() => {
+                    setTimeout(() => {
+                        requestAnimationFrame(resolve);
+                    }, 0);
+                });
+            });
 
         const handleLine = async (line) => {
             const ev = JSON.parse(line);
@@ -202,8 +214,13 @@ const ApiClient = (() => {
             } catch (err) {
                 console.error("Assistant event handler error", err, ev);
             }
-            // Force a browser paint/reflow between events so the UI updates visibly.
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            // At the end of an assistant loop we need a full paint so the user sees
+            // the whole loop result before the next loop starts.
+            if (ev.kind === "loop_done" || ev.kind === "assistant_done" || ev.kind === "tool_result") {
+                await forcePaint();
+            } else if (ev.kind !== "assistant_text" && ev.kind !== "thinking") {
+                await new Promise((resolve) => requestAnimationFrame(resolve));
+            }
         };
 
         while (true) {
