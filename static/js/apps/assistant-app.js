@@ -144,13 +144,10 @@ class AssistantApp extends AppBase {
         return div;
     }
 
-    _appendAssistantPlaceholder() {
-        const id = 'assistant-loading-' + Date.now();
+    _appendThinkingPlaceholder() {
         const wrapper = document.createElement('div');
-        wrapper.id = id;
-        wrapper.className = 'flex flex-col items-start gap-3 mb-6';
+        wrapper.className = 'flex flex-col items-start gap-3 mb-6 assistant-thinking-placeholder';
         wrapper.innerHTML = `
-            <div class="text-sm text-gray-800 leading-relaxed w-full markdown-body message-content"></div>
             <div class="flex items-center gap-2">
                 <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic">
                     ${this._sparkleSvg()}
@@ -160,14 +157,41 @@ class AssistantApp extends AppBase {
         `;
         this.chatEl.appendChild(wrapper);
         this._scrollToBottom();
-        return { wrapper, content: wrapper.querySelector('.message-content'), label: wrapper.querySelector('.thinking-label') };
+        return wrapper;
     }
 
-    _movePlaceholderToEnd(placeholder) {
-        if (!placeholder || !placeholder.wrapper) return;
-        placeholder.wrapper.remove();
-        this.chatEl.appendChild(placeholder.wrapper);
+    _ensureAssistantBubble() {
+        // Create a new assistant message bubble if the last one is not an active assistant bubble.
+        const last = this.chatEl.lastElementChild;
+        if (last && last.dataset.role === 'assistant' && last.dataset.active === 'true') {
+            return last.querySelector('.assistant-bubble-content');
+        }
+        const wrapper = document.createElement('div');
+        wrapper.className = 'flex flex-col items-start gap-3 mb-6';
+        wrapper.dataset.role = 'assistant';
+        wrapper.dataset.active = 'true';
+        wrapper.innerHTML = `
+            <div class="text-sm text-gray-800 leading-relaxed w-full markdown-body assistant-bubble-content"></div>
+            <div class="flex items-center gap-2">
+                <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic">
+                    ${this._sparkleSvg()}
+                </div>
+            </div>
+        `;
+        this.chatEl.appendChild(wrapper);
         this._scrollToBottom();
+        return wrapper.querySelector('.assistant-bubble-content');
+    }
+
+    _closeAssistantBubble() {
+        const last = this.chatEl.lastElementChild;
+        if (last && last.dataset.role === 'assistant' && last.dataset.active === 'true') {
+            last.dataset.active = 'false';
+            const avatar = last.querySelector('.ai-avatar-wrapper');
+            if (avatar) {
+                avatar.classList.remove('trigger-magic');
+            }
+        }
     }
 
     _appendToolCalls(toolCalls) {
@@ -336,7 +360,6 @@ class AssistantApp extends AppBase {
 
     _fillSearchCard(query, resultsHtml) {
         const cards = this.chatEl.querySelectorAll('[data-search-card="true"]');
-        // Find the most recent still-loading card for this query, or the most recent card.
         let target = null;
         for (let i = cards.length - 1; i >= 0; i--) {
             const card = cards[i];
@@ -348,7 +371,6 @@ class AssistantApp extends AppBase {
             }
         }
         if (!target) {
-            // Fallback: create a finished card directly if no loading card found.
             target = this._appendSearchCard(query, resultsHtml);
             return target;
         }
@@ -424,12 +446,12 @@ class AssistantApp extends AppBase {
         this.modelName = this.modelInput.value.trim();
 
         this.messages.push({ role: 'user', content: text });
-        const userMsgEl = this._appendUserMessage(text);
+        this._appendUserMessage(text);
         this.isStreaming = true;
 
-        const placeholder = this._appendAssistantPlaceholder();
+        const placeholder = this._appendThinkingPlaceholder();
         const loadingInterval = setInterval(() => {
-            const avatar = placeholder.wrapper.querySelector('.ai-avatar-wrapper');
+            const avatar = placeholder.querySelector('.ai-avatar-wrapper');
             if (avatar) {
                 avatar.classList.remove('trigger-magic');
                 void avatar.offsetWidth;
@@ -437,8 +459,14 @@ class AssistantApp extends AppBase {
             }
         }, 1200);
 
+        let currentBubbleContent = null;
         let currentText = '';
-        let toolStartEl = null;
+
+        const removePlaceholder = () => {
+            if (placeholder && placeholder.parentNode) {
+                placeholder.remove();
+            }
+        };
 
         try {
             await ApiClient.streamAssistant(
@@ -453,38 +481,48 @@ class AssistantApp extends AppBase {
                     if (event.kind === 'thinking') {
                         return;
                     }
+
+                    // Any concrete event removes the "thinking" placeholder.
+                    removePlaceholder();
+
                     if (event.kind === 'assistant_text') {
-                        if (placeholder.label) placeholder.label.remove();
-                        if (placeholder.wrapper.style.display === 'none') {
-                            placeholder.wrapper.style.display = '';
+                        if (!currentBubbleContent) {
+                            this._closeAssistantBubble();
+                            currentBubbleContent = this._ensureAssistantBubble();
                         }
                         currentText += event.content || '';
-                        if (placeholder.content) {
-                            placeholder.content.innerHTML = this._markdown(currentText);
-                        }
+                        currentBubbleContent.innerHTML = this._markdown(currentText);
                         this._scrollToBottom();
                         return;
                     }
+
                     if (event.kind === 'assistant_tool_calls') {
-                        if (placeholder.label) placeholder.label.remove();
+                        currentBubbleContent = null;
+                        currentText = '';
+                        this._closeAssistantBubble();
                         this._appendToolCalls(event.tool_calls);
                         this.messages.push({ role: 'assistant_tool_calls', tool_calls: event.tool_calls });
                         this._scrollToBottom();
                         return;
                     }
+
                     if (event.kind === 'tool_start') {
-                        if (placeholder.label) placeholder.label.remove();
+                        currentBubbleContent = null;
+                        currentText = '';
+                        this._closeAssistantBubble();
                         if (event.name === 'retrieve_documents') {
-                            toolStartEl = this._appendSearchCard(event.arguments?.search_terms || '', null);
+                            this._appendSearchCard(event.arguments?.search_terms || '', null);
                         } else {
-                            toolStartEl = this._createToolCard(event.name, event.arguments || {});
-                            this._markToolRunning(toolStartEl, true);
+                            const card = this._createToolCard(event.name, event.arguments || {});
+                            this._markToolRunning(card, true);
                         }
                         this.messages.push({ role: 'tool_start', name: event.name, arguments: event.arguments });
                         this._scrollToBottom();
                         return;
                     }
+
                     if (event.kind === 'tool_result') {
+                        this._closeAssistantBubble();
                         if (event.name === 'plan_workflow_with_tools') {
                             this._renderPlan(event.result);
                         }
@@ -497,20 +535,21 @@ class AssistantApp extends AppBase {
                         this._scrollToBottom();
                         return;
                     }
+
                     if (event.kind === 'assistant_done') {
-                        if (placeholder.label) placeholder.label.remove();
-                        if (event.content && !currentText && placeholder.content) {
-                            currentText = event.content;
-                            placeholder.content.innerHTML = this._markdown(currentText);
+                        if (event.content && !currentText) {
+                            const bubble = this._ensureAssistantBubble();
+                            bubble.innerHTML = this._markdown(event.content);
                         }
+                        this._closeAssistantBubble();
                         this._scrollToBottom();
                         return;
                     }
+
                     if (event.kind === 'error') {
-                        if (placeholder.label) placeholder.label.remove();
-                        if (placeholder.content) {
-                            placeholder.content.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(event.message || '')}</em>`;
-                        }
+                        this._closeAssistantBubble();
+                        const bubble = this._ensureAssistantBubble();
+                        bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(event.message || '')}</em>`;
                         this._scrollToBottom();
                     }
                 }
@@ -518,20 +557,21 @@ class AssistantApp extends AppBase {
 
         } catch (err) {
             console.error('Assistant stream error', err);
-            if (placeholder.label) placeholder.label.remove();
-            if (placeholder.content) {
-                placeholder.content.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(err.message)}</em>`;
-            }
+            removePlaceholder();
+            const bubble = this._ensureAssistantBubble();
+            bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(err.message)}</em>`;
+            this._scrollToBottom();
         } finally {
             clearInterval(loadingInterval);
             this.isStreaming = false;
+            this._closeAssistantBubble();
 
             if (currentText) {
                 this.messages.push({ role: 'assistant', content: currentText });
             }
 
             requestAnimationFrame(() => {
-                const paddingBottom = Math.max(0, this.chatEl.clientHeight - (placeholder.wrapper ? placeholder.wrapper.offsetHeight : 0) - 20);
+                const paddingBottom = Math.max(0, this.chatEl.clientHeight - 20);
                 this.chatEl.style.paddingBottom = paddingBottom + 'px';
                 this._scrollToBottom();
             });
