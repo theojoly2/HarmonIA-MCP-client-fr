@@ -566,15 +566,15 @@ class AssistantApp extends AppBase {
                     }
 
                     if (event.kind === 'assistant_tool_calls') {
+                        // Hidden from the chat UI: do not show the "planned tool calls" summary.
+                        // Just close any active text bubble so the next assistant text starts fresh.
                         if (currentBubbleContent && currentText) {
                             currentBubbleContent.innerHTML = this._markdown(currentText);
                         }
                         currentBubbleContent = null;
                         currentText = '';
                         this._closeAssistantBubble();
-                        this._appendToolCalls(event.tool_calls);
                         this.messages.push({ role: 'assistant_tool_calls', tool_calls: event.tool_calls });
-                        this._scrollToBottom();
                         return;
                     }
 
@@ -599,9 +599,9 @@ class AssistantApp extends AppBase {
                     if (event.kind === 'tool_result') {
                         this._closeAssistantBubble();
                         if (event.name === 'plan_workflow_with_tools') {
-                            this._renderPlan(event.result);
-                        }
-                        if (event.name === 'retrieve_documents') {
+                            // The plan itself is internal; only any assistant text following it is shown.
+                            // Keep the plan result out of the visible chat stream.
+                        } else if (event.name === 'retrieve_documents') {
                             this._fillSearchCard(event.display?.query || '', event.display?.results_html || '');
                         } else {
                             this._fillToolResult(event.name, event.result, event.display);
