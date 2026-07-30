@@ -148,7 +148,8 @@ class AssistantApp extends AppBase {
         const wrapper = document.createElement('div');
         wrapper.className = 'flex flex-col items-start gap-3 mb-6 assistant-thinking-placeholder';
         wrapper.innerHTML = `
-            <div class="flex items-center gap-2">
+            <div class="text-sm text-gray-800 leading-relaxed w-full markdown-body assistant-bubble-content" style="min-height:0;"></div>
+            <div class="ai-avatar-row flex items-center gap-2">
                 <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic">
                     ${this._sparkleSvg()}
                 </div>
@@ -172,7 +173,7 @@ class AssistantApp extends AppBase {
         wrapper.dataset.active = 'true';
         wrapper.innerHTML = `
             <div class="text-sm text-gray-800 leading-relaxed w-full markdown-body assistant-bubble-content"></div>
-            <div class="flex items-center gap-2">
+            <div class="ai-avatar-row flex items-center gap-2">
                 <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic">
                     ${this._sparkleSvg()}
                 </div>
@@ -189,15 +190,21 @@ class AssistantApp extends AppBase {
         }
     }
 
+    _hideAllSparkles() {
+        this.chatEl.querySelectorAll('.ai-avatar-wrapper').forEach((avatar) => {
+            avatar.classList.remove('trigger-magic');
+            avatar.style.transition = 'opacity 0.3s ease, height 0.3s ease, margin 0.3s ease';
+            avatar.style.opacity = '0';
+            avatar.style.height = '0';
+            avatar.style.margin = '0';
+            setTimeout(() => { avatar.style.display = 'none'; }, 300);
+        });
+    }
+
     _closeAssistantBubble() {
         const last = this.chatEl.lastElementChild;
         if (last && last.dataset.role === 'assistant' && last.dataset.active === 'true') {
             last.dataset.active = 'false';
-            const avatar = last.querySelector('.ai-avatar-wrapper');
-            if (avatar) {
-                avatar.classList.remove('trigger-magic');
-                avatar.style.visibility = 'hidden';
-            }
         }
     }
 
@@ -509,7 +516,11 @@ class AssistantApp extends AppBase {
         this._appendUserMessage(text);
         this.isStreaming = true;
 
+        // Hide all previous sparkle avatars so only the new thinking one stays alive.
+        this._hideAllSparkles();
+
         const placeholder = this._appendThinkingPlaceholder();
+        const placeholderContent = placeholder.querySelector('.assistant-bubble-content');
         const loadingInterval = setInterval(() => {
             const avatar = placeholder.querySelector('.ai-avatar-wrapper');
             if (avatar) {
@@ -539,18 +550,13 @@ class AssistantApp extends AppBase {
                         if (event.session) this.session = event.session;
                         return;
                     }
-                    if (event.kind === 'thinking') {
-                        removePlaceholder();
-                        const bubble = this._ensureAssistantBubble();
-                        bubble.innerHTML = '<span class="assistant-chunk">.</span>';
-                        bubble.innerHTML = '';
-                        this._closeAssistantBubble();
-                        this._forceReflow();
-                        return;
-                    }
 
                     // Any concrete event removes the "thinking" placeholder.
                     removePlaceholder();
+
+                    if (event.kind === 'thinking') {
+                        return;
+                    }
 
                     if (event.kind === 'assistant_text') {
                         if (!currentBubbleContent) {
