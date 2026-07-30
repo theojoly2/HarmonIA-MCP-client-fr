@@ -238,11 +238,21 @@ async def assistant_stream_generator(
 
             loop_count = 0
             max_loops = 10
+            plan_already_used = False
             while loop_count < max_loops:
                 loop_count += 1
-                print(f"[Assistant loop {loop_count}/{max_loops}] start")
+                print(f"[Assistant loop {loop_count}/{max_loops}] start, plan_used={plan_already_used}")
 
                 yield _event("thinking", {})
+
+                # If a plan was already generated in this request, hide the planner
+                # so the LLM cannot loop on re-planning.
+                available_tool_schemas = tool_schemas
+                if plan_already_used:
+                    available_tool_schemas = [
+                        t for t in tool_schemas
+                        if t.get("function", {}).get("name") != "plan_workflow_with_tools"
+                    ]
 
                 llm_messages = [
                     {"role": msg["role"], "content": str(msg.get("content", ""))}
@@ -258,7 +268,7 @@ async def assistant_stream_generator(
 
                 async for stage, payload in _create_completion_streaming(
                     llm_messages=llm_messages,
-                    tools=tool_schemas,
+                    tools=available_tool_schemas,
                     tool_choice="auto",
                 ):
                     if stage == "text":
@@ -287,6 +297,10 @@ async def assistant_stream_generator(
                         arguments = _safe_json_loads(raw_arguments) or {}
                         if not isinstance(arguments, dict):
                             arguments = {}
+
+                        # Mark that a plan has been generated so subsequent loops cannot re-call it.
+                        if name == "plan_workflow_with_tools":
+                            plan_already_used = True
 
                         yield _event("tool_start", {"name": name, "arguments": arguments})
                         await asyncio.sleep(0)
@@ -373,7 +387,6 @@ async def stream_assistant_response(
             "X-Accel-Buffering": "no",
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "Transfer-Encoding": "chunked",
         },
     )
 

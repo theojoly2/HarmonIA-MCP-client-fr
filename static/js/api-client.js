@@ -200,7 +200,8 @@ const ApiClient = (() => {
                 if (!line.trim()) continue;
                 try {
                     const event = JSON.parse(line);
-                    onEvent(event);
+                    await onEvent(event);
+                    await new Promise((r) => setTimeout(r, 0));
                 } catch (err) {
                     console.error("Assistant event parse error", err, line);
                 }
@@ -208,7 +209,7 @@ const ApiClient = (() => {
         }
         if (buffer.trim()) {
             try {
-                onEvent(JSON.parse(buffer));
+                await onEvent(JSON.parse(buffer));
             } catch (err) {
                 console.error("Assistant trailing event parse error", err, buffer);
             }

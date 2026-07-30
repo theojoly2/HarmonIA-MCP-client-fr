@@ -490,13 +490,26 @@ class AssistantApp extends AppBase {
                             this._closeAssistantBubble();
                             currentBubbleContent = this._ensureAssistantBubble();
                         }
-                        currentText += event.content || '';
-                        currentBubbleContent.innerHTML = this._markdown(currentText);
+                        const chunk = event.content || '';
+                        currentText += chunk;
+                        // Stream incrementally: append a text node to avoid re-parsing the whole message each chunk.
+                        const node = document.createElement('span');
+                        node.className = 'assistant-chunk';
+                        node.textContent = chunk;
+                        currentBubbleContent.appendChild(node);
+                        // Periodically re-render markdown when chunk ends a sentence/paragraph or message is large.
+                        const shouldRender = /[\.\!\?\n]$/.test(chunk) || currentText.length > 300;
+                        if (shouldRender) {
+                            currentBubbleContent.innerHTML = this._markdown(currentText);
+                        }
                         this._scrollToBottom();
                         return;
                     }
 
                     if (event.kind === 'assistant_tool_calls') {
+                        if (currentBubbleContent && currentText) {
+                            currentBubbleContent.innerHTML = this._markdown(currentText);
+                        }
                         currentBubbleContent = null;
                         currentText = '';
                         this._closeAssistantBubble();
@@ -507,6 +520,9 @@ class AssistantApp extends AppBase {
                     }
 
                     if (event.kind === 'tool_start') {
+                        if (currentBubbleContent && currentText) {
+                            currentBubbleContent.innerHTML = this._markdown(currentText);
+                        }
                         currentBubbleContent = null;
                         currentText = '';
                         this._closeAssistantBubble();
@@ -537,6 +553,9 @@ class AssistantApp extends AppBase {
                     }
 
                     if (event.kind === 'assistant_done') {
+                        if (currentBubbleContent && currentText) {
+                            currentBubbleContent.innerHTML = this._markdown(currentText);
+                        }
                         if (event.content && !currentText) {
                             const bubble = this._ensureAssistantBubble();
                             bubble.innerHTML = this._markdown(event.content);
