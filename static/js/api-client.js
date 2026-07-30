@@ -190,30 +190,38 @@ const ApiClient = (() => {
 
         const events = [];
         let flushScheduled = false;
-        const frameDelay = 3000; // DEBUG: 3 seconds between each event to verify progressive rendering
 
-        const flushNextEvent = () => {
+        const isMergeable = (ev) => ev.kind === 'assistant_text' || ev.kind === 'thinking';
+
+        // Drain exactly one batch per animation frame so the browser renders
+        // each structural step (tool card, plan card, search card, final message)
+        // distinctly before the next event arrives.
+        const flushBatch = () => {
             if (events.length === 0) return;
-            const ev = events.shift();
+            let batch = events.shift();
+            while (events.length > 0 && isMergeable(events[0]) && isMergeable(batch)) {
+                const next = events.shift();
+                if (batch.kind === 'assistant_text' && next.kind === 'assistant_text') {
+                    batch.content = (batch.content || '') + (next.content || '');
+                }
+            }
             try {
-                onEvent(ev);
+                onEvent(batch);
             } catch (err) {
-                console.error("Assistant event handler error", err, ev);
+                console.error("Assistant event handler error", err, batch);
             }
         };
 
         const scheduleFlush = () => {
             if (flushScheduled || events.length === 0) return;
             flushScheduled = true;
-            setTimeout(() => {
-                requestAnimationFrame(() => {
-                    flushScheduled = false;
-                    flushNextEvent();
-                    if (events.length > 0) {
-                        scheduleFlush();
-                    }
-                });
-            }, frameDelay);
+            requestAnimationFrame(() => {
+                flushScheduled = false;
+                flushBatch();
+                if (events.length > 0) {
+                    scheduleFlush();
+                }
+            });
         };
 
         const reader = res.body.getReader();
@@ -232,8 +240,7 @@ const ApiClient = (() => {
                 if (!line) continue;
                 if (line.startsWith("event:") || line.startsWith("id:") || line.startsWith(":")) continue;
                 try {
-                    const event = JSON.parse(line);
-                    events.push(event);
+                    events.push(JSON.parse(line));
                     scheduleFlush();
                 } catch (err) {
                     console.error("Assistant event parse error", err, line);
@@ -241,7 +248,6 @@ const ApiClient = (() => {
             }
         }
 
-        // Drain remaining buffer.
         const tail = buffer.replace(/^data:\s*/, "").trim();
         if (tail) {
             try {
@@ -253,14 +259,12 @@ const ApiClient = (() => {
 
         const drainRemaining = () => {
             if (events.length === 0) return;
-            setTimeout(() => {
-                requestAnimationFrame(() => {
-                    flushNextEvent();
-                    if (events.length > 0) {
-                        drainRemaining();
-                    }
-                });
-            }, frameDelay);
+            requestAnimationFrame(() => {
+                flushBatch();
+                if (events.length > 0) {
+                    drainRemaining();
+                }
+            });
         };
         drainRemaining();
     }
