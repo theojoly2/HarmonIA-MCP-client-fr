@@ -188,20 +188,22 @@ const ApiClient = (() => {
         });
         if (!res.ok || !res.body) throw new Error(`Assistant stream failed: ${res.status}`);
 
-        // Forward every SSE event to the app immediately.  The UI layer (AssistantApp)
-        // is responsible for rendering text progressively via its own typewriter, so we
-        // do not add any artificial delays or batching here.
+        // Forward every SSE event to the app as it arrives, then yield back to the
+        // browser so the DOM can paint before the next event is processed.  This keeps
+        // tool cards, plan cards and the typewriter text appearing progressively.
         const reader = res.body.getReader();
         const decoder = new TextDecoder("utf-8");
         let buffer = "";
 
-        const handleLine = (line) => {
+        const handleLine = async (line) => {
             const ev = JSON.parse(line);
             try {
-                onEvent(ev);
+                await onEvent(ev);
             } catch (err) {
                 console.error("Assistant event handler error", err, ev);
             }
+            // Force a browser paint/reflow between events so the UI updates visibly.
+            await new Promise((resolve) => setTimeout(resolve, 0));
         };
 
         while (true) {
@@ -217,9 +219,9 @@ const ApiClient = (() => {
                 if (!line) continue;
                 if (line.startsWith("event:") || line.startsWith("id:") || line.startsWith(":")) continue;
                 try {
-                    handleLine(line);
+                    await handleLine(line);
                 } catch (err) {
-                    console.error("Assistant event parse error", err, line);
+                    console.error("Assistant event parse/handler error", err, line);
                 }
             }
         }
@@ -227,9 +229,9 @@ const ApiClient = (() => {
         const tail = buffer.replace(/^data:\s*/, "").trim();
         if (tail) {
             try {
-                handleLine(tail);
+                await handleLine(tail);
             } catch (err) {
-                console.error("Assistant trailing event parse error", err, tail);
+                console.error("Assistant trailing event parse/handler error", err, tail);
             }
         }
     }

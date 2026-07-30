@@ -328,17 +328,17 @@ async def assistant_stream_generator(
                         if not isinstance(arguments, dict):
                             arguments = {}
 
-                        # Mark that a plan has been generated so subsequent loops cannot re-call it.
-                        if name == "plan_workflow_with_tools":
-                            plan_already_used = True
-                            if isinstance(parsed_tool, dict) and not parsed_tool.get("error"):
-                                plan_successful = True
-
                         yield _event("tool_start", {"name": name, "arguments": arguments})
                         await asyncio.sleep(0)
 
                         tool_message = await mcp_client.call_tool(name, arguments)
                         parsed_tool = _safe_json_loads(tool_message) or {}
+
+                        # Mark that a plan has been generated so subsequent loops cannot re-call it.
+                        if name == "plan_workflow_with_tools":
+                            plan_already_used = True
+                            if isinstance(parsed_tool, dict) and not parsed_tool.get("error"):
+                                plan_successful = True
 
                         display_payload: dict[str, Any] | None = None
                         if name == "retrieve_documents":
