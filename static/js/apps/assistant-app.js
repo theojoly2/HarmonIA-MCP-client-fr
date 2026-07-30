@@ -191,12 +191,14 @@ class AssistantApp extends AppBase {
     }
 
     _hideAllSparkles() {
-        this.chatEl.querySelectorAll('.ai-avatar-wrapper').forEach((avatar) => {
+        this.chatEl.querySelectorAll('.sparkle-container').forEach((container) => {
+            const avatar = container.closest('.ai-avatar-wrapper') || container;
             avatar.classList.remove('trigger-magic');
             avatar.style.transition = 'opacity 0.3s ease, height 0.3s ease, margin 0.3s ease';
             avatar.style.opacity = '0';
             avatar.style.height = '0';
             avatar.style.margin = '0';
+            avatar.style.overflow = 'hidden';
             setTimeout(() => { avatar.style.display = 'none'; }, 300);
         });
     }
