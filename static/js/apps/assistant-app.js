@@ -322,26 +322,6 @@ class AssistantApp extends AppBase {
             return null;
         }
 
-        const stepsHtml = planSteps.map((step, index) => {
-            const tool = toolsToCall.find((t) => t.step_index === index);
-            const toolName = tool?.tool || '';
-            const toolBadge = toolName
-                ? `<span class="assistant-plan-tool-badge">${this._escape(toolName)}</span>`
-                : '';
-            const stepText = typeof step === 'string' ? step : (step.step || '');
-            const needsTool = typeof step === 'object' ? step.needs_tool : false;
-            return `
-                <li class="assistant-plan-step">
-                    <span class="assistant-plan-step-number">${index + 1}</span>
-                    <div class="assistant-plan-step-content">
-                        <div class="assistant-plan-step-text">${this._escape(stepText)}</div>
-                        ${toolBadge}
-                        ${needsTool ? '<span class="assistant-plan-uses-tool">nécessite un outil</span>' : ''}
-                    </div>
-                </li>
-            `;
-        }).join('');
-
         const div = document.createElement('div');
         div.className = 'assistant-plan-card mb-4';
         div.innerHTML = `
@@ -352,14 +332,58 @@ class AssistantApp extends AppBase {
                 <span>Plan d’action proposé</span>
             </div>
             <div class="assistant-plan-body">
-                <ol class="assistant-plan-steps">
-                    ${stepsHtml}
-                </ol>
-                ${notes ? `<div class="assistant-plan-notes">${this._escape(notes)}</div>` : ''}
+                <ol class="assistant-plan-steps"></ol>
+                ${notes ? `<div class="assistant-plan-notes" style="display:none;">${this._escape(notes)}</div>` : ''}
             </div>
         `;
+        const stepsList = div.querySelector('.assistant-plan-steps');
+        const notesEl = div.querySelector('.assistant-plan-notes');
+
+        planSteps.forEach((step, index) => {
+            const tool = toolsToCall.find((t) => t.step_index === index);
+            const toolName = tool?.tool || '';
+            const toolBadge = toolName
+                ? `<span class="assistant-plan-tool-badge">${this._escape(toolName)}</span>`
+                : '';
+            const stepText = typeof step === 'string' ? step : (step.step || '');
+            const needsTool = typeof step === 'object' ? step.needs_tool : false;
+            const li = document.createElement('li');
+            li.className = 'assistant-plan-step';
+            li.style.opacity = '0';
+            li.style.transform = 'translateY(6px)';
+            li.style.transition = 'opacity 180ms ease, transform 180ms ease';
+            li.innerHTML = `
+                <span class="assistant-plan-step-number">${index + 1}</span>
+                <div class="assistant-plan-step-content">
+                    <div class="assistant-plan-step-text">${this._escape(stepText)}</div>
+                    ${toolBadge}
+                    ${needsTool ? '<span class="assistant-plan-uses-tool">nécessite un outil</span>' : ''}
+                </div>
+            `;
+            stepsList.appendChild(li);
+        });
+
         this.chatEl.appendChild(div);
         this._scrollToBottom();
+
+        // Reveal plan steps one by one for a progressive execution feel.
+        requestAnimationFrame(() => {
+            const items = stepsList.querySelectorAll('.assistant-plan-step');
+            items.forEach((item, i) => {
+                setTimeout(() => {
+                    item.style.opacity = '1';
+                    item.style.transform = 'translateY(0)';
+                    this._scrollToBottom();
+                }, i * 120);
+            });
+            if (notesEl) {
+                setTimeout(() => {
+                    notesEl.style.display = '';
+                    this._scrollToBottom();
+                }, items.length * 120);
+            }
+        });
+
         return div;
     }
 

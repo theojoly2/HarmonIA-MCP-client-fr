@@ -141,6 +141,7 @@ venv.bak/
 
 # dirs
 **/data/users.db
+**/data/assistant_histories
 **/data/.session_secret
 **/data/sample_roh.ttl
 **/documents/

@@ -190,25 +190,33 @@ const ApiClient = (() => {
 
         const events = [];
         let flushScheduled = false;
+        let lastFlushTime = 0;
+        const MIN_FLUSH_INTERVAL_MS = 80;
+
         const scheduleFlush = () => {
             if (flushScheduled || events.length === 0) return;
             flushScheduled = true;
-            requestAnimationFrame(() => {
-                flushScheduled = false;
-                let batch = 0;
-                while (events.length > 0 && batch < 20) {
-                    const ev = events.shift();
-                    batch++;
-                    try {
-                        onEvent(ev);
-                    } catch (err) {
-                        console.error("Assistant event handler error", err, ev);
+            const now = performance.now();
+            const delay = Math.max(0, MIN_FLUSH_INTERVAL_MS - (now - lastFlushTime));
+            setTimeout(() => {
+                requestAnimationFrame(() => {
+                    flushScheduled = false;
+                    lastFlushTime = performance.now();
+                    let batch = 0;
+                    while (events.length > 0 && batch < 5) {
+                        const ev = events.shift();
+                        batch++;
+                        try {
+                            onEvent(ev);
+                        } catch (err) {
+                            console.error("Assistant event handler error", err, ev);
+                        }
                     }
-                }
-                if (events.length > 0) {
-                    scheduleFlush();
-                }
-            });
+                    if (events.length > 0) {
+                        scheduleFlush();
+                    }
+                });
+            }, delay);
         };
 
         const reader = res.body.getReader();
@@ -246,15 +254,31 @@ const ApiClient = (() => {
             }
         }
 
-        // Flush any remaining events synchronously before resolving.
-        while (events.length > 0) {
-            const ev = events.shift();
-            try {
-                onEvent(ev);
-            } catch (err) {
-                console.error("Assistant event handler error", err, ev);
-            }
-        }
+        // Flush any remaining events with the same pacing before resolving.
+        const drainRemaining = () => {
+            if (events.length === 0) return;
+            const now = performance.now();
+            const delay = Math.max(0, MIN_FLUSH_INTERVAL_MS - (now - lastFlushTime));
+            setTimeout(() => {
+                requestAnimationFrame(() => {
+                    lastFlushTime = performance.now();
+                    let batch = 0;
+                    while (events.length > 0 && batch < 5) {
+                        const ev = events.shift();
+                        batch++;
+                        try {
+                            onEvent(ev);
+                        } catch (err) {
+                            console.error("Assistant event handler error", err, ev);
+                        }
+                    }
+                    if (events.length > 0) {
+                        drainRemaining();
+                    }
+                });
+            }, delay);
+        };
+        drainRemaining();
     }
 
     async function getAssistantSessions() {
