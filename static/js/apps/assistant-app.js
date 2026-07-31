@@ -29,7 +29,7 @@ class AssistantApp extends AppBase {
                 <div id="assistant-chat" class="flex-1 overflow-y-auto">
                     ${this._welcomeMessage()}
                 </div>
-                <div class="assistant-input-area p-3 flex-shrink-0" id="assistant-input-area">
+                <div class="assistant-input-area p-3 flex-shrink-0 hidden" id="assistant-input-area">
                     <div class="assistant-input-wrapper max-w-3xl mx-auto rounded-2xl border-2 border-gray-300 focus-within:border-black bg-white transition-colors shadow-sm">
                         <form id="assistant-form" class="flex flex-col gap-2 p-3">
                             <textarea id="assistant-input" rows="1" autocomplete="off"
@@ -55,25 +55,30 @@ class AssistantApp extends AppBase {
         `;
 
         this.chatEl = container.querySelector('#assistant-chat');
-        this.inputEl = container.querySelector('#assistant-input');
         this.inputArea = container.querySelector('#assistant-input-area');
         this.fileInput = container.querySelector('#assistant-model-file');
 
+        // The active textarea is inside the visible input area (home or bottom).
+        this.inputEl = this._activeInput();
         this._bindInputEvents();
+
+        // Bind both forms: the centered home form and the bottom chat form.
+        container.querySelectorAll('#assistant-form').forEach((form) => {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const textarea = form.querySelector('textarea');
+                const text = textarea?.value.trim();
+                if (!text || this.isStreaming) return;
+                textarea.value = '';
+                textarea.style.height = 'auto';
+                this._switchToChatMode();
+                this._send(text);
+            });
+        });
 
         if (window.GlowEffects && typeof window.GlowEffects.scanAndBind === 'function') {
             window.GlowEffects.scanAndBind(container);
         }
-
-        container.querySelector('#assistant-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const text = this.inputEl.value.trim();
-            if (!text || this.isStreaming) return;
-            this.inputEl.value = '';
-            this.inputEl.style.height = 'auto';
-            this._switchToChatMode();
-            this._send(text);
-        });
 
         container.querySelector('#assistant-import-model').addEventListener('click', () => {
             this.fileInput.click();
@@ -100,17 +105,25 @@ class AssistantApp extends AppBase {
         });
     }
 
+    _activeInput() {
+        // Prefer the visible bottom input; fall back to the home input if still present.
+        const bottom = this.container?.querySelector('#assistant-input-area:not(.hidden) #assistant-input');
+        if (bottom) return bottom;
+        return this.container?.querySelector('.assistant-home-input-area #assistant-input') || this.container?.querySelector('#assistant-input');
+    }
+
     _bindInputEvents() {
-        if (!this.inputEl) return;
-        this.inputEl.addEventListener('input', () => {
-            this.inputEl.style.height = 'auto';
-            this.inputEl.style.height = Math.min(this.inputEl.scrollHeight, 160) + 'px';
-        });
-        this.inputEl.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                this.inputEl.closest('form')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-            }
+        this.container?.querySelectorAll('textarea#assistant-input').forEach((textarea) => {
+            textarea.addEventListener('input', () => {
+                textarea.style.height = 'auto';
+                textarea.style.height = Math.min(textarea.scrollHeight, 160) + 'px';
+            });
+            textarea.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    textarea.closest('form')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                }
+            });
         });
     }
 
@@ -180,13 +193,14 @@ class AssistantApp extends AppBase {
             this.inputArea.style.transform = '';
             this.inputArea.style.transition = '';
         }
+        this.inputEl = this._activeInput();
     }
 
     _switchToChatMode() {
         // Animate the home screen into chat mode: title slides up, centered input fades out,
         // and the bottom input area fades in. Then restore focus to the bottom textarea.
         const home = this.chatEl.querySelector('.assistant-home');
-        const hadFocus = document.activeElement === this.inputEl;
+        const hadFocus = this.inputEl && document.activeElement === this.inputEl;
         if (home) {
             requestAnimationFrame(() => {
                 home.classList.remove('homescreen-mode');
@@ -203,6 +217,7 @@ class AssistantApp extends AppBase {
                 setTimeout(() => {
                     this.inputArea.style.transition = '';
                     this.inputArea.style.transform = '';
+                    this.inputEl = this._activeInput();
                     if (hadFocus && this.inputEl) {
                         this.inputEl.focus();
                     }
