@@ -487,6 +487,31 @@
 
 .assistant-messages {
     padding-top: 0.5rem;
+    font-size: 1rem;
+}
+
+.assistant-messages .markdown-body {
+    font-size: 1rem;
+}
+
+.assistant-messages .markdown-body h1,
+.assistant-messages .markdown-body h2,
+.assistant-messages .markdown-body h3 {
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.assistant-messages .markdown-body p,
+.assistant-messages .markdown-body li {
+    font-size: 1rem;
+}
+
+.assistant-messages .markdown-body code {
+    font-size: 0.9em;
+}
+
+.assistant-messages .user-msg-anchor > div {
+    font-size: 1rem;
 }
 
 .assistant-search-results .result-item {
