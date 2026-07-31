@@ -82,7 +82,7 @@ def render_results(results_data: list, query: str = "") -> dict:
         </div>
         """
     elif query and results_data:
-        results_html = f'<p id="results-header" class="font-bold text-gray-500 mb-8 border-b-2 border-gray-200 pb-4">{len(results_data)} RÉSULTAT(S)</p>'
+        results_html = f'<p id="results-header" class="text-sm font-bold text-gray-500 mb-6 border-b-2 border-gray-200 pb-3">{len(results_data)} RÉSULTAT(S)</p>'
         for i, row in enumerate(results_data):
             if not isinstance(row, (list, tuple)) or len(row) < 6:
                 continue
@@ -106,20 +106,20 @@ def render_results(results_data: list, query: str = "") -> dict:
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
                         </button>"""
             results_html += f"""
-            <div class="py-8 border-b border-gray-200 last:border-0 result-item">
-                <h3 class="font-bold mb-3">
+            <div class="py-6 border-b border-gray-200 last:border-0 result-item">
+                <h3 class="text-sm font-bold mb-2">
                     <a href="{safe_filename}?download={chunk0_id}" target="_blank" class="text-black hover:text-blue-600 hover:underline transition-colors" title="Ouvrir le document">
                         {filename}
                     </a>
                 </h3>
-                <div class="text-gray-800 font-medium leading-relaxed mb-4 markdown-body">
+                <div class="text-sm text-gray-800 font-medium leading-relaxed mb-3 markdown-body">
                     {preview_html}
                 </div>
                 <div class="flex items-end justify-between">
-                    <div class="flex flex-wrap gap-4 font-bold text-gray-500">
+                    <div class="flex flex-wrap gap-4 text-xs font-bold text-gray-500">
                         <span title="Score de pertinence">Score: {score}</span>
                         <span>Source: {tags_badges}</span>
-                        <span class="font-mono text-xs mt-0.5" title="{document_id}">ID: {str(document_id)[:8]}...</span>
+                        <span class="font-mono mt-0.5" title="{document_id}">ID: {str(document_id)[:8]}...</span>
                     </div>
                     <div class="flex gap-2">
                         {preview_button}
