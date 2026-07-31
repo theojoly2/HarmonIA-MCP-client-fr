@@ -27,16 +27,45 @@ class AssistantApp extends AppBase {
         container.innerHTML = `
             <div class="assistant-app h-full w-full flex flex-col bg-white rounded-[1.25rem] overflow-hidden relative">
                 <div id="assistant-chat" class="flex-1 overflow-y-auto">
-                    ${this._welcomeMessage()}
+                    <div class="assistant-wrapper" id="assistant-wrapper">
+                        <div class="assistant-hero" id="assistant-hero">
+                            <h1 class="assistant-hero-title text-center">
+                                <span class="assistant-title-glow title-glow">Assistant Sémantique</span>
+                            </h1>
+                            <div class="assistant-hero-input assistant-input-wrapper rounded-2xl border-2 border-gray-300 focus-within:border-black bg-white transition-colors shadow-sm">
+                                <form id="assistant-form" class="flex flex-col gap-2 p-3">
+                                    <textarea id="assistant-input" rows="1" autocomplete="off"
+                                        placeholder="Interrogez l'assistant sémantique..."
+                                        class="w-full resize-none max-h-40 bg-transparent border-none focus:outline-none focus:ring-0 text-sm text-gray-900 placeholder-gray-500 px-1 py-1"></textarea>
+                                    <div class="flex items-center justify-between">
+                                        <button type="button" id="assistant-import-model" class="magic-btn flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl text-gray-500 hover:text-black hover:bg-gray-100 transition-colors" title="Importer un modèle">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                            </svg>
+                                        </button>
+                                        <button type="submit" class="magic-btn assistant-send-btn flex-shrink-0 w-8 h-8 text-white bg-black hover:bg-gray-800 rounded-xl flex items-center justify-center transition-colors">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19V5M5 12l7-7 7 7"></path>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                            <div class="assistant-hero-subtitle text-center text-sm text-gray-500 max-w-md mt-6">
+                                Décrivez le modèle que vous souhaitez construire ou posez une question sur vos données.
+                            </div>
+                        </div>
+                        <div class="assistant-messages" id="assistant-messages"></div>
+                    </div>
                 </div>
                 <div class="assistant-input-area p-3 flex-shrink-0 hidden" id="assistant-input-area">
                     <div class="assistant-input-wrapper max-w-3xl mx-auto rounded-2xl border-2 border-gray-300 focus-within:border-black bg-white transition-colors shadow-sm">
-                        <form id="assistant-form" class="flex flex-col gap-2 p-3">
-                            <textarea id="assistant-input" rows="1" autocomplete="off"
+                        <form id="assistant-bottom-form" class="flex flex-col gap-2 p-3">
+                            <textarea id="assistant-bottom-input" rows="1" autocomplete="off"
                                 placeholder="Interrogez l'assistant sémantique..."
                                 class="w-full resize-none max-h-40 bg-transparent border-none focus:outline-none focus:ring-0 text-sm text-gray-900 placeholder-gray-500 px-1 py-1"></textarea>
                             <div class="flex items-center justify-between">
-                                <button type="button" id="assistant-import-model" class="magic-btn flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl text-gray-500 hover:text-black hover:bg-gray-100 transition-colors" title="Importer un modèle">
+                                <button type="button" id="assistant-import-model-bottom" class="magic-btn flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl text-gray-500 hover:text-black hover:bg-gray-100 transition-colors" title="Importer un modèle">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                                     </svg>
@@ -55,37 +84,44 @@ class AssistantApp extends AppBase {
         `;
 
         this.chatEl = container.querySelector('#assistant-chat');
+        this.wrapperEl = container.querySelector('#assistant-wrapper');
+        this.heroEl = container.querySelector('#assistant-hero');
+        this.messagesEl = container.querySelector('#assistant-messages');
         this.inputArea = container.querySelector('#assistant-input-area');
         this.fileInput = container.querySelector('#assistant-model-file');
+        this.inputEl = container.querySelector('#assistant-input');
+        this.bottomInputEl = container.querySelector('#assistant-bottom-input');
 
-        // The active textarea is inside the visible input area (home or bottom).
-        this.inputEl = this._activeInput();
         this._bindInputEvents();
-        // Wait for DOM layout before centering, otherwise clientHeight/bounding rects are 0.
-        requestAnimationFrame(() => requestAnimationFrame(() => this._applyCentering(true)));
         this._observeResize();
 
-        // Bind both forms: the centered home form and the bottom chat form.
-        container.querySelectorAll('#assistant-form').forEach((form) => {
-            form.addEventListener('submit', (e) => {
-                e.preventDefault();
-                const textarea = form.querySelector('textarea');
-                const text = textarea?.value.trim();
-                if (!text || this.isStreaming) return;
-                textarea.value = '';
-                textarea.style.height = 'auto';
-                this._switchToChatMode();
-                this._send(text);
-            });
+        const onSubmit = (textarea) => {
+            const text = textarea.value.trim();
+            if (!text || this.isStreaming) return;
+            textarea.value = '';
+            textarea.style.height = 'auto';
+            this._switchToChatMode();
+            this._send(text);
+        };
+
+        container.querySelector('#assistant-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            onSubmit(this.inputEl);
+        });
+        container.querySelector('#assistant-bottom-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            onSubmit(this.bottomInputEl);
         });
 
         if (window.GlowEffects && typeof window.GlowEffects.scanAndBind === 'function') {
             window.GlowEffects.scanAndBind(container);
         }
 
-        container.querySelector('#assistant-import-model').addEventListener('click', () => {
-            this.fileInput.click();
-        });
+        const importBtn = container.querySelector('#assistant-import-model');
+        const importBtnBottom = container.querySelector('#assistant-import-model-bottom');
+        const doImport = () => this.fileInput.click();
+        if (importBtn) importBtn.addEventListener('click', doImport);
+        if (importBtnBottom) importBtnBottom.addEventListener('click', doImport);
 
         this.fileInput.addEventListener('change', (e) => {
             const file = e.target.files?.[0];
@@ -93,7 +129,7 @@ class AssistantApp extends AppBase {
         });
 
         // Delegate clicks for embedded search result actions (preview / chat).
-        this.chatEl.addEventListener('click', (e) => {
+        this.messagesEl.addEventListener('click', (e) => {
             const btn = e.target.closest('[data-action]');
             if (!btn) return;
             const action = btn.dataset.action;
@@ -106,17 +142,16 @@ class AssistantApp extends AppBase {
                 EventBus.emit('open-chat', { documentId, name });
             }
         });
-    }
 
-    _activeInput() {
-        // Prefer the visible bottom input; fall back to the home input if still present.
-        const bottom = this.container?.querySelector('#assistant-input-area:not(.hidden) #assistant-input');
-        if (bottom) return bottom;
-        return this.container?.querySelector('.assistant-home-input-area #assistant-input') || this.container?.querySelector('#assistant-input');
+        // Initial centering after layout is ready.
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => this._applyCentering(true));
+        });
     }
 
     _bindInputEvents() {
-        this.container?.querySelectorAll('textarea#assistant-input').forEach((textarea) => {
+        [this.inputEl, this.bottomInputEl].forEach((textarea) => {
+            if (!textarea) return;
             textarea.addEventListener('input', () => {
                 textarea.style.height = 'auto';
                 textarea.style.height = Math.min(textarea.scrollHeight, 160) + 'px';
@@ -138,40 +173,6 @@ class AssistantApp extends AppBase {
             .replace(/>/g, '&gt;');
     }
 
-    _welcomeMessage() {
-        return `
-            <div class="assistant-home homescreen-mode h-full flex flex-col items-center justify-center px-4 py-8">
-                <h1 class="text-center mb-4">
-                    <span class="assistant-title-glow title-glow">Assistant Sémantique</span>
-                </h1>
-                <div class="assistant-home-input-area">
-                    <div class="assistant-input-wrapper rounded-2xl border-2 border-gray-300 focus-within:border-black bg-white transition-colors shadow-sm">
-                        <form id="assistant-form" class="flex flex-col gap-2 p-3">
-                            <textarea id="assistant-input" rows="1" autocomplete="off"
-                                placeholder="Interrogez l'assistant sémantique..."
-                                class="w-full resize-none max-h-40 bg-transparent border-none focus:outline-none focus:ring-0 text-sm text-gray-900 placeholder-gray-500 px-1 py-1"></textarea>
-                            <div class="flex items-center justify-between">
-                                <button type="button" id="assistant-import-model" class="magic-btn flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl text-gray-500 hover:text-black hover:bg-gray-100 transition-colors" title="Importer un modèle">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                                    </svg>
-                                </button>
-                                <button type="submit" class="magic-btn assistant-send-btn flex-shrink-0 w-8 h-8 text-white bg-black hover:bg-gray-800 rounded-xl flex items-center justify-center transition-colors">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19V5M5 12l7-7 7 7"></path>
-                                    </svg>
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-                <div class="assistant-home-subtitle text-center text-sm text-gray-500 max-w-md mt-6">
-                    Décrivez le modèle que vous souhaitez construire ou posez une question sur vos données.
-                </div>
-            </div>
-        `;
-    }
-
     _slugify(text) {
         return text
             .toLowerCase()
@@ -189,35 +190,37 @@ class AssistantApp extends AppBase {
         this.session = '';
         this.modelName = '';
         this.messages = [];
-        this.chatEl.innerHTML = this._welcomeMessage();
-        if (this.chatEl) {
-            this.chatEl.classList.remove('assistant-chat-mode');
-        }
+        this.messagesEl.innerHTML = '';
+        this.heroEl.classList.remove('assistant-hero-compact');
+        this.heroEl.classList.add('assistant-hero-home');
+        this.chatEl.classList.remove('assistant-chat-mode');
+        this.wrapperEl.classList.remove('assistant-wrapper-chat');
         if (this.inputArea) {
             this.inputArea.classList.add('hidden');
             this.inputArea.style.opacity = '';
             this.inputArea.style.transform = '';
             this.inputArea.style.transition = '';
         }
-        this.inputEl = this._activeInput();
-        // Wait for DOM layout before measuring for centering.
-        requestAnimationFrame(() => requestAnimationFrame(() => this._applyCentering(true)));
+        this.inputEl.value = '';
+        this.inputEl.style.height = 'auto';
+        this.bottomInputEl.value = '';
+        this.bottomInputEl.style.height = 'auto';
+        // Reset centering and re-measure after layout.
+        this.heroEl.style.paddingTop = '';
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => this._applyCentering(true));
+        });
     }
 
     _switchToChatMode() {
-        // Animate the home screen into chat mode like SearchApp:
-        // the title+input glide upward and the bottom input area fades in.
-        const hadFocus = this.inputEl && document.activeElement === this.inputEl;
-        const home = this.chatEl.querySelector('.assistant-home');
-        if (home) {
-            requestAnimationFrame(() => {
-                home.classList.remove('homescreen-mode');
-            });
-        }
-        if (this.chatEl) {
-            this.chatEl.classList.add('assistant-chat-mode');
-        }
+        const hadFocus = document.activeElement === this.inputEl;
+        this.heroEl.classList.remove('assistant-hero-home');
+        this.heroEl.classList.add('assistant-hero-compact');
+        this.chatEl.classList.add('assistant-chat-mode');
+        this.wrapperEl.classList.add('assistant-wrapper-chat');
+
         this._applyCentering();
+
         if (this.inputArea) {
             this.inputArea.classList.remove('hidden');
             this.inputArea.style.opacity = '0';
@@ -229,47 +232,48 @@ class AssistantApp extends AppBase {
                 setTimeout(() => {
                     this.inputArea.style.transition = '';
                     this.inputArea.style.transform = '';
-                    this.inputEl = this._activeInput();
-                    if (hadFocus && this.inputEl) {
-                        this.inputEl.focus();
+                    if (hadFocus && this.bottomInputEl) {
+                        this.bottomInputEl.focus();
                     }
                 }, 520);
             });
         }
     }
 
-    _measureContentHeight(wrapper) {
-        let contentHeight = 0;
-        for (const child of wrapper.children) {
+    _measureHeroContentHeight() {
+        if (!this.heroEl) return 220;
+        let height = 0;
+        for (const child of this.heroEl.children) {
             const rect = child.getBoundingClientRect();
             const styles = getComputedStyle(child);
             const marginTop = parseFloat(styles.marginTop) || 0;
             const marginBottom = parseFloat(styles.marginBottom) || 0;
-            contentHeight += rect.height + marginTop + marginBottom;
+            height += rect.height + marginTop + marginBottom;
         }
-        return Math.max(contentHeight, 220);
+        return Math.max(height, 220);
     }
 
     _applyCentering(skipTransition) {
-        const home = this.chatEl.querySelector('.assistant-home');
-        if (!home) return;
-        const was = home.style.transition;
-        if (skipTransition) home.style.transition = 'none';
-        if (!this.chatEl.classList.contains('assistant-chat-mode')) {
-            const contentHeight = this._measureContentHeight(home);
-            const available = Math.max(this.chatEl.clientHeight, contentHeight);
-            const offset = Math.max(0, (available - contentHeight) / 2);
-            home.style.paddingTop = offset + 'px';
-            home.style.paddingBottom = '0px';
-            home.style.minHeight = '100%';
+        if (!this.heroEl || !this.chatEl) return;
+        const was = this.heroEl.style.transition;
+        if (skipTransition) this.heroEl.style.transition = 'none';
+
+        if (this.chatEl.classList.contains('assistant-chat-mode')) {
+            // Compact mode: small top padding, hero stays at the top.
+            this.heroEl.style.paddingTop = '0.75rem';
+            this.heroEl.style.paddingBottom = '0';
         } else {
-            home.style.paddingTop = '0.5rem';
-            home.style.paddingBottom = '0px';
-            home.style.minHeight = 'auto';
+            // Home mode: vertically center the hero content inside the viewport.
+            const contentHeight = this._measureHeroContentHeight();
+            const available = Math.max(this.chatEl.clientHeight, contentHeight);
+            const offset = Math.max(0, (available - contentHeight) / 2 - 24); // slight optical lift
+            this.heroEl.style.paddingTop = offset + 'px';
+            this.heroEl.style.paddingBottom = '0';
         }
+
         if (skipTransition) {
-            home.offsetHeight;
-            home.style.transition = was;
+            this.heroEl.offsetHeight;
+            this.heroEl.style.transition = was;
         }
     }
 
@@ -307,14 +311,16 @@ class AssistantApp extends AppBase {
         div.innerHTML = `
             <div class="text-sm text-gray-800 leading-relaxed w-full markdown-body">${this._markdown(text)}</div>
         `;
-        this.chatEl.appendChild(div);
+        this.messagesEl.appendChild(div);
+        this._scrollToBottom();
     }
 
     _appendUserMessage(text) {
         const div = document.createElement('div');
         div.className = 'flex items-end justify-end mb-6 user-msg-anchor';
         div.innerHTML = `<div class="bg-gray-50 border border-gray-100 text-gray-900 px-5 py-3.5 rounded-[1.5rem] text-sm max-w-[80%] leading-relaxed">${this._escape(text)}</div>`;
-        this.chatEl.appendChild(div);
+        this.messagesEl.appendChild(div);
+        this._scrollToBottom();
         return div;
     }
 
@@ -331,27 +337,27 @@ class AssistantApp extends AppBase {
                 <span class="thinking-label text-xs font-bold tracking-widest uppercase text-gray-400">${this._escape(label)}</span>
             </div>
         `;
-        this.chatEl.appendChild(wrapper);
+        this.messagesEl.appendChild(wrapper);
         this._scrollToBottom();
         return wrapper;
     }
 
     _updateThinkingLabel(label) {
-        const target = this.chatEl.querySelector('.assistant-thinking-placeholder');
+        const target = this.messagesEl.querySelector('.assistant-thinking-placeholder');
         if (!target) return;
         const labelEl = target.querySelector('.thinking-label');
         if (labelEl) labelEl.textContent = label;
     }
 
     _removeThinkingPlaceholder() {
-        this.chatEl.querySelectorAll('.assistant-thinking-placeholder').forEach((el) => {
+        this.messagesEl.querySelectorAll('.assistant-thinking-placeholder').forEach((el) => {
             if (el.parentNode) el.remove();
         });
     }
 
     _ensureAssistantBubble() {
         // Create a new assistant message bubble if the last one is not an active assistant bubble.
-        const last = this.chatEl.lastElementChild;
+        const last = this.messagesEl.lastElementChild;
         if (last && last.dataset.role === 'assistant' && last.dataset.active === 'true') {
             return last.querySelector('.assistant-bubble-content');
         }
@@ -367,7 +373,7 @@ class AssistantApp extends AppBase {
                 </div>
             </div>
         `;
-        this.chatEl.appendChild(wrapper);
+        this.messagesEl.appendChild(wrapper);
         this._scrollToBottom();
         return wrapper.querySelector('.assistant-bubble-content');
     }
@@ -561,7 +567,7 @@ class AssistantApp extends AppBase {
             stepsList.appendChild(li);
         });
 
-        this.chatEl.appendChild(div);
+        this.messagesEl.appendChild(div);
         this._scrollToBottom();
 
         // Reveal plan steps one by one for a progressive execution feel.
@@ -611,13 +617,13 @@ class AssistantApp extends AppBase {
                 ${resultsHtml || ''}
             </div>
         `;
-        this.chatEl.appendChild(div);
+        this.messagesEl.appendChild(div);
         this._scrollToBottom();
         return div;
     }
 
     _fillSearchCard(query, resultsHtml) {
-        const cards = this.chatEl.querySelectorAll('[data-search-card="true"]');
+        const cards = this.messagesEl.querySelectorAll('[data-search-card="true"]');
         let target = null;
         for (let i = cards.length - 1; i >= 0; i--) {
             const card = cards[i];
