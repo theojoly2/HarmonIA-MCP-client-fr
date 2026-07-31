@@ -842,9 +842,7 @@ class AssistantApp extends AppBase {
                 this.messages.push({ role: 'assistant', content: currentText });
             }
 
-            requestAnimationFrame(() => {
-                this.chatEl.style.paddingBottom = '0px';
-            });
+
         }
     }
 
