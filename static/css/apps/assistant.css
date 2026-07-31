@@ -277,8 +277,8 @@
     border-radius: 1rem;
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
     overflow: hidden;
-    max-width: 100%;
-    margin: 0.75rem 0;
+    max-width: 92%;
+    margin: 0.75rem auto;
 }
 
 .assistant-search-card .assistant-search-results {
@@ -343,6 +343,12 @@
     max-height: 32rem;
     overflow-y: auto;
     padding: 0;
+}
+
+/* Add horizontal padding to the assistant chat container */
+#assistant-chat {
+    padding-left: 1rem;
+    padding-right: 1rem;
 }
 
 .assistant-search-results .result-item {
