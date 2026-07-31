@@ -383,8 +383,8 @@
 
 /* Chat scroll area */
 #assistant-chat {
-    padding-left: 0.75rem;
-    padding-right: 0.75rem;
+    padding-left: 4%;
+    padding-right: 4%;
     padding-bottom: 6rem;
 }
 
@@ -431,7 +431,7 @@
 .assistant-input-area {
     width: 100%;
     max-width: none;
-    padding: 0.75rem 0.75rem 1rem;
+    padding: 0.75rem 4% 1rem;
     position: absolute;
     bottom: 0;
     left: 0;
@@ -449,18 +449,18 @@
     left: 0;
     right: 0;
     width: 100%;
-    padding: 0.75rem 0.75rem 1rem;
+    padding: 0.75rem 4% 1rem;
 }
 
 .assistant-input-wrapper {
     width: 100%;
-    max-width: 42rem;
+    max-width: 92%;
     margin: 0 auto;
     transition: max-width 0.7s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .assistant-input-box-chat .assistant-input-wrapper {
-    max-width: 42rem;
+    max-width: 92%;
 }
 
 .assistant-input-wrapper textarea {
