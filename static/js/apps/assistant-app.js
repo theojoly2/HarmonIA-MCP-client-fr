@@ -40,7 +40,7 @@ class AssistantApp extends AppBase {
                     <div class="assistant-messages" id="assistant-messages"></div>
                 </div>
                 <div class="assistant-input-area p-3 flex-shrink-0" id="assistant-input-area">
-                    <div class="assistant-input-wrapper rounded-2xl border-2 border-gray-300 focus-within:border-black bg-white transition-colors shadow-sm" id="assistant-input-box">
+                    <div class="assistant-input-wrapper max-w-3xl mx-auto rounded-2xl border-2 border-gray-300 focus-within:border-black bg-white transition-colors shadow-sm" id="assistant-input-box">
                         <form id="assistant-form" class="flex flex-col gap-2 p-3">
                             <textarea id="assistant-input" rows="1" autocomplete="off"
                                 placeholder="Interrogez l'assistant sémantique..."
