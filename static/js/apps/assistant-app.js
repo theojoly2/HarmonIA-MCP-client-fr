@@ -61,7 +61,9 @@ class AssistantApp extends AppBase {
         // The active textarea is inside the visible input area (home or bottom).
         this.inputEl = this._activeInput();
         this._bindInputEvents();
-        this._applyCentering(true);
+        // Wait for DOM layout before centering, otherwise clientHeight/bounding rects are 0.
+        requestAnimationFrame(() => requestAnimationFrame(() => this._applyCentering(true)));
+        this._observeResize();
 
         // Bind both forms: the centered home form and the bottom chat form.
         container.querySelectorAll('#assistant-form').forEach((form) => {
@@ -198,7 +200,8 @@ class AssistantApp extends AppBase {
             this.inputArea.style.transition = '';
         }
         this.inputEl = this._activeInput();
-        requestAnimationFrame(() => this._applyCentering(true));
+        // Wait for DOM layout before measuring for centering.
+        requestAnimationFrame(() => requestAnimationFrame(() => this._applyCentering(true)));
     }
 
     _switchToChatMode() {
@@ -258,14 +261,27 @@ class AssistantApp extends AppBase {
             const offset = Math.max(0, (available - contentHeight) / 2);
             home.style.paddingTop = offset + 'px';
             home.style.paddingBottom = '0px';
+            home.style.minHeight = '100%';
         } else {
-            home.style.paddingTop = '1rem';
+            home.style.paddingTop = '0.5rem';
             home.style.paddingBottom = '0px';
+            home.style.minHeight = 'auto';
         }
         if (skipTransition) {
             home.offsetHeight;
             home.style.transition = was;
         }
+    }
+
+    _observeResize() {
+        if (this._resizeObserver) this._resizeObserver.disconnect();
+        if (!this.chatEl || typeof ResizeObserver === 'undefined') return;
+        this._resizeObserver = new ResizeObserver(() => {
+            if (!this.chatEl.classList.contains('assistant-chat-mode')) {
+                this._applyCentering(true);
+            }
+        });
+        this._resizeObserver.observe(this.chatEl);
     }
 
     async _importModel(file) {
@@ -935,6 +951,12 @@ class AssistantApp extends AppBase {
                 buffer = '';
             },
         };
+    }
+
+    unmount() {
+        if (this._resizeObserver) this._resizeObserver.disconnect();
+        this._resizeObserver = null;
+        super.unmount();
     }
 }
 
