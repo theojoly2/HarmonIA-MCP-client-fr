@@ -365,14 +365,14 @@
 }
 
 .assistant-search-header svg {
-    width: 0.9rem;
-    height: 0.9rem;
+    width: 1rem;
+    height: 1rem;
     flex-shrink: 0;
 }
 
 .assistant-search-query {
-    font-size: 0.75rem;
-    font-weight: 600;
+    font-size: 0.9rem;
+    font-weight: 700;
     color: #111827;
     white-space: nowrap;
     overflow: hidden;
