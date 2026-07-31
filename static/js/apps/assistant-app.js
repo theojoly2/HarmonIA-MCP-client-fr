@@ -568,12 +568,14 @@ class AssistantApp extends AppBase {
         const typewriter = this._createTypewriter((chunk) => {
             currentText += chunk;
             if (!currentBubble) {
+                // Remove the thinking placeholder as soon as real text starts so it
+                // does not stay above the final answer.
+                this._appendThinkingPlaceholder(); // removes any existing placeholder
                 this._closeAssistantBubble();
                 currentBubble = this._ensureAssistantBubble();
             }
-            currentBubble.textContent = currentText;
-            // Force layout/paint after each typewriter tick so streaming text is
-            // visible immediately, not batched until the next structural event.
+            // Render markdown progressively so the text looks formatted while streaming.
+            currentBubble.innerHTML = this._markdown(currentText);
             this._forceReflow();
             this.chatEl.scrollTop = this.chatEl.scrollHeight;
         });
