@@ -26,46 +26,27 @@ class AssistantApp extends AppBase {
         this.container = container;
         container.innerHTML = `
             <div class="assistant-app h-full w-full flex flex-col bg-white rounded-[1.25rem] overflow-hidden relative">
-                <div id="assistant-chat" class="flex-1 overflow-y-auto">
-                    <div class="assistant-wrapper" id="assistant-wrapper">
-                        <div class="assistant-hero" id="assistant-hero">
-                            <h1 class="assistant-hero-title text-center">
-                                <span class="assistant-title-glow title-glow">Assistant Sémantique</span>
-                            </h1>
-                            <div class="assistant-hero-input assistant-input-wrapper rounded-2xl border-2 border-gray-300 focus-within:border-black bg-white transition-colors shadow-sm">
-                                <form id="assistant-form" class="flex flex-col gap-2 p-3">
-                                    <textarea id="assistant-input" rows="1" autocomplete="off"
-                                        placeholder="Interrogez l'assistant sémantique..."
-                                        class="w-full resize-none max-h-40 bg-transparent border-none focus:outline-none focus:ring-0 text-sm text-gray-900 placeholder-gray-500 px-1 py-1"></textarea>
-                                    <div class="flex items-center justify-between">
-                                        <button type="button" id="assistant-import-model" class="magic-btn flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl text-gray-500 hover:text-black hover:bg-gray-100 transition-colors" title="Importer un modèle">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                                            </svg>
-                                        </button>
-                                        <button type="submit" class="magic-btn assistant-send-btn flex-shrink-0 w-8 h-8 text-white bg-black hover:bg-gray-800 rounded-xl flex items-center justify-center transition-colors">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19V5M5 12l7-7 7 7"></path>
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                            <div class="assistant-hero-subtitle text-center text-sm text-gray-500 max-w-md mt-6">
-                                Décrivez le modèle que vous souhaitez construire ou posez une question sur vos données.
-                            </div>
-                        </div>
-                        <div class="assistant-messages" id="assistant-messages"></div>
-                    </div>
+                <div class="assistant-header" id="assistant-header">
+                    <h1 class="assistant-header-title text-center">
+                        <span class="assistant-title-glow title-glow">Assistant Sémantique</span>
+                    </h1>
                 </div>
-                <div class="assistant-input-area p-3 flex-shrink-0 hidden" id="assistant-input-area">
+                <div id="assistant-chat" class="flex-1 overflow-y-auto">
+                    <div class="assistant-hero" id="assistant-hero">
+                        <div class="assistant-hero-subtitle text-center text-gray-500 max-w-md">
+                            Décrivez le modèle que vous souhaitez construire ou posez une question sur vos données.
+                        </div>
+                    </div>
+                    <div class="assistant-messages" id="assistant-messages"></div>
+                </div>
+                <div class="assistant-input-area p-3 flex-shrink-0" id="assistant-input-area">
                     <div class="assistant-input-wrapper max-w-3xl mx-auto rounded-2xl border-2 border-gray-300 focus-within:border-black bg-white transition-colors shadow-sm">
-                        <form id="assistant-bottom-form" class="flex flex-col gap-2 p-3">
-                            <textarea id="assistant-bottom-input" rows="1" autocomplete="off"
+                        <form id="assistant-form" class="flex flex-col gap-2 p-3">
+                            <textarea id="assistant-input" rows="1" autocomplete="off"
                                 placeholder="Interrogez l'assistant sémantique..."
-                                class="w-full resize-none max-h-40 bg-transparent border-none focus:outline-none focus:ring-0 text-sm text-gray-900 placeholder-gray-500 px-1 py-1"></textarea>
+                                class="w-full resize-none max-h-40 bg-transparent border-none focus:outline-none focus:ring-0 text-gray-900 placeholder-gray-500 px-1 py-1"></textarea>
                             <div class="flex items-center justify-between">
-                                <button type="button" id="assistant-import-model-bottom" class="magic-btn flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl text-gray-500 hover:text-black hover:bg-gray-100 transition-colors" title="Importer un modèle">
+                                <button type="button" id="assistant-import-model" class="magic-btn flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl text-gray-500 hover:text-black hover:bg-gray-100 transition-colors" title="Importer un modèle">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                                     </svg>
@@ -84,44 +65,37 @@ class AssistantApp extends AppBase {
         `;
 
         this.chatEl = container.querySelector('#assistant-chat');
-        this.wrapperEl = container.querySelector('#assistant-wrapper');
+        this.headerEl = container.querySelector('#assistant-header');
         this.heroEl = container.querySelector('#assistant-hero');
         this.messagesEl = container.querySelector('#assistant-messages');
         this.inputArea = container.querySelector('#assistant-input-area');
         this.fileInput = container.querySelector('#assistant-model-file');
         this.inputEl = container.querySelector('#assistant-input');
-        this.bottomInputEl = container.querySelector('#assistant-bottom-input');
 
         this._bindInputEvents();
         this._observeResize();
 
-        const onSubmit = (textarea) => {
-            const text = textarea.value.trim();
+        const onSubmit = () => {
+            const text = this.inputEl.value.trim();
             if (!text || this.isStreaming) return;
-            textarea.value = '';
-            textarea.style.height = 'auto';
+            this.inputEl.value = '';
+            this.inputEl.style.height = 'auto';
             this._switchToChatMode();
             this._send(text);
         };
 
         container.querySelector('#assistant-form').addEventListener('submit', (e) => {
             e.preventDefault();
-            onSubmit(this.inputEl);
-        });
-        container.querySelector('#assistant-bottom-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            onSubmit(this.bottomInputEl);
+            onSubmit();
         });
 
         if (window.GlowEffects && typeof window.GlowEffects.scanAndBind === 'function') {
             window.GlowEffects.scanAndBind(container);
         }
 
-        const importBtn = container.querySelector('#assistant-import-model');
-        const importBtnBottom = container.querySelector('#assistant-import-model-bottom');
-        const doImport = () => this.fileInput.click();
-        if (importBtn) importBtn.addEventListener('click', doImport);
-        if (importBtnBottom) importBtnBottom.addEventListener('click', doImport);
+        container.querySelector('#assistant-import-model').addEventListener('click', () => {
+            this.fileInput.click();
+        });
 
         this.fileInput.addEventListener('change', (e) => {
             const file = e.target.files?.[0];
@@ -150,18 +124,16 @@ class AssistantApp extends AppBase {
     }
 
     _bindInputEvents() {
-        [this.inputEl, this.bottomInputEl].forEach((textarea) => {
-            if (!textarea) return;
-            textarea.addEventListener('input', () => {
-                textarea.style.height = 'auto';
-                textarea.style.height = Math.min(textarea.scrollHeight, 160) + 'px';
-            });
-            textarea.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    textarea.closest('form')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-                }
-            });
+        if (!this.inputEl) return;
+        this.inputEl.addEventListener('input', () => {
+            this.inputEl.style.height = 'auto';
+            this.inputEl.style.height = Math.min(this.inputEl.scrollHeight, 160) + 'px';
+        });
+        this.inputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                this.inputEl.closest('form')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+            }
         });
     }
 
@@ -191,20 +163,11 @@ class AssistantApp extends AppBase {
         this.modelName = '';
         this.messages = [];
         this.messagesEl.innerHTML = '';
-        this.heroEl.classList.remove('assistant-hero-compact');
-        this.heroEl.classList.add('assistant-hero-home');
         this.chatEl.classList.remove('assistant-chat-mode');
-        this.wrapperEl.classList.remove('assistant-wrapper-chat');
-        if (this.inputArea) {
-            this.inputArea.classList.add('hidden');
-            this.inputArea.style.opacity = '';
-            this.inputArea.style.transform = '';
-            this.inputArea.style.transition = '';
-        }
+        this.headerEl.classList.remove('assistant-header-compact');
+        this.heroEl.classList.remove('assistant-hero-hidden');
         this.inputEl.value = '';
         this.inputEl.style.height = 'auto';
-        this.bottomInputEl.value = '';
-        this.bottomInputEl.style.height = 'auto';
         // Reset centering and re-measure after layout.
         this.heroEl.style.paddingTop = '';
         requestAnimationFrame(() => {
@@ -214,30 +177,10 @@ class AssistantApp extends AppBase {
 
     _switchToChatMode() {
         const hadFocus = document.activeElement === this.inputEl;
-        this.heroEl.classList.remove('assistant-hero-home');
-        this.heroEl.classList.add('assistant-hero-compact');
         this.chatEl.classList.add('assistant-chat-mode');
-        this.wrapperEl.classList.add('assistant-wrapper-chat');
-
-        this._applyCentering();
-
-        if (this.inputArea) {
-            this.inputArea.classList.remove('hidden');
-            this.inputArea.style.opacity = '0';
-            this.inputArea.style.transform = 'translateY(20px)';
-            requestAnimationFrame(() => {
-                this.inputArea.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
-                this.inputArea.style.opacity = '1';
-                this.inputArea.style.transform = 'translateY(0)';
-                setTimeout(() => {
-                    this.inputArea.style.transition = '';
-                    this.inputArea.style.transform = '';
-                    if (hadFocus && this.bottomInputEl) {
-                        this.bottomInputEl.focus();
-                    }
-                }, 520);
-            });
-        }
+        this.headerEl.classList.add('assistant-header-compact');
+        this.heroEl.classList.add('assistant-hero-hidden');
+        this.inputEl.focus();
     }
 
     _measureHeroContentHeight() {
@@ -259,12 +202,10 @@ class AssistantApp extends AppBase {
         if (skipTransition) this.heroEl.style.transition = 'none';
 
         if (this.chatEl.classList.contains('assistant-chat-mode')) {
-            // Compact mode: small top padding, hero stays at the top.
-            this.heroEl.style.paddingTop = '0.5rem';
+            this.heroEl.style.paddingTop = '0';
             this.heroEl.style.paddingBottom = '0';
         } else {
             // Home mode: vertically center the hero content inside the app viewport.
-            // Use the app container height (like Modeler/Search) for a stable measurement.
             const contentHeight = this._measureHeroContentHeight();
             const available = Math.max(this.container.clientHeight, contentHeight);
             const offset = Math.max(0, (available - contentHeight) / 2);
