@@ -98,7 +98,8 @@
     border: 1px solid #e5e7eb;
     border-radius: 0.75rem;
     overflow: hidden;
-    max-width: 100%;
+    max-width: 92%;
+    margin: 0.75rem auto;
     transition: border-color 0.2s;
 }
 
@@ -172,7 +173,8 @@
     border: 1px solid #93c5fd;
     border-radius: 0.75rem;
     overflow: hidden;
-    max-width: 100%;
+    max-width: 92%;
+    margin: 0.75rem auto;
     box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.08);
 }
 
@@ -347,8 +349,8 @@
 
 /* Add horizontal padding to the assistant chat container */
 #assistant-chat {
-    padding-left: 1rem;
-    padding-right: 1rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
 }
 
 .assistant-search-results .result-item {
