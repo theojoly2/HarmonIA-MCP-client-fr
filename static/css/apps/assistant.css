@@ -329,23 +329,30 @@
 }
 
 .assistant-search-card .assistant-search-results .result-item h3 {
-    font-size: 0.75rem;
+    font-size: 0.9rem;
     font-weight: 700;
 }
 
 .assistant-search-card .assistant-search-results .result-item .markdown-body {
-    font-size: 0.75rem;
+    font-size: 0.9rem;
 }
 
 .assistant-search-card .assistant-search-results .result-item .markdown-body p,
 .assistant-search-card .assistant-search-results .result-item .markdown-body li,
 .assistant-search-card .assistant-search-results .result-item .markdown-body strong,
 .assistant-search-card .assistant-search-results .result-item .markdown-body em {
-    font-size: 0.75rem;
+    font-size: 0.9rem;
 }
 
 .assistant-search-card .assistant-search-results .result-item .flex {
     font-size: 0.75rem;
+}
+
+.assistant-search-card #results-header {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
 }
 
 .assistant-search-header {
