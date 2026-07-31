@@ -82,7 +82,7 @@ def render_results(results_data: list, query: str = "") -> dict:
         </div>
         """
     elif query and results_data:
-            results_html = f'<p id="results-header" class="font-bold text-gray-500 mb-8 border-b-2 border-gray-200 pb-4">{len(results_data)} RÉSULTAT(S)</p>'
+        results_html = f'<p id="results-header" class="font-bold text-gray-500 mb-8 border-b-2 border-gray-200 pb-4">{len(results_data)} RÉSULTAT(S)</p>'
         for i, row in enumerate(results_data):
             if not isinstance(row, (list, tuple)) or len(row) < 6:
                 continue
