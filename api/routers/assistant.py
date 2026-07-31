@@ -360,8 +360,13 @@ async def assistant_stream_generator(
                         display_payload: dict[str, Any] | None = None
                         if name == "retrieve_documents":
                             query_terms = arguments.get("search_terms", "")
+                            requested_limit = arguments.get("limit", 20)
                             try:
-                                search_rows = await fetch_search(query_terms, [], 20)
+                                limit = int(requested_limit) if isinstance(requested_limit, (int, float, str)) and str(requested_limit).isdigit() else 20
+                            except Exception:
+                                limit = 20
+                            try:
+                                search_rows = await fetch_search(query_terms, [], limit)
                                 if search_rows == "TIMEOUT":
                                     search_rows = []
                                 rendered = render_results(search_rows, query=query_terms)
