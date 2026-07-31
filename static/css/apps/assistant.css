@@ -519,13 +519,15 @@
     max-width: calc(100% - 2rem);
     margin: 0 auto;
     padding: 0;
-    transition: width 0.7s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.7s cubic-bezier(0.4, 0, 0.2, 1), padding 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateX(-0.5rem);
+    transition: width 0.7s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.7s cubic-bezier(0.4, 0, 0.2, 1), padding 0.7s cubic-bezier(0.4, 0, 0.2, 1), transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .assistant-input-box-chat .assistant-input-wrapper {
     width: 40rem;
     max-width: calc(100% - 2rem);
     padding: 0;
+    transform: translateX(-0.5rem);
 }
 
 .assistant-input-wrapper form {
