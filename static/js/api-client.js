@@ -214,11 +214,13 @@ const ApiClient = (() => {
             } catch (err) {
                 console.error("Assistant event handler error", err, ev);
             }
-            // At the end of an assistant loop we need a full paint so the user sees
-            // the whole loop result before the next loop starts.
-            if (ev.kind === "loop_done" || ev.kind === "assistant_done" || ev.kind === "tool_result") {
+            // Make structural events visible immediately. For text we let the
+            // typewriter handle the pace, but for every milestone event we force a
+            // layout + paint so the user sees the tool card / status before the
+            // next chunk arrives.
+            if (ev.kind === "loop_done" || ev.kind === "assistant_done" || ev.kind === "tool_result" || ev.kind === "tool_start" || ev.kind === "assistant_tool_calls") {
                 await forcePaint();
-            } else if (ev.kind !== "assistant_text" && ev.kind !== "thinking") {
+            } else {
                 await new Promise((resolve) => requestAnimationFrame(resolve));
             }
         };

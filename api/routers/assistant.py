@@ -280,8 +280,9 @@ async def assistant_stream_generator(
                 print(f"[Assistant loop {loop_count}/{max_loops}] start, plan_used={plan_already_used}, elapsed={elapsed:.1f}s")
 
                 yield _event("thinking", {})
-                # Give the event loop a chance to flush the thinking event to the client.
-                await asyncio.sleep(0)
+                # Give the HTTP layer time to flush the event to the client before the
+                # next event is produced, so each assistant loop/tool step is visible.
+                await asyncio.sleep(0.03)
 
                 llm_messages = [
                     {"role": msg["role"], "content": str(msg.get("content", ""))}
@@ -304,12 +305,10 @@ async def assistant_stream_generator(
                         streamed_any_text = True
                         content += str(payload)
                         yield _event("assistant_text", {"content": str(payload)})
-                        await asyncio.sleep(0)
                     elif stage == "done":
                         content = payload.get("content", "") or ""
                         tool_calls = _normalize_tool_calls(payload.get("tool_calls", []))
                         streamed_any_text = bool(payload.get("streamed_any_text", False))
-                        await asyncio.sleep(0)
 
                 if not content and not tool_calls:
                     yield _event("assistant_done", {"content": ""})
@@ -318,7 +317,6 @@ async def assistant_stream_generator(
                 if tool_calls:
                     history.add_assistant_message(content, tool_calls=tool_calls)
                     yield _event("assistant_tool_calls", {"tool_calls": tool_calls})
-                    await asyncio.sleep(0)
 
                     for tool_call in tool_calls:
                         function = tool_call["function"]
@@ -329,7 +327,6 @@ async def assistant_stream_generator(
                             arguments = {}
 
                         yield _event("tool_start", {"name": name, "arguments": arguments})
-                        await asyncio.sleep(0)
 
                         tool_message = await mcp_client.call_tool(name, arguments)
                         parsed_tool = _safe_json_loads(tool_message) or {}
@@ -362,7 +359,6 @@ async def assistant_stream_generator(
 
 
                         yield _event("tool_result", {"name": name, "result": parsed_tool, "display": display_payload})
-                        await asyncio.sleep(0)
 
                         history.add_tool_message(
                             content=tool_message,
@@ -389,7 +385,6 @@ async def assistant_stream_generator(
                     # After processing all tool calls, signal loop completion so the UI
                     # can render this iteration before the next LLM call starts.
                     yield _event("loop_done", {"loop": loop_count})
-                    await asyncio.sleep(0)
                     continue
 
                 else:
@@ -420,7 +415,7 @@ async def stream_assistant_response(
         media_type="text/event-stream",
         headers={
             "X-Accel-Buffering": "no",
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
             "Connection": "keep-alive",
         },
     )

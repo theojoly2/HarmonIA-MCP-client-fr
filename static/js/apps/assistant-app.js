@@ -564,6 +564,9 @@ class AssistantApp extends AppBase {
                 currentBubble = this._ensureAssistantBubble();
             }
             currentBubble.textContent = currentText;
+            // Force layout/paint after each typewriter tick so streaming text is
+            // visible immediately, not batched until the next structural event.
+            this._forceReflow();
             this.chatEl.scrollTop = this.chatEl.scrollHeight;
         });
 
@@ -697,31 +700,37 @@ class AssistantApp extends AppBase {
 
     _createTypewriter(onChunk) {
         let buffer = '';
-        let interval = null;
-        const SPEED_MS = 20;
+        let rafId = null;
+        let running = false;
         const CHUNK_SIZE = 3;
 
-        const tick = () => {
-            if (buffer === '') {
-                clearInterval(interval);
-                interval = null;
-                return;
-            }
-            const chunk = buffer.slice(0, CHUNK_SIZE);
-            buffer = buffer.slice(CHUNK_SIZE);
-            onChunk(chunk);
+        const schedule = () => {
+            if (running || rafId) return;
+            running = true;
+            rafId = requestAnimationFrame(() => {
+                // One paint per frame: render a small chunk then schedule the next.
+                const chunk = buffer.slice(0, CHUNK_SIZE);
+                if (chunk) {
+                    buffer = buffer.slice(CHUNK_SIZE);
+                    onChunk(chunk);
+                }
+                rafId = null;
+                running = false;
+                if (buffer !== '') schedule();
+            });
         };
 
         return {
             append: (text) => {
                 buffer += text;
-                if (!interval) interval = setInterval(tick, SPEED_MS);
+                schedule();
             },
             flush: () => {
-                if (interval) {
-                    clearInterval(interval);
-                    interval = null;
+                if (rafId) {
+                    cancelAnimationFrame(rafId);
+                    rafId = null;
                 }
+                running = false;
                 while (buffer !== '') {
                     const chunk = buffer.slice(0, CHUNK_SIZE);
                     buffer = buffer.slice(CHUNK_SIZE);
@@ -729,10 +738,11 @@ class AssistantApp extends AppBase {
                 }
             },
             stop: () => {
-                if (interval) {
-                    clearInterval(interval);
-                    interval = null;
+                if (rafId) {
+                    cancelAnimationFrame(rafId);
+                    rafId = null;
                 }
+                running = false;
                 buffer = '';
             },
         };
