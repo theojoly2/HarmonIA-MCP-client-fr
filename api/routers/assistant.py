@@ -21,6 +21,7 @@ from api.dependencies import _LLM_MODEL, llm_client, render_results
 from api.routers.auth import require_user
 from api.services.assistant_history import AssistantHistory
 from api.services.assistant_mcp_client import AssistantMCPClient
+from api.services.mcp_service import fetch_search
 
 router = APIRouter(prefix="/api/assistant", tags=["assistant"])
 
@@ -360,19 +361,9 @@ async def assistant_stream_generator(
                         if name == "retrieve_documents":
                             query_terms = arguments.get("search_terms", "")
                             try:
-                                raw_rows: Any = None
-                                if isinstance(parsed_tool, list):
-                                    raw_rows = parsed_tool
-                                elif isinstance(parsed_tool, dict):
-                                    raw_rows = parsed_tool.get("result") or parsed_tool.get("tool_results") or parsed_tool.get("results")
-                                if not isinstance(raw_rows, list):
-                                    raw_rows = []
-                                search_rows: list[tuple[Any, ...]] = []
-                                for r in raw_rows:
-                                    if isinstance(r, (list, tuple)) and len(r) >= 3:
-                                        search_rows.append(tuple(r))
-                                # Use the same renderer as the Search tab so the assistant
-                                # search card has identical features (open file, preview, chat).
+                                search_rows = await fetch_search(query_terms, [], 20)
+                                if search_rows == "TIMEOUT":
+                                    search_rows = []
                                 rendered = render_results(search_rows, query=query_terms)
                                 display_payload = {
                                     "type": "search",
