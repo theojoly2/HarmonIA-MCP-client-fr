@@ -541,10 +541,13 @@ class AssistantApp extends AppBase {
         // because a new user message begins a new assistant turn.
         this._hideAllSparkles();
 
-        const placeholder = this._appendThinkingPlaceholder();
+        let placeholder = this._appendThinkingPlaceholder();
         const placeholderContent = placeholder.querySelector('.assistant-bubble-content');
         const loadingInterval = setInterval(() => {
-            const avatar = placeholder.querySelector('.ai-avatar-wrapper');
+            // Always target the latest placeholder so the sparkle keeps beating
+            // across phase changes (text -> tool -> new text, etc.).
+            const latest = this.chatEl.querySelector('.assistant-thinking-placeholder');
+            const avatar = latest?.querySelector('.ai-avatar-wrapper');
             if (avatar) {
                 avatar.classList.remove('trigger-magic');
                 void avatar.offsetWidth;
@@ -586,8 +589,9 @@ class AssistantApp extends AppBase {
         };
 
         const removePlaceholder = () => {
-            if (placeholder && placeholder.parentNode) {
-                placeholder.remove();
+            const latest = this.chatEl.querySelector('.assistant-thinking-placeholder');
+            if (latest && latest.parentNode) {
+                latest.remove();
                 this._forceReflow();
             }
         };
@@ -604,8 +608,11 @@ class AssistantApp extends AppBase {
                     }
 
                     if (event.kind === 'thinking') {
-                        // Keep the placeholder alive but update its label before the next loop.
-                        this._updateThinkingLabel('Réflexion...');
+                        // Each thinking event starts a new reasoning step. Remove any
+                        // previous placeholder and create a fresh one so stale sparkles
+                        // from earlier phases do not linger on screen.
+                        removePlaceholder();
+                        placeholder = this._appendThinkingPlaceholder('Réflexion...');
                         return;
                     }
 
@@ -624,14 +631,16 @@ class AssistantApp extends AppBase {
 
                     if (event.kind === 'tool_start') {
                         resetBubble();
-                        // Show a transient status label while the tool runs.
-                        this._appendThinkingPlaceholder(this._toolStatusLabel(event.name));
+                        // Render the tool card/search card BEFORE the placeholder so the
+                        // sparkle/"Réflexion" label stays at the bottom of the current step.
                         if (event.name === 'retrieve_documents') {
                             this._appendSearchCard(event.arguments?.search_terms || '', null);
                         } else if (event.name !== 'plan_workflow_with_tools') {
                             const card = this._createToolCard(event.name, event.arguments || {});
                             this._markToolRunning(card, true);
                         }
+                        // Show a transient status label while the tool runs.
+                        placeholder = this._appendThinkingPlaceholder(this._toolStatusLabel(event.name));
                         this.messages.push({ role: 'tool_start', name: event.name, arguments: event.arguments });
                         return;
                     }
