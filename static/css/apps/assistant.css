@@ -329,16 +329,16 @@
 }
 
 .assistant-search-card .assistant-search-results .result-item h3 {
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: 700;
 }
 
 .assistant-search-card .assistant-search-results .result-item .markdown-body {
-    font-size: 1rem;
+    font-size: 0.9rem;
 }
 
 .assistant-search-card .assistant-search-results .result-item .flex {
-    font-size: 0.875rem;
+    font-size: 0.75rem;
 }
 
 .assistant-search-header {
@@ -351,7 +351,7 @@
 }
 
 .assistant-search-query {
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: 600;
     color: #111827;
     white-space: nowrap;
@@ -469,7 +469,7 @@
 .assistant-input-area {
     width: 100%;
     max-width: none;
-    padding: 0 0 0.5rem;
+    padding: 0 0 0.35rem;
     position: absolute;
     bottom: 0;
     left: 0;
@@ -489,7 +489,7 @@
     left: 0;
     right: 0;
     width: 100%;
-    padding: 0 0 0.5rem;
+    padding: 0 0 0.35rem;
     display: flex;
     justify-content: center;
 }
@@ -515,7 +515,9 @@
     min-height: 1.5rem;
     field-sizing: content;
     font-size: clamp(0.75rem, 1.1vw, 1rem);
-    padding: 0.75rem clamp(3.5rem, 7vw, 5.5rem) 0.75rem clamp(0.875rem, 1.8vw, 1.5rem);
+    padding: 0.55rem clamp(3.25rem, 6.5vw, 5rem) 0.55rem clamp(0.75rem, 1.5vw, 1.25rem);
+    margin: 0;
+    border-radius: 0.75rem;
 }
 
 .assistant-input-wrapper textarea::-webkit-scrollbar {
