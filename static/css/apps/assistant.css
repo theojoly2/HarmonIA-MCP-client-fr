@@ -515,7 +515,7 @@
 }
 
 .assistant-input-wrapper {
-    width: 41rem;
+    width: 40rem;
     max-width: calc(100% - 2rem);
     margin: 0 auto;
     padding: 0;
@@ -523,7 +523,7 @@
 }
 
 .assistant-input-box-chat .assistant-input-wrapper {
-    width: 41rem;
+    width: 40rem;
     max-width: calc(100% - 2rem);
     padding: 0;
 }
