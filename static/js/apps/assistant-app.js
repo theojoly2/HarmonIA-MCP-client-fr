@@ -145,6 +145,10 @@ class AssistantApp extends AppBase {
     }
 
     _appendThinkingPlaceholder(label = 'Réflexion...') {
+        // Remove any previous thinking placeholder first so we never stack them.
+        this.chatEl.querySelectorAll('.assistant-thinking-placeholder').forEach((el) => {
+            if (el.parentNode) el.remove();
+        });
         const wrapper = document.createElement('div');
         wrapper.className = 'flex flex-col items-start gap-3 mb-6 assistant-thinking-placeholder';
         wrapper.innerHTML = `
@@ -546,7 +550,8 @@ class AssistantApp extends AppBase {
         const loadingInterval = setInterval(() => {
             // Always target the latest placeholder so the sparkle keeps beating
             // across phase changes (text -> tool -> new text, etc.).
-            const latest = this.chatEl.querySelector('.assistant-thinking-placeholder');
+            const placeholders = Array.from(this.chatEl.querySelectorAll('.assistant-thinking-placeholder'));
+            const latest = placeholders.length ? placeholders[placeholders.length - 1] : null;
             const avatar = latest?.querySelector('.ai-avatar-wrapper');
             if (avatar) {
                 avatar.classList.remove('trigger-magic');
@@ -588,13 +593,7 @@ class AssistantApp extends AppBase {
             this._closeAssistantBubble();
         };
 
-        const removePlaceholder = () => {
-            const latest = this.chatEl.querySelector('.assistant-thinking-placeholder');
-            if (latest && latest.parentNode) {
-                latest.remove();
-                this._forceReflow();
-            }
-        };
+
 
         try {
             await ApiClient.streamAssistant(
@@ -608,15 +607,12 @@ class AssistantApp extends AppBase {
                     }
 
                     if (event.kind === 'thinking') {
-                        // Each thinking event starts a new reasoning step. Remove any
-                        // previous placeholder and create a fresh one so stale sparkles
-                        // from earlier phases do not linger on screen.
-                        removePlaceholder();
+                        // Each thinking event starts a new reasoning step. The helper
+                        // removes any previous placeholder before creating a fresh one,
+                        // so stale sparkles from earlier phases do not linger on screen.
                         placeholder = this._appendThinkingPlaceholder('Réflexion...');
                         return;
                     }
-
-                    removePlaceholder();
 
                     if (event.kind === 'assistant_text') {
                         typewriter.append(event.content || '');
@@ -639,7 +635,8 @@ class AssistantApp extends AppBase {
                             const card = this._createToolCard(event.name, event.arguments || {});
                             this._markToolRunning(card, true);
                         }
-                        // Show a transient status label while the tool runs.
+                        // Show a transient status label while the tool runs. The helper
+                        // removes any previous placeholder first.
                         placeholder = this._appendThinkingPlaceholder(this._toolStatusLabel(event.name));
                         this.messages.push({ role: 'tool_start', name: event.name, arguments: event.arguments });
                         return;
@@ -687,8 +684,7 @@ class AssistantApp extends AppBase {
 
         } catch (err) {
             console.error('Assistant stream error', err);
-            removePlaceholder();
-            typewriter.flush();
+            this._appendThinkingPlaceholder(); // ensures any previous one is removed first
             const bubble = this._ensureAssistantBubble();
             bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(err.message)}</em>`;
         } finally {
