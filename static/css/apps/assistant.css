@@ -64,18 +64,27 @@
 .assistant-tool-calls {
     width: 100%;
     max-width: 42rem;
-    margin-left: auto;
-    margin-right: auto;
+}
+
+.assistant-bubble {
+    display: flex;
+    flex-direction: column;
 }
 
 .assistant-bubble-user {
-    margin-left: auto;
-    margin-right: 0;
+    align-items: flex-end;
 }
 
 .assistant-bubble-assistant {
-    margin-left: 0;
-    margin-right: auto;
+    align-items: flex-start;
+}
+
+.assistant-bubble-user > .assistant-bubble-content {
+    max-width: 80%;
+}
+
+.assistant-bubble-assistant > .assistant-bubble-content {
+    width: 100%;
 }
 
 /* === Tool calls summary === */
@@ -412,8 +421,8 @@
 
 /* Chat scroll area */
 #assistant-chat {
-    padding-left: max(4%, calc((100% - 42rem) / 2));
-    padding-right: max(4%, calc((100% - 42rem) / 2));
+    padding-left: max(1rem, calc((100% - 42rem) / 2));
+    padding-right: max(1rem, calc((100% - 42rem) / 2));
     padding-bottom: 6rem;
 }
 
@@ -557,7 +566,6 @@
     padding: 0.75rem 1rem;
     border-radius: 1.25rem;
     display: inline-block;
-    max-width: 100%;
 }
 
 .assistant-messages .markdown-body {
