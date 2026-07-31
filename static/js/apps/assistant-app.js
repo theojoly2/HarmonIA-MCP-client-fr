@@ -144,7 +144,7 @@ class AssistantApp extends AppBase {
         return div;
     }
 
-    _appendThinkingPlaceholder() {
+    _appendThinkingPlaceholder(label = 'Réflexion...') {
         const wrapper = document.createElement('div');
         wrapper.className = 'flex flex-col items-start gap-3 mb-6 assistant-thinking-placeholder';
         wrapper.innerHTML = `
@@ -153,12 +153,20 @@ class AssistantApp extends AppBase {
                 <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic">
                     ${this._sparkleSvg()}
                 </div>
-                <span class="thinking-label text-xs font-bold tracking-widest uppercase text-gray-400">Réflexion...</span>
+                <span class="thinking-label text-xs font-bold tracking-widest uppercase text-gray-400">${this._escape(label)}</span>
             </div>
         `;
         this.chatEl.appendChild(wrapper);
         this._scrollToBottom();
         return wrapper;
+    }
+
+    _updateThinkingLabel(label) {
+        const placeholders = this.chatEl.querySelectorAll('.assistant-thinking-placeholder');
+        if (!placeholders.length) return;
+        const target = placeholders[placeholders.length - 1];
+        const labelEl = target.querySelector('.thinking-label');
+        if (labelEl) labelEl.textContent = label;
     }
 
     _ensureAssistantBubble() {
@@ -490,6 +498,18 @@ class AssistantApp extends AppBase {
         return this._escape(text).replace(/\n/g, '<br>');
     }
 
+    _toolStatusLabel(name) {
+        const labels = {
+            plan_workflow_with_tools: 'Planification en cours...',
+            retrieve_documents: 'Recherche de documents...',
+            add_class: 'Création de la classe...',
+            add_attribute: "Ajout d'un attribut...",
+            add_connector: 'Création de la relation...',
+            style_guide_check: 'Vérification du style...',
+        };
+        return labels[name] || `${name}...`;
+    }
+
     _toolSummary(result) {
         if (!result || typeof result !== 'object') return '';
         const toolResults = result.tool_results;
@@ -583,6 +603,8 @@ class AssistantApp extends AppBase {
                     removePlaceholder();
 
                     if (event.kind === 'thinking') {
+                        // Keep the placeholder alive but update its label before the next loop.
+                        this._updateThinkingLabel('Réflexion...');
                         return;
                     }
 
@@ -599,6 +621,8 @@ class AssistantApp extends AppBase {
 
                     if (event.kind === 'tool_start') {
                         resetBubble();
+                        // Show a transient status label while the tool runs.
+                        this._appendThinkingPlaceholder(this._toolStatusLabel(event.name));
                         if (event.name === 'retrieve_documents') {
                             this._appendSearchCard(event.arguments?.search_terms || '', null);
                         } else if (event.name !== 'plan_workflow_with_tools') {
