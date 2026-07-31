@@ -145,10 +145,7 @@ class AssistantApp extends AppBase {
     }
 
     _appendThinkingPlaceholder(label = 'Réflexion...') {
-        // Remove any previous thinking placeholder first so we never stack them.
-        this.chatEl.querySelectorAll('.assistant-thinking-placeholder').forEach((el) => {
-            if (el.parentNode) el.remove();
-        });
+        this._removeThinkingPlaceholder();
         const wrapper = document.createElement('div');
         wrapper.className = 'flex flex-col items-start gap-3 mb-6 assistant-thinking-placeholder';
         wrapper.innerHTML = `
@@ -170,6 +167,12 @@ class AssistantApp extends AppBase {
         if (!target) return;
         const labelEl = target.querySelector('.thinking-label');
         if (labelEl) labelEl.textContent = label;
+    }
+
+    _removeThinkingPlaceholder() {
+        this.chatEl.querySelectorAll('.assistant-thinking-placeholder').forEach((el) => {
+            if (el.parentNode) el.remove();
+        });
     }
 
     _ensureAssistantBubble() {
@@ -570,14 +573,13 @@ class AssistantApp extends AppBase {
             if (!currentBubble) {
                 // Remove the thinking placeholder as soon as real text starts so it
                 // does not stay above the final answer.
-                this._appendThinkingPlaceholder(); // removes any existing placeholder
+                this._removeThinkingPlaceholder();
                 this._closeAssistantBubble();
                 currentBubble = this._ensureAssistantBubble();
             }
             // Render markdown progressively so the text looks formatted while streaming.
             currentBubble.innerHTML = this._markdown(currentText);
             this._forceReflow();
-            this.chatEl.scrollTop = this.chatEl.scrollHeight;
         });
 
         const finalizeText = () => {
@@ -612,6 +614,7 @@ class AssistantApp extends AppBase {
                         // Each thinking event starts a new reasoning step. The helper
                         // removes any previous placeholder before creating a fresh one,
                         // so stale sparkles from earlier phases do not linger on screen.
+                        this._removeThinkingPlaceholder();
                         placeholder = this._appendThinkingPlaceholder('Réflexion...');
                         return;
                     }
