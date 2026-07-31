@@ -241,7 +241,7 @@ class AssistantApp extends AppBase {
     }
 
     _measureHeroContentHeight() {
-        if (!this.heroEl) return 220;
+        if (!this.heroEl) return 360;
         let height = 0;
         for (const child of this.heroEl.children) {
             const rect = child.getBoundingClientRect();
@@ -250,23 +250,24 @@ class AssistantApp extends AppBase {
             const marginBottom = parseFloat(styles.marginBottom) || 0;
             height += rect.height + marginTop + marginBottom;
         }
-        return Math.max(height, 220);
+        return Math.max(height, 360);
     }
 
     _applyCentering(skipTransition) {
-        if (!this.heroEl || !this.chatEl) return;
+        if (!this.heroEl || !this.container) return;
         const was = this.heroEl.style.transition;
         if (skipTransition) this.heroEl.style.transition = 'none';
 
         if (this.chatEl.classList.contains('assistant-chat-mode')) {
             // Compact mode: small top padding, hero stays at the top.
-            this.heroEl.style.paddingTop = '0.75rem';
+            this.heroEl.style.paddingTop = '0.5rem';
             this.heroEl.style.paddingBottom = '0';
         } else {
-            // Home mode: vertically center the hero content inside the viewport.
+            // Home mode: vertically center the hero content inside the app viewport.
+            // Use the app container height (like Modeler/Search) for a stable measurement.
             const contentHeight = this._measureHeroContentHeight();
-            const available = Math.max(this.chatEl.clientHeight, contentHeight);
-            const offset = Math.max(0, (available - contentHeight) / 2 - 24); // slight optical lift
+            const available = Math.max(this.container.clientHeight, contentHeight);
+            const offset = Math.max(0, (available - contentHeight) / 2);
             this.heroEl.style.paddingTop = offset + 'px';
             this.heroEl.style.paddingBottom = '0';
         }
@@ -279,13 +280,13 @@ class AssistantApp extends AppBase {
 
     _observeResize() {
         if (this._resizeObserver) this._resizeObserver.disconnect();
-        if (!this.chatEl || typeof ResizeObserver === 'undefined') return;
+        if (!this.container || typeof ResizeObserver === 'undefined') return;
         this._resizeObserver = new ResizeObserver(() => {
             if (!this.chatEl.classList.contains('assistant-chat-mode')) {
                 this._applyCentering(true);
             }
         });
-        this._resizeObserver.observe(this.chatEl);
+        this._resizeObserver.observe(this.container);
     }
 
     async _importModel(file) {
