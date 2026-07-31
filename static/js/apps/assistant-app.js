@@ -743,7 +743,7 @@ class AssistantApp extends AppBase {
                             finalizeText();
                         }
                         this._closeAssistantBubble();
-                        this._hideAllSparkles({ keepLast: true });
+                        this._hideAllSparkles();
                         return;
                     }
 
@@ -769,8 +769,8 @@ class AssistantApp extends AppBase {
             this.isStreaming = false;
             this._removePlaceholder();
             this._closeAssistantBubble();
-            // Keep the last sparkle visible at the bottom of the generated answer.
-            this._hideAllSparkles({ keepLast: true });
+            // Stop the sparkle animation once generation is complete.
+            this._hideAllSparkles();
 
             if (currentText) {
                 this.messages.push({ role: 'assistant', content: currentText });
