@@ -17,7 +17,7 @@ from pydantic import BaseModel
 
 from openai.types.chat import ChatCompletionSystemMessageParam
 
-from api.dependencies import _LLM_MODEL, llm_client
+from api.dependencies import _LLM_MODEL, llm_client, render_results
 from api.routers.auth import require_user
 from api.services.assistant_history import AssistantHistory
 from api.services.assistant_mcp_client import AssistantMCPClient
