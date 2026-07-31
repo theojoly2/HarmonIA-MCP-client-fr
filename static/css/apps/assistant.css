@@ -347,7 +347,7 @@
     padding: 0;
 }
 
-/* Sticky header at the top of the assistant app */
+/* Sticky header */
 .assistant-header {
     position: sticky;
     top: 0;
@@ -361,14 +361,14 @@
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(4px);
     border-bottom: 1px solid transparent;
-    transition: padding 0.35s ease, border-color 0.35s ease;
+    transition: padding 0.55s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.35s ease;
     flex-shrink: 0;
 }
 
 .assistant-header-title {
     margin: 0;
     font-size: clamp(1.25rem, 2.5vw, 2.25rem);
-    transition: font-size 0.35s ease;
+    transition: font-size 0.55s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .assistant-header-compact {
@@ -394,6 +394,7 @@
     align-items: center;
     justify-content: flex-start;
     transition: padding-top 0.7s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.45s ease;
+    min-height: 100%;
 }
 
 .assistant-hero-hidden {
@@ -437,37 +438,36 @@
     right: 0;
     background: transparent;
     border-top: none;
-    will-change: opacity, transform;
+    will-change: top, left, right, width, transform;
+    transition: top 0.7s cubic-bezier(0.4, 0, 0.2, 1), left 0.7s cubic-bezier(0.4, 0, 0.2, 1), right 0.7s cubic-bezier(0.4, 0, 0.2, 1), width 0.7s cubic-bezier(0.4, 0, 0.2, 1), padding 0.7s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.assistant-input-area.hidden {
-    display: none;
+.assistant-input-area-chat {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    padding: 0.75rem 0.75rem 1rem;
 }
 
 .assistant-input-wrapper {
     width: 100%;
     max-width: 42rem;
     margin: 0 auto;
+    transition: max-width 0.7s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.assistant-input-wrapper form {
-    position: relative;
+.assistant-input-box-chat .assistant-input-wrapper {
+    max-width: 42rem;
 }
 
 .assistant-input-wrapper textarea {
     min-height: 1.5rem;
     field-sizing: content;
     font-size: clamp(0.875rem, 1.3vw, 1.125rem);
-    padding: 0.75rem 3rem 0.75rem 0.75rem;
-}
-
-.assistant-input-wrapper .flex {
-    position: absolute;
-    right: 0.5rem;
-    bottom: 0.5rem;
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
+    padding: 0.75rem clamp(3.5rem, 7vw, 5.5rem) 0.75rem clamp(0.875rem, 1.8vw, 1.5rem);
 }
 
 .assistant-input-wrapper textarea::-webkit-scrollbar {

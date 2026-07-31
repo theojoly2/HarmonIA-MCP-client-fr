@@ -33,18 +33,18 @@ class AssistantApp extends AppBase {
                 </div>
                 <div id="assistant-chat" class="flex-1 overflow-y-auto">
                     <div class="assistant-hero" id="assistant-hero">
-                        <div class="assistant-hero-subtitle text-center text-gray-500 max-w-md">
+                        <div class="assistant-hero-subtitle text-center text-sm text-gray-500 max-w-md">
                             Décrivez le modèle que vous souhaitez construire ou posez une question sur vos données.
                         </div>
                     </div>
                     <div class="assistant-messages" id="assistant-messages"></div>
                 </div>
                 <div class="assistant-input-area p-3 flex-shrink-0" id="assistant-input-area">
-                    <div class="assistant-input-wrapper max-w-3xl mx-auto rounded-2xl border-2 border-gray-300 focus-within:border-black bg-white transition-colors shadow-sm">
+                    <div class="assistant-input-wrapper max-w-3xl mx-auto rounded-2xl border-2 border-gray-300 focus-within:border-black bg-white transition-colors shadow-sm" id="assistant-input-box">
                         <form id="assistant-form" class="flex flex-col gap-2 p-3">
                             <textarea id="assistant-input" rows="1" autocomplete="off"
                                 placeholder="Interrogez l'assistant sémantique..."
-                                class="w-full resize-none max-h-40 bg-transparent border-none focus:outline-none focus:ring-0 text-gray-900 placeholder-gray-500 px-1 py-1"></textarea>
+                                class="w-full resize-none max-h-40 bg-transparent border-none focus:outline-none focus:ring-0 text-sm text-gray-900 placeholder-gray-500 px-1 py-1"></textarea>
                             <div class="flex items-center justify-between">
                                 <button type="button" id="assistant-import-model" class="magic-btn flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl text-gray-500 hover:text-black hover:bg-gray-100 transition-colors" title="Importer un modèle">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -69,24 +69,21 @@ class AssistantApp extends AppBase {
         this.heroEl = container.querySelector('#assistant-hero');
         this.messagesEl = container.querySelector('#assistant-messages');
         this.inputArea = container.querySelector('#assistant-input-area');
+        this.inputBox = container.querySelector('#assistant-input-box');
         this.fileInput = container.querySelector('#assistant-model-file');
         this.inputEl = container.querySelector('#assistant-input');
 
         this._bindInputEvents();
         this._observeResize();
 
-        const onSubmit = () => {
+        container.querySelector('#assistant-form').addEventListener('submit', (e) => {
+            e.preventDefault();
             const text = this.inputEl.value.trim();
             if (!text || this.isStreaming) return;
             this.inputEl.value = '';
             this.inputEl.style.height = 'auto';
             this._switchToChatMode();
             this._send(text);
-        };
-
-        container.querySelector('#assistant-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            onSubmit();
         });
 
         if (window.GlowEffects && typeof window.GlowEffects.scanAndBind === 'function') {
@@ -166,10 +163,14 @@ class AssistantApp extends AppBase {
         this.chatEl.classList.remove('assistant-chat-mode');
         this.headerEl.classList.remove('assistant-header-compact');
         this.heroEl.classList.remove('assistant-hero-hidden');
+        this.inputArea.classList.remove('assistant-input-area-chat');
+        this.inputBox.classList.remove('assistant-input-box-chat');
         this.inputEl.value = '';
         this.inputEl.style.height = 'auto';
-        // Reset centering and re-measure after layout.
         this.heroEl.style.paddingTop = '';
+        this.inputArea.style.top = '';
+        this.inputArea.style.width = '';
+        this.inputArea.style.position = '';
         requestAnimationFrame(() => {
             requestAnimationFrame(() => this._applyCentering(true));
         });
@@ -180,7 +181,11 @@ class AssistantApp extends AppBase {
         this.chatEl.classList.add('assistant-chat-mode');
         this.headerEl.classList.add('assistant-header-compact');
         this.heroEl.classList.add('assistant-hero-hidden');
-        this.inputEl.focus();
+        this.inputArea.classList.add('assistant-input-area-chat');
+        this.inputBox.classList.add('assistant-input-box-chat');
+        if (hadFocus) {
+            setTimeout(() => this.inputEl.focus(), 550);
+        }
     }
 
     _measureHeroContentHeight() {
@@ -205,7 +210,6 @@ class AssistantApp extends AppBase {
             this.heroEl.style.paddingTop = '0';
             this.heroEl.style.paddingBottom = '0';
         } else {
-            // Home mode: vertically center the hero content inside the app viewport.
             const contentHeight = this._measureHeroContentHeight();
             const available = Math.max(this.container.clientHeight, contentHeight);
             const offset = Math.max(0, (available - contentHeight) / 2);
