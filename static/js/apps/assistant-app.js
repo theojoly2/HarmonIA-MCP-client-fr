@@ -184,8 +184,9 @@ class AssistantApp extends AppBase {
 
     _switchToChatMode() {
         // Animate the home screen into chat mode: title slides up, centered input fades out,
-        // and the bottom input area fades in.
+        // and the bottom input area fades in. Then restore focus to the bottom textarea.
         const home = this.chatEl.querySelector('.assistant-home');
+        const hadFocus = document.activeElement === this.inputEl;
         if (home) {
             requestAnimationFrame(() => {
                 home.classList.remove('homescreen-mode');
@@ -199,6 +200,13 @@ class AssistantApp extends AppBase {
                 this.inputArea.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
                 this.inputArea.style.opacity = '1';
                 this.inputArea.style.transform = 'translateY(0)';
+                setTimeout(() => {
+                    this.inputArea.style.transition = '';
+                    this.inputArea.style.transform = '';
+                    if (hadFocus && this.inputEl) {
+                        this.inputEl.focus();
+                    }
+                }, 520);
             });
         }
     }
@@ -623,8 +631,20 @@ class AssistantApp extends AppBase {
     }
 
     _scrollToBottom() {
-        // Scrolling is intentionally left to the user so they can read
-        // multi-step assistant/tool output without being pulled down.
+        const el = this.chatEl;
+        if (!el) return;
+        const threshold = 80; // px from bottom to consider "at bottom"
+        const isNearBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < threshold;
+        if (isNearBottom) {
+            el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+        }
+    }
+
+    _isNearBottom() {
+        const el = this.chatEl;
+        if (!el) return true;
+        const threshold = 80;
+        return (el.scrollHeight - el.scrollTop - el.clientHeight) < threshold;
     }
 
     async _send(text) {
@@ -658,8 +678,9 @@ class AssistantApp extends AppBase {
         let currentBubble = null;
         let currentText = '';
 
-        // Typewriter: append raw text to the DOM progressively, parse markdown only
-        // when finalizing, so the browser can paint smoothly.
+        // Typewriter: stream raw text into a <span>, parsing markdown only at finalization
+        // to avoid re-creating the DOM and losing selection on every chunk.
+        let streamSpan = null;
         const typewriter = this._createTypewriter((chunk) => {
             currentText += chunk;
             if (!currentBubble) {
@@ -668,10 +689,17 @@ class AssistantApp extends AppBase {
                 this._removeThinkingPlaceholder();
                 this._closeAssistantBubble();
                 currentBubble = this._ensureAssistantBubble();
+                streamSpan = currentBubble.querySelector('.assistant-stream-text');
+                if (!streamSpan) {
+                    streamSpan = document.createElement('span');
+                    streamSpan.className = 'assistant-stream-text';
+                    currentBubble.appendChild(streamSpan);
+                }
             }
-            // Render markdown progressively so the text looks formatted while streaming.
-            currentBubble.innerHTML = this._markdown(currentText);
-            this._forceReflow();
+            if (streamSpan) {
+                streamSpan.textContent += chunk;
+                this._forceReflow();
+            }
         });
 
         const finalizeText = () => {
@@ -759,6 +787,8 @@ class AssistantApp extends AppBase {
 
                     if (event.kind === 'assistant_done') {
                         resetBubble();
+                        // Remove any lingering thinking placeholder before rendering the final answer.
+                        this._removeThinkingPlaceholder();
                         // If the backend only sent the final message inside assistant_done
                         // (no preceding assistant_text chunks), render it now.
                         if (event.content && !currentText && !currentBubble) {
