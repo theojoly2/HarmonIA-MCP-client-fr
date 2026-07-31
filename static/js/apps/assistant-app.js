@@ -26,11 +26,6 @@ class AssistantApp extends AppBase {
         this.container = container;
         container.innerHTML = `
             <div class="assistant-app h-full w-full flex flex-col bg-white rounded-[1.25rem] overflow-hidden relative">
-                <div class="assistant-header flex-shrink-0">
-                    <h1 class="text-center">
-                        <span class="assistant-title-glow title-glow" data-glow-text="Assistant Sémantique">Assistant Sémantique</span>
-                    </h1>
-                </div>
                 <div id="assistant-chat" class="flex-1 overflow-y-auto">
                     ${this._welcomeMessage()}
                 </div>
@@ -60,14 +55,13 @@ class AssistantApp extends AppBase {
         `;
 
         this.chatEl = container.querySelector('#assistant-chat');
-        this.headerEl = container.querySelector('.assistant-header');
-        this.headerTitleEl = container.querySelector('.assistant-header .assistant-title-glow');
         this.inputArea = container.querySelector('#assistant-input-area');
         this.fileInput = container.querySelector('#assistant-model-file');
 
         // The active textarea is inside the visible input area (home or bottom).
         this.inputEl = this._activeInput();
         this._bindInputEvents();
+        this._applyCentering(true);
 
         // Bind both forms: the centered home form and the bottom chat form.
         container.querySelectorAll('#assistant-form').forEach((form) => {
@@ -194,10 +188,6 @@ class AssistantApp extends AppBase {
         this.modelName = '';
         this.messages = [];
         this.chatEl.innerHTML = this._welcomeMessage();
-        if (this.headerEl) {
-            this.headerEl.classList.remove('assistant-header-compact');
-            this.headerEl.style.opacity = '0';
-        }
         if (this.chatEl) {
             this.chatEl.classList.remove('assistant-chat-mode');
         }
@@ -208,11 +198,12 @@ class AssistantApp extends AppBase {
             this.inputArea.style.transition = '';
         }
         this.inputEl = this._activeInput();
+        requestAnimationFrame(() => this._applyCentering(true));
     }
 
     _switchToChatMode() {
-        // Animate the home screen into chat mode: centered title+input fade out,
-        // the fixed header fades in at the top, and the bottom input area appears.
+        // Animate the home screen into chat mode like SearchApp:
+        // the title+input glide upward and the bottom input area fades in.
         const hadFocus = this.inputEl && document.activeElement === this.inputEl;
         const home = this.chatEl.querySelector('.assistant-home');
         if (home) {
@@ -220,14 +211,10 @@ class AssistantApp extends AppBase {
                 home.classList.remove('homescreen-mode');
             });
         }
-        if (this.headerEl) {
-            this.headerEl.style.transition = 'opacity 0.4s ease';
-            this.headerEl.style.opacity = '1';
-            this.headerEl.classList.add('assistant-header-compact');
-        }
         if (this.chatEl) {
             this.chatEl.classList.add('assistant-chat-mode');
         }
+        this._applyCentering();
         if (this.inputArea) {
             this.inputArea.classList.remove('hidden');
             this.inputArea.style.opacity = '0';
@@ -245,6 +232,39 @@ class AssistantApp extends AppBase {
                     }
                 }, 520);
             });
+        }
+    }
+
+    _measureContentHeight(wrapper) {
+        let contentHeight = 0;
+        for (const child of wrapper.children) {
+            const rect = child.getBoundingClientRect();
+            const styles = getComputedStyle(child);
+            const marginTop = parseFloat(styles.marginTop) || 0;
+            const marginBottom = parseFloat(styles.marginBottom) || 0;
+            contentHeight += rect.height + marginTop + marginBottom;
+        }
+        return Math.max(contentHeight, 220);
+    }
+
+    _applyCentering(skipTransition) {
+        const home = this.chatEl.querySelector('.assistant-home');
+        if (!home) return;
+        const was = home.style.transition;
+        if (skipTransition) home.style.transition = 'none';
+        if (!this.chatEl.classList.contains('assistant-chat-mode')) {
+            const contentHeight = this._measureContentHeight(home);
+            const available = Math.max(this.chatEl.clientHeight, contentHeight);
+            const offset = Math.max(0, (available - contentHeight) / 2);
+            home.style.paddingTop = offset + 'px';
+            home.style.paddingBottom = '0px';
+        } else {
+            home.style.paddingTop = '1rem';
+            home.style.paddingBottom = '0px';
+        }
+        if (skipTransition) {
+            home.offsetHeight;
+            home.style.transition = was;
         }
     }
 

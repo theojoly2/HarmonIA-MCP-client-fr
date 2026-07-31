@@ -347,51 +347,11 @@
     padding: 0;
 }
 
-/* Fixed header at the top of the assistant app */
-.assistant-header {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 20;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1.25rem 0.75rem;
-    background: transparent;
-    border-bottom: none;
-    transition: all 0.7s cubic-bezier(0.4, 0, 0.2, 1);
-    pointer-events: none;
-}
-
-.assistant-header h1 {
-    margin: 0;
-    font-size: clamp(1.1rem, 2vw, 1.5rem);
-    transition: font-size 0.7s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.assistant-header-compact {
-    padding-top: 0.5rem;
-    padding-bottom: 0.35rem;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(4px);
-    pointer-events: auto;
-}
-
-.assistant-header-compact h1 {
-    font-size: clamp(1rem, 2vw, 1.35rem);
-}
-
-/* Chat scroll area with room for compact header + bottom input */
+/* Chat scroll area */
 #assistant-chat {
     padding-left: 0.75rem;
     padding-right: 0.75rem;
-    padding-top: 0;
     padding-bottom: 6rem;
-}
-
-#assistant-chat.assistant-chat-mode {
-    padding-top: 3rem;
 }
 
 .assistant-home {
@@ -399,8 +359,8 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    transition: opacity 0.5s ease;
+    justify-content: flex-start;
+    transition: padding-top 0.7s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .assistant-home h1 {
@@ -410,8 +370,9 @@
     transition: all 0.7s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.assistant-home.homescreen-mode {
-    justify-content: center;
+.assistant-home:not(.homescreen-mode) h1 {
+    font-size: clamp(1.1rem, 2vw, 1.5rem);
+    margin-bottom: 0.75rem;
 }
 
 .assistant-home-input-area {
@@ -419,8 +380,6 @@
     max-width: 42rem;
     margin-top: 0.5rem;
     transition: opacity 0.4s ease, transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-    z-index: 30;
 }
 
 .assistant-home.homescreen-mode .assistant-home-input-area {
@@ -438,10 +397,6 @@
     opacity: 0;
     transform: translateY(-10px);
     transition: opacity 0.3s ease, transform 0.4s ease;
-}
-
-.assistant-home.homescreen-mode {
-    padding-top: 0;
 }
 
 .assistant-title-glow {
