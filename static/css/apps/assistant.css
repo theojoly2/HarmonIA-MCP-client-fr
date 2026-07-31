@@ -63,7 +63,7 @@
     border-radius: 0.75rem;
     padding: 0.75rem 1rem;
     max-width: 84%;
-    margin: 0.75rem auto;
+    margin: 0.75rem 0;
 }
 
 .assistant-tool-calls-title {
@@ -101,7 +101,7 @@
     border-radius: 0.75rem;
     overflow: hidden;
     max-width: 84%;
-    margin: 0.75rem auto;
+    margin: 0.75rem 0;
     transition: border-color 0.2s;
 }
 
@@ -176,7 +176,7 @@
     border-radius: 0.75rem;
     overflow: hidden;
     max-width: 84%;
-    margin: 0.75rem auto;
+    margin: 0.75rem 0;
     box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.08);
 }
 
@@ -282,7 +282,7 @@
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
     overflow: hidden;
     max-width: 84%;
-    margin: 0.75rem auto;
+    margin: 0.75rem 0;
 }
 
 .assistant-search-card .assistant-search-results {
@@ -456,13 +456,13 @@
 
 .assistant-input-wrapper {
     width: 100%;
-    max-width: 84%;
-    margin: 0 auto;
+    max-width: 100%;
+    margin: 0;
     transition: max-width 0.7s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .assistant-input-box-chat .assistant-input-wrapper {
-    max-width: 84%;
+    max-width: 100%;
 }
 
 .assistant-input-wrapper textarea {

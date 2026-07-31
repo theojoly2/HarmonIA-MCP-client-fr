@@ -703,9 +703,8 @@ class AssistantApp extends AppBase {
         let currentBubble = null;
         let currentText = '';
 
-        // Typewriter: stream raw text into a <span>, parsing markdown only at finalization
-        // to avoid re-creating the DOM and losing selection on every chunk.
-        let streamSpan = null;
+        // Typewriter: stream markdown progressively. We keep a hidden raw text accumulator
+        // and render parsed markdown on every chunk so formatting appears immediately.
         const typewriter = this._createTypewriter((chunk) => {
             currentText += chunk;
             if (!currentBubble) {
@@ -714,15 +713,9 @@ class AssistantApp extends AppBase {
                 this._removeThinkingPlaceholder();
                 this._closeAssistantBubble();
                 currentBubble = this._ensureAssistantBubble();
-                streamSpan = currentBubble.querySelector('.assistant-stream-text');
-                if (!streamSpan) {
-                    streamSpan = document.createElement('span');
-                    streamSpan.className = 'assistant-stream-text';
-                    currentBubble.appendChild(streamSpan);
-                }
             }
-            if (streamSpan) {
-                streamSpan.textContent += chunk;
+            if (currentBubble) {
+                currentBubble.innerHTML = this._markdown(currentText);
                 this._forceReflow();
             }
         });
