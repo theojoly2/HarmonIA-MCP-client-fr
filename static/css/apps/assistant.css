@@ -159,13 +159,13 @@
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: 700;
     color: #111827;
 }
 
 .assistant-tool-args {
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     color: #6b7280;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     white-space: nowrap;
@@ -182,7 +182,7 @@
 }
 
 .assistant-tool-section-title {
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -194,7 +194,7 @@
     background: #f3f4f6;
     padding: 0.75rem 1rem;
     border-radius: 0.5rem;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     max-height: 16rem;
     overflow-y: auto;
     white-space: pre-wrap;
@@ -221,14 +221,14 @@
     padding: 0.75rem 1rem;
     background: #eff6ff;
     border-bottom: 1px solid #dbeafe;
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: 700;
     color: #1d4ed8;
 }
 
 .assistant-plan-body {
     padding: 0.75rem 1rem;
-    font-size: 1rem;
+    font-size: 0.9rem;
     color: #1f2937;
 }
 
@@ -253,15 +253,15 @@
 
 .assistant-plan-step-number {
     flex-shrink: 0;
-    width: 1.5rem;
-    height: 1.5rem;
+    width: 1.35rem;
+    height: 1.35rem;
     display: flex;
     align-items: center;
     justify-content: center;
     background: #2563eb;
     color: #ffffff;
     border-radius: 9999px;
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     font-weight: 700;
 }
 
@@ -285,7 +285,7 @@
     border-radius: 9999px;
     background: #dbeafe;
     color: #1d4ed8;
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     font-weight: 600;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
@@ -294,7 +294,7 @@
     display: inline-flex;
     align-items: center;
     width: fit-content;
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     color: #6b7280;
     font-style: italic;
 }
@@ -304,7 +304,7 @@
     padding-top: 0.75rem;
     border-top: 1px solid #e5e7eb;
     color: #6b7280;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     line-height: 1.4;
 }
 
@@ -405,7 +405,7 @@
 
 .assistant-header-title {
     margin: 0;
-    font-size: clamp(1.25rem, 2.5vw, 2.25rem);
+    font-size: clamp(1rem, 2vw, 1.5rem);
     transition: font-size 0.55s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -416,7 +416,7 @@
 }
 
 .assistant-header-compact .assistant-header-title {
-    font-size: clamp(1rem, 2vw, 1.35rem);
+    font-size: clamp(0.875rem, 1.6vw, 1.15rem);
 }
 
 /* Chat scroll area */
@@ -446,7 +446,7 @@
 
 .assistant-hero-subtitle {
     text-align: center;
-    font-size: clamp(0.875rem, 1.3vw, 1.125rem);
+    font-size: clamp(0.75rem, 1.1vw, 1rem);
     color: #6b7280;
     max-width: 28rem;
     margin-top: 1.5rem;
@@ -514,7 +514,7 @@
 .assistant-input-wrapper textarea {
     min-height: 1.5rem;
     field-sizing: content;
-    font-size: clamp(0.875rem, 1.3vw, 1.125rem);
+    font-size: clamp(0.75rem, 1.1vw, 1rem);
     padding: 0.75rem clamp(3.5rem, 7vw, 5.5rem) 0.75rem clamp(0.875rem, 1.8vw, 1.5rem);
 }
 
@@ -533,15 +533,15 @@
 
 .assistant-messages {
     padding-top: 0.5rem;
-    font-size: clamp(0.875rem, 1.3vw, 1.125rem);
+    font-size: clamp(0.75rem, 1.1vw, 1rem);
     display: flex;
     flex-direction: column;
     align-items: center;
 }
 
 .assistant-bubble {
-    width: 100%;
-    max-width: 84%;
+    width: 42rem;
+    max-width: 100%;
     margin-bottom: 1.25rem;
 }
 
@@ -556,7 +556,7 @@
 .assistant-bubble-content {
     color: #1f2937;
     line-height: 1.6;
-    font-size: clamp(0.875rem, 1.3vw, 1.125rem);
+    font-size: clamp(0.75rem, 1.1vw, 1rem);
 }
 
 .assistant-bubble-user .assistant-bubble-content {
@@ -569,19 +569,19 @@
 }
 
 .assistant-messages .markdown-body {
-    font-size: clamp(0.875rem, 1.3vw, 1.125rem);
+    font-size: clamp(0.75rem, 1.1vw, 1rem);
 }
 
 .assistant-messages .markdown-body h1,
 .assistant-messages .markdown-body h2,
 .assistant-messages .markdown-body h3 {
-    font-size: 1.25rem;
+    font-size: 1.1rem;
     font-weight: 700;
 }
 
 .assistant-messages .markdown-body p,
 .assistant-messages .markdown-body li {
-    font-size: clamp(0.875rem, 1.3vw, 1.125rem);
+    font-size: clamp(0.75rem, 1.1vw, 1rem);
 }
 
 .assistant-messages .markdown-body code {
