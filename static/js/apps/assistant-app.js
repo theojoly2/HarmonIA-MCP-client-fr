@@ -28,7 +28,7 @@ class AssistantApp extends AppBase {
             <div class="assistant-app h-full w-full flex flex-col bg-white rounded-[1.25rem] overflow-hidden relative">
                 <div class="assistant-header flex-shrink-0">
                     <h1 class="text-center">
-                        <span class="assistant-title-glow title-glow">Assistant Sémantique</span>
+                        <span class="assistant-title-glow title-glow" data-glow-text="Assistant Sémantique">Assistant Sémantique</span>
                     </h1>
                 </div>
                 <div id="assistant-chat" class="flex-1 overflow-y-auto">
@@ -61,6 +61,7 @@ class AssistantApp extends AppBase {
 
         this.chatEl = container.querySelector('#assistant-chat');
         this.headerEl = container.querySelector('.assistant-header');
+        this.headerTitleEl = container.querySelector('.assistant-header .assistant-title-glow');
         this.inputArea = container.querySelector('#assistant-input-area');
         this.fileInput = container.querySelector('#assistant-model-file');
 
@@ -144,6 +145,9 @@ class AssistantApp extends AppBase {
     _welcomeMessage() {
         return `
             <div class="assistant-home homescreen-mode h-full flex flex-col items-center justify-center px-4 py-8">
+                <h1 class="text-center mb-4">
+                    <span class="assistant-title-glow title-glow">Assistant Sémantique</span>
+                </h1>
                 <div class="assistant-home-input-area">
                     <div class="assistant-input-wrapper rounded-2xl border-2 border-gray-300 focus-within:border-black bg-white transition-colors shadow-sm">
                         <form id="assistant-form" class="flex flex-col gap-2 p-3">
@@ -192,6 +196,10 @@ class AssistantApp extends AppBase {
         this.chatEl.innerHTML = this._welcomeMessage();
         if (this.headerEl) {
             this.headerEl.classList.remove('assistant-header-compact');
+            this.headerEl.style.opacity = '0';
+        }
+        if (this.chatEl) {
+            this.chatEl.classList.remove('assistant-chat-mode');
         }
         if (this.inputArea) {
             this.inputArea.classList.add('hidden');
@@ -203,17 +211,22 @@ class AssistantApp extends AppBase {
     }
 
     _switchToChatMode() {
-        // Animate the home screen into chat mode: centered input fades out,
-        // the bottom input area fades in, and the header becomes compact.
+        // Animate the home screen into chat mode: centered title+input fade out,
+        // the fixed header fades in at the top, and the bottom input area appears.
         const hadFocus = this.inputEl && document.activeElement === this.inputEl;
-        if (this.headerEl) {
-            this.headerEl.classList.add('assistant-header-compact');
-        }
         const home = this.chatEl.querySelector('.assistant-home');
         if (home) {
             requestAnimationFrame(() => {
                 home.classList.remove('homescreen-mode');
             });
+        }
+        if (this.headerEl) {
+            this.headerEl.style.transition = 'opacity 0.4s ease';
+            this.headerEl.style.opacity = '1';
+            this.headerEl.classList.add('assistant-header-compact');
+        }
+        if (this.chatEl) {
+            this.chatEl.classList.add('assistant-chat-mode');
         }
         if (this.inputArea) {
             this.inputArea.classList.remove('hidden');
