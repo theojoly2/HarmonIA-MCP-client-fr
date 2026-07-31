@@ -62,7 +62,7 @@
     border: 1px solid #e5e7eb;
     border-radius: 0.75rem;
     padding: 0.75rem 1rem;
-    max-width: 84%;
+    max-width: 72%;
     margin: 0.75rem 0;
 }
 
@@ -100,7 +100,7 @@
     border: 1px solid #e5e7eb;
     border-radius: 0.75rem;
     overflow: hidden;
-    max-width: 84%;
+    max-width: 72%;
     margin: 0.75rem 0;
     transition: border-color 0.2s;
 }
@@ -175,7 +175,7 @@
     border: 1px solid #93c5fd;
     border-radius: 0.75rem;
     overflow: hidden;
-    max-width: 84%;
+    max-width: 72%;
     margin: 0.75rem 0;
     box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.08);
 }
@@ -281,7 +281,7 @@
     border-radius: 1rem;
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
     overflow: hidden;
-    max-width: 84%;
+    max-width: 72%;
     margin: 0.75rem 0;
 }
 
@@ -294,7 +294,7 @@
 }
 
 .assistant-search-card .assistant-search-results .result-item h3 {
-    font-size: 1.25rem;
+    font-size: 1rem;
     font-weight: 700;
 }
 
@@ -434,7 +434,7 @@
 .assistant-input-area {
     width: 100%;
     max-width: none;
-    padding: 0.75rem 8% 1rem;
+    padding: 0 8% 0.5rem;
     position: absolute;
     bottom: 0;
     left: 0;
@@ -452,7 +452,7 @@
     left: 0;
     right: 0;
     width: 100%;
-    padding: 0.75rem 8% 1rem;
+    padding: 0 8% 0.5rem;
 }
 
 .assistant-input-wrapper {
@@ -464,6 +464,10 @@
 
 .assistant-input-box-chat .assistant-input-wrapper {
     max-width: 100%;
+}
+
+.assistant-input-wrapper form {
+    margin: 0;
 }
 
 .assistant-input-wrapper textarea {

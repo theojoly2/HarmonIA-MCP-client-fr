@@ -82,7 +82,7 @@ def render_results(results_data: list, query: str = "") -> dict:
         </div>
         """
     elif query and results_data:
-        results_html = f'<p id="results-header" class="text-sm font-bold text-gray-500 mb-8 border-b-2 border-gray-200 pb-4">{len(results_data)} RÉSULTAT(S)</p>'
+            results_html = f'<p id="results-header" class="font-bold text-gray-500 mb-8 border-b-2 border-gray-200 pb-4">{len(results_data)} RÉSULTAT(S)</p>'
         for i, row in enumerate(results_data):
             if not isinstance(row, (list, tuple)) or len(row) < 6:
                 continue
@@ -107,16 +107,16 @@ def render_results(results_data: list, query: str = "") -> dict:
                         </button>"""
             results_html += f"""
             <div class="py-8 border-b border-gray-200 last:border-0 result-item">
-                <h3 class="text-xl font-bold mb-3">
+                <h3 class="font-bold mb-3">
                     <a href="{safe_filename}?download={chunk0_id}" target="_blank" class="text-black hover:text-blue-600 hover:underline transition-colors" title="Ouvrir le document">
                         {filename}
                     </a>
                 </h3>
-                <div class="text-base text-gray-800 font-medium leading-relaxed mb-4 markdown-body">
+                <div class="text-gray-800 font-medium leading-relaxed mb-4 markdown-body">
                     {preview_html}
                 </div>
                 <div class="flex items-end justify-between">
-                    <div class="flex flex-wrap gap-4 text-sm font-bold text-gray-500">
+                    <div class="flex flex-wrap gap-4 font-bold text-gray-500">
                         <span title="Score de pertinence">Score: {score}</span>
                         <span>Source: {tags_badges}</span>
                         <span class="font-mono text-xs mt-0.5" title="{document_id}">ID: {str(document_id)[:8]}...</span>
