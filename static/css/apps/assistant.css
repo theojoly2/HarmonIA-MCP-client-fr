@@ -355,10 +355,12 @@
 
 .assistant-home {
     min-height: 100%;
+    padding-bottom: 8rem;
 }
 
 .assistant-home h1 {
     font-size: clamp(1.5rem, 3vw, 2.5rem);
+    margin-top: -4rem;
 }
 
 .assistant-title-glow {
@@ -377,7 +379,12 @@
 
 .assistant-input-area {
     background: #ffffff;
-    border-top: 1px solid #f3f4f6;
+    border-top: none;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 1rem 0.75rem 1.25rem;
 }
 
 .assistant-input-wrapper {
@@ -396,6 +403,10 @@
 .assistant-input-wrapper textarea::-webkit-scrollbar-thumb {
     background-color: #d1d5db;
     border-radius: 9999px;
+}
+
+.assistant-app {
+    position: relative;
 }
 
 .assistant-search-results .result-item {
