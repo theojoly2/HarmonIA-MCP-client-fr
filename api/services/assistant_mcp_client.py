@@ -37,6 +37,11 @@ EXPOSED_TOOLS: set[str] = {
     "style_guide_check",
 }
 
+# Internal MCP tool names that should be exposed to the LLM under a legacy alias.
+_TOOL_ALIASES: dict[str, str] = {
+    "retrieve_search_documents": "retrieve_documents",
+}
+
 
 def _normalize_str_arg(value: Any, default: str = "") -> str:
     if value is None:
@@ -141,12 +146,13 @@ class AssistantMCPClient:
         tools = await self.client.list_tools()
         exposed: list[ChatCompletionToolParam] = []
         for t in tools:
-            if t.name in EXPOSED_TOOLS:
+            exposed_name = _TOOL_ALIASES.get(t.name, t.name)
+            if exposed_name in EXPOSED_TOOLS:
                 exposed.append(
                     ChatCompletionToolParam(
                         type="function",
                         function=FunctionDefinition(
-                            name=t.name,
+                            name=exposed_name,
                             description=t.description or "",
                             parameters=t.inputSchema,
                         ),
@@ -162,13 +168,22 @@ class AssistantMCPClient:
             payload["tool_results"] = f"Tool '{name}' is not exposed."
             return json.dumps(payload, ensure_ascii=False)
 
+        # Map the LLM-facing alias back to the internal MCP tool name.
+        internal_name = name
+        for internal, exposed in _TOOL_ALIASES.items():
+            if exposed == name:
+                internal_name = internal
+                break
+
         wrapper = getattr(self, f"_{name}", None)
         if wrapper is None:
             payload["tool_results"] = f"No wrapper implemented for '{name}'."
             return json.dumps(payload, ensure_ascii=False)
 
         try:
+            payload["tool_name"] = internal_name
             payload = await wrapper(payload)
+            payload["tool_name"] = name
         except Exception as e:
             logger.exception("call_tool failed for %s: %s", name, e)
             payload["tool_results"] = f"Error calling tool '{name}': {e}"
@@ -204,11 +219,12 @@ class AssistantMCPClient:
             return payload
         call_args = {
             "search_terms": _normalize_str_arg(search_terms),
-            "limit": _normalize_int_arg(arguments.get("limit"), default=10),
-            "return_full_document": _normalize_bool_arg(arguments.get("return_full_document"), default=True),
+            "limit": _normalize_int_arg(arguments.get("limit"), default=20),
         }
+        # The assistant expects the richer 8-tuple format used by the Search tab,
+        # which includes document_id, chunk0_id and tags for preview/chat actions.
         payload["tool_arguments"] = call_args
-        result = await self._call_tool_raw("retrieve_documents", call_args)
+        result = await self._call_tool_raw("retrieve_search_documents", call_args)
         payload["tool_results"] = self._extract_result(result) or []
         return payload
 
