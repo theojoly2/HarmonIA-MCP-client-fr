@@ -372,7 +372,7 @@
 
 .assistant-hero-title {
     margin: 0 0 1rem 0;
-    font-size: clamp(1.5rem, 3vw, 2.5rem);
+    font-size: clamp(1.25rem, 2.5vw, 2.25rem);
     transition: font-size 0.55s cubic-bezier(0.4, 0, 0.2, 1), margin 0.55s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -400,7 +400,7 @@
 
 .assistant-hero-subtitle {
     text-align: center;
-    font-size: 0.875rem;
+    font-size: clamp(0.875rem, 1.3vw, 1.125rem);
     color: #6b7280;
     max-width: 28rem;
     margin-top: 1.5rem;
@@ -456,6 +456,8 @@
 .assistant-input-wrapper textarea {
     min-height: 1.5rem;
     field-sizing: content;
+    font-size: clamp(0.875rem, 1.3vw, 1.125rem);
+    padding: 0.75rem clamp(3.5rem, 7vw, 5.5rem) 0.75rem clamp(0.875rem, 1.8vw, 1.5rem);
 }
 
 .assistant-input-wrapper textarea::-webkit-scrollbar {
