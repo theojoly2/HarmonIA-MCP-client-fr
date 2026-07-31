@@ -56,14 +56,40 @@
     scroll-margin-top: 2px;
 }
 
+/* Global max-width container shared by bubbles, cards, and input */
+.assistant-bubble,
+.assistant-tool-card,
+.assistant-plan-card,
+.assistant-search-card,
+.assistant-tool-calls {
+    width: 100%;
+    max-width: 84%;
+}
+
+.assistant-bubble {
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.assistant-bubble-user {
+    margin-left: auto;
+    margin-right: 0;
+}
+
+.assistant-bubble-assistant {
+    margin-left: 0;
+    margin-right: auto;
+}
+
 /* === Tool calls summary === */
 .assistant-tool-calls {
     background: #f9fafb;
     border: 1px solid #e5e7eb;
     border-radius: 0.75rem;
     padding: 0.75rem 1rem;
-    max-width: 72%;
-    margin: 0.75rem 0;
+    width: 100%;
+    max-width: 84%;
+    margin: 0.75rem auto;
 }
 
 .assistant-tool-calls-title {
@@ -100,8 +126,9 @@
     border: 1px solid #e5e7eb;
     border-radius: 0.75rem;
     overflow: hidden;
-    max-width: 72%;
-    margin: 0.75rem 0;
+    width: 100%;
+    max-width: 84%;
+    margin: 0.75rem auto;
     transition: border-color 0.2s;
 }
 
@@ -175,8 +202,9 @@
     border: 1px solid #93c5fd;
     border-radius: 0.75rem;
     overflow: hidden;
-    max-width: 72%;
-    margin: 0.75rem 0;
+    width: 100%;
+    max-width: 84%;
+    margin: 0.75rem auto;
     box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.08);
 }
 
@@ -281,8 +309,9 @@
     border-radius: 1rem;
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
     overflow: hidden;
-    max-width: 72%;
-    margin: 0.75rem 0;
+    width: 100%;
+    max-width: 84%;
+    margin: 0.75rem auto;
 }
 
 .assistant-search-card .assistant-search-results {
@@ -434,13 +463,15 @@
 .assistant-input-area {
     width: 100%;
     max-width: none;
-    padding: 0 8% 0.5rem;
+    padding: 0 0 0.5rem;
     position: absolute;
     bottom: 0;
     left: 0;
     right: 0;
     background: transparent;
     border-top: none;
+    display: flex;
+    justify-content: center;
     will-change: top, left, right, width, transform;
     transition: top 0.7s cubic-bezier(0.4, 0, 0.2, 1), left 0.7s cubic-bezier(0.4, 0, 0.2, 1), right 0.7s cubic-bezier(0.4, 0, 0.2, 1), width 0.7s cubic-bezier(0.4, 0, 0.2, 1), padding 0.7s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -452,18 +483,22 @@
     left: 0;
     right: 0;
     width: 100%;
-    padding: 0 8% 0.5rem;
+    padding: 0 0 0.5rem;
+    display: flex;
+    justify-content: center;
 }
 
 .assistant-input-wrapper {
     width: 100%;
     max-width: 100%;
     margin: 0;
-    transition: max-width 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+    padding: 0 8%;
+    transition: max-width 0.7s cubic-bezier(0.4, 0, 0.2, 1), padding 0.7s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .assistant-input-box-chat .assistant-input-wrapper {
     max-width: 100%;
+    padding: 0 8%;
 }
 
 .assistant-input-wrapper form {
@@ -493,6 +528,39 @@
 .assistant-messages {
     padding-top: 0.5rem;
     font-size: clamp(0.875rem, 1.3vw, 1.125rem);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.assistant-bubble {
+    width: 100%;
+    max-width: 84%;
+    margin-bottom: 1.25rem;
+}
+
+.assistant-bubble-assistant {
+    align-self: flex-start;
+}
+
+.assistant-bubble-user {
+    align-self: flex-end;
+}
+
+.assistant-bubble-content {
+    color: #1f2937;
+    line-height: 1.6;
+    font-size: clamp(0.875rem, 1.3vw, 1.125rem);
+}
+
+.assistant-bubble-user .assistant-bubble-content {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    color: #111827;
+    padding: 0.75rem 1rem;
+    border-radius: 1.25rem;
+    display: inline-block;
+    max-width: 100%;
 }
 
 .assistant-messages .markdown-body {
@@ -502,7 +570,7 @@
 .assistant-messages .markdown-body h1,
 .assistant-messages .markdown-body h2,
 .assistant-messages .markdown-body h3 {
-    font-size: clamp(1.25rem, 2.5vw, 2.25rem);
+    font-size: 1.25rem;
     font-weight: 700;
 }
 
@@ -513,10 +581,6 @@
 
 .assistant-messages .markdown-body code {
     font-size: 0.9em;
-}
-
-.assistant-messages .user-msg-anchor > div {
-    font-size: clamp(0.875rem, 1.3vw, 1.125rem);
 }
 
 .assistant-search-results .result-item {

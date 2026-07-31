@@ -253,9 +253,9 @@ class AssistantApp extends AppBase {
 
     _appendSystemMessage(text) {
         const div = document.createElement('div');
-        div.className = 'flex flex-col items-start gap-3 mb-6';
+        div.className = 'assistant-bubble assistant-bubble-assistant mb-6';
         div.innerHTML = `
-            <div class="text-sm text-gray-800 leading-relaxed w-full markdown-body">${this._markdown(text)}</div>
+            <div class="assistant-bubble-content markdown-body">${this._markdown(text)}</div>
         `;
         this.messagesEl.appendChild(div);
         this._scrollToBottom();
@@ -263,8 +263,8 @@ class AssistantApp extends AppBase {
 
     _appendUserMessage(text) {
         const div = document.createElement('div');
-        div.className = 'flex items-end justify-end mb-6 user-msg-anchor';
-        div.innerHTML = `<div class="bg-gray-50 border border-gray-100 text-gray-900 px-5 py-3.5 rounded-[1.5rem] text-sm max-w-[80%] leading-relaxed">${this._escape(text)}</div>`;
+        div.className = 'assistant-bubble assistant-bubble-user mb-6 user-msg-anchor';
+        div.innerHTML = `<div class="assistant-bubble-content">${this._escape(text)}</div>`;
         this.messagesEl.appendChild(div);
         this._scrollToBottom();
         return div;
@@ -273,9 +273,9 @@ class AssistantApp extends AppBase {
     _appendThinkingPlaceholder(label = 'Réflexion...') {
         this._removeThinkingPlaceholder();
         const wrapper = document.createElement('div');
-        wrapper.className = 'flex flex-col items-start gap-3 mb-6 assistant-thinking-placeholder';
+        wrapper.className = 'assistant-bubble assistant-bubble-assistant mb-6 assistant-thinking-placeholder';
         wrapper.innerHTML = `
-            <div class="text-sm text-gray-800 leading-relaxed w-full markdown-body assistant-bubble-content" style="min-height:0;"></div>
+            <div class="assistant-bubble-content markdown-body" style="min-height:0;"></div>
             <div class="ai-avatar-row flex items-center gap-2">
                 <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic">
                     ${this._sparkleSvg()}
@@ -308,11 +308,11 @@ class AssistantApp extends AppBase {
             return last.querySelector('.assistant-bubble-content');
         }
         const wrapper = document.createElement('div');
-        wrapper.className = 'flex flex-col items-start gap-3 mb-6';
+        wrapper.className = 'assistant-bubble assistant-bubble-assistant mb-6';
         wrapper.dataset.role = 'assistant';
         wrapper.dataset.active = 'true';
         wrapper.innerHTML = `
-            <div class="text-sm text-gray-800 leading-relaxed w-full markdown-body assistant-bubble-content"></div>
+            <div class="assistant-bubble-content markdown-body"></div>
             <div class="ai-avatar-row flex items-center gap-2">
                 <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic" data-hidden="false">
                     ${this._sparkleSvg()}
