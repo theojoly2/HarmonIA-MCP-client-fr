@@ -29,12 +29,34 @@ class AssistantApp extends AppBase {
                 <div id="assistant-chat" class="flex-1 overflow-y-auto">
                     ${this._welcomeMessage()}
                 </div>
+                <div class="assistant-input-area p-3 flex-shrink-0" id="assistant-input-area">
+                    <div class="assistant-input-wrapper max-w-3xl mx-auto rounded-2xl border-2 border-gray-300 focus-within:border-black bg-white transition-colors shadow-sm">
+                        <form id="assistant-form" class="flex flex-col gap-2 p-3">
+                            <textarea id="assistant-input" rows="1" autocomplete="off"
+                                placeholder="Interrogez l'assistant sémantique..."
+                                class="w-full resize-none max-h-40 bg-transparent border-none focus:outline-none focus:ring-0 text-sm text-gray-900 placeholder-gray-500 px-1 py-1"></textarea>
+                            <div class="flex items-center justify-between">
+                                <button type="button" id="assistant-import-model" class="magic-btn flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl text-gray-500 hover:text-black hover:bg-gray-100 transition-colors" title="Importer un modèle">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                    </svg>
+                                </button>
+                                <button type="submit" class="magic-btn assistant-send-btn flex-shrink-0 w-8 h-8 text-white bg-black hover:bg-gray-800 rounded-xl flex items-center justify-center transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19V5M5 12l7-7 7 7"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
                 <input type="file" id="assistant-model-file" accept=".xmi,.owl,.ttl,.rdf,.json" class="hidden">
             </div>
         `;
 
         this.chatEl = container.querySelector('#assistant-chat');
         this.inputEl = container.querySelector('#assistant-input');
+        this.inputArea = container.querySelector('#assistant-input-area');
         this.fileInput = container.querySelector('#assistant-model-file');
 
         this._bindInputEvents();
@@ -49,6 +71,7 @@ class AssistantApp extends AppBase {
             if (!text || this.isStreaming) return;
             this.inputEl.value = '';
             this.inputEl.style.height = 'auto';
+            this._switchToChatMode();
             this._send(text);
         });
 
@@ -101,11 +124,11 @@ class AssistantApp extends AppBase {
 
     _welcomeMessage() {
         return `
-            <div class="assistant-home h-full flex flex-col items-center justify-center px-4 py-8">
+            <div class="assistant-home homescreen-mode h-full flex flex-col items-center justify-center px-4 py-8">
                 <h1 class="text-center mb-4">
                     <span class="assistant-title-glow title-glow">Assistant Sémantique</span>
                 </h1>
-                <div class="assistant-input-area">
+                <div class="assistant-home-input-area">
                     <div class="assistant-input-wrapper rounded-2xl border-2 border-gray-300 focus-within:border-black bg-white transition-colors shadow-sm">
                         <form id="assistant-form" class="flex flex-col gap-2 p-3">
                             <textarea id="assistant-input" rows="1" autocomplete="off"
@@ -126,7 +149,7 @@ class AssistantApp extends AppBase {
                         </form>
                     </div>
                 </div>
-                <div class="text-center text-sm text-gray-500 max-w-md mt-6">
+                <div class="assistant-home-subtitle text-center text-sm text-gray-500 max-w-md mt-6">
                     Décrivez le modèle que vous souhaitez construire ou posez une question sur vos données.
                 </div>
             </div>
@@ -151,6 +174,33 @@ class AssistantApp extends AppBase {
         this.modelName = '';
         this.messages = [];
         this.chatEl.innerHTML = this._welcomeMessage();
+        if (this.inputArea) {
+            this.inputArea.classList.add('hidden');
+            this.inputArea.style.opacity = '';
+            this.inputArea.style.transform = '';
+            this.inputArea.style.transition = '';
+        }
+    }
+
+    _switchToChatMode() {
+        // Animate the home screen into chat mode: title slides up, centered input fades out,
+        // and the bottom input area fades in.
+        const home = this.chatEl.querySelector('.assistant-home');
+        if (home) {
+            requestAnimationFrame(() => {
+                home.classList.remove('homescreen-mode');
+            });
+        }
+        if (this.inputArea) {
+            this.inputArea.classList.remove('hidden');
+            this.inputArea.style.opacity = '0';
+            this.inputArea.style.transform = 'translateY(20px)';
+            requestAnimationFrame(() => {
+                this.inputArea.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                this.inputArea.style.opacity = '1';
+                this.inputArea.style.transform = 'translateY(0)';
+            });
+        }
     }
 
     async _importModel(file) {
