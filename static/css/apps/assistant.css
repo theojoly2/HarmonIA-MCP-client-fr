@@ -347,10 +347,45 @@
     padding: 0;
 }
 
-/* Add horizontal padding to the assistant chat container */
+/* Fixed header at the top of the assistant app */
+.assistant-header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem 0.75rem 0.75rem;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(4px);
+    border-bottom: 1px solid transparent;
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.assistant-header h1 {
+    margin: 0;
+    font-size: clamp(1.5rem, 3vw, 2.5rem);
+    transition: font-size 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.assistant-header-compact {
+    padding-top: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom-color: #f3f4f6;
+}
+
+.assistant-header-compact h1 {
+    font-size: clamp(1.1rem, 2vw, 1.5rem);
+}
+
+/* Chat scroll area with room for fixed header + bottom input */
 #assistant-chat {
     padding-left: 0.75rem;
     padding-right: 0.75rem;
+    padding-top: 5rem;
+    padding-bottom: 6rem;
 }
 
 .assistant-home {
@@ -360,30 +395,11 @@
     align-items: center;
     justify-content: center;
     transition: opacity 0.5s ease;
+    padding-top: 2rem;
 }
 
 .assistant-home.homescreen-mode {
     justify-content: center;
-}
-
-.assistant-home.homescreen-mode h1 {
-    font-size: clamp(1.5rem, 3vw, 2.5rem);
-    margin-top: -6rem;
-    margin-bottom: 1rem;
-    transition: all 0.7s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.assistant-home h1 {
-    font-size: clamp(1.1rem, 2vw, 1.5rem);
-    margin-top: 0;
-    margin-bottom: 1rem;
-    padding-top: 1rem;
-    padding-bottom: 0.5rem;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(4px);
-    z-index: 10;
-    width: 100%;
-    transition: all 0.7s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .assistant-home-input-area {
@@ -425,8 +441,6 @@
 }
 
 .assistant-input-area {
-    background: #ffffff;
-    border-top: 1px solid #f3f4f6;
     width: 100%;
     max-width: none;
     padding: 0.75rem 0.75rem 1rem;
@@ -434,6 +448,8 @@
     bottom: 0;
     left: 0;
     right: 0;
+    background: transparent;
+    border-top: none;
     will-change: opacity, transform;
 }
 
