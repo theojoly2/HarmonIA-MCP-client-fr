@@ -17,7 +17,7 @@ from pydantic import BaseModel
 
 from openai.types.chat import ChatCompletionSystemMessageParam
 
-from api.dependencies import _LLM_MODEL, llm_client, render_results
+from api.dependencies import _LLM_MODEL, llm_client
 from api.routers.auth import require_user
 from api.services.assistant_history import AssistantHistory
 from api.services.assistant_mcp_client import AssistantMCPClient
@@ -42,6 +42,37 @@ def _safe_json_loads(text: str | None) -> Any:
         return json.loads(text)
     except Exception:
         return None
+
+
+def _render_retrieve_documents_rows(rows: list[tuple[Any, ...]], query: str) -> str:
+    """Render rows returned by the retrieve_documents tool.
+
+    The server-side wrapper returns 3-tuples (filename, text, score).
+    Build a simple HTML list that the assistant chat can display.
+    """
+    if not rows:
+        return '<p class="text-gray-500 text-sm p-4">Aucun résultat.</p>'
+    html_parts: list[str] = []
+    header = f'<p id="results-header" class="text-sm font-bold text-gray-500 mb-4 border-b-2 border-gray-200 pb-2">{len(rows)} RÉSULTAT(S)</p>'
+    html_parts.append(header)
+    for i, row in enumerate(rows):
+        filename = str(row[0] if row[0] is not None else "")
+        text = str(row[1] if row[1] is not None else "")
+        try:
+            score = f"{float(row[2] if len(row) > 2 and row[2] is not None else 0.0):.4f}"
+        except Exception:
+            score = "0.0000"
+        preview = text[:600]
+        if len(text) > 600:
+            preview += "..."
+        html_parts.append(f"""
+        <div class="py-4 border-b border-gray-200 last:border-0 result-item">
+            <h3 class="text-base font-bold mb-2">{filename}</h3>
+            <p class="text-sm text-gray-700 leading-relaxed mb-2">{preview}</p>
+            <div class="text-xs font-bold text-gray-500">Score: {score}</div>
+        </div>
+        """)
+    return "\n".join(html_parts)
 
 
 def _extract_delta_content(delta: Any) -> str:
@@ -357,18 +388,23 @@ async def assistant_stream_generator(
                         if name == "retrieve_documents":
                             query_terms = arguments.get("search_terms", "")
                             try:
-                                raw_rows = parsed_tool.get("result") if isinstance(parsed_tool, dict) else parsed_tool
+                                raw_rows: Any = None
+                                if isinstance(parsed_tool, list):
+                                    raw_rows = parsed_tool
+                                elif isinstance(parsed_tool, dict):
+                                    raw_rows = parsed_tool.get("result") or parsed_tool.get("tool_results") or parsed_tool.get("results")
                                 if not isinstance(raw_rows, list):
                                     raw_rows = []
-                                search_rows: list[tuple[Any, ...]] = []
+                                rows: list[tuple[Any, ...]] = []
                                 for r in raw_rows:
                                     if isinstance(r, (list, tuple)) and len(r) >= 3:
-                                        search_rows.append(tuple(r))
-                                rendered = render_results(search_rows, query=query_terms)
+                                        rows.append(tuple(r))
+                                # Use the legacy 3-tuple renderer exposed to the assistant router.
+                                results_html = _render_retrieve_documents_rows(rows, query_terms)
                                 display_payload = {
                                     "type": "search",
                                     "query": query_terms,
-                                    "results_html": rendered.get("results_html", ""),
+                                    "results_html": results_html,
                                 }
                             except Exception as exc:
                                 display_payload = {"type": "search", "query": query_terms, "results_html": f"<div class=\"text-red-600 p-4\">Erreur rendu recherche: {exc}</div>"}
