@@ -145,12 +145,15 @@ class AssistantApp extends AppBase {
     }
 
     _appendThinkingPlaceholder(label = 'Réflexion...') {
+        // Remove any existing thinking placeholder first to avoid duplicates.
+        this._removePlaceholder();
         const wrapper = document.createElement('div');
         wrapper.className = 'flex flex-col items-start gap-3 mb-6 assistant-thinking-placeholder';
+        wrapper.dataset.thinking = 'true';
         wrapper.innerHTML = `
             <div class="text-sm text-gray-800 leading-relaxed w-full markdown-body assistant-bubble-content" style="min-height:0;"></div>
             <div class="ai-avatar-row flex items-center gap-2">
-                <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic">
+                <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic" data-hidden="false">
                     ${this._sparkleSvg()}
                 </div>
                 <span class="thinking-label text-xs font-bold tracking-widest uppercase text-gray-400">${this._escape(label)}</span>
@@ -162,11 +165,26 @@ class AssistantApp extends AppBase {
     }
 
     _updateThinkingLabel(label) {
-        const placeholders = this.chatEl.querySelectorAll('.assistant-thinking-placeholder');
-        if (!placeholders.length) return;
-        const target = placeholders[placeholders.length - 1];
+        const target = this.chatEl.querySelector('.assistant-thinking-placeholder');
+        if (!target) return;
         const labelEl = target.querySelector('.thinking-label');
         if (labelEl) labelEl.textContent = label;
+    }
+
+    _removePlaceholder() {
+        const existing = this.chatEl.querySelector('.assistant-thinking-placeholder');
+        if (existing && existing.parentNode) {
+            // Hide its sparkle before removing to avoid orphan animation.
+            const sparkle = existing.querySelector('.sparkle-container');
+            if (sparkle) {
+                const avatar = sparkle.closest('.ai-avatar-wrapper') || sparkle;
+                avatar.dataset.hidden = 'true';
+                avatar.classList.remove('trigger-magic');
+                avatar.style.display = 'none';
+            }
+            existing.remove();
+            this._forceReflow();
+        }
     }
 
     _ensureAssistantBubble() {
@@ -182,7 +200,7 @@ class AssistantApp extends AppBase {
         wrapper.innerHTML = `
             <div class="text-sm text-gray-800 leading-relaxed w-full markdown-body assistant-bubble-content"></div>
             <div class="ai-avatar-row flex items-center gap-2">
-                <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic">
+                <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic" data-hidden="false">
                     ${this._sparkleSvg()}
                 </div>
             </div>
@@ -201,13 +219,36 @@ class AssistantApp extends AppBase {
     _hideAllSparkles() {
         this.chatEl.querySelectorAll('.sparkle-container').forEach((container) => {
             const avatar = container.closest('.ai-avatar-wrapper') || container;
+            // Only animate if it is still visible/animated.
+            if (avatar.style.display === 'none' || avatar.dataset.hidden === 'true') return;
+            avatar.dataset.hidden = 'true';
             avatar.classList.remove('trigger-magic');
-            avatar.style.transition = 'opacity 0.3s ease, height 0.3s ease, margin 0.3s ease';
+            avatar.style.transition = 'opacity 0.25s ease, height 0.25s ease, margin 0.25s ease';
             avatar.style.opacity = '0';
             avatar.style.height = '0';
             avatar.style.margin = '0';
             avatar.style.overflow = 'hidden';
-            setTimeout(() => { avatar.style.display = 'none'; }, 300);
+            setTimeout(() => { avatar.style.display = 'none'; }, 250);
+        });
+    }
+
+    _keepSparkleAlive() {
+        // Keep only the last sparkle avatar alive (e.g. current thinking or current bubble).
+        const avatars = Array.from(this.chatEl.querySelectorAll('.ai-avatar-wrapper'));
+        if (!avatars.length) return;
+        const last = avatars[avatars.length - 1];
+        // Hide all others.
+        avatars.forEach((avatar) => {
+            if (avatar === last) return;
+            if (avatar.style.display === 'none' || avatar.dataset.hidden === 'true') return;
+            avatar.dataset.hidden = 'true';
+            avatar.classList.remove('trigger-magic');
+            avatar.style.transition = 'opacity 0.25s ease, height 0.25s ease, margin 0.25s ease';
+            avatar.style.opacity = '0';
+            avatar.style.height = '0';
+            avatar.style.margin = '0';
+            avatar.style.overflow = 'hidden';
+            setTimeout(() => { avatar.style.display = 'none'; }, 250);
         });
     }
 
@@ -538,34 +579,27 @@ class AssistantApp extends AppBase {
         this._appendUserMessage(text);
         this.isStreaming = true;
 
-        // Hide all previous sparkle avatars so only the new thinking one stays alive.
+        // Start with a clean thinking placeholder.
         this._hideAllSparkles();
-
         const placeholder = this._appendThinkingPlaceholder();
-        const placeholderContent = placeholder.querySelector('.assistant-bubble-content');
-        const loadingInterval = setInterval(() => {
-            const avatar = placeholder.querySelector('.ai-avatar-wrapper');
-            if (avatar) {
-                avatar.classList.remove('trigger-magic');
-                void avatar.offsetWidth;
-                avatar.classList.add('trigger-magic');
-            }
-        }, 1200);
 
         let currentBubble = null;
         let currentText = '';
+        let assistantHasStarted = false;
 
         // Typewriter: append raw text to the DOM progressively, parse markdown only
         // when finalizing, so the browser can paint smoothly.
         const typewriter = this._createTypewriter((chunk) => {
             currentText += chunk;
             if (!currentBubble) {
+                // Remove the thinking placeholder as soon as real text starts.
+                this._removePlaceholder();
                 this._closeAssistantBubble();
                 currentBubble = this._ensureAssistantBubble();
+                this._keepSparkleAlive();
+                assistantHasStarted = true;
             }
             currentBubble.textContent = currentText;
-            // Force layout/paint after each typewriter tick so streaming text is
-            // visible immediately, not batched until the next structural event.
             this._forceReflow();
             this.chatEl.scrollTop = this.chatEl.scrollHeight;
         });
@@ -578,18 +612,15 @@ class AssistantApp extends AppBase {
             }
         };
 
-        const resetBubble = () => {
+        const finishActiveBubble = () => {
             finalizeText();
+            if (currentBubble) {
+                this._closeAssistantBubble();
+                this._hideAllSparkles();
+            }
             currentBubble = null;
             currentText = '';
-            this._closeAssistantBubble();
-        };
-
-        const removePlaceholder = () => {
-            if (placeholder && placeholder.parentNode) {
-                placeholder.remove();
-                this._forceReflow();
-            }
+            assistantHasStarted = false;
         };
 
         try {
@@ -603,29 +634,42 @@ class AssistantApp extends AppBase {
                         return;
                     }
 
-                    removePlaceholder();
-
                     if (event.kind === 'thinking') {
-                        // Keep the placeholder alive but update its label before the next loop.
-                        this._updateThinkingLabel('Réflexion...');
+                        // Ensure a visible thinking placeholder exists with the right label.
+                        if (!this.chatEl.querySelector('.assistant-thinking-placeholder')) {
+                            this._appendThinkingPlaceholder('Réflexion...');
+                        } else {
+                            this._updateThinkingLabel('Réflexion...');
+                        }
+                        this._keepSparkleAlive();
                         return;
                     }
 
                     if (event.kind === 'assistant_text') {
+                        if (!assistantHasStarted) {
+                            this._removePlaceholder();
+                            this._closeAssistantBubble();
+                            currentBubble = this._ensureAssistantBubble();
+                            this._keepSparkleAlive();
+                            assistantHasStarted = true;
+                        }
                         typewriter.append(event.content || '');
                         return;
                     }
 
                     if (event.kind === 'assistant_tool_calls') {
-                        resetBubble();
+                        this._removePlaceholder();
+                        finishActiveBubble();
                         this.messages.push({ role: 'assistant_tool_calls', tool_calls: event.tool_calls });
                         return;
                     }
 
                     if (event.kind === 'tool_start') {
-                        resetBubble();
+                        this._removePlaceholder();
+                        finishActiveBubble();
                         // Show a transient status label while the tool runs.
                         this._appendThinkingPlaceholder(this._toolStatusLabel(event.name));
+                        this._keepSparkleAlive();
                         if (event.name === 'retrieve_documents') {
                             this._appendSearchCard(event.arguments?.search_terms || '', null);
                         } else if (event.name !== 'plan_workflow_with_tools') {
@@ -637,7 +681,8 @@ class AssistantApp extends AppBase {
                     }
 
                     if (event.kind === 'tool_result') {
-                        resetBubble();
+                        this._removePlaceholder();
+                        finishActiveBubble();
                         if (event.name === 'plan_workflow_with_tools') {
                             this._renderPlan(event.result);
                         } else if (event.name === 'retrieve_documents') {
@@ -650,27 +695,35 @@ class AssistantApp extends AppBase {
                     }
 
                     if (event.kind === 'loop_done') {
-                        resetBubble();
+                        this._removePlaceholder();
+                        finishActiveBubble();
                         return;
                     }
 
                     if (event.kind === 'assistant_done') {
-                        resetBubble();
+                        this._removePlaceholder();
                         // If the backend only sent the final message inside assistant_done
                         // (no preceding assistant_text chunks), render it now.
                         if (event.content && !currentText && !currentBubble) {
-                            currentText = event.content;
+                            this._closeAssistantBubble();
                             currentBubble = this._ensureAssistantBubble();
+                            this._keepSparkleAlive();
+                            currentText = event.content;
                             currentBubble.innerHTML = this._markdown(currentText);
                             this._forceReflow();
+                        } else {
+                            finalizeText();
                         }
                         this._closeAssistantBubble();
+                        this._hideAllSparkles();
                         return;
                     }
 
                     if (event.kind === 'error') {
-                        resetBubble();
+                        this._removePlaceholder();
+                        finishActiveBubble();
                         const bubble = this._ensureAssistantBubble();
+                        this._keepSparkleAlive();
                         bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(event.message || '')}</em>`;
                     }
                 }
@@ -678,15 +731,17 @@ class AssistantApp extends AppBase {
 
         } catch (err) {
             console.error('Assistant stream error', err);
-            removePlaceholder();
+            this._removePlaceholder();
             typewriter.flush();
             const bubble = this._ensureAssistantBubble();
+            this._keepSparkleAlive();
             bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(err.message)}</em>`;
         } finally {
-            clearInterval(loadingInterval);
             typewriter.stop();
             this.isStreaming = false;
+            this._removePlaceholder();
             this._closeAssistantBubble();
+            this._hideAllSparkles();
 
             if (currentText) {
                 this.messages.push({ role: 'assistant', content: currentText });

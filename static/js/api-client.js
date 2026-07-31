@@ -236,7 +236,10 @@ const ApiClient = (() => {
                 const rawLine = rawLines[i];
                 const line = rawLine.replace(/^data:\s*/, "").trim();
                 if (!line) continue;
-                if (line.startsWith("event:") || line.startsWith("id:") || line.startsWith(":")) continue;
+                // SSE comments start with ":" and are used as heartbeats to force
+                // reverse proxies to flush their buffers. The client ignores them.
+                if (line.startsWith("event:") || line.startsWith("id:")) continue;
+                if (line.startsWith(":")) continue;
                 try {
                     await handleLine(line);
                 } catch (err) {

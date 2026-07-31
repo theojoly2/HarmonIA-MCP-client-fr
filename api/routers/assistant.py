@@ -171,8 +171,8 @@ def _event(kind: str, payload: dict[str, Any]) -> str:
     instead of being buffered/compressed (e.g. Brotli) until the stream ends.
     """
     if kind.startswith(":"):
-        # SSE comment/heartbeat line.
-        return f"{kind}\n\n"
+        # SSE comment/heartbeat line. Must start with a colon on its own line.
+        return f": {kind[1:]}\n\n"
     data = json.dumps({"kind": kind, **payload}, ensure_ascii=False)
     return f"data: {data}\n\n"
 
@@ -195,6 +195,7 @@ def _slugify_session_name(text: str) -> str:
         from datetime import datetime
         slug = datetime.now().strftime("session_%Y%m%d_%H%M%S")
     return slug
+
 
 
 async def assistant_stream_generator(
@@ -231,6 +232,28 @@ async def assistant_stream_generator(
 
     yield _event("user", {"content": user_input, "session": session_name, "is_new_session": is_new_session})
 
+    # Background heartbeat: sends an SSE comment every ~300ms. This forces reverse
+    # proxies / CDNs to flush their buffers so the client sees events progressively.
+    heartbeat_queue: asyncio.Queue[str] = asyncio.Queue()
+
+    async def _heartbeat() -> None:
+        while True:
+            await asyncio.sleep(0.2)
+            await heartbeat_queue.put(_event(":heartbeat", {}))
+
+    heartbeat_task = asyncio.create_task(_heartbeat())
+    last_heartbeat = asyncio.get_event_loop().time()
+
+    async def _drain_heartbeats() -> AsyncGenerator[str, None]:
+        nonlocal last_heartbeat
+        while not heartbeat_queue.empty():
+            last_heartbeat = asyncio.get_event_loop().time()
+            yield heartbeat_queue.get_nowait()
+
+    async def _drain_heartbeats_once() -> None:
+        async for line in _drain_heartbeats():
+            yield line
+
     try:
         async with AssistantMCPClient(state) as mcp_client:
             tools = await mcp_client.tools()
@@ -250,7 +273,6 @@ async def assistant_stream_generator(
             max_loops = 6
             plan_already_used = False
             plan_successful = False
-            heartbeat_task: asyncio.Task | None = None
             stream_started_at = asyncio.get_event_loop().time()
 
             def _available_tool_schemas() -> list[dict[str, Any]]:
@@ -258,31 +280,16 @@ async def assistant_stream_generator(
                     return [t for t in tool_schemas if t["function"]["name"] != "plan_workflow_with_tools"]
                 return tool_schemas
 
-            async def _heartbeat(queue: asyncio.Queue[str]) -> None:
-                # Keep the reverse-proxy connection alive by sending SSE comments every ~5s.
-                while True:
-                    await asyncio.sleep(5)
-                    await queue.put(_event(":keep-alive", {}))
-
-            heartbeat_queue: asyncio.Queue[str] = asyncio.Queue()
-            heartbeat_task = asyncio.create_task(_heartbeat(heartbeat_queue))
-            last_heartbeat = asyncio.get_event_loop().time()
-
-            def _drain_heartbeat_queue() -> AsyncGenerator[str, None]:
-                nonlocal last_heartbeat
-                while not heartbeat_queue.empty():
-                    last_heartbeat = asyncio.get_event_loop().time()
-                    yield heartbeat_queue.get_nowait()
-
             while loop_count < max_loops:
                 loop_count += 1
                 elapsed = asyncio.get_event_loop().time() - stream_started_at
                 print(f"[Assistant loop {loop_count}/{max_loops}] start, plan_used={plan_already_used}, elapsed={elapsed:.1f}s")
 
                 yield _event("thinking", {})
-                # Give the HTTP layer time to flush the event to the client before the
-                # next event is produced, so each assistant loop/tool step is visible.
+                # Give the HTTP layer a chance to flush before the LLM call starts.
                 await asyncio.sleep(0.03)
+                async for line in _drain_heartbeats():
+                    yield line
 
                 llm_messages = [
                     {"role": msg["role"], "content": str(msg.get("content", ""))}
@@ -305,10 +312,15 @@ async def assistant_stream_generator(
                         streamed_any_text = True
                         content += str(payload)
                         yield _event("assistant_text", {"content": str(payload)})
+                        async for line in _drain_heartbeats():
+                            yield line
                     elif stage == "done":
                         content = payload.get("content", "") or ""
                         tool_calls = _normalize_tool_calls(payload.get("tool_calls", []))
                         streamed_any_text = bool(payload.get("streamed_any_text", False))
+
+                async for line in _drain_heartbeats():
+                    yield line
 
                 if not content and not tool_calls:
                     yield _event("assistant_done", {"content": ""})
@@ -317,6 +329,8 @@ async def assistant_stream_generator(
                 if tool_calls:
                     history.add_assistant_message(content, tool_calls=tool_calls)
                     yield _event("assistant_tool_calls", {"tool_calls": tool_calls})
+                    async for line in _drain_heartbeats():
+                        yield line
 
                     for tool_call in tool_calls:
                         function = tool_call["function"]
@@ -327,6 +341,8 @@ async def assistant_stream_generator(
                             arguments = {}
 
                         yield _event("tool_start", {"name": name, "arguments": arguments})
+                        async for line in _drain_heartbeats():
+                            yield line
 
                         tool_message = await mcp_client.call_tool(name, arguments)
                         parsed_tool = _safe_json_loads(tool_message) or {}
@@ -359,6 +375,8 @@ async def assistant_stream_generator(
 
 
                         yield _event("tool_result", {"name": name, "result": parsed_tool, "display": display_payload})
+                        async for line in _drain_heartbeats():
+                            yield line
 
                         history.add_tool_message(
                             content=tool_message,
@@ -379,12 +397,16 @@ async def assistant_stream_generator(
                             if report:
                                 history.add_assistant_message(report)
                                 yield _event("assistant_text", {"content": report})
-                            yield _event("assistant_done", {"content": report})
-                            return
+                                async for line in _drain_heartbeats():
+                                    yield line
+                                yield _event("assistant_done", {"content": report})
+                                return
 
                     # After processing all tool calls, signal loop completion so the UI
                     # can render this iteration before the next LLM call starts.
                     yield _event("loop_done", {"loop": loop_count})
+                    async for line in _drain_heartbeats():
+                        yield line
                     continue
 
                 else:
@@ -398,10 +420,15 @@ async def assistant_stream_generator(
         print(f"[Assistant stream error] {type(e).__name__}: {e}")
         yield _event("error", {"message": f"{type(e).__name__}: {e}"})
         return
+    finally:
+        heartbeat_task.cancel()
+        try:
+            await heartbeat_task
+        except asyncio.CancelledError:
+            pass
 
     history.finalize_current_request_summary()
     history.save()
-    await asyncio.sleep(0)
     yield _event("done", {})
 
 
