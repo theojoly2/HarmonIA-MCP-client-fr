@@ -180,9 +180,18 @@ class AssistantApp extends AppBase {
                 const avatar = sparkle.closest('.ai-avatar-wrapper') || sparkle;
                 avatar.dataset.hidden = 'true';
                 avatar.classList.remove('trigger-magic');
-                avatar.style.display = 'none';
+                avatar.style.transition = 'opacity 0.2s ease';
+                avatar.style.opacity = '0';
+                setTimeout(() => {
+                    if (avatar.parentNode && !avatar.closest('.assistant-thinking-placeholder')) return;
+                    avatar.style.display = 'none';
+                }, 200);
             }
-            existing.remove();
+            // Detach the wrapper after a short delay so the fade out can play.
+            const wrapper = existing;
+            setTimeout(() => {
+                if (wrapper.parentNode) wrapper.remove();
+            }, 210);
             this._forceReflow();
         }
     }
@@ -216,8 +225,11 @@ class AssistantApp extends AppBase {
         }
     }
 
-    _hideAllSparkles() {
-        this.chatEl.querySelectorAll('.sparkle-container').forEach((container) => {
+    _hideAllSparkles({ keepLast = false } = {}) {
+        const containers = Array.from(this.chatEl.querySelectorAll('.sparkle-container'));
+        const last = keepLast && containers.length ? containers[containers.length - 1] : null;
+        containers.forEach((container) => {
+            if (container === last) return;
             const avatar = container.closest('.ai-avatar-wrapper') || container;
             // Only animate if it is still visible/animated.
             if (avatar.style.display === 'none' || avatar.dataset.hidden === 'true') return;
@@ -237,6 +249,21 @@ class AssistantApp extends AppBase {
         const avatars = Array.from(this.chatEl.querySelectorAll('.ai-avatar-wrapper'));
         if (!avatars.length) return;
         const last = avatars[avatars.length - 1];
+        // Make sure the last one is visible and actively animating.
+        if (last.style.display === 'none') {
+            last.style.display = '';
+        }
+        if (last.dataset.hidden === 'true') {
+            last.dataset.hidden = 'false';
+        }
+        last.classList.add('trigger-magic');
+        // Reset inline hiding styles if they were previously applied.
+        last.style.opacity = '';
+        last.style.height = '';
+        last.style.margin = '';
+        last.style.overflow = '';
+        last.style.transition = '';
+
         // Hide all others.
         avatars.forEach((avatar) => {
             if (avatar === last) return;
@@ -579,7 +606,8 @@ class AssistantApp extends AppBase {
         this._appendUserMessage(text);
         this.isStreaming = true;
 
-        // Start with a clean thinking placeholder.
+        // Start with a clean thinking placeholder. Hide stale sparkles first,
+        // because a new user message begins a new assistant turn.
         this._hideAllSparkles();
         const placeholder = this._appendThinkingPlaceholder();
 
@@ -612,11 +640,11 @@ class AssistantApp extends AppBase {
             }
         };
 
-        const finishActiveBubble = () => {
+        const finishActiveBubble = (keepSparkle = false) => {
             finalizeText();
             if (currentBubble) {
                 this._closeAssistantBubble();
-                this._hideAllSparkles();
+                this._hideAllSparkles({ keepLast: keepSparkle });
             }
             currentBubble = null;
             currentText = '';
@@ -715,7 +743,7 @@ class AssistantApp extends AppBase {
                             finalizeText();
                         }
                         this._closeAssistantBubble();
-                        this._hideAllSparkles();
+                        this._hideAllSparkles({ keepLast: true });
                         return;
                     }
 
@@ -741,7 +769,8 @@ class AssistantApp extends AppBase {
             this.isStreaming = false;
             this._removePlaceholder();
             this._closeAssistantBubble();
-            this._hideAllSparkles();
+            // Keep the last sparkle visible at the bottom of the generated answer.
+            this._hideAllSparkles({ keepLast: true });
 
             if (currentText) {
                 this.messages.push({ role: 'assistant', content: currentText });
