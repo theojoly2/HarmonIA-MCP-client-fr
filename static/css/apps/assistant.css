@@ -353,6 +353,51 @@
     padding-right: 0.75rem;
 }
 
+.assistant-home {
+    min-height: 100%;
+}
+
+.assistant-home h1 {
+    font-size: clamp(1.5rem, 3vw, 2.5rem);
+}
+
+.assistant-title-glow {
+    display: inline-block;
+    background-color: #111827;
+    background-image: radial-gradient(circle var(--glow-size, 0px) at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255,255,255,0.85) 0%, rgba(255,255,255,0) 100%);
+    background-repeat: no-repeat;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    transition: --glow-size 0.3s ease;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.assistant-input-area {
+    background: #ffffff;
+    border-top: 1px solid #f3f4f6;
+}
+
+.assistant-input-wrapper {
+    width: 100%;
+}
+
+.assistant-input-wrapper textarea {
+    min-height: 1.5rem;
+    field-sizing: content;
+}
+
+.assistant-input-wrapper textarea::-webkit-scrollbar {
+    width: 6px;
+}
+
+.assistant-input-wrapper textarea::-webkit-scrollbar-thumb {
+    background-color: #d1d5db;
+    border-radius: 9999px;
+}
+
 .assistant-search-results .result-item {
     padding: 1.5rem 1rem;
     border-bottom: 1px solid #e5e7eb;

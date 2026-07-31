@@ -25,56 +25,71 @@ class AssistantApp extends AppBase {
     render(container) {
         this.container = container;
         container.innerHTML = `
-            <div class="assistant-app h-full w-full flex flex-col bg-white rounded-[1.25rem] overflow-hidden">
-                <div class="assistant-toolbar px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-3 flex-shrink-0">
-                    <div class="flex items-center gap-2 text-sm font-semibold text-gray-900">
-                        <span class="w-2 h-2 rounded-full bg-blue-600"></span>
-                        Assistant Sémantique
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <input type="text" id="assistant-model" value="${this._escape(this.modelName)}"
-                            placeholder="Nom du modèle (optionnel)"
-                            class="assistant-model-input text-sm px-3 py-1.5 rounded-full border border-gray-200 focus:outline-none focus:border-black transition-colors w-48"
-                            autocomplete="off">
-                        <button type="button" id="assistant-new-session" class="assistant-btn-secondary text-sm px-3 py-1.5 rounded-full border border-gray-200 hover:bg-gray-50 transition-colors">Nouvelle session</button>
-                    </div>
-                </div>
-                <div id="assistant-chat" class="flex-1 overflow-y-auto p-4">
+            <div class="assistant-app h-full w-full flex flex-col bg-white rounded-[1.25rem] overflow-hidden relative">
+                <div id="assistant-chat" class="flex-1 overflow-y-auto">
                     ${this._welcomeMessage()}
                 </div>
-                <div class="p-3 border-t border-gray-100 flex-shrink-0">
-                    <form id="assistant-form" class="relative flex items-center">
-                        <input type="text" id="assistant-input" autocomplete="off"
-                            placeholder="Interrogez l'assistant sémantique..."
-                            class="w-full rounded-[2rem] border-2 border-gray-300 focus:outline-none focus:border-black font-medium transition-colors placeholder-gray-500 pl-4 pr-12 py-3 text-sm"
-                            value="">
-                        <button type="submit" class="magic-btn assistant-send-btn absolute right-2 text-white bg-black hover:bg-gray-800 rounded-full w-9 h-9 flex items-center justify-center transition-colors">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19V5M5 12l7-7 7 7"></path>
-                            </svg>
-                        </button>
-                    </form>
+                <div class="assistant-input-area p-3 flex-shrink-0">
+                    <div class="assistant-input-wrapper max-w-3xl mx-auto rounded-2xl border-2 border-gray-300 focus-within:border-black bg-white transition-colors shadow-sm">
+                        <form id="assistant-form" class="flex items-end gap-2 p-2">
+                            <button type="button" id="assistant-import-model" class="magic-btn flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl text-gray-500 hover:text-black hover:bg-gray-100 transition-colors" title="Importer un modèle">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                </svg>
+                            </button>
+                            <div class="flex-1 min-w-0 flex flex-col">
+                                <input type="text" id="assistant-model" value="${this._escape(this.modelName)}"
+                                    placeholder="Nom du modèle (optionnel)"
+                                    class="assistant-model-input w-full text-xs text-gray-500 bg-transparent border-none focus:outline-none px-1 py-0.5"
+                                    autocomplete="off">
+                                <textarea id="assistant-input" rows="1" autocomplete="off"
+                                    placeholder="Interrogez l'assistant sémantique..."
+                                    class="w-full resize-none max-h-40 bg-transparent border-none focus:outline-none focus:ring-0 text-sm text-gray-900 placeholder-gray-500 px-1 py-1"></textarea>
+                            </div>
+                            <button type="submit" class="magic-btn assistant-send-btn flex-shrink-0 w-8 h-8 text-white bg-black hover:bg-gray-800 rounded-xl flex items-center justify-center transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19V5M5 12l7-7 7 7"></path>
+                                </svg>
+                            </button>
+                        </form>
+                    </div>
                 </div>
+                <input type="file" id="assistant-model-file" accept=".xmi,.owl,.ttl,.rdf,.json" class="hidden">
             </div>
         `;
 
         this.chatEl = container.querySelector('#assistant-chat');
         this.inputEl = container.querySelector('#assistant-input');
         this.modelInput = container.querySelector('#assistant-model');
+        this.fileInput = container.querySelector('#assistant-model-file');
+
+        this._bindInputEvents();
+
+        if (window.GlowEffects && typeof window.GlowEffects.scanAndBind === 'function') {
+            window.GlowEffects.scanAndBind(container);
+        }
 
         container.querySelector('#assistant-form').addEventListener('submit', (e) => {
             e.preventDefault();
             const text = this.inputEl.value.trim();
             if (!text || this.isStreaming) return;
             this.inputEl.value = '';
+            this.inputEl.style.height = 'auto';
             this._send(text);
+        });
+
+        container.querySelector('#assistant-import-model').addEventListener('click', () => {
+            this.fileInput.click();
+        });
+
+        this.fileInput.addEventListener('change', (e) => {
+            const file = e.target.files?.[0];
+            if (file) this._importModel(file);
         });
 
         this.modelInput.addEventListener('change', () => {
             this.modelName = this.modelInput.value.trim();
         });
-
-        container.querySelector('#assistant-new-session').addEventListener('click', () => this._newSession());
 
         // Delegate clicks for embedded search result actions (preview / chat).
         this.chatEl.addEventListener('click', (e) => {
@@ -92,6 +107,20 @@ class AssistantApp extends AppBase {
         });
     }
 
+    _bindInputEvents() {
+        if (!this.inputEl) return;
+        this.inputEl.addEventListener('input', () => {
+            this.inputEl.style.height = 'auto';
+            this.inputEl.style.height = Math.min(this.inputEl.scrollHeight, 160) + 'px';
+        });
+        this.inputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                this.inputEl.closest('form')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+            }
+        });
+    }
+
     _escape(text) {
         return String(text || '')
             .replace(/&/g, '&amp;')
@@ -102,16 +131,12 @@ class AssistantApp extends AppBase {
 
     _welcomeMessage() {
         return `
-            <div class="flex flex-col items-start gap-3 mb-8">
-                <div class="text-sm text-gray-800 leading-relaxed w-full markdown-body">
-                    <p>Je suis l'assistant de modélisation sémantique. Posez-moi une question ou décrivez le modèle que vous souhaitez construire.</p>
-                </div>
-                <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container">
-                    <svg class="w-5 h-5 overflow-visible ai-sparkle-icon" viewBox="0 0 24 24">
-                        <path class="sparkle-main" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
-                        <path class="sparkle-orbit-path" d="M5.5 2.5L6.34 5.16L9 6L6.34 6.84L5.5 9.5L4.66 6.84L2 6L4.66 5.16L5.5 2.5Z"></path>
-                        <path class="sparkle-orbit-path" d="M19.5 15.5L20.34 18.16L23 19L20.34 19.84L19.5 22.5L18.66 19.84L16 19L18.66 18.16L19.5 15.5Z"></path>
-                    </svg>
+            <div class="assistant-home h-full flex flex-col items-center justify-center px-4 py-8">
+                <h1 class="text-center mb-8">
+                    <span class="assistant-title-glow title-glow">Assistant Sémantique</span>
+                </h1>
+                <div class="text-center text-sm text-gray-500 max-w-md mb-8">
+                    Décrivez le modèle que vous souhaitez construire ou posez une question sur vos données.
                 </div>
             </div>
         `;
@@ -132,8 +157,37 @@ class AssistantApp extends AppBase {
 
     _newSession() {
         this.session = '';
+        this.modelName = '';
+        if (this.modelInput) this.modelInput.value = '';
         this.messages = [];
         this.chatEl.innerHTML = this._welcomeMessage();
+    }
+
+    async _importModel(file) {
+        if (!file) return;
+        try {
+            const result = await ApiClient.importAndSaveModel(file, file.name);
+            if (result?.name || result?.model_name) {
+                this.modelName = result.name || result.model_name;
+                if (this.modelInput) this.modelInput.value = this.modelName;
+                this._appendSystemMessage(`Modèle **${this._escape(this.modelName)}** importé avec succès. Vous pouvez maintenant lui poser des questions.`);
+            } else {
+                this._appendSystemMessage('Le modèle a été importé.');
+            }
+        } catch (err) {
+            console.error('Assistant import model error', err);
+            this._appendSystemMessage(`Erreur lors de l'import du modèle : ${this._escape(err.message)}`);
+        }
+        if (this.fileInput) this.fileInput.value = '';
+    }
+
+    _appendSystemMessage(text) {
+        const div = document.createElement('div');
+        div.className = 'flex flex-col items-start gap-3 mb-6';
+        div.innerHTML = `
+            <div class="text-sm text-gray-800 leading-relaxed w-full markdown-body">${this._markdown(text)}</div>
+        `;
+        this.chatEl.appendChild(div);
     }
 
     _appendUserMessage(text) {
