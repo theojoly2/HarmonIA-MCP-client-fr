@@ -40,12 +40,12 @@ class AssistantApp extends AppBase {
                     <div class="assistant-messages" id="assistant-messages"></div>
                 </div>
                 <div class="assistant-input-area p-3 flex-shrink-0" id="assistant-input-area">
-                    <div class="assistant-input-wrapper max-w-3xl mx-auto rounded-2xl border-2 border-gray-300 focus-within:border-black bg-white transition-colors shadow-sm" id="assistant-input-box">
+                    <div class="assistant-input-wrapper mx-auto rounded-xl border-2 border-gray-300 focus-within:border-black bg-white transition-colors shadow-sm" id="assistant-input-box">
                         <form id="assistant-form" class="flex flex-col">
                             <textarea id="assistant-input" rows="1" autocomplete="off"
                                 placeholder="Interrogez l'assistant sémantique..."
-                                class="w-full resize-none max-h-40 bg-transparent border-none focus:outline-none focus:ring-0 text-sm text-gray-900 placeholder-gray-500 px-1 py-1"></textarea>
-                            <div class="flex items-center justify-between px-1 pb-2 pt-1">
+                                class="w-full resize-none max-h-40 bg-transparent border-none focus:outline-none focus:ring-0 text-sm text-gray-900 placeholder-gray-500 px-1 py-0.5"></textarea>
+                            <div class="flex items-center justify-between px-0 pb-1 pt-0">
                                 <button type="button" id="assistant-import-model" class="magic-btn flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl text-gray-500 hover:text-black hover:bg-gray-100 transition-colors" title="Importer un modèle">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>

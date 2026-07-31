@@ -515,15 +515,16 @@
 }
 
 .assistant-input-wrapper {
-    width: 100%;
-    max-width: 42rem;
+    width: 40rem;
+    max-width: calc(100% - 2rem);
     margin: 0 auto;
     padding: 0;
-    transition: max-width 0.7s cubic-bezier(0.4, 0, 0.2, 1), padding 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: width 0.7s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.7s cubic-bezier(0.4, 0, 0.2, 1), padding 0.7s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .assistant-input-box-chat .assistant-input-wrapper {
-    max-width: 42rem;
+    width: 40rem;
+    max-width: calc(100% - 2rem);
     padding: 0;
 }
 
@@ -532,12 +533,12 @@
 }
 
 .assistant-input-wrapper textarea {
-    min-height: 1.5rem;
+    min-height: 1.35rem;
     field-sizing: content;
     font-size: clamp(0.75rem, 1.1vw, 1rem);
-    padding: 0.55rem clamp(3.25rem, 6.5vw, 5rem) 0.55rem clamp(0.75rem, 1.5vw, 1.25rem);
+    padding: 0.4rem clamp(2.75rem, 6vw, 4.5rem) 0.4rem clamp(0.65rem, 1.3vw, 1rem);
     margin: 0;
-    border-radius: 0.75rem;
+    border-radius: 0.6rem;
 }
 
 .assistant-input-wrapper textarea::-webkit-scrollbar {
