@@ -82,7 +82,7 @@ def render_results(results_data: list, query: str = "") -> dict:
         </div>
         """
     elif query and results_data:
-        results_html = f'<p id="results-header" class="text-sm font-bold text-gray-500 mb-6 border-b-2 border-gray-200 pb-3">{len(results_data)} RÉSULTAT(S)</p>'
+        results_html = f'<p id="results-header" class="text-xs font-bold text-gray-500 mb-5 border-b border-gray-200 pb-2">{len(results_data)} RÉSULTAT(S)</p>'
         for i, row in enumerate(results_data):
             if not isinstance(row, (list, tuple)) or len(row) < 6:
                 continue
@@ -107,19 +107,19 @@ def render_results(results_data: list, query: str = "") -> dict:
                         </button>"""
             results_html += f"""
             <div class="py-6 border-b border-gray-200 last:border-0 result-item">
-                <h3 class="text-sm font-bold mb-2">
+                <h3 class="text-xs font-bold mb-2">
                     <a href="{safe_filename}?download={chunk0_id}" target="_blank" class="text-black hover:text-blue-600 hover:underline transition-colors" title="Ouvrir le document">
                         {filename}
                     </a>
                 </h3>
-                <div class="text-sm text-gray-800 font-medium leading-relaxed mb-3 markdown-body">
+                <div class="text-xs text-gray-800 font-medium leading-relaxed mb-3 markdown-body">
                     {preview_html}
                 </div>
                 <div class="flex items-end justify-between">
                     <div class="flex flex-wrap gap-4 text-xs font-bold text-gray-500">
                         <span title="Score de pertinence">Score: {score}</span>
                         <span>Source: {tags_badges}</span>
-                        <span class="font-mono mt-0.5" title="{document_id}">ID: {str(document_id)[:8]}...</span>
+                        <span class="font-mono text-xs mt-0.5" title="{document_id}">ID: {str(document_id)[:8]}...</span>
                     </div>
                     <div class="flex gap-2">
                         {preview_button}
