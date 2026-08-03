@@ -281,15 +281,6 @@ async def assistant_stream_generator(
 
     yield _event("user", {"content": user_input, "session": session_name, "is_new_session": is_new_session})
 
-    # Send the initial SVG visualization of the imported model after entering the streaming
-    # loop so _drain_heartbeats is available.
-    if model_name and model_data:
-        svg_text = _generate_model_svg(model_data)
-        if svg_text:
-            yield _event("model_svg", {"svg": svg_text, "model_name": model_name})
-            async for line in _drain_heartbeats():
-                yield line
-
     # Background heartbeat: sends an SSE comment every ~300ms. This forces reverse
     # proxies / CDNs to flush their buffers so the client sees events progressively.
     heartbeat_queue: asyncio.Queue[str] = asyncio.Queue()
@@ -314,6 +305,12 @@ async def assistant_stream_generator(
 
     try:
         async with AssistantMCPClient(state) as mcp_client:
+            # Send the initial SVG visualization of the imported model once the MCP client is ready.
+            if model_name and model_data:
+                svg_text = _generate_model_svg(model_data)
+                if svg_text:
+                    yield _event("model_svg", {"svg": svg_text, "model_name": model_name})
+
             tools = await mcp_client.tools()
             tool_schemas = [
                 {

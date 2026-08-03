@@ -439,17 +439,21 @@
 }
 
 .assistant-svg-body {
-    padding: 1rem;
+    padding: 0;
     background: #ffffff;
-    overflow-x: auto;
+    overflow: hidden;
+    min-height: 18rem;
+    max-height: 32rem;
+    position: relative;
 }
 
-.assistant-svg-body svg {
+.assistant-svg-body .svg-viewer {
     width: 100%;
-    height: auto;
-    display: block;
-    min-height: 12rem;
-    max-height: 40rem;
+    height: 100%;
+    min-height: 18rem;
+    max-height: 32rem;
+    background: #ffffff;
+    border-radius: 0 0 0.5rem 0.5rem;
 }
 
 /* Sticky header */

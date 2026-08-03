@@ -612,10 +612,6 @@ class AssistantApp extends AppBase {
         // Clicks are handled globally on this.chatEl; kept for compatibility.
     }
 
-    _currentSvgCard() {
-        return this.activeSvgCard || null;
-    }
-
     _appendSvgCard(svgText) {
         if (!svgText) return null;
         const id = 'assistant-svg-' + Date.now();
@@ -630,27 +626,33 @@ class AssistantApp extends AppBase {
                 </svg>
                 <span>Visualisation du modèle</span>
             </div>
-            <div class="assistant-svg-body">${svgText}</div>
+            <div class="assistant-svg-body"></div>
         `;
         this.messagesEl.appendChild(div);
+        const body = div.querySelector('.assistant-svg-body');
+        const viewer = new SvgViewer(body, { defaultScale: 1 });
+        viewer.setSvgAndRestore(svgText, '');
         this.activeSvgCard = div;
+        this.activeSvgViewer = viewer;
         this._scrollToBottom();
         return div;
     }
 
     _updateCurrentSvgCard(svgText) {
         if (!svgText) return;
-        let card = this._currentSvgCard();
-        if (!card) {
-            card = this._appendSvgCard(svgText);
+        if (!this.activeSvgCard || !this.activeSvgViewer) {
+            this._appendSvgCard(svgText);
         } else {
-            card.querySelector('.assistant-svg-body').innerHTML = svgText;
+            const state = this.activeSvgViewer.getState();
+            this.activeSvgViewer.setSvg(svgText, '');
+            this.activeSvgViewer.restoreState(state);
         }
         this._scrollToBottom();
     }
 
     _freezeCurrentSvgCard() {
         this.activeSvgCard = null;
+        this.activeSvgViewer = null;
     }
 
     _sparkleSvg() {
