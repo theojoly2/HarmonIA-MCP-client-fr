@@ -413,9 +413,23 @@ class AssistantMCPClient:
 
     async def _style_guide_check(self, payload: dict[str, Any]) -> dict[str, Any]:
         arguments = payload.get("tool_arguments") or {}
-        self.tool_results.setdefault("validator_check", arguments.get("validator_check", {}))
-        self.tool_results.setdefault("metadata_checker", arguments.get("metadata_checker", {}))
-        self.tool_results.setdefault("reuse_check", arguments.get("reuse_check", {}))
+
+        def _as_result_dict(value: Any) -> dict[str, Any]:
+            if isinstance(value, dict):
+                return value
+            if isinstance(value, str):
+                return {"report": value, "status": "error"}
+            return {}
+
+        self.tool_results.setdefault("validator_check", _as_result_dict(arguments.get("validator_check")))
+        self.tool_results.setdefault("metadata_checker", _as_result_dict(arguments.get("metadata_checker")))
+        self.tool_results.setdefault("reuse_check", _as_result_dict(arguments.get("reuse_check")))
+
+        # Ensure previously stored results (from prior tool calls in the same request) are dicts.
+        self.tool_results["validator_check"] = _as_result_dict(self.tool_results.get("validator_check"))
+        self.tool_results["metadata_checker"] = _as_result_dict(self.tool_results.get("metadata_checker"))
+        self.tool_results["reuse_check"] = _as_result_dict(self.tool_results.get("reuse_check"))
+
         call_args = {
             "validator_check": self.tool_results.get("validator_check") or {},
             "metadata_checks": self.tool_results.get("metadata_checker") or {},

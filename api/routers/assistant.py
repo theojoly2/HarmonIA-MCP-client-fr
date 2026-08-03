@@ -468,9 +468,14 @@ async def assistant_stream_generator(
 
                             parsed_tool = _safe_json_loads(tool_message) or {}
                             tool_results = parsed_tool.get("tool_results") if isinstance(parsed_tool, dict) else None
-                            tool_error = isinstance(tool_results, dict) and bool(tool_results.get("error"))
+                            tool_error = (
+                                isinstance(tool_results, dict) and bool(tool_results.get("error"))
+                                or isinstance(tool_results, str) and (
+                                    tool_results.lower().startswith("error") or "error" in tool_results.lower()
+                                )
+                            )
                             top_error = isinstance(parsed_tool, dict) and bool(parsed_tool.get("error"))
-                            call_results[call_key] = {"error": tool_error or top_error}
+                            call_results[call_key] = {"error": bool(tool_error or top_error)}
 
                         is_mutation = name in {"add_class", "add_attribute", "add_connector"}
                         is_analysis = name in analysis_tools
@@ -598,7 +603,11 @@ async def assistant_stream_generator(
                         if name == "style_guide_check":
                             report = ""
                             if isinstance(parsed_tool, dict):
-                                report = (parsed_tool.get("tool_results") or {}).get("report", "")
+                                tool_results = parsed_tool.get("tool_results")
+                                if isinstance(tool_results, dict):
+                                    report = tool_results.get("report", "")
+                                elif isinstance(tool_results, str):
+                                    report = tool_results
                             if report:
                                 history.add_assistant_message(report)
                                 yield _event("assistant_text", {"content": report})
