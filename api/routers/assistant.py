@@ -346,6 +346,11 @@ async def assistant_stream_generator(
                         current_model_prompt=current_model_prompt,
                     )
                 ]
+                print(f"[Assistant loop {loop_count}/{max_loops}] messages sent to LLM: {len(llm_messages)} (system/user/tool)")
+                for i, msg in enumerate(llm_messages):
+                    role = msg.get("role", "unknown")
+                    content_preview = str(msg.get("content", ""))[:120].replace('\n', ' ')
+                    print(f"  msg[{i}] role={role} len={len(str(msg.get('content', '')))} preview={content_preview}...")
 
                 content = ""
                 tool_calls: list[dict[str, Any]] = []
@@ -370,11 +375,15 @@ async def assistant_stream_generator(
                 async for line in _drain_heartbeats():
                     yield line
 
+                print(f"[Assistant loop {loop_count}/{max_loops}] LLM response: content_len={len(content)}, tool_calls={len(tool_calls)}, streamed_any_text={streamed_any_text}")
+
                 if not content and not tool_calls:
+                    print(f"[Assistant loop {loop_count}/{max_loops}] empty response, stopping")
                     yield _event("assistant_done", {"content": ""})
                     break
 
                 if tool_calls:
+                    print(f"[Assistant loop {loop_count}/{max_loops}] processing {len(tool_calls)} tool call(s): {[tc['function']['name'] for tc in tool_calls]}")
                     history.add_assistant_message(content, tool_calls=tool_calls)
                     yield _event("assistant_tool_calls", {"tool_calls": tool_calls})
                     async for line in _drain_heartbeats():
@@ -388,12 +397,27 @@ async def assistant_stream_generator(
                         if not isinstance(arguments, dict):
                             arguments = {}
 
+                        print(f"[Assistant loop {loop_count}/{max_loops}] calling tool: {name} args={arguments}")
                         yield _event("tool_start", {"name": name, "arguments": arguments})
                         async for line in _drain_heartbeats():
                             yield line
 
                         tool_message = await mcp_client.call_tool(name, arguments)
                         parsed_tool = _safe_json_loads(tool_message) or {}
+                        print(f"[Assistant loop {loop_count}/{max_loops}] tool {name} result preview: {str(tool_message)[:300]}")
+
+                        # Keep the last execution plan in the LLM context so the assistant
+                        # follows it instead of calling the planner again each turn.
+                        if name == "plan_workflow_with_tools":
+                            plan_content = tool_message or ""
+                            if isinstance(parsed_tool, dict):
+                                if "final_plan" in parsed_tool:
+                                    plan_content = json.dumps(parsed_tool, ensure_ascii=False)
+                                elif isinstance(parsed_tool.get("tool_results"), dict) and "final_plan" in parsed_tool["tool_results"]:
+                                    plan_content = json.dumps(parsed_tool["tool_results"], ensure_ascii=False)
+                            if plan_content:
+                                history.last_execution_plan_full = plan_content
+                                print(f"[Assistant loop {loop_count}/{max_loops}] stored execution plan, len={len(plan_content)}")
 
                         display_payload: dict[str, Any] | None = None
                         if name == "retrieve_documents":
@@ -468,6 +492,7 @@ async def assistant_stream_generator(
                     continue
 
                 else:
+                    print(f"[Assistant loop {loop_count}/{max_loops}] final text response, stopping")
                     history.add_assistant_message(content)
                     yield _event("assistant_done", {"content": ""})
                     break
