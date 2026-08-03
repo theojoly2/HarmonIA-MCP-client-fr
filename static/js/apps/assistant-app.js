@@ -638,10 +638,10 @@ class AssistantApp extends AppBase {
         return div;
     }
 
-    _updateCurrentSvgCard(svgText) {
+    _updateCurrentSvgCard(svgText, label = 'Visualisation du modèle') {
         if (!svgText) return;
         if (!this.activeSvgCard || !this.activeSvgViewer) {
-            this._appendSvgCard(svgText);
+            this._appendSvgCard(svgText, label);
         } else {
             const state = this.activeSvgViewer.getState();
             this.activeSvgViewer.setSvg(svgText, '');
@@ -1049,10 +1049,11 @@ class AssistantApp extends AppBase {
                     }
 
                     if (event.kind === 'model_svg') {
-                        // Append/update the SVG card for model mutations. Multiple model_svg
-                        // events in the same turn update the same active card rather than
-                        // creating a new card each time. A new user message freezes it first.
-                        this._updateCurrentSvgCard(event.svg);
+                        // Update the active SVG card if one exists; otherwise create a new one.
+                        // The active card is frozen (and detached) on every new user message, so
+                        // a new user request always starts with a fresh visualization card.
+                        // Multiple model_svg events within the same turn update that same card.
+                        this._updateCurrentSvgCard(event.svg, event.label || 'Visualisation du modèle');
                         return;
                     }
 

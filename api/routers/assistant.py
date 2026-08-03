@@ -305,11 +305,8 @@ async def assistant_stream_generator(
 
     try:
         async with AssistantMCPClient(state) as mcp_client:
-            # Send the initial SVG visualization of the imported model once the MCP client is ready.
-            if model_name and model_data:
-                svg_text = _generate_model_svg(model_data)
-                if svg_text:
-                    yield _event("model_svg", {"svg": svg_text, "model_name": model_name})
+            # SVG is only emitted after a model mutation or an explicit user request.
+            # Do NOT send the imported-model snapshot automatically on every user message.
 
             tools = await mcp_client.tools()
             tool_schemas = [
@@ -498,6 +495,8 @@ async def assistant_stream_generator(
                             summary = "Vérification de réutilisation effectuée."
                         elif name == "validator_check":
                             summary = "Validation effectuée."
+                        elif name == "display_model_visualization":
+                            summary = "Affichage de la visualisation du modèle demandé."
                         else:
                             summary = f"Résultat de {name} reçu."
                         history.add_assistant_message(
@@ -511,15 +510,17 @@ async def assistant_stream_generator(
                             parsed_tool.get("tool_results") if isinstance(parsed_tool, dict) else parsed_tool
                         )
 
-                        # After a model mutation, regenerate and stream the updated SVG so the
-                        # user can see the model evolve in the chat card.
-                        if name in {"add_class", "add_attribute", "add_connector"} and model_name:
+                        # SVG is only emitted on explicit model mutations or an explicit
+                        # display request. In both cases, refresh/update the single active
+                        # visualization card in place.
+                        should_display_svg = name in {"add_class", "add_attribute", "add_connector", "display_model_visualization"} and model_name
+                        if should_display_svg:
                             try:
-                                updated_model = await get_model_mcp(username, model_name)
-                                if updated_model:
-                                    updated_svg = _generate_model_svg(updated_model)
-                                    if updated_svg:
-                                        yield _event("model_svg", {"svg": updated_svg, "model_name": model_name})
+                                current_model = await get_model_mcp(username, model_name)
+                                if current_model:
+                                    svg_text = _generate_model_svg(current_model)
+                                    if svg_text:
+                                        yield _event("model_svg", {"svg": svg_text, "model_name": model_name, "source": name})
                                         async for line in _drain_heartbeats():
                                             yield line
                             except Exception as e:

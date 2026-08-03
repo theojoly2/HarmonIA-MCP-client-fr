@@ -36,6 +36,7 @@ EXPOSED_TOOLS: set[str] = {
     "reuse_check",
     "validator_check",
     "style_guide_check",
+    "display_model_visualization",
 }
 
 # Internal MCP tool names that should be exposed to the LLM under a legacy alias.
@@ -390,6 +391,20 @@ class AssistantMCPClient:
         payload["tool_arguments"] = call_args
         result = await self._call_tool_raw("style_guide_check", call_args)
         payload["tool_results"] = self._extract_result(result) or {}
+        return payload
+
+    async def _display_model_visualization(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """UI-only tool: tells the assistant to show the current model SVG in the chat.
+
+        This tool does not call the MCP server; the backend detects it and emits a
+        `model_svg` SSE event that the front-end renders as the live model card.
+        """
+        arguments = payload.get("tool_arguments") or {}
+        payload["tool_arguments"] = {
+            "model_name": _normalize_str_arg(arguments.get("model_name", self.state.get("name")), default=""),
+            "reason": _normalize_str_arg(arguments.get("reason", ""), default=""),
+        }
+        payload["tool_results"] = {"ok": True, "display": True}
         return payload
 
     # ------------------------------------------------------------------
