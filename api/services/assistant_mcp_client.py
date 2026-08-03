@@ -13,6 +13,7 @@ import logging
 import os
 from contextlib import AsyncExitStack
 from typing import Any, Mapping
+from uuid import uuid4
 
 from fastmcp import Client
 from openai import AsyncOpenAI
@@ -390,3 +391,53 @@ class AssistantMCPClient:
         result = await self._call_tool_raw("style_guide_check", call_args)
         payload["tool_results"] = self._extract_result(result) or {}
         return payload
+
+    # ------------------------------------------------------------------
+    # Direct UI helpers (not exposed to the LLM)
+    # ------------------------------------------------------------------
+
+    async def upload_model(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        """Upload a model JSON to the MCP server under the current user/session."""
+        assert self.client is not None, "MCP client not initialized"
+        model_payload = arguments.get("model")
+        if not model_payload:
+            return {}
+        try:
+            result = await self._call_tool_raw(
+                "upload_model",
+                {
+                    "user": self.state.get("user"),
+                    "name": self.state.get("name"),
+                    "model": model_payload,
+                },
+            )
+            if result is None:
+                return {}
+            return self._extract_result(result) or {}
+        except Exception as e:
+            logger.exception("upload_model failed: %s", e)
+            return {}
+
+    async def read_model(self) -> dict[str, Any]:
+        """Read the current user/session model from the MCP resource."""
+        assert self.client is not None, "MCP client not initialized"
+        user = self.state.get("user")
+        name = self.state.get("name")
+        if not user or not name:
+            return {}
+        try:
+            contents = await asyncio.wait_for(
+                self.client.read_resource(f"resource://model/{user}/{name}"),
+                timeout=15.0,
+            )
+            if not contents:
+                return {}
+            text = getattr(contents[0], "text", None)
+            return _safe_json_loads(text) or {}
+        except Exception as e:
+            logger.exception("read_model failed: %s", e)
+            return {}
+
+    @staticmethod
+    def _generate_id() -> str:
+        return f"EAID_{str(uuid4()).upper().replace('-', '_')}"

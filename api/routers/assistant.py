@@ -9,10 +9,11 @@ from __future__ import annotations
 import asyncio
 import json
 from collections import defaultdict
-from typing import Any, AsyncGenerator
+from io import BytesIO
+from typing import Any, AsyncGenerator, Optional
 
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, Request, UploadFile, File, Form, HTTPException
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from openai.types.chat import ChatCompletionSystemMessageParam
@@ -21,7 +22,9 @@ from api.dependencies import _LLM_MODEL, llm_client, render_results
 from api.routers.auth import require_user
 from api.services.assistant_history import AssistantHistory
 from api.services.assistant_mcp_client import AssistantMCPClient
-from api.services.mcp_service import fetch_search
+from api.services.mcp_service import fetch_search, upload_model_mcp, get_model_mcp
+from data_model_utils import _detect_file_type, ModelProcessingError, process_and_upload_model
+from data_model_utils.chat_data_structure import shorten_json
 
 router = APIRouter(prefix="/api/assistant", tags=["assistant"])
 
@@ -34,6 +37,16 @@ class AssistantStreamRequest(BaseModel):
 
 class AssistantSessionRequest(BaseModel):
     session: str = "default"
+
+
+def _model_name_from_filename(filename: Optional[str]) -> str:
+    import os as _os
+    import re as _re
+    base = filename or "imported_model"
+    base = _os.path.splitext(base)[0]
+    base = base.strip() or "imported_model"
+    base = _re.sub(r"[^a-zA-Z0-9_\-]", "_", base)
+    return base
 
 
 def _safe_json_loads(text: str | None) -> Any:
@@ -219,11 +232,23 @@ async def assistant_stream_generator(
         session=session_name,
     )
 
+    model_name = request.model_name.strip()
     state = {
         "user": username,
-        "name": request.model_name or session_name,
+        "name": model_name or session_name,
         "package": "",
     }
+
+    # Load the uploaded model from the MCP server to inject it into the LLM context.
+    current_model_prompt = ""
+    if model_name:
+        try:
+            model_data = await get_model_mcp(username, model_name)
+            if model_data:
+                short_model = shorten_json(model_data)
+                current_model_prompt = "[CURRENT MODEL]\n" + json.dumps(short_model, ensure_ascii=False, indent=2) + "\n\n[CURRENT USER MESSAGE]\n\n"
+        except Exception as e:
+            print(f"[Assistant] Failed to load model context for {model_name}: {e}")
 
     history.start_new_request(user_input)
     history.add_user_message(user_input, track_trace=False)
@@ -299,7 +324,7 @@ async def assistant_stream_generator(
                     {"role": msg["role"], "content": str(msg.get("content", ""))}
                     for msg in history.build_messages_for_llm(
                         current_user_input=user_input,
-                        current_model_prompt="",
+                        current_model_prompt=current_model_prompt,
                     )
                 ]
 
@@ -451,6 +476,102 @@ async def stream_assistant_response(
             "Connection": "keep-alive",
         },
     )
+
+
+@router.post("/import")
+async def import_assistant_model(
+    file: UploadFile = File(...),
+    name: Optional[str] = Form(None),
+    username: str = Depends(require_user),
+):
+    """
+    Import a model for the assistant chatbot, mirroring autre_version's upload_xml:
+    parse the file locally, build the JSON model, add a 'Generated' package for
+    XMI/XML, and upload the model to the MCP server so it becomes context for the LLM.
+    """
+    try:
+        file_bytes = await file.read()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to read uploaded file: {e}") from e
+
+    filename = file.filename or "model.txt"
+    display_name = (name or filename).strip() or "imported_model"
+    session_name = _model_name_from_filename(display_name)
+
+    try:
+        from data_model_utils import _detect_file_type
+        from data_model_utils.import_ttl import ttl_to_json
+        from data_model_utils.import_xml import xml_to_json
+        from api.services.assistant_mcp_client import AssistantMCPClient
+
+        kind = _detect_file_type(file_bytes, filename)
+        if kind is None:
+            raise ModelProcessingError("Unsupported file format.", "Please upload an XMI/XML or TTL file.")
+
+        json_data: dict[str, Any] = {}
+        if kind in {"xml", "xmi"}:
+            try:
+                json_data = xml_to_json(BytesIO(file_bytes))
+            except Exception as e:
+                raise ModelProcessingError("Failed to parse the XML/XMI file.", str(e))
+
+            elements = json_data.get("elements", [])
+            if not elements:
+                raise ModelProcessingError("Parsed XML has no elements.", "Ensure the XMI version is supported.")
+
+            root_model_id = elements[0].get("ID")
+            if not root_model_id:
+                raise ModelProcessingError("Parsed XML root element is missing an ID.")
+
+            async with AssistantMCPClient(state={"user": username, "name": session_name, "package": ""}) as mcp_client:
+                generated_id = mcp_client._generate_id()
+
+            elements.append({
+                "name": "Generated",
+                "ID": generated_id,
+                "type": "uml:Package",
+                "package": root_model_id,
+                "tags": [],
+            })
+            json_data["elements"] = elements
+            json_data["xmi"] = {
+                "elements": json_data.get("elements", []),
+                "connectors": json_data.get("connectors", []),
+            }
+            json_data["source_format"] = "xmi"
+            json_data["xmi_raw"] = file_bytes.decode("utf-8", errors="replace")
+            json_data["xmi_xml"] = json_data["xmi_raw"]
+        else:
+            try:
+                json_data = ttl_to_json(BytesIO(file_bytes))
+            except Exception as e:
+                raise ModelProcessingError("Failed to parse the TTL file.", str(e))
+
+            json_data["source_format"] = "ttl"
+            json_data["ttl_raw"] = file_bytes.decode("utf-8", errors="replace")
+            if "elements" in json_data or "connectors" in json_data:
+                json_data["xmi"] = {
+                    "elements": json_data.get("elements", []),
+                    "connectors": json_data.get("connectors", []),
+                }
+
+        async with AssistantMCPClient(state={"user": username, "name": session_name, "package": ""}) as mcp_client:
+            server_model = await mcp_client.upload_model({"model": json_data})
+            if not server_model:
+                raise ModelProcessingError("MCP Server Error", "Model upload returned None.")
+
+    except ModelProcessingError as e:
+        raise HTTPException(status_code=400, detail={"title": e.title, "details": e.details}) from e
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Import failed: {e}") from e
+
+    return JSONResponse({
+        "name": session_name,
+        "display_name": display_name,
+        "source_format": kind or "unknown",
+    })
 
 
 @router.get("/test-stream")

@@ -60,7 +60,7 @@ class AssistantApp extends AppBase {
                         </form>
                     </div>
                 </div>
-                <input type="file" id="assistant-model-file" accept=".xmi,.owl,.ttl,.rdf,.json" class="hidden">
+                <input type="file" id="assistant-model-file" accept=".xml,.xmi,.ttl" class="hidden">
             </div>
         `;
 
@@ -237,10 +237,10 @@ class AssistantApp extends AppBase {
     async _importModel(file) {
         if (!file) return;
         try {
-            const result = await ApiClient.importAndSaveModel(file, file.name);
-            if (result?.name || result?.model_name) {
-                this.modelName = result.name || result.model_name;
-                this._appendSystemMessage(`Modèle **${this._escape(this.modelName)}** importé avec succès. Vous pouvez maintenant lui poser des questions.`);
+            const result = await ApiClient.importAssistantModel(file, file.name);
+            if (result?.name) {
+                this.modelName = result.name;
+                this._appendSystemMessage(`Modèle **${this._escape(result.display_name || result.name)}** importé avec succès. Vous pouvez maintenant lui poser des questions.`);
             } else {
                 this._appendSystemMessage('Le modèle a été importé.');
             }

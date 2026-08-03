@@ -61,6 +61,23 @@ const ApiClient = (() => {
         return res.json();
     }
 
+    async function importAssistantModel(file, name) {
+        const formData = new FormData();
+        formData.append("file", file);
+        if (name) formData.append("name", name);
+        const res = await fetch(apiUrl("assistant/import"), {
+            method: "POST",
+            credentials: "same-origin",
+            body: formData,
+        });
+        if (!res.ok) {
+            if (res.status === 401) throw new Error("not_authenticated");
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || `Assistant model import failed: ${res.status}`);
+        }
+        return res.json();
+    }
+
     async function getModelSvg(name) {
         const res = await fetch(apiUrl(`models/${encodeURIComponent(name)}/open`), {
             method: "POST",
@@ -278,6 +295,7 @@ const ApiClient = (() => {
         getDocumentVisualizeUrl,
         importModéliseurFile,
         importAndSaveModel,
+        importAssistantModel,
         getModelSvg,
         createEmptyModel,
         getModels,
