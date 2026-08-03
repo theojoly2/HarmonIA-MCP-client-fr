@@ -424,7 +424,7 @@ class AssistantApp extends AppBase {
     _appendProgressCard(cardId, toolName) {
         const labels = {
             metadata_checker: 'Vérification des métadonnées',
-            validator_check: 'Validation',
+            validator_check: 'Validation guide de style',
             reuse_check: 'Vérification de réutilisation',
             style_guide_check: 'Vérification du guide de style',
         };
@@ -451,8 +451,46 @@ class AssistantApp extends AppBase {
         // Also add a pulsing sparkle placeholder just below the card, like "Planification en cours...".
         const status = this._appendThinkingPlaceholder(label);
         status.dataset.progressStatus = cardId;
+        this._startFakeProgress(cardId);
         this._scrollToBottom();
         return div;
+    }
+
+    _startFakeProgress(cardId) {
+        const card = document.getElementById(cardId);
+        if (!card) return;
+        // Don't run the fake animation if the tool reports real progress quickly.
+        let realPercent = 0;
+        const fill = card.querySelector('.assistant-progress-bar-fill');
+        const updateReal = (pct) => { realPercent = pct; };
+        card.dataset.realPercent = '0';
+        card._updateRealPercent = updateReal;
+
+        let fakePercent = 0;
+        const interval = setInterval(() => {
+            if (!document.getElementById(cardId)) {
+                clearInterval(interval);
+                return;
+            }
+            const reported = parseInt(card.dataset.realPercent || '0', 10);
+            // Only advance the fake bar if we are ahead of the real reported progress.
+            // Stop a little before the end (90%) until the tool actually finishes.
+            const cap = reported > 0 ? Math.min(90, Math.max(reported + 5, fakePercent + 2)) : Math.min(90, fakePercent + 2);
+            if (fakePercent < cap) {
+                fakePercent = cap;
+                if (fill && fakePercent > reported) fill.style.width = `${fakePercent}%`;
+            }
+        }, 800);
+        card._fakeProgressInterval = interval;
+    }
+
+    _stopFakeProgress(cardId) {
+        const card = document.getElementById(cardId);
+        if (!card) return;
+        if (card._fakeProgressInterval) {
+            clearInterval(card._fakeProgressInterval);
+            card._fakeProgressInterval = null;
+        }
     }
 
     _updateProgressCard(cardId, percent, message) {
@@ -460,6 +498,7 @@ class AssistantApp extends AppBase {
         if (!card) return;
         const fill = card.querySelector('.assistant-progress-bar-fill');
         const msg = card.querySelector('.assistant-progress-message');
+        card.dataset.realPercent = String(percent);
         if (fill) fill.style.width = `${percent}%`;
         if (msg) msg.textContent = message || '';
         this._scrollToBottom();
@@ -474,8 +513,12 @@ class AssistantApp extends AppBase {
     _completeProgressCard(cardId) {
         const card = document.getElementById(cardId);
         if (!card) return;
+        this._stopFakeProgress(cardId);
         const fill = card.querySelector('.assistant-progress-bar-fill');
-        if (fill) fill.style.width = '100%';
+        if (fill) {
+            fill.style.transition = 'width 0.3s ease';
+            fill.style.width = '100%';
+        }
         card.classList.add('assistant-progress-done');
         this._scrollToBottom();
     }

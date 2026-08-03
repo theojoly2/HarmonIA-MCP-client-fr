@@ -425,26 +425,36 @@ async def assistant_stream_generator(
                                 async for line in _drain_heartbeats():
                                     yield line
 
+                            queue: asyncio.Queue[str] = asyncio.Queue()
+
                             async def _progress_handler(progress: float, total: float | None, message: str | None) -> None:
                                 if progress_card_id is None:
                                     return
                                 pct = 0
                                 if total and total > 0:
                                     pct = int(min(100, max(0, (progress / total) * 100)))
-                                yield _event("progress_update", {
+                                await queue.put(_event("progress_update", {
                                     "card_id": progress_card_id,
                                     "tool_name": name,
                                     "percent": pct,
                                     "step": int(progress),
                                     "total": int(total) if total else None,
                                     "message": message or "",
-                                })
+                                }))
 
                             try:
                                 if progress_card_id is not None:
-                                    tool_message = await mcp_client.call_tool(
-                                        name, arguments, progress_handler=_progress_handler
-                                    )
+                                    progress_task = asyncio.create_task(_emit_progress_queue(queue))
+                                    try:
+                                        tool_message = await mcp_client.call_tool(
+                                            name, arguments, progress_handler=_progress_handler
+                                        )
+                                    finally:
+                                        await queue.put("__done__")
+                                        try:
+                                            await asyncio.wait_for(progress_task, timeout=2.0)
+                                        except Exception:
+                                            pass
                                 else:
                                     tool_message = await mcp_client.call_tool(name, arguments)
                             finally:
@@ -631,6 +641,13 @@ async def assistant_stream_generator(
     history.finalize_current_request_summary()
     history.save()
     yield _event("done", {})
+
+
+async def _emit_progress_queue(queue: asyncio.Queue[str]) -> None:
+    while True:
+        item = await queue.get()
+        if item == "__done__":
+            break
 
 
 @router.post("/stream")
