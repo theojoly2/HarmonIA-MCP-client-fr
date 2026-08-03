@@ -625,7 +625,12 @@ async def assistant_stream_generator(
                             add_to_display=False,
                         )
                     elif all_tools_were_analysis and analysis_success_count > 0:
-                        final_observation = f"[OBSERVATION] L(es) {analysis_success_count} analyse(s)/vérification(s) demandée(s) ont été effectuées. Tu dois maintenant répondre à l'utilisateur avec un résumé des résultats, sans rappeler le même outil d'analyse."
+                        names = sorted({tc['function']['name'] for tc in tool_calls})
+                        final_observation = (
+                            "[OBSERVATION] "
+                            + ", ".join(names)
+                            + " exécuté(s) avec succès. Passe à l'étape suivante du plan si une autre vérification est prévue."
+                        )
                         history.add_assistant_message(
                             final_observation,
                             add_to_llm_request=True,
