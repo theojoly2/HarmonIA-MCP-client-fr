@@ -327,6 +327,10 @@ async def assistant_stream_generator(
             loop_count = 0
             max_loops = 6
             stream_started_at = asyncio.get_event_loop().time()
+            # Track mutation calls within this request. Key: "tool_name:args_json".
+            # Value: last result dict. Used to avoid infinite loops while still allowing
+            # retries after genuine errors.
+            mutation_results: dict[str, dict[str, Any]] = {}
 
             while loop_count < max_loops:
                 loop_count += 1
@@ -391,8 +395,26 @@ async def assistant_stream_generator(
                         async for line in _drain_heartbeats():
                             yield line
 
-                        tool_message = await mcp_client.call_tool(name, arguments)
-                        parsed_tool = _safe_json_loads(tool_message) or {}
+                        # Deduplicate repeated mutation calls within the same request.
+                        # Allow retries only if the previous identical call failed.
+                        if name in {"add_class", "add_attribute", "add_connector"}:
+                            mutation_key = f"{name}:{json.dumps(arguments, sort_keys=True, ensure_ascii=False)}"
+                            previous = mutation_results.get(mutation_key)
+                            if previous and not previous.get("error"):
+                                tool_message = json.dumps({
+                                    "tool_name": name,
+                                    "tool_arguments": arguments,
+                                    "tool_results": {"status": "already_executed", "ok": True},
+                                }, ensure_ascii=False)
+                                parsed_tool = _safe_json_loads(tool_message) or {}
+                            else:
+                                tool_message = await mcp_client.call_tool(name, arguments)
+                                parsed_tool = _safe_json_loads(tool_message) or {}
+                                tool_results = parsed_tool.get("tool_results") if isinstance(parsed_tool, dict) else None
+                                mutation_results[mutation_key] = {"error": bool(tool_results and tool_results.get("error"))}
+                        else:
+                            tool_message = await mcp_client.call_tool(name, arguments)
+                            parsed_tool = _safe_json_loads(tool_message) or {}
 
                         # Keep the last execution plan in the LLM context so the assistant
                         # follows it instead of calling the planner again each turn.
