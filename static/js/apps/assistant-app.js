@@ -20,6 +20,7 @@ class AssistantApp extends AppBase {
         this.modelName = props.modelName || '';
         this.messages = [];
         this.isStreaming = false;
+        this.hasReceivedModelSvg = false;
     }
 
     render(container) {
@@ -159,6 +160,7 @@ class AssistantApp extends AppBase {
         this.session = '';
         this.modelName = '';
         this.messages = [];
+        this.hasReceivedModelSvg = false;
         this.messagesEl.innerHTML = '';
         this.chatEl.classList.remove('assistant-chat-mode');
         this.headerEl.classList.remove('assistant-header-compact');
@@ -640,6 +642,17 @@ class AssistantApp extends AppBase {
 
     _updateCurrentSvgCard(svgText) {
         if (!svgText) return;
+        const isFirstSvg = !this.hasReceivedModelSvg;
+        this.hasReceivedModelSvg = true;
+
+        if (isFirstSvg) {
+            // First SVG = imported model snapshot. Append it, then freeze it
+            // immediately so it stays pinned at the top of the chat.
+            this._appendSvgCard(svgText);
+            this._freezeCurrentSvgCard();
+            return;
+        }
+
         if (!this.activeSvgCard || !this.activeSvgViewer) {
             this._appendSvgCard(svgText);
         } else {
@@ -651,6 +664,10 @@ class AssistantApp extends AppBase {
     }
 
     _freezeCurrentSvgCard() {
+        if (this.activeSvgCard && this.activeSvgViewer) {
+            // Detach the live viewer reference so the card becomes a static snapshot.
+            this.activeSvgCard.dataset.svgFrozen = 'true';
+        }
         this.activeSvgCard = null;
         this.activeSvgViewer = null;
     }
