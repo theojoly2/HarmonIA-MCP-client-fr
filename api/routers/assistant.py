@@ -260,18 +260,13 @@ async def assistant_stream_generator(
 
     # Load the uploaded model from the MCP server to inject it into the LLM context.
     current_model_prompt = ""
+    model_data: dict[str, Any] | None = None
     if model_name:
         try:
             model_data = await get_model_mcp(username, model_name)
             if model_data:
                 short_model = shorten_json(model_data)
                 current_model_prompt = "[CURRENT MODEL]\n" + json.dumps(short_model, ensure_ascii=False, indent=2) + "\n\n[CURRENT USER MESSAGE]\n\n"
-                # Send the initial SVG visualization of the imported model.
-                svg_text = _generate_model_svg(model_data)
-                if svg_text:
-                    yield _event("model_svg", {"svg": svg_text, "model_name": model_name})
-                    async for line in _drain_heartbeats():
-                        yield line
         except Exception as e:
             print(f"[Assistant] Failed to load model context for {model_name}: {e}")
 
@@ -285,6 +280,15 @@ async def assistant_stream_generator(
         )
 
     yield _event("user", {"content": user_input, "session": session_name, "is_new_session": is_new_session})
+
+    # Send the initial SVG visualization of the imported model after entering the streaming
+    # loop so _drain_heartbeats is available.
+    if model_name and model_data:
+        svg_text = _generate_model_svg(model_data)
+        if svg_text:
+            yield _event("model_svg", {"svg": svg_text, "model_name": model_name})
+            async for line in _drain_heartbeats():
+                yield line
 
     # Background heartbeat: sends an SSE comment every ~300ms. This forces reverse
     # proxies / CDNs to flush their buffers so the client sees events progressively.
@@ -386,6 +390,11 @@ async def assistant_stream_generator(
                     async for line in _drain_heartbeats():
                         yield line
 
+                    # Track whether this turn actually mutated the model. If a planning tool is
+                    # called but no mutation happens, we should stop looping to avoid infinite
+                    # plan/execute cycles.
+                    turn_mutated_model = False
+
                     for tool_call in tool_calls:
                         function = tool_call["function"]
                         name = function["name"]
@@ -448,6 +457,7 @@ async def assistant_stream_generator(
                         # After a model mutation, regenerate and stream the updated SVG so the
                         # user can see the model evolve in the chat card.
                         if name in {"add_class", "add_attribute", "add_connector"} and model_name:
+                            turn_mutated_model = True
                             try:
                                 updated_model = await get_model_mcp(username, model_name)
                                 if updated_model:
@@ -476,6 +486,13 @@ async def assistant_stream_generator(
                     yield _event("loop_done", {"loop": loop_count})
                     async for line in _drain_heartbeats():
                         yield line
+
+                    # If we planned but did not actually mutate the model this turn, do not loop
+                    # again: the plan has been executed and the response should now be final.
+                    if plan_already_used and plan_successful and not turn_mutated_model:
+                        yield _event("assistant_done", {"content": ""})
+                        break
+
                     continue
 
                 else:
