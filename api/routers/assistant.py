@@ -389,10 +389,13 @@ async def assistant_stream_generator(
                     async for line in _drain_heartbeats():
                         yield line
 
-                    # Track whether this loop contained only successful mutation tools.
+                    # Track whether this loop contained only successful mutation/analysis tools.
                     # If so, we add a clear final observation at the end so the LLM stops.
                     all_tools_were_mutations = True
                     mutation_success_count = 0
+                    analysis_tools = {"metadata_checker", "reuse_check", "validator_check", "style_guide_check"}
+                    all_tools_were_analysis = True
+                    analysis_success_count = 0
 
                     for tool_call in tool_calls:
                         function = tool_call["function"]
@@ -470,9 +473,13 @@ async def assistant_stream_generator(
                             call_results[call_key] = {"error": tool_error or top_error}
 
                         is_mutation = name in {"add_class", "add_attribute", "add_connector"}
+                        is_analysis = name in analysis_tools
                         all_tools_were_mutations = all_tools_were_mutations and is_mutation
+                        all_tools_were_analysis = all_tools_were_analysis and is_analysis
                         if is_mutation and not call_results.get(call_key, {}).get("error"):
                             mutation_success_count += 1
+                        if is_analysis and not call_results.get(call_key, {}).get("error"):
+                            analysis_success_count += 1
 
                         # Keep the last execution plan in the LLM context so the assistant
                         # follows it instead of calling the planner again each turn.
@@ -606,11 +613,19 @@ async def assistant_stream_generator(
                     async for line in _drain_heartbeats():
                         yield line
 
-                    # If this loop contained only successful mutations, inject a final
-                    # assistant observation telling the model the mutations are done.
-                    # This prevents the LLM from re-issuing the same mutation tool forever.
+                    # If this loop contained only successful mutations or analysis tools,
+                    # inject a final assistant observation telling the model to stop and
+                    # answer the user. This prevents the LLM from re-issuing the same tool.
                     if all_tools_were_mutations and mutation_success_count > 0:
                         final_observation = f"[OBSERVATION] Les {mutation_success_count} mutation(s) demandée(s) ont été appliquées au modèle. Tu dois maintenant répondre à l'utilisateur avec un résumé de ce qui a été fait, sans appeler d'autre outil de mutation."
+                        history.add_assistant_message(
+                            final_observation,
+                            add_to_llm_request=True,
+                            track_trace=False,
+                            add_to_display=False,
+                        )
+                    elif all_tools_were_analysis and analysis_success_count > 0:
+                        final_observation = f"[OBSERVATION] L(es) {analysis_success_count} analyse(s)/vérification(s) demandée(s) ont été effectuées. Tu dois maintenant répondre à l'utilisateur avec un résumé des résultats, sans rappeler le même outil d'analyse."
                         history.add_assistant_message(
                             final_observation,
                             add_to_llm_request=True,
