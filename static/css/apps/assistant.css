@@ -146,6 +146,84 @@
     border-color: #86efac;
 }
 
+/* === Progress card (metadata/validator/reuse/style checks) === */
+.assistant-progress-card {
+    background: #ffffff;
+    border: 1px solid #fdba74;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    width: 42rem;
+    max-width: 100%;
+    margin: 0.75rem 0;
+    box-shadow: 0 4px 6px -1px rgba(234, 88, 12, 0.08);
+}
+
+.assistant-progress-card.assistant-progress-done {
+    border-color: #86efac;
+    box-shadow: 0 4px 6px -1px rgba(22, 101, 52, 0.08);
+}
+
+.assistant-progress-card.assistant-progress-done .assistant-progress-header {
+    background: #f0fdf4;
+    border-bottom-color: #bbf7d0;
+    color: #166534;
+}
+
+.assistant-progress-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: #fff7ed;
+    border-bottom: 1px solid #ffedd5;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #c2410c;
+}
+
+.assistant-progress-header svg {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+}
+
+.assistant-progress-body {
+    padding: 0.75rem 1rem;
+}
+
+.assistant-progress-bar-bg {
+    width: 100%;
+    height: 0.5rem;
+    background: #fed7aa;
+    border-radius: 9999px;
+    overflow: hidden;
+}
+
+.assistant-progress-bar-fill {
+    height: 100%;
+    background: #f97316;
+    border-radius: 9999px;
+    transition: width 0.2s ease;
+}
+
+.assistant-progress-card.assistant-progress-done .assistant-progress-bar-bg {
+    background: #bbf7d0;
+}
+
+.assistant-progress-card.assistant-progress-done .assistant-progress-bar-fill {
+    background: #22c55e;
+}
+
+.assistant-progress-message {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    color: #9a3412;
+}
+
+.assistant-progress-card.assistant-progress-done .assistant-progress-message {
+    color: #166534;
+}
+
 .assistant-tool-card-header {
     display: flex;
     flex-direction: column;

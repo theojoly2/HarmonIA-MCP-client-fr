@@ -12,7 +12,7 @@ import json
 import logging
 import os
 from contextlib import AsyncExitStack
-from typing import Any, Mapping
+from typing import Any, Awaitable, Callable, Mapping, Optional
 from uuid import uuid4
 
 from fastmcp import Client
@@ -143,6 +143,32 @@ class AssistantMCPClient:
     async def __aexit__(self, exc_type, exc, tb) -> None:
         await self.exit_stack.aclose()
 
+    async def _call_tool_raw(
+        self,
+        tool_name: str,
+        call_args: dict[str, Any],
+        progress_handler: Optional[Callable[[float, Optional[float], Optional[str]], Awaitable[None]]] = None,
+    ) -> Any:
+        assert self.client is not None, "MCP client not initialized"
+        try:
+            if progress_handler is not None:
+                progress_client = Client(
+                    self.server_url,
+                    sampling_handler=_sampling_handler,
+                    progress_handler=progress_handler,
+                )
+                async with progress_client:
+                    return await asyncio.wait_for(
+                        progress_client.call_tool(tool_name, call_args),
+                        timeout=240.0,
+                    )
+            return await asyncio.wait_for(
+                self.client.call_tool(tool_name, call_args),
+                timeout=240.0,
+            )
+        except asyncio.TimeoutError:
+            return None
+
     async def tools(self) -> list[ChatCompletionToolParam]:
         assert self.client is not None, "MCP client not initialized"
         tools = await self.client.list_tools()
@@ -162,9 +188,19 @@ class AssistantMCPClient:
                 )
         return exposed
 
-    async def call_tool(self, name: str, arguments: dict[str, Any]) -> str:
+    async def call_tool(
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        progress_handler: Optional[Callable[[float, Optional[float], Optional[str]], Awaitable[None]]] = None,
+    ) -> str:
         logger.info("[Assistant MCP] call_tool: %s args=%s", name, arguments)
-        payload: dict[str, Any] = {"tool_name": name, "tool_arguments": arguments, "tool_results": ""}
+        payload: dict[str, Any] = {
+            "tool_name": name,
+            "tool_arguments": arguments,
+            "tool_results": "",
+            "progress_handler": progress_handler,
+        }
 
         if name not in EXPOSED_TOOLS:
             payload["tool_results"] = f"Tool '{name}' is not exposed."
@@ -190,17 +226,8 @@ class AssistantMCPClient:
             logger.exception("call_tool failed for %s: %s", name, e)
             payload["tool_results"] = f"Error calling tool '{name}': {e}"
 
+        payload.pop("progress_handler", None)
         return json.dumps(payload, ensure_ascii=False)
-
-    async def _call_tool_raw(self, tool_name: str, call_args: dict[str, Any]) -> Any:
-        assert self.client is not None, "MCP client not initialized"
-        try:
-            return await asyncio.wait_for(
-                self.client.call_tool(tool_name, call_args),
-                timeout=240.0,
-            )
-        except asyncio.TimeoutError:
-            return None
 
     def _extract_result(self, result: Any) -> Any:
         if result is None:
@@ -346,7 +373,9 @@ class AssistantMCPClient:
             "check_instruction": _normalize_str_arg(arguments.get("check_instruction", "")),
         }
         payload["tool_arguments"] = call_args
-        result = await self._call_tool_raw("metadata_checker", call_args)
+        result = await self._call_tool_raw(
+            "metadata_checker", call_args, progress_handler=payload.get("progress_handler")
+        )
         payload["tool_results"] = self._extract_result(result) or {}
         return payload
 
@@ -360,7 +389,9 @@ class AssistantMCPClient:
             "target_names": _normalize_list_arg(arguments.get("target_names")),
         }
         payload["tool_arguments"] = call_args
-        result = await self._call_tool_raw("reuse_check", call_args)
+        result = await self._call_tool_raw(
+            "reuse_check", call_args, progress_handler=payload.get("progress_handler")
+        )
         payload["tool_results"] = self._extract_result(result) or {}
         return payload
 
@@ -374,7 +405,9 @@ class AssistantMCPClient:
             "validation_version": _normalize_str_arg(arguments.get("validation_version", "owl")),
         }
         payload["tool_arguments"] = call_args
-        result = await self._call_tool_raw("validator_check", call_args)
+        result = await self._call_tool_raw(
+            "validator_check", call_args, progress_handler=payload.get("progress_handler")
+        )
         payload["tool_results"] = self._extract_result(result) or {}
         return payload
 
@@ -389,7 +422,9 @@ class AssistantMCPClient:
             "reuse_checks": self.tool_results.get("reuse_check") or {},
         }
         payload["tool_arguments"] = call_args
-        result = await self._call_tool_raw("style_guide_check", call_args)
+        result = await self._call_tool_raw(
+            "style_guide_check", call_args, progress_handler=payload.get("progress_handler")
+        )
         payload["tool_results"] = self._extract_result(result) or {}
         return payload
 

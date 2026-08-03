@@ -421,6 +421,56 @@ class AssistantApp extends AppBase {
         card.classList.toggle('tool-done', !isRunning);
     }
 
+    _appendProgressCard(cardId, toolName) {
+        const labels = {
+            metadata_checker: 'Vérification des métadonnées',
+            validator_check: 'Validation',
+            reuse_check: 'Vérification de réutilisation',
+            style_guide_check: 'Vérification du guide de style',
+        };
+        const label = labels[toolName] || toolName;
+        const div = document.createElement('div');
+        div.id = cardId;
+        div.className = 'assistant-progress-card mb-4';
+        div.dataset.progressCard = 'true';
+        div.innerHTML = `
+            <div class="assistant-progress-header">
+                <svg class="text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+                <span>${this._escape(label)}</span>
+            </div>
+            <div class="assistant-progress-body">
+                <div class="assistant-progress-bar-bg">
+                    <div class="assistant-progress-bar-fill" style="width:0%"></div>
+                </div>
+                <div class="assistant-progress-message"></div>
+            </div>
+        `;
+        this.messagesEl.appendChild(div);
+        this._scrollToBottom();
+        return div;
+    }
+
+    _updateProgressCard(cardId, percent, message) {
+        const card = document.getElementById(cardId);
+        if (!card) return;
+        const fill = card.querySelector('.assistant-progress-bar-fill');
+        const msg = card.querySelector('.assistant-progress-message');
+        if (fill) fill.style.width = `${percent}%`;
+        if (msg) msg.textContent = message || '';
+        this._scrollToBottom();
+    }
+
+    _completeProgressCard(cardId) {
+        const card = document.getElementById(cardId);
+        if (!card) return;
+        const fill = card.querySelector('.assistant-progress-bar-fill');
+        if (fill) fill.style.width = '100%';
+        card.classList.add('assistant-progress-done');
+        this._scrollToBottom();
+    }
+
     _fillToolResult(name, result, display) {
         if (display && display.type === 'search') {
             this._fillSearchCard(display.query || '', display.results_html || '');
@@ -1072,6 +1122,23 @@ class AssistantApp extends AppBase {
                         // removes any previous placeholder first.
                         placeholder = this._appendThinkingPlaceholder(this._toolStatusLabel(event.name));
                         this.messages.push({ role: 'tool_start', name: event.name, arguments: event.arguments });
+                        return;
+                    }
+
+                    if (event.kind === 'progress_start') {
+                        resetBubble();
+                        this._hideAllSparkles();
+                        this._appendProgressCard(event.card_id, event.tool_name);
+                        return;
+                    }
+
+                    if (event.kind === 'progress_update') {
+                        this._updateProgressCard(event.card_id, event.percent, event.message);
+                        return;
+                    }
+
+                    if (event.kind === 'progress_done') {
+                        this._completeProgressCard(event.card_id);
                         return;
                     }
 

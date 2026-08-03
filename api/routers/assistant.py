@@ -12,6 +12,7 @@ import re
 from collections import defaultdict
 from io import BytesIO
 from typing import Any, AsyncGenerator, Optional
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Request, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -417,7 +418,41 @@ async def assistant_stream_generator(
                             }, ensure_ascii=False)
                             parsed_tool = _safe_json_loads(tool_message) or {}
                         else:
-                            tool_message = await mcp_client.call_tool(name, arguments)
+                            progress_card_id: str | None = None
+                            if name in {"metadata_checker", "reuse_check", "validator_check", "style_guide_check"}:
+                                progress_card_id = f"progress-{name}-{uuid4().hex[:8]}"
+                                yield _event("progress_start", {"card_id": progress_card_id, "tool_name": name})
+                                async for line in _drain_heartbeats():
+                                    yield line
+
+                            async def _progress_handler(progress: float, total: float | None, message: str | None) -> None:
+                                if progress_card_id is None:
+                                    return
+                                pct = 0
+                                if total and total > 0:
+                                    pct = int(min(100, max(0, (progress / total) * 100)))
+                                yield _event("progress_update", {
+                                    "card_id": progress_card_id,
+                                    "tool_name": name,
+                                    "percent": pct,
+                                    "step": int(progress),
+                                    "total": int(total) if total else None,
+                                    "message": message or "",
+                                })
+
+                            try:
+                                if progress_card_id is not None:
+                                    tool_message = await mcp_client.call_tool(
+                                        name, arguments, progress_handler=_progress_handler
+                                    )
+                                else:
+                                    tool_message = await mcp_client.call_tool(name, arguments)
+                            finally:
+                                if progress_card_id is not None:
+                                    yield _event("progress_done", {"card_id": progress_card_id, "tool_name": name})
+                                    async for line in _drain_heartbeats():
+                                        yield line
+
                             parsed_tool = _safe_json_loads(tool_message) or {}
                             tool_results = parsed_tool.get("tool_results") if isinstance(parsed_tool, dict) else None
                             tool_error = isinstance(tool_results, dict) and bool(tool_results.get("error"))
