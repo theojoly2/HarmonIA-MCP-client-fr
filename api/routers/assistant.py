@@ -629,7 +629,7 @@ async def assistant_stream_generator(
                         final_observation = (
                             "[OBSERVATION] "
                             + ", ".join(names)
-                            + " exécuté(s) avec succès. Passe à l'étape suivante du plan si une autre vérification est prévue."
+                            + " exécuté(s) avec succès."
                         )
                         history.add_assistant_message(
                             final_observation,

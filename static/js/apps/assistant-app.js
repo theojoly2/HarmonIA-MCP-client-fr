@@ -459,37 +459,49 @@ class AssistantApp extends AppBase {
     _startFakeProgress(cardId) {
         const card = document.getElementById(cardId);
         if (!card) return;
-        // Don't run the fake animation if the tool reports real progress quickly.
-        let realPercent = 0;
         const fill = card.querySelector('.assistant-progress-bar-fill');
-        const updateReal = (pct) => { realPercent = pct; };
         card.dataset.realPercent = '0';
-        card._updateRealPercent = updateReal;
 
         let fakePercent = 0;
-        const interval = setInterval(() => {
-            if (!document.getElementById(cardId)) {
-                clearInterval(interval);
-                return;
-            }
+        let velocity = 0;
+        let lastTime = performance.now();
+
+        const step = (now) => {
+            if (!document.getElementById(cardId)) return;
             const reported = parseInt(card.dataset.realPercent || '0', 10);
-            // Only advance the fake bar if we are ahead of the real reported progress.
-            // Stop a little before the end (90%) until the tool actually finishes.
-            const cap = reported > 0 ? Math.min(90, Math.max(reported + 5, fakePercent + 2)) : Math.min(90, fakePercent + 2);
-            if (fakePercent < cap) {
-                fakePercent = cap;
-                if (fill && fakePercent > reported) fill.style.width = `${fakePercent}%`;
+            const dt = Math.min((now - lastTime) / 1000, 0.1);
+            lastTime = now;
+
+            // Target is slightly ahead of reported progress, capped at 90% until real done.
+            const headroom = reported > 0 ? Math.min(90, reported + 8) : 90;
+            const distance = headroom - fakePercent;
+
+            if (distance > 0) {
+                // Smooth spring-like acceleration with a little randomness.
+                const targetVelocity = Math.max(0.5, distance * 1.5 + Math.random() * 4);
+                velocity += (targetVelocity - velocity) * 4 * dt;
+                const stepSize = velocity * dt;
+                fakePercent = Math.min(headroom, fakePercent + stepSize);
+            } else {
+                velocity *= 0.9;
             }
-        }, 800);
-        card._fakeProgressInterval = interval;
+
+            if (fill && fakePercent > reported) {
+                fill.style.width = `${fakePercent}%`;
+            }
+
+            card._fakeProgressFrame = requestAnimationFrame(step);
+        };
+
+        card._fakeProgressFrame = requestAnimationFrame(step);
     }
 
     _stopFakeProgress(cardId) {
         const card = document.getElementById(cardId);
         if (!card) return;
-        if (card._fakeProgressInterval) {
-            clearInterval(card._fakeProgressInterval);
-            card._fakeProgressInterval = null;
+        if (card._fakeProgressFrame) {
+            cancelAnimationFrame(card._fakeProgressFrame);
+            card._fakeProgressFrame = null;
         }
     }
 
