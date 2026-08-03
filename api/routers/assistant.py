@@ -327,10 +327,10 @@ async def assistant_stream_generator(
             loop_count = 0
             max_loops = 6
             stream_started_at = asyncio.get_event_loop().time()
-            # Track mutation calls within this request. Key: "tool_name:args_json".
-            # Value: last result dict. Used to avoid infinite loops while still allowing
+            # Track tool calls within this request. Key: "tool_name:args_json".
+            # Value: {error: bool}. Used to avoid infinite loops while still allowing
             # retries after genuine errors.
-            mutation_results: dict[str, dict[str, Any]] = {}
+            call_results: dict[str, dict[str, Any]] = {}
 
             while loop_count < max_loops:
                 loop_count += 1
@@ -378,6 +378,7 @@ async def assistant_stream_generator(
                     break
 
                 if tool_calls:
+                    print(f"[loop {loop_count}] tool_calls={[tc['function']['name'] for tc in tool_calls]}", flush=True)
                     history.add_assistant_message(content, tool_calls=tool_calls)
                     yield _event("assistant_tool_calls", {"tool_calls": tool_calls})
                     async for line in _drain_heartbeats():
@@ -395,26 +396,23 @@ async def assistant_stream_generator(
                         async for line in _drain_heartbeats():
                             yield line
 
-                        # Deduplicate repeated mutation calls within the same request.
+                        # Deduplicate repeated calls within the same request.
                         # Allow retries only if the previous identical call failed.
-                        if name in {"add_class", "add_attribute", "add_connector"}:
-                            mutation_key = f"{name}:{json.dumps(arguments, sort_keys=True, ensure_ascii=False)}"
-                            previous = mutation_results.get(mutation_key)
-                            if previous and not previous.get("error"):
-                                tool_message = json.dumps({
-                                    "tool_name": name,
-                                    "tool_arguments": arguments,
-                                    "tool_results": {"status": "already_executed", "ok": True},
-                                }, ensure_ascii=False)
-                                parsed_tool = _safe_json_loads(tool_message) or {}
-                            else:
-                                tool_message = await mcp_client.call_tool(name, arguments)
-                                parsed_tool = _safe_json_loads(tool_message) or {}
-                                tool_results = parsed_tool.get("tool_results") if isinstance(parsed_tool, dict) else None
-                                mutation_results[mutation_key] = {"error": bool(tool_results and tool_results.get("error"))}
+                        call_key = f"{name}:{json.dumps(arguments, sort_keys=True, ensure_ascii=False)}"
+                        previous = call_results.get(call_key)
+                        if previous and not previous.get("error"):
+                            tool_message = json.dumps({
+                                "tool_name": name,
+                                "tool_arguments": arguments,
+                                "tool_results": {"status": "already_executed", "ok": True},
+                            }, ensure_ascii=False)
+                            parsed_tool = _safe_json_loads(tool_message) or {}
                         else:
                             tool_message = await mcp_client.call_tool(name, arguments)
                             parsed_tool = _safe_json_loads(tool_message) or {}
+                            tool_results = parsed_tool.get("tool_results") if isinstance(parsed_tool, dict) else None
+                            has_error = bool(tool_results and tool_results.get("error")) or bool(parsed_tool and parsed_tool.get("error"))
+                            call_results[call_key] = {"error": has_error}
 
                         # Keep the last execution plan in the LLM context so the assistant
                         # follows it instead of calling the planner again each turn.
@@ -427,14 +425,12 @@ async def assistant_stream_generator(
                                     plan_content = json.dumps(parsed_tool["tool_results"], ensure_ascii=False)
                             if plan_content:
                                 history.last_execution_plan_full = plan_content
-                                # Add an explicit assistant "plan acknowledgement" message
-                                # (matching autre_version's pattern) so the LLM sees the plan
-                                # as an assistant message rather than just a raw tool result.
                                 plan_ack = json.dumps({"final_plan": json.loads(plan_content)}, ensure_ascii=False)
                                 history.add_assistant_message(
                                     plan_ack,
                                     add_to_llm_request=True,
                                     track_trace=False,
+                                    add_to_display=False,
                                 )
 
                         display_payload: dict[str, Any] | None = None
@@ -469,6 +465,45 @@ async def assistant_stream_generator(
                             llm_content=tool_message,
                             tool_name=name,
                             arguments=arguments,
+                        )
+
+                        # Add a short assistant observation to the LLM context so the model
+                        # clearly sees what happened instead of re-executing the same tool.
+                        tool_results = parsed_tool.get("tool_results") if isinstance(parsed_tool, dict) else None
+                        if name == "retrieve_documents":
+                            filenames = []
+                            if isinstance(tool_results, list):
+                                for item in tool_results:
+                                    if isinstance(item, (list, tuple)) and len(item) >= 1:
+                                        filenames.append(str(item[0]))
+                                    elif isinstance(item, dict):
+                                        filenames.append(str(item.get("filename") or item.get("file") or item.get("name") or ""))
+                            summary = f"J'ai récupéré {len(filenames)} document(s) : {', '.join(filenames)}." if filenames else "Aucun document pertinent trouvé."
+                        elif name == "add_class":
+                            title = tool_results.get("name") if isinstance(tool_results, dict) else None
+                            summary = f"Classe '{title}' ajoutée au modèle." if title else "Classe ajoutée au modèle."
+                        elif name == "add_attribute":
+                            attr_name = tool_results.get("name") if isinstance(tool_results, dict) else None
+                            class_name = tool_results.get("class_name") if isinstance(tool_results, dict) else None
+                            summary = f"Attribut '{attr_name}' ajouté à la classe '{class_name}'." if attr_name and class_name else "Attribut ajouté au modèle."
+                        elif name == "add_connector":
+                            rel_name = tool_results.get("rel_label") if isinstance(tool_results, dict) else None
+                            summary = f"Relation '{rel_name}' ajoutée au modèle." if rel_name else "Relation ajoutée au modèle."
+                        elif name == "style_guide_check":
+                            summary = "Vérification du guide de style effectuée."
+                        elif name == "metadata_checker":
+                            summary = "Vérification des métadonnées effectuée."
+                        elif name == "reuse_check":
+                            summary = "Vérification de réutilisation effectuée."
+                        elif name == "validator_check":
+                            summary = "Validation effectuée."
+                        else:
+                            summary = f"Résultat de {name} reçu."
+                        history.add_assistant_message(
+                            f"[OBSERVATION] {summary}",
+                            add_to_llm_request=True,
+                            track_trace=False,
+                            add_to_display=False,
                         )
 
                         mcp_client.tool_results[name] = (

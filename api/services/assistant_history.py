@@ -122,11 +122,13 @@ class AssistantHistory:
         tool_calls: Optional[list[dict[str, Any]]] = None,
         add_to_llm_request: bool = True,
         track_trace: bool = True,
+        add_to_display: bool = True,
     ) -> None:
         message = ChatCompletionAssistantMessageParam(role="assistant", content=content)
         if tool_calls:
             message["tool_calls"] = deepcopy(tool_calls)
-        self.display_messages.append(message)
+        if add_to_display:
+            self.display_messages.append(message)
         if add_to_llm_request:
             self.current_request_llm_messages.append(deepcopy(message))
         self._append_recent_message("assistant", content or "")
