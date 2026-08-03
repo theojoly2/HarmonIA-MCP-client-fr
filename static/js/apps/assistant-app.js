@@ -20,7 +20,6 @@ class AssistantApp extends AppBase {
         this.modelName = props.modelName || '';
         this.messages = [];
         this.isStreaming = false;
-        this.hasReceivedModelSvg = false;
     }
 
     render(container) {
@@ -160,7 +159,6 @@ class AssistantApp extends AppBase {
         this.session = '';
         this.modelName = '';
         this.messages = [];
-        this.hasReceivedModelSvg = false;
         this.messagesEl.innerHTML = '';
         this.chatEl.classList.remove('assistant-chat-mode');
         this.headerEl.classList.remove('assistant-header-compact');
@@ -614,7 +612,7 @@ class AssistantApp extends AppBase {
         // Clicks are handled globally on this.chatEl; kept for compatibility.
     }
 
-    _appendSvgCard(svgText) {
+    _appendSvgCard(svgText, label = 'Visualisation du modèle') {
         if (!svgText) return null;
         const id = 'assistant-svg-' + Date.now();
         const div = document.createElement('div');
@@ -626,7 +624,7 @@ class AssistantApp extends AppBase {
                 <svg class="text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
                 </svg>
-                <span>Visualisation du modèle</span>
+                <span>${label}</span>
             </div>
             <div class="assistant-svg-body"></div>
         `;
@@ -642,17 +640,6 @@ class AssistantApp extends AppBase {
 
     _updateCurrentSvgCard(svgText) {
         if (!svgText) return;
-        const isFirstSvg = !this.hasReceivedModelSvg;
-        this.hasReceivedModelSvg = true;
-
-        if (isFirstSvg) {
-            // First SVG = imported model snapshot. Append it, then freeze it
-            // immediately so it stays pinned at the top of the chat.
-            this._appendSvgCard(svgText);
-            this._freezeCurrentSvgCard();
-            return;
-        }
-
         if (!this.activeSvgCard || !this.activeSvgViewer) {
             this._appendSvgCard(svgText);
         } else {
@@ -1062,6 +1049,11 @@ class AssistantApp extends AppBase {
                     }
 
                     if (event.kind === 'model_svg') {
+                        // Only show/update the SVG card when a model mutation actually
+                        // happened in this turn. The backend already filters model_svg
+                        // events to mutation-only updates, so here we just create/refresh
+                        // the live card. We freeze any previous live card first.
+                        this._freezeCurrentSvgCard();
                         this._updateCurrentSvgCard(event.svg);
                         return;
                     }
