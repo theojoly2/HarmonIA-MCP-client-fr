@@ -434,6 +434,7 @@ class AssistantMCPClient:
             "validator_check": self.tool_results.get("validator_check") or {},
             "metadata_checks": self.tool_results.get("metadata_checker") or {},
             "reuse_checks": self.tool_results.get("reuse_check") or {},
+            "language": _normalize_str_arg(arguments.get("language"), default="fr"),
         }
         payload["tool_arguments"] = call_args
         result = await self._call_tool_raw(
