@@ -229,7 +229,10 @@ class AssistantHistory:
                 )
             recent_blocks.append("\n\n".join(rendered))
         if self.last_execution_plan_full:
+            print(f"[build_messages_for_llm] injecting last_execution_plan_full len={len(self.last_execution_plan_full)}")
             recent_blocks.append("[LAST EXECUTION PLAN - FULL]\n" + self.last_execution_plan_full)
+        else:
+            print("[build_messages_for_llm] last_execution_plan_full is empty")
         if self.last_tool_observations_compact:
             recent_blocks.append(
                 "[RECENT TOOL OBSERVATIONS - COMPACT]\n"
