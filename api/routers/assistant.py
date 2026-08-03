@@ -387,11 +387,6 @@ async def assistant_stream_generator(
                     async for line in _drain_heartbeats():
                         yield line
 
-                    # Track whether this turn actually mutated the model. If a planning tool is
-                    # called but no mutation happens, we should stop looping to avoid infinite
-                    # plan/execute cycles.
-                    turn_mutated_model = False
-
                     for tool_call in tool_calls:
                         function = tool_call["function"]
                         name = function["name"]
@@ -454,7 +449,6 @@ async def assistant_stream_generator(
                         # After a model mutation, regenerate and stream the updated SVG so the
                         # user can see the model evolve in the chat card.
                         if name in {"add_class", "add_attribute", "add_connector"} and model_name:
-                            turn_mutated_model = True
                             try:
                                 updated_model = await get_model_mcp(username, model_name)
                                 if updated_model:
@@ -483,12 +477,6 @@ async def assistant_stream_generator(
                     yield _event("loop_done", {"loop": loop_count})
                     async for line in _drain_heartbeats():
                         yield line
-
-                    # If we planned but did not actually mutate the model this turn, do not loop
-                    # again: the plan has been executed and the response should now be final.
-                    if plan_already_used and plan_successful and not turn_mutated_model:
-                        yield _event("assistant_done", {"content": ""})
-                        break
 
                     continue
 
