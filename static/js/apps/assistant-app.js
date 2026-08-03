@@ -426,6 +426,13 @@ class AssistantApp extends AppBase {
             this._fillSearchCard(display.query || '', display.results_html || '');
             return null;
         }
+
+        // Mutation tools are silent: no JSON card is shown. The SVG card is updated
+        // instead by the backend's model_svg event.
+        if (name === 'add_class' || name === 'add_attribute' || name === 'add_connector') {
+            return null;
+        }
+
         const cards = this.chatEl.querySelectorAll('[data-tool-name]');
         let card = null;
         for (let i = cards.length - 1; i >= 0; i--) {
