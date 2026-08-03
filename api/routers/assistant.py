@@ -339,6 +339,7 @@ async def assistant_stream_generator(
                 async for line in _drain_heartbeats():
                     yield line
 
+                print(f"[Assistant loop {loop_count}/{max_loops}] before build_messages: last_execution_plan_full={bool(history.last_execution_plan_full)} len={len(history.last_execution_plan_full)}", flush=True)
                 llm_messages = [
                     {"role": msg["role"], "content": str(msg.get("content", ""))}
                     for msg in history.build_messages_for_llm(
@@ -346,11 +347,11 @@ async def assistant_stream_generator(
                         current_model_prompt=current_model_prompt,
                     )
                 ]
-                print(f"[Assistant loop {loop_count}/{max_loops}] messages sent to LLM: {len(llm_messages)} (system/user/tool)")
+                print(f"[Assistant loop {loop_count}/{max_loops}] messages sent to LLM: {len(llm_messages)} (system/user/tool)", flush=True)
                 for i, msg in enumerate(llm_messages):
                     role = msg.get("role", "unknown")
                     content_preview = str(msg.get("content", ""))[:120].replace('\n', ' ')
-                    print(f"  msg[{i}] role={role} len={len(str(msg.get('content', '')))} preview={content_preview}...")
+                    print(f"  msg[{i}] role={role} len={len(str(msg.get('content', '')))} preview={content_preview}...", flush=True)
 
                 content = ""
                 tool_calls: list[dict[str, Any]] = []
@@ -417,7 +418,7 @@ async def assistant_stream_generator(
                                     plan_content = json.dumps(parsed_tool["tool_results"], ensure_ascii=False)
                             if plan_content:
                                 history.last_execution_plan_full = plan_content
-                                print(f"[Assistant loop {loop_count}/{max_loops}] stored execution plan, len={len(plan_content)}")
+                                print(f"[Assistant loop {loop_count}/{max_loops}] stored execution plan, len={len(plan_content)}", flush=True)
 
                         display_payload: dict[str, Any] | None = None
                         if name == "retrieve_documents":
