@@ -408,13 +408,13 @@
 /* SVG model card */
 .assistant-svg-card {
     background: #ffffff;
-    border: 1px solid #e5e7eb;
+    border: 1px solid #86efac;
     border-radius: 0.75rem;
     overflow: hidden;
     width: 42rem;
     max-width: 100%;
     margin: 0.75rem 0;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 4px 6px -1px rgba(22, 101, 52, 0.08);
 }
 
 .assistant-svg-header {
@@ -445,6 +445,8 @@
     min-height: 18rem;
     max-height: 32rem;
     position: relative;
+    isolation: isolate;
+    z-index: 1;
 }
 
 .assistant-svg-body .svg-viewer {
@@ -454,6 +456,10 @@
     max-height: 32rem;
     background: #ffffff;
     border-radius: 0 0 0.5rem 0.5rem;
+}
+
+.assistant-svg-body .svg-controls {
+    z-index: 2;
 }
 
 /* Sticky header */
@@ -549,6 +555,7 @@
     border-top: none;
     display: flex;
     justify-content: center;
+    z-index: 30;
     will-change: top, left, right, width, transform;
     transition: top 0.7s cubic-bezier(0.4, 0, 0.2, 1), left 0.7s cubic-bezier(0.4, 0, 0.2, 1), right 0.7s cubic-bezier(0.4, 0, 0.2, 1), width 0.7s cubic-bezier(0.4, 0, 0.2, 1), padding 0.7s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -563,6 +570,7 @@
     padding: 0 0 0.35rem;
     display: flex;
     justify-content: center;
+    z-index: 30;
 }
 
 .assistant-input-wrapper {

@@ -677,8 +677,39 @@ class AssistantApp extends AppBase {
         `;
     }
 
+    _stripLatexText(label) {
+        if (!label) return '';
+        // Remove \text{...} wrappers while preserving the content.
+        return label.replace(/\\text\{([^{}]*)\}/g, '$1').trim();
+    }
+
     _preprocessLatex(text) {
         if (!text) return '';
+        // Convert extensible arrows with text above/below: \xrightarrow{text} / \xleftarrow{text}
+        // The label may itself contain nested braces (e.g. \text{...}), so we match balanced
+        // braces to capture the whole argument.
+        const balancedArg = /\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/;
+        text = text.replace(
+            new RegExp('\\\\xrightarrow' + balancedArg.source, 'g'),
+            (_, label) => {
+                const clean = this._stripLatexText(label).trim();
+                return clean ? `${clean} →` : '→';
+            }
+        );
+        text = text.replace(
+            new RegExp('\\\\xleftarrow' + balancedArg.source, 'g'),
+            (_, label) => {
+                const clean = this._stripLatexText(label).trim();
+                return clean ? `← ${clean}` : '←';
+            }
+        );
+        text = text.replace(
+            new RegExp('\\\\xleftrightarrow' + balancedArg.source, 'g'),
+            (_, label) => {
+                const clean = this._stripLatexText(label).trim();
+                return clean ? `↔ ${clean}` : '↔';
+            }
+        );
         const replacements = [
             [/\\rightarrow/g, '→'],
             [/\\leftarrow/g, '←'],
@@ -1026,6 +1057,9 @@ class AssistantApp extends AppBase {
 
                     if (event.kind === 'tool_start') {
                         resetBubble();
+                        // Hide the sparkle on any previous assistant bubble as soon as a new
+                        // tool starts, so it does not stay under an intermediate message.
+                        this._hideAllSparkles();
                         // Render the tool card/search card BEFORE the placeholder so the
                         // sparkle/"Réflexion" label stays at the bottom of the current step.
                         if (event.name === 'retrieve_documents') {
