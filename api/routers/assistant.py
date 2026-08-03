@@ -326,19 +326,12 @@ async def assistant_stream_generator(
 
             loop_count = 0
             max_loops = 6
-            plan_already_used = False
-            plan_successful = False
             stream_started_at = asyncio.get_event_loop().time()
-
-            def _available_tool_schemas() -> list[dict[str, Any]]:
-                if plan_already_used and plan_successful:
-                    return [t for t in tool_schemas if t["function"]["name"] != "plan_workflow_with_tools"]
-                return tool_schemas
 
             while loop_count < max_loops:
                 loop_count += 1
                 elapsed = asyncio.get_event_loop().time() - stream_started_at
-                print(f"[Assistant loop {loop_count}/{max_loops}] start, plan_used={plan_already_used}, elapsed={elapsed:.1f}s")
+                print(f"[Assistant loop {loop_count}/{max_loops}] start, elapsed={elapsed:.1f}s")
 
                 yield _event("thinking", {})
                 # Give the HTTP layer a chance to flush before the LLM call starts.
@@ -360,7 +353,7 @@ async def assistant_stream_generator(
 
                 async for stage, payload in _create_completion_streaming(
                     llm_messages=llm_messages,
-                    tools=_available_tool_schemas(),
+                    tools=tool_schemas,
                     tool_choice="auto",
                 ):
                     if stage == "text":
@@ -401,12 +394,6 @@ async def assistant_stream_generator(
 
                         tool_message = await mcp_client.call_tool(name, arguments)
                         parsed_tool = _safe_json_loads(tool_message) or {}
-
-                        # Mark that a plan has been generated so subsequent loops cannot re-call it.
-                        if name == "plan_workflow_with_tools":
-                            plan_already_used = True
-                            if isinstance(parsed_tool, dict) and not parsed_tool.get("error"):
-                                plan_successful = True
 
                         display_payload: dict[str, Any] | None = None
                         if name == "retrieve_documents":
