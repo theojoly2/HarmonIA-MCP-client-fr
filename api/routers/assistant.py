@@ -411,8 +411,9 @@ async def assistant_stream_generator(
                             tool_message = await mcp_client.call_tool(name, arguments)
                             parsed_tool = _safe_json_loads(tool_message) or {}
                             tool_results = parsed_tool.get("tool_results") if isinstance(parsed_tool, dict) else None
-                            has_error = bool(tool_results and tool_results.get("error")) or bool(parsed_tool and parsed_tool.get("error"))
-                            call_results[call_key] = {"error": has_error}
+                            tool_error = isinstance(tool_results, dict) and bool(tool_results.get("error"))
+                            top_error = isinstance(parsed_tool, dict) and bool(parsed_tool.get("error"))
+                            call_results[call_key] = {"error": tool_error or top_error}
 
                         # Keep the last execution plan in the LLM context so the assistant
                         # follows it instead of calling the planner again each turn.
