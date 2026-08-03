@@ -1049,11 +1049,9 @@ class AssistantApp extends AppBase {
                     }
 
                     if (event.kind === 'model_svg') {
-                        // Only show/update the SVG card when a model mutation actually
-                        // happened in this turn. The backend already filters model_svg
-                        // events to mutation-only updates, so here we just create/refresh
-                        // the live card. We freeze any previous live card first.
-                        this._freezeCurrentSvgCard();
+                        // Append/update the SVG card for model mutations. Multiple model_svg
+                        // events in the same turn update the same active card rather than
+                        // creating a new card each time. A new user message freezes it first.
                         this._updateCurrentSvgCard(event.svg);
                         return;
                     }
