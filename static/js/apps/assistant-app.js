@@ -60,7 +60,7 @@ class AssistantApp extends AppBase {
                         </form>
                     </div>
                 </div>
-                <input type="file" id="assistant-model-file" accept=".xml,.xmi,.ttl" class="hidden">
+                <input type="file" id="assistant-model-file" accept=".xml,.xmi,.ttl,.json,.jsonld,.sql,.txt,.html,.htm,.csv" class="hidden">
             </div>
         `;
 

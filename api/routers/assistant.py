@@ -502,11 +502,14 @@ async def import_assistant_model(
         from data_model_utils import _detect_file_type
         from data_model_utils.import_ttl import ttl_to_json
         from data_model_utils.import_xml import xml_to_json
+        from data_model_utils.import_json import json_file_to_model
+        from data_model_utils.import_sql import sql_to_model
+        from data_model_utils.import_text import text_to_model
         from api.services.assistant_mcp_client import AssistantMCPClient
 
         kind = _detect_file_type(file_bytes, filename)
         if kind is None:
-            raise ModelProcessingError("Unsupported file format.", "Please upload an XMI/XML or TTL file.")
+            raise ModelProcessingError("Unsupported file format.", "Please upload an XMI/XML, TTL, JSON, SQL or text file.")
 
         json_data: dict[str, Any] = {}
         if kind in {"xml", "xmi"}:
@@ -541,7 +544,7 @@ async def import_assistant_model(
             json_data["source_format"] = "xmi"
             json_data["xmi_raw"] = file_bytes.decode("utf-8", errors="replace")
             json_data["xmi_xml"] = json_data["xmi_raw"]
-        else:
+        elif kind == "ttl":
             try:
                 json_data = ttl_to_json(BytesIO(file_bytes))
             except Exception as e:
@@ -550,6 +553,51 @@ async def import_assistant_model(
             json_data["source_format"] = "ttl"
             json_data["ttl_raw"] = file_bytes.decode("utf-8", errors="replace")
             if "elements" in json_data or "connectors" in json_data:
+                json_data["xmi"] = {
+                    "elements": json_data.get("elements", []),
+                    "connectors": json_data.get("connectors", []),
+                }
+        elif kind == "json":
+            try:
+                json_data = json_file_to_model(BytesIO(file_bytes), filename=filename)
+            except Exception as e:
+                raise ModelProcessingError("Failed to parse the JSON/JSON-LD file.", str(e))
+            json_data["source_format"] = "json"
+            json_data["json_raw"] = file_bytes.decode("utf-8", errors="replace")
+            if isinstance(json_data.get("xmi"), dict):
+                json_data.setdefault("elements", json_data["xmi"].get("elements", []))
+                json_data.setdefault("connectors", json_data["xmi"].get("connectors", []))
+            else:
+                json_data["xmi"] = {
+                    "elements": json_data.get("elements", []),
+                    "connectors": json_data.get("connectors", []),
+                }
+        elif kind == "sql":
+            try:
+                json_data = sql_to_model(BytesIO(file_bytes), filename=filename)
+            except Exception as e:
+                raise ModelProcessingError("Failed to parse the SQL file.", str(e))
+            json_data["source_format"] = "sql"
+            json_data["sql_raw"] = file_bytes.decode("utf-8", errors="replace")
+            if isinstance(json_data.get("xmi"), dict):
+                json_data.setdefault("elements", json_data["xmi"].get("elements", []))
+                json_data.setdefault("connectors", json_data["xmi"].get("connectors", []))
+            else:
+                json_data["xmi"] = {
+                    "elements": json_data.get("elements", []),
+                    "connectors": json_data.get("connectors", []),
+                }
+        else:  # text
+            try:
+                json_data = text_to_model(BytesIO(file_bytes), filename=filename)
+            except Exception as e:
+                raise ModelProcessingError("Failed to parse the text file.", str(e))
+            json_data["source_format"] = "text"
+            json_data["text_raw"] = file_bytes.decode("utf-8", errors="replace")
+            if isinstance(json_data.get("xmi"), dict):
+                json_data.setdefault("elements", json_data["xmi"].get("elements", []))
+                json_data.setdefault("connectors", json_data["xmi"].get("connectors", []))
+            else:
                 json_data["xmi"] = {
                     "elements": json_data.get("elements", []),
                     "connectors": json_data.get("connectors", []),
