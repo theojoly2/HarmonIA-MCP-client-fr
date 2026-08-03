@@ -997,6 +997,9 @@ class AssistantApp extends AppBase {
                 async (event) => {
                     if (event.kind === 'user') {
                         if (event.session) this.session = event.session;
+                        // A new user message starts a new turn: freeze any previous SVG card
+                        // immediately so mutations in this turn create a fresh visualization card.
+                        this._freezeCurrentSvgCard();
                         return;
                     }
 
@@ -1026,7 +1029,7 @@ class AssistantApp extends AppBase {
                         // sparkle/"Réflexion" label stays at the bottom of the current step.
                         if (event.name === 'retrieve_documents') {
                             this._appendSearchCard(event.arguments?.search_terms || '', null);
-                        } else if (event.name !== 'plan_workflow_with_tools') {
+                        } else if (event.name !== 'plan_workflow_with_tools' && event.name !== 'add_class' && event.name !== 'add_attribute' && event.name !== 'add_connector') {
                             const card = this._createToolCard(event.name, event.arguments || {});
                             this._markToolRunning(card, true);
                         }
@@ -1065,9 +1068,7 @@ class AssistantApp extends AppBase {
                     }
 
                     if (event.kind === 'user') {
-                        // A new user message starts a new turn: freeze the previous SVG card
-                        // so future updates create a fresh card for this turn.
-                        this._freezeCurrentSvgCard();
+                        // Handled at the top of the event handler.
                         return;
                     }
 
