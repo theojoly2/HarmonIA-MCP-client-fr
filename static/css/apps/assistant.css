@@ -191,6 +191,51 @@
     padding: 0.75rem 1rem;
 }
 
+.assistant-progress-footer {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    color: #9a3412;
+}
+
+.assistant-progress-card.assistant-progress-done .assistant-progress-footer {
+    color: #166534;
+}
+
+.assistant-progress-label {
+    font-weight: 700;
+}
+
+.assistant-progress-message {
+    color: #c2410c;
+    font-size: 0.8rem;
+}
+
+.assistant-progress-card.assistant-progress-done .assistant-progress-message {
+    color: #16a34a;
+}
+
+.assistant-progress-sparkle {
+    width: 1.25rem;
+    height: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #f97316;
+    flex-shrink: 0;
+}
+
+.assistant-progress-sparkle svg {
+    width: 100%;
+    height: 100%;
+}
+
+.assistant-progress-card.assistant-progress-done .assistant-progress-sparkle {
+    color: #22c55e;
+}
+
 .assistant-progress-bar-bg {
     width: 100%;
     height: 0.5rem;
@@ -201,9 +246,49 @@
 
 .assistant-progress-bar-fill {
     height: 100%;
-    background: #f97316;
+    background: linear-gradient(90deg, #fb923c 0%, #f97316 50%, #fb923c 100%);
+    background-size: 200% 100%;
     border-radius: 9999px;
     transition: width 0.2s ease;
+    animation: assistant-progress-shimmer 1.5s infinite linear;
+}
+
+@keyframes assistant-progress-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.assistant-progress-card.assistant-progress-done .assistant-progress-bar-bg {
+    background: #bbf7d0;
+}
+
+.assistant-progress-card.assistant-progress-done .assistant-progress-bar-fill {
+    background: #22c55e;
+    animation: none;
+}
+    padding: 0.75rem 1rem;
+}
+
+.assistant-progress-bar-bg {
+    width: 100%;
+    height: 0.5rem;
+    background: #fed7aa;
+    border-radius: 9999px;
+    overflow: hidden;
+}
+
+.assistant-progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #fb923c 0%, #f97316 50%, #fb923c 100%);
+    background-size: 200% 100%;
+    border-radius: 9999px;
+    transition: width 0.2s ease;
+    animation: assistant-progress-shimmer 1.5s infinite linear;
+}
+
+@keyframes assistant-progress-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
 }
 
 .assistant-progress-card.assistant-progress-done .assistant-progress-bar-bg {

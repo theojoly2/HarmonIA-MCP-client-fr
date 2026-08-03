@@ -438,7 +438,7 @@ class AssistantApp extends AppBase {
                 <svg class="text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                 </svg>
-                <span>${this._escape(label)}</span>
+                <span>Analyse en cours</span>
             </div>
             <div class="assistant-progress-body">
                 <div class="assistant-progress-bar-bg">
@@ -448,6 +448,9 @@ class AssistantApp extends AppBase {
             </div>
         `;
         this.messagesEl.appendChild(div);
+        // Also add a pulsing sparkle placeholder just below the card, like "Planification en cours...".
+        const status = this._appendThinkingPlaceholder(label);
+        status.dataset.progressStatus = cardId;
         this._scrollToBottom();
         return div;
     }
@@ -460,6 +463,12 @@ class AssistantApp extends AppBase {
         if (fill) fill.style.width = `${percent}%`;
         if (msg) msg.textContent = message || '';
         this._scrollToBottom();
+    }
+
+    _removeProgressStatus(cardId) {
+        this.messagesEl.querySelectorAll(`[data-progress-status="${cardId}"]`).forEach((el) => {
+            if (el.parentNode) el.remove();
+        });
     }
 
     _completeProgressCard(cardId) {
@@ -1139,6 +1148,7 @@ class AssistantApp extends AppBase {
 
                     if (event.kind === 'progress_done') {
                         this._completeProgressCard(event.card_id);
+                        this._removeProgressStatus(event.card_id);
                         return;
                     }
 
