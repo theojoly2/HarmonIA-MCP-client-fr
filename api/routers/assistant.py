@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from collections import defaultdict
 from io import BytesIO
 from typing import Any, AsyncGenerator, Optional
@@ -23,7 +24,7 @@ from api.routers.auth import require_user
 from api.services.assistant_history import AssistantHistory
 from api.services.assistant_mcp_client import AssistantMCPClient
 from api.services.mcp_service import fetch_search, upload_model_mcp, get_model_mcp
-from data_model_utils import _detect_file_type, ModelProcessingError, process_and_upload_model
+from data_model_utils import _detect_file_type, ModelProcessingError, generate_visualisation
 from data_model_utils.chat_data_structure import shorten_json
 
 router = APIRouter(prefix="/api/assistant", tags=["assistant"])
@@ -206,13 +207,31 @@ def _slugify_session_name(text: str) -> str:
     )
     slug = re.sub(r"[^a-z0-9\s]", "", slug)
     slug = re.sub(r"\s+", "_", slug)
-    parts = slug.split("_")[:8]
-    slug = "_".join(parts)[:80]
+    slug = slug[:40]
     if not slug:
-        from datetime import datetime
-        slug = datetime.now().strftime("session_%Y%m%d_%H%M%S")
-    return slug
+        slug = "session"
+    from datetime import datetime
+    return f"{slug}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
+
+def _generate_model_svg(model_data: dict[str, Any]) -> str:
+    """Regenerate SVG text from the current model JSON, mirroring /api/models/{name}/open."""
+    try:
+        xmi = model_data.get("xmi") if isinstance(model_data.get("xmi"), dict) else model_data
+        if not isinstance(xmi, dict) or (not xmi.get("elements") and not xmi.get("connectors")):
+            return ""
+        svg_result = generate_visualisation(xmi)
+        svg_bytes = svg_result.getvalue() if hasattr(svg_result, "getvalue") else svg_result
+        svg_text = svg_bytes.decode("utf-8", errors="replace")
+        # Preserve main-class hint if present in stored SVG.
+        if svg_text and model_data.get("svg"):
+            match = re.search(r'data-main-class="([^"]*)"', model_data.get("svg", ""))
+            if match and "data-main-class=" not in svg_text:
+                svg_text = svg_text.replace("<svg", f'<svg data-main-class="{match.group(1)}"', 1)
+        return svg_text
+    except Exception as e:
+        print(f"[Assistant] SVG generation failed: {e}")
+        return ""
 
 
 async def assistant_stream_generator(
@@ -247,6 +266,12 @@ async def assistant_stream_generator(
             if model_data:
                 short_model = shorten_json(model_data)
                 current_model_prompt = "[CURRENT MODEL]\n" + json.dumps(short_model, ensure_ascii=False, indent=2) + "\n\n[CURRENT USER MESSAGE]\n\n"
+                # Send the initial SVG visualization of the imported model.
+                svg_text = _generate_model_svg(model_data)
+                if svg_text:
+                    yield _event("model_svg", {"svg": svg_text, "model_name": model_name})
+                    async for line in _drain_heartbeats():
+                        yield line
         except Exception as e:
             print(f"[Assistant] Failed to load model context for {model_name}: {e}")
 
@@ -419,6 +444,20 @@ async def assistant_stream_generator(
                         mcp_client.tool_results[name] = (
                             parsed_tool.get("tool_results") if isinstance(parsed_tool, dict) else parsed_tool
                         )
+
+                        # After a model mutation, regenerate and stream the updated SVG so the
+                        # user can see the model evolve in the chat card.
+                        if name in {"add_class", "add_attribute", "add_connector"} and model_name:
+                            try:
+                                updated_model = await get_model_mcp(username, model_name)
+                                if updated_model:
+                                    updated_svg = _generate_model_svg(updated_model)
+                                    if updated_svg:
+                                        yield _event("model_svg", {"svg": updated_svg, "model_name": model_name})
+                                        async for line in _drain_heartbeats():
+                                            yield line
+                            except Exception as e:
+                                print(f"[Assistant] Failed to refresh SVG after {name}: {e}")
 
                         if name == "style_guide_check":
                             report = ""

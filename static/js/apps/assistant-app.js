@@ -612,6 +612,47 @@ class AssistantApp extends AppBase {
         // Clicks are handled globally on this.chatEl; kept for compatibility.
     }
 
+    _currentSvgCard() {
+        return this.activeSvgCard || null;
+    }
+
+    _appendSvgCard(svgText) {
+        if (!svgText) return null;
+        const id = 'assistant-svg-' + Date.now();
+        const div = document.createElement('div');
+        div.id = id;
+        div.className = 'assistant-svg-card mb-6';
+        div.dataset.svgCard = 'true';
+        div.innerHTML = `
+            <div class="assistant-svg-header">
+                <svg class="text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+                </svg>
+                <span>Visualisation du modèle</span>
+            </div>
+            <div class="assistant-svg-body">${svgText}</div>
+        `;
+        this.messagesEl.appendChild(div);
+        this.activeSvgCard = div;
+        this._scrollToBottom();
+        return div;
+    }
+
+    _updateCurrentSvgCard(svgText) {
+        if (!svgText) return;
+        let card = this._currentSvgCard();
+        if (!card) {
+            card = this._appendSvgCard(svgText);
+        } else {
+            card.querySelector('.assistant-svg-body').innerHTML = svgText;
+        }
+        this._scrollToBottom();
+    }
+
+    _freezeCurrentSvgCard() {
+        this.activeSvgCard = null;
+    }
+
     _sparkleSvg() {
         return `
             <svg class="w-5 h-5 overflow-visible ai-sparkle-icon" viewBox="0 0 24 24">
@@ -800,6 +841,18 @@ class AssistantApp extends AppBase {
 
                     if (event.kind === 'loop_done') {
                         resetBubble();
+                        return;
+                    }
+
+                    if (event.kind === 'model_svg') {
+                        this._updateCurrentSvgCard(event.svg);
+                        return;
+                    }
+
+                    if (event.kind === 'user') {
+                        // A new user message starts a new turn: freeze the previous SVG card
+                        // so future updates create a fresh card for this turn.
+                        this._freezeCurrentSvgCard();
                         return;
                     }
 
