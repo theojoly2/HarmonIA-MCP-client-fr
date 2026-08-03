@@ -205,6 +205,9 @@ class AssistantHistory:
         summary_blocks: list[str] = []
         if self.conversation_summary:
             summary_text = "\n\n".join(self.conversation_summary[-max_summary_items:])
+            # Cap summary size so it does not drown the current plan/model context.
+            if len(summary_text) > 3000:
+                summary_text = self._truncate(summary_text, 3000)
             summary_blocks.append(
                 "[STEP BY STEP SUMMARY OF OLDER REQUESTS]\n"
                 "Use this as compact traceability for older turns.\n\n"
@@ -223,20 +226,20 @@ class AssistantHistory:
         recent_blocks: list[str] = []
         if self.last_two_messages_fullish:
             rendered: list[str] = []
-            for i, msg in enumerate(self.last_two_messages_fullish[-6:], start=1):
+            for i, msg in enumerate(self.last_two_messages_fullish[-2:], start=1):
                 rendered.append(
-                    f"[RECENT MESSAGE {i} - ROLE={msg.get('role', '')}]\n{msg.get('content', '')}"
+                    f"[RECENT MESSAGE {i} - ROLE={msg.get('role', '')}]\n{self._truncate(msg.get('content', ''), 2000)}"
                 )
             recent_blocks.append("\n\n".join(rendered))
         if self.last_execution_plan_full:
-            print(f"[build_messages_for_llm] injecting last_execution_plan_full len={len(self.last_execution_plan_full)}", flush=True)
-            recent_blocks.append("[LAST EXECUTION PLAN - FULL]\n" + self.last_execution_plan_full)
-        else:
-            print("[build_messages_for_llm] last_execution_plan_full is empty", flush=True)
+            plan_text = self.last_execution_plan_full
+            if len(plan_text) > 6000:
+                plan_text = self._truncate(plan_text, 6000)
+            recent_blocks.append("[LAST EXECUTION PLAN - FULL]\n" + plan_text)
         if self.last_tool_observations_compact:
             recent_blocks.append(
                 "[RECENT TOOL OBSERVATIONS - COMPACT]\n"
-                + self._json_text(self.last_tool_observations_compact[-10:], 8000)
+                + self._json_text(self.last_tool_observations_compact[-5:], 4000)
             )
         if recent_blocks:
             llm_messages.append(
@@ -373,6 +376,10 @@ class AssistantHistory:
             self._init_prompts(None, None)
 
     def _append_recent_message(self, role: str, content: str) -> None:
+        # Keep only user/assistant messages here, like autre_version. Tool results are
+        # already available through current_request_llm_messages / tool observations.
+        if role not in {"user", "assistant"}:
+            return
         self.last_two_messages_fullish.append({"role": role, "content": self._truncate(content, 8000)})
         self.last_two_messages_fullish = self.last_two_messages_fullish[-6:]
 
