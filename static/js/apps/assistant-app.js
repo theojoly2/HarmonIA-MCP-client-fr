@@ -141,6 +141,31 @@ class AssistantApp extends AppBase {
         });
     }
 
+    getState() {
+        return {
+            session: this.session,
+            modelName: this.modelName,
+            messagesHtml: this.messagesEl ? this.messagesEl.innerHTML : '',
+            heroHidden: this.heroEl ? this.heroEl.classList.contains('assistant-hero-hidden') : false,
+            chatMode: this.chatEl ? this.chatEl.classList.contains('assistant-chat-mode') : false,
+        };
+    }
+
+    setState(state) {
+        if (!state || !Object.keys(state).length) return;
+        if (state.session !== undefined) this.session = state.session;
+        if (state.modelName !== undefined) this.modelName = state.modelName;
+        if (this.messagesEl && state.messagesHtml !== undefined) {
+            this.messagesEl.innerHTML = state.messagesHtml;
+        }
+        if (this.heroEl && state.heroHidden) {
+            this.heroEl.classList.add('assistant-hero-hidden');
+        }
+        if (this.chatEl && state.chatMode) {
+            this.chatEl.classList.add('assistant-chat-mode');
+        }
+    }
+
     async mount(container) {
         await super.mount(container);
         // If this instance was created from the history panel with a session,
