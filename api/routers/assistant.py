@@ -11,7 +11,7 @@ import json
 import re
 from collections import defaultdict
 from io import BytesIO
-from typing import Any, AsyncGenerator, Optional
+from typing import Any, AsyncGenerator, Callable, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Request, UploadFile, File, Form, HTTPException
@@ -282,27 +282,27 @@ async def assistant_stream_generator(
 
     yield _event("user", {"content": user_input, "session": session_name, "is_new_session": is_new_session})
 
-    # Background heartbeat: sends an SSE comment every ~300ms. This forces reverse
-    # proxies / CDNs to flush their buffers so the client sees events progressively.
-    heartbeat_queue: asyncio.Queue[str] = asyncio.Queue()
+    # Shared output queue: assistant events, progress updates and heartbeats all go
+    # here. A dedicated heartbeat task keeps pushing SSE comment lines so reverse
+    # proxies / CDNs flush their buffers and the browser does not close the
+    # connection during long MCP calls.
+    out_queue: asyncio.Queue[str] = asyncio.Queue()
 
     async def _heartbeat() -> None:
         while True:
             await asyncio.sleep(0.2)
-            await heartbeat_queue.put(_event(":heartbeat", {}))
+            await out_queue.put(_event(":heartbeat", {}))
 
     heartbeat_task = asyncio.create_task(_heartbeat())
-    last_heartbeat = asyncio.get_event_loop().time()
+    last_flush = asyncio.get_event_loop().time()
 
-    async def _drain_heartbeats() -> AsyncGenerator[str, None]:
-        nonlocal last_heartbeat
-        while not heartbeat_queue.empty():
-            last_heartbeat = asyncio.get_event_loop().time()
-            yield heartbeat_queue.get_nowait()
+    async def _drain_out_queue() -> AsyncGenerator[str, None]:
+        nonlocal last_flush
+        while not out_queue.empty():
+            last_flush = asyncio.get_event_loop().time()
+            yield out_queue.get_nowait()
 
-    async def _drain_heartbeats_once() -> None:
-        async for line in _drain_heartbeats():
-            yield line
+
 
     try:
         async with AssistantMCPClient(state) as mcp_client:
@@ -338,7 +338,7 @@ async def assistant_stream_generator(
                 yield _event("thinking", {})
                 # Give the HTTP layer a chance to flush before the LLM call starts.
                 await asyncio.sleep(0.03)
-                async for line in _drain_heartbeats():
+                async for line in _drain_out_queue():
                     yield line
 
                 llm_messages = [
@@ -368,14 +368,14 @@ async def assistant_stream_generator(
                         streamed_any_text = True
                         content += str(payload)
                         yield _event("assistant_text", {"content": str(payload)})
-                        async for line in _drain_heartbeats():
+                        async for line in _drain_out_queue():
                             yield line
                     elif stage == "done":
                         content = payload.get("content", "") or ""
                         tool_calls = _normalize_tool_calls(payload.get("tool_calls", []))
                         streamed_any_text = bool(payload.get("streamed_any_text", False))
 
-                async for line in _drain_heartbeats():
+                async for line in _drain_out_queue():
                     yield line
 
                 if not content and not tool_calls:
@@ -386,7 +386,7 @@ async def assistant_stream_generator(
                     print(f"[loop {loop_count}] tool_calls={[tc['function']['name'] for tc in tool_calls]}", flush=True)
                     history.add_assistant_message(content, tool_calls=tool_calls)
                     yield _event("assistant_tool_calls", {"tool_calls": tool_calls})
-                    async for line in _drain_heartbeats():
+                    async for line in _drain_out_queue():
                         yield line
 
                     # Track whether this loop contained only successful mutation/analysis tools.
@@ -406,7 +406,7 @@ async def assistant_stream_generator(
                             arguments = {}
 
                         yield _event("tool_start", {"name": name, "arguments": arguments})
-                        async for line in _drain_heartbeats():
+                        async for line in _drain_out_queue():
                             yield line
 
                         # Deduplicate repeated calls within the same request.
@@ -425,7 +425,7 @@ async def assistant_stream_generator(
                             if name in {"metadata_checker", "reuse_check", "validator_check", "style_guide_check"}:
                                 progress_card_id = f"progress-{name}-{uuid4().hex[:8]}"
                                 yield _event("progress_start", {"card_id": progress_card_id, "tool_name": name})
-                                async for line in _drain_heartbeats():
+                                async for line in _drain_out_queue():
                                     yield line
 
                             queue: asyncio.Queue[str] = asyncio.Queue()
@@ -445,26 +445,36 @@ async def assistant_stream_generator(
                                     "message": message or "",
                                 }))
 
+                            # Run the MCP tool call in a background task while the main
+                            # generator keeps draining the output queue (heartbeats +
+                            # progress updates). This keeps the SSE connection alive.
+                            call_task: asyncio.Task[str] = asyncio.create_task(
+                                mcp_client.call_tool(name, arguments, progress_handler=_progress_handler)
+                            )
+                            progress_task: asyncio.Task[None] | None = None
+                            if progress_card_id is not None:
+                                progress_task = asyncio.create_task(_emit_progress_queue(queue, out_queue))
                             try:
+                                while not call_task.done():
+                                    async for line in _drain_out_queue():
+                                        yield line
+                                    await asyncio.sleep(0.05)
+                                tool_message = call_task.result()
+                            finally:
                                 if progress_card_id is not None:
-                                    progress_task = asyncio.create_task(_emit_progress_queue(queue))
-                                    try:
-                                        tool_message = await mcp_client.call_tool(
-                                            name, arguments, progress_handler=_progress_handler
-                                        )
-                                    finally:
-                                        await queue.put("__done__")
+                                    await queue.put("__done__")
+                                    if progress_task is not None:
                                         try:
                                             await asyncio.wait_for(progress_task, timeout=2.0)
                                         except Exception:
                                             pass
-                                else:
-                                    tool_message = await mcp_client.call_tool(name, arguments)
-                            finally:
-                                if progress_card_id is not None:
-                                    yield _event("progress_done", {"card_id": progress_card_id, "tool_name": name})
-                                    async for line in _drain_heartbeats():
-                                        yield line
+                                async for line in _drain_out_queue():
+                                    yield line
+
+                            if progress_card_id is not None:
+                                yield _event("progress_done", {"card_id": progress_card_id, "tool_name": name})
+                                async for line in _drain_out_queue():
+                                    yield line
 
                             parsed_tool = _safe_json_loads(tool_message) or {}
                             tool_results = parsed_tool.get("tool_results") if isinstance(parsed_tool, dict) else None
@@ -528,7 +538,7 @@ async def assistant_stream_generator(
 
 
                         yield _event("tool_result", {"name": name, "result": parsed_tool, "display": display_payload})
-                        async for line in _drain_heartbeats():
+                        async for line in _drain_out_queue():
                             yield line
 
                         history.add_tool_message(
@@ -595,7 +605,7 @@ async def assistant_stream_generator(
                                     svg_text = _generate_model_svg(current_model)
                                     if svg_text:
                                         yield _event("model_svg", {"svg": svg_text, "model_name": model_name, "source": name})
-                                        async for line in _drain_heartbeats():
+                                        async for line in _drain_out_queue():
                                             yield line
                             except Exception as e:
                                 print(f"[Assistant] Failed to refresh SVG after {name}: {e}")
@@ -611,7 +621,7 @@ async def assistant_stream_generator(
                             if report:
                                 history.add_assistant_message(report)
                                 yield _event("assistant_text", {"content": report})
-                                async for line in _drain_heartbeats():
+                                async for line in _drain_out_queue():
                                     yield line
                                 yield _event("assistant_done", {"content": report})
                                 return
@@ -619,7 +629,7 @@ async def assistant_stream_generator(
                     # After processing all tool calls, signal loop completion so the UI
                     # can render this iteration before the next LLM call starts.
                     yield _event("loop_done", {"loop": loop_count})
-                    async for line in _drain_heartbeats():
+                    async for line in _drain_out_queue():
                         yield line
 
                     # If this loop contained only successful mutations or analysis tools,
@@ -672,11 +682,20 @@ async def assistant_stream_generator(
     yield _event("done", {})
 
 
-async def _emit_progress_queue(queue: asyncio.Queue[str]) -> None:
+async def _emit_progress_queue(
+    queue: asyncio.Queue[str],
+    sink: asyncio.Queue[str],
+) -> None:
+    """Forward progress events from a tool's progress queue into the main stream queue.
+
+    This runs concurrently with the MCP tool call so the client sees progress
+    updates even when the tool blocks for a long time.
+    """
     while True:
         item = await queue.get()
         if item == "__done__":
             break
+        await sink.put(item)
 
 
 @router.post("/stream")

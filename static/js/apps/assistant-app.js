@@ -469,21 +469,21 @@ class AssistantApp extends AppBase {
         const step = (now) => {
             if (!document.getElementById(cardId)) return;
             const reported = parseInt(card.dataset.realPercent || '0', 10);
-            const dt = Math.min((now - lastTime) / 1000, 0.1);
+            const dt = Math.min((now - lastTime) / 1000, 0.5);
             lastTime = now;
 
             // Target is slightly ahead of reported progress, capped at 90% until real done.
-            const headroom = reported > 0 ? Math.min(90, reported + 8) : 90;
+            const headroom = reported > 0 ? Math.min(90, reported + 5) : 90;
             const distance = headroom - fakePercent;
 
             if (distance > 0) {
-                // Smooth spring-like acceleration with a little randomness.
-                const targetVelocity = Math.max(0.5, distance * 1.5 + Math.random() * 4);
-                velocity += (targetVelocity - velocity) * 4 * dt;
+                // Slow, smooth spring-like acceleration with a little randomness.
+                const targetVelocity = Math.max(0.2, distance * 0.35 + Math.random() * 1.5);
+                velocity += (targetVelocity - velocity) * 1.2 * dt;
                 const stepSize = velocity * dt;
                 fakePercent = Math.min(headroom, fakePercent + stepSize);
             } else {
-                velocity *= 0.9;
+                velocity *= 0.85;
             }
 
             if (fill && fakePercent > reported) {
@@ -1101,6 +1101,10 @@ class AssistantApp extends AppBase {
         let currentBubble = null;
         let currentText = '';
 
+        // Abort controller lets the client survive long waits and prevents duplicate streams.
+        this._streamAbortController?.abort();
+        this._streamAbortController = new AbortController();
+
         // Typewriter: stream markdown progressively. We keep a hidden raw text accumulator
         // and render parsed markdown on every chunk so formatting appears immediately.
         const typewriter = this._createTypewriter((chunk) => {
@@ -1141,6 +1145,15 @@ class AssistantApp extends AppBase {
                 text,
                 this.modelName,
                 async (event) => {
+                    if (this._streamAliveTimeout) {
+                        clearTimeout(this._streamAliveTimeout);
+                        this._streamAliveTimeout = null;
+                    }
+                    // Restart the watchdog each time something arrives (2 min silence = dead).
+                    this._streamAliveTimeout = setTimeout(() => {
+                        this._streamAbortController?.abort();
+                    }, 120000);
+
                     if (event.kind === 'user') {
                         if (event.session) this.session = event.session;
                         // A new user message starts a new turn: freeze any previous SVG card
