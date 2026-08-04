@@ -447,7 +447,7 @@ class HistoryPanel {
     async _deleteAll() {
         const confirmed = await this._showConfirmDialog(
             "Supprimer tout l'historique",
-            "Cette action supprimera définitivement tous vos modèles et toutes vos recherches. Cette action est irréversible."
+            "Cette action supprimera définitivement tous vos modèles, toutes vos recherches et toutes vos conversations. Cette action est irréversible."
         );
         if (!confirmed) return;
         try {
@@ -455,6 +455,9 @@ class HistoryPanel {
                 this.items.map((item) => {
                     if (item.kind === "search") {
                         return ApiClient.deleteSearch(item.id);
+                    }
+                    if (item.kind === "assistant") {
+                        return ApiClient.deleteAssistantSession(item.name);
                     }
                     const encodedName = encodeURIComponent(item.name);
                     return fetch(`api/models/${encodedName}`, {

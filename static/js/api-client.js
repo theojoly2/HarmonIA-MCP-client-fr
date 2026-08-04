@@ -291,6 +291,16 @@ const ApiClient = (() => {
         return res.json();
     }
 
+    async function deleteAssistantSession(session) {
+        if (!session) return { ok: true };
+        const res = await fetch(apiUrl(`assistant/sessions/${encodeURIComponent(session)}`), {
+            method: "DELETE",
+            credentials: "same-origin",
+        });
+        if (!res.ok) throw new Error(`Assistant session delete failed: ${res.status}`);
+        return res.json();
+    }
+
     return {
         postSearch,
         getTags,
@@ -314,6 +324,7 @@ const ApiClient = (() => {
         streamAssistant,
         getAssistantSessions,
         getAssistantHistory,
+        deleteAssistantSession,
     };
 })();
 

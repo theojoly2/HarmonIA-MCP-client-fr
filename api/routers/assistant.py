@@ -24,7 +24,7 @@ from api.dependencies import _LLM_MODEL, llm_client, render_results
 from api.routers.auth import require_user
 from api.services.assistant_history import AssistantHistory
 from api.services.assistant_mcp_client import AssistantMCPClient
-from api.services.mcp_service import fetch_search, upload_model_mcp, get_model_mcp
+from api.services.mcp_service import fetch_search, upload_model_mcp, get_model_mcp, delete_model_mcp
 from data_model_utils import _detect_file_type, ModelProcessingError, generate_visualisation
 from data_model_utils.chat_data_structure import shorten_json
 
@@ -212,7 +212,7 @@ def _slugify_session_name(text: str) -> str:
     if not slug:
         slug = "session"
     from datetime import datetime
-    return f"{slug}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    return f"{slug}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{datetime.now().microsecond // 1000:03d}"
 
 
 def _generate_model_svg(model_data: dict[str, Any]) -> str:
@@ -752,7 +752,9 @@ async def import_assistant_model(
 
     filename = file.filename or "model.txt"
     display_name = (name or filename).strip() or "imported_model"
-    session_name = _model_name_from_filename(display_name)
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+    session_name = f"{_model_name_from_filename(display_name)}_{timestamp}"
 
     try:
         from data_model_utils import _detect_file_type
@@ -932,10 +934,18 @@ async def delete_assistant_session(
     username: str = Depends(require_user),
 ):
     history = AssistantHistory(user=username, session=session)
+    # Also delete the model linked to this assistant session so we do not leave
+    # orphan models behind when a conversation is removed.
+    linked_model = history.assistant_model_name
     if history.display_fp.exists():
         history.display_fp.unlink()
     if history.llm_fp.exists():
         history.llm_fp.unlink()
+    if linked_model:
+        try:
+            await delete_model_mcp(username, linked_model)
+        except Exception as e:
+            print(f"[Assistant delete session] failed to delete linked model {linked_model}: {e}", flush=True)
     return {"ok": True}
 
 
