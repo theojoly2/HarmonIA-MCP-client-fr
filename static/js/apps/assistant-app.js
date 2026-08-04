@@ -1180,13 +1180,10 @@ class AssistantApp extends AppBase {
     }
 
     async _send(text) {
-        if (!this.session) {
-            this.session = this._slugify(text);
-            // The session name is only a base slug; the backend appends a unique
-            // timestamp when it sees an empty session, exactly like imported
-            // models. We rely on the backend's first `user` event to learn the
-            // final session name.
-        }
+        // For a brand-new conversation we intentionally pass an empty session.
+        // The backend will generate a unique slug + timestamp and return it in
+        // the first `user` event, exactly like the modeler does for imports.
+        const sessionToSend = this.session || '';
 
         this.messages.push({ role: 'user', content: text });
         this._appendUserMessage(text);
@@ -1318,7 +1315,7 @@ class AssistantApp extends AppBase {
 
         try {
             await ApiClient.streamAssistant(
-                this.session,
+                sessionToSend,
                 text,
                 this.modelName,
                 async (event) => {
