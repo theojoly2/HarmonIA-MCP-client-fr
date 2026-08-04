@@ -28,7 +28,9 @@ class AssistantApp extends AppBase {
             <div class="assistant-app h-full w-full flex flex-col bg-white rounded-[1.25rem] overflow-hidden relative">
                 <div class="assistant-header" id="assistant-header">
                     <h1 class="assistant-header-title text-center">
-                        <span class="assistant-title-glow title-glow">Assistant Sémantique</span>
+                        <button type="button" id="assistant-reset" class="assistant-title-reset" title="Nouvelle conversation">
+                            <span class="assistant-title-glow title-glow">Assistant Sémantique</span>
+                        </button>
                     </h1>
                 </div>
                 <div id="assistant-chat" class="flex-1 overflow-y-auto">
@@ -89,6 +91,10 @@ class AssistantApp extends AppBase {
         if (window.GlowEffects && typeof window.GlowEffects.scanAndBind === 'function') {
             window.GlowEffects.scanAndBind(container);
         }
+
+        container.querySelector('#assistant-reset').addEventListener('click', () => {
+            this._newSession();
+        });
 
         container.querySelector('#assistant-import-model').addEventListener('click', () => {
             this.fileInput.click();
