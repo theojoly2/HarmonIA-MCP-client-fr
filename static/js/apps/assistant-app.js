@@ -158,7 +158,9 @@ class AssistantApp extends AppBase {
         if (state.session !== undefined) this.session = state.session;
         if (state.modelName !== undefined) this.modelName = state.modelName;
         if (state.isStreaming !== undefined) this.isStreaming = state.isStreaming;
-        if (this.messagesEl && state.messagesHtml !== undefined) {
+        // Only restore the message HTML if we actually have saved HTML. An empty
+        // saved state must not wipe out messages that were just loaded from history.
+        if (this.messagesEl && state.messagesHtml) {
             this.messagesEl.innerHTML = state.messagesHtml;
         }
         if (this.heroEl && state.heroHidden) {
