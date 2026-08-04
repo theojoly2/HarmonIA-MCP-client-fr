@@ -244,8 +244,8 @@ async def assistant_stream_generator(
         yield _event("error", {"message": "Message vide."})
         return
 
-    session_name = request.session.strip() or _slugify_session_name(user_input)
     is_new_session = not request.session.strip()
+    session_name = request.session.strip() or _slugify_session_name(user_input)
 
     # Make the session name unique by appending a timestamp when it comes from
     # a fresh user message, exactly like the modeler does for imported files.
