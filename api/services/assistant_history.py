@@ -90,12 +90,9 @@ class AssistantHistory:
 
         if system_prompt:
             self.add_system_message(system_prompt)
-        if welcome_prompt:
-            self.add_assistant_message(
-                welcome_prompt,
-                add_to_llm_request=False,
-                track_trace=False,
-            )
+        # The welcome prompt is no longer persisted as a display message. It is
+        # injected on-the-fly by the frontend when starting a brand-new session,
+        # so that reopening a saved conversation does not show the welcome text.
 
     def add_system_message(self, content: str) -> None:
         self.system_messages.append(

@@ -118,6 +118,12 @@ class AssistantApp extends AppBase {
         requestAnimationFrame(() => {
             requestAnimationFrame(() => this._applyCentering(true));
         });
+
+        // If this is a brand-new session (no persisted history), show the welcome
+        // message once in the UI without persisting it.
+        if (!this.session && !this.props.session && !this.props.fromHistory) {
+            this._appendWelcomeMessage();
+        }
     }
 
     _bindInputEvents() {
@@ -274,6 +280,15 @@ class AssistantApp extends AppBase {
         this._scrollToBottom();
     }
 
+    _appendWelcomeMessage() {
+        const welcome = "Bienvenue sur votre plateforme de gestion de modèles de données !\n\nJe suis votre assistant IA. Voici ce que vous pouvez déjà faire :\n- **Exploration interactive** : interrogez des standards de données en langage naturel.\n- **Import de fichiers** : chargez vos fichiers XMI ou ontologies OWL/Turtle pour analyse.\n- **Modification du modèle** : demandez-moi des évolutions de votre modèle.\n- **Visualisation** : explorez votre modèle directement dans l'interface.";
+        const div = document.createElement('div');
+        div.className = 'assistant-bubble assistant-bubble-assistant mb-6';
+        div.innerHTML = `<div class="assistant-bubble-content markdown-body">${this._markdown(welcome)}</div>`;
+        this.messagesEl.appendChild(div);
+        this._scrollToBottom();
+    }
+
     async loadHistory(session) {
         console.log('[AssistantApp] loadHistory', session);
         const data = await ApiClient.getAssistantHistory(session);
@@ -308,7 +323,10 @@ class AssistantApp extends AppBase {
                 console.warn('[AssistantApp] unknown history role', role, msg);
             }
         }
-        this._scrollToBottom();
+        // Ensure the view is scrolled all the way to the bottom after rendering.
+        requestAnimationFrame(() => {
+            this.chatEl.scrollTo({ top: this.chatEl.scrollHeight, behavior: 'auto' });
+        });
         console.log('[AssistantApp] loaded messages count', this.messages.length);
     }
 
