@@ -283,6 +283,11 @@ class AssistantApp extends AppBase {
             console.warn('[AssistantApp] no messages in history data');
             return;
         }
+        const displayEventCount = Array.isArray(data.display_events) ? data.display_events.length : 0;
+        console.log('[AssistantApp] display_events count', displayEventCount);
+        if (displayEventCount === 0) {
+            console.warn('[AssistantApp] no display_events: conversation was saved before card replay support. Start a new conversation after restarting the server.');
+        }
 
         this.session = session;
         this.modelName = data.model_name || this.modelName || '';
@@ -353,6 +358,18 @@ class AssistantApp extends AppBase {
                 this.activeSvgCard = null;
                 this.activeSvgViewer = null;
                 this._removeThinkingPlaceholder();
+                lastRole = 'assistant';
+                return;
+            }
+            if (kind === 'assistant_message') {
+                // Full assistant message persisted as a single event (used for
+                // intermediate explanations produced between tool calls).
+                closeReplayBubble();
+                this._hideAllSparkles();
+                this._removeThinkingPlaceholder();
+                const bubble = ensureReplayBubble();
+                bubble.innerHTML = this._markdown(event.content || '', false);
+                closeReplayBubble();
                 lastRole = 'assistant';
                 return;
             }

@@ -374,6 +374,9 @@ async def assistant_stream_generator(
                     if stage == "text":
                         streamed_any_text = True
                         content += str(payload)
+                        # Persist every streamed chunk as a separate display event so
+                        # intermediate assistant messages are visible when reloading.
+                        history.add_display_event({"kind": "assistant_text", "content": str(payload)})
                         yield _event("assistant_text", {"content": str(payload)})
                         async for line in _drain_out_queue():
                             yield line
@@ -391,8 +394,6 @@ async def assistant_stream_generator(
 
                 if tool_calls:
                     print(f"[loop {loop_count}] tool_calls={[tc['function']['name'] for tc in tool_calls]}", flush=True)
-                    if content.strip():
-                        history.add_display_event({"kind": "assistant_text", "content": content})
                     history.add_assistant_message(content, tool_calls=tool_calls)
                     history.add_display_event({"kind": "assistant_tool_calls", "tool_calls": tool_calls})
                     yield _event("assistant_tool_calls", {"tool_calls": tool_calls})
@@ -645,10 +646,6 @@ async def assistant_stream_generator(
 
                     # After processing all tool calls, signal loop completion so the UI
                     # can render this iteration before the next LLM call starts.
-                    # Persist any assistant text produced during this loop so it is
-                    # visible when the conversation is reloaded.
-                    if content.strip():
-                        history.add_display_event({"kind": "assistant_text", "content": content})
                     yield _event("loop_done", {"loop": loop_count})
                     async for line in _drain_out_queue():
                         yield line

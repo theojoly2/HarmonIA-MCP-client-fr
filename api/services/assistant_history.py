@@ -115,6 +115,7 @@ class AssistantHistory:
         self.display_messages.append(
             ChatCompletionUserMessageParam(role="user", content=content)
         )
+        self.add_display_event({"kind": "user", "content": content})
         self._append_recent_message("user", content)
         if track_trace:
             self.current_request_trace.append({"type": "user_message", "content": content})
