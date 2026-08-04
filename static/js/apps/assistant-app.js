@@ -430,27 +430,22 @@ class AssistantApp extends AppBase {
         closeReplayBubble();
         this._removeThinkingPlaceholder();
 
-        // Fallback: render any legacy display_messages that were not covered by events.
-        let renderedUsers = this.messagesEl.querySelectorAll('.assistant-bubble-user').length;
-        let renderedAssistants = this.messagesEl.querySelectorAll('.assistant-bubble-assistant').length;
-        for (const msg of data.messages) {
-            const role = msg.role;
-            const content = msg.content || '';
-            if (role === 'user') {
-                if (renderedUsers === 0) {
+        // Legacy fallback: if the backend did not save display_events, render from
+        // display_messages in order. This can be removed once all histories are migrated.
+        if (!events.length) {
+            for (const msg of data.messages) {
+                const role = msg.role;
+                const content = msg.content || '';
+                if (role === 'user') {
                     this.messages.push({ role: 'user', content });
                     this._appendUserMessage(content);
-                }
-                renderedUsers = Math.max(0, renderedUsers - 1);
-            } else if (role === 'assistant') {
-                if (renderedAssistants === 0 && content.trim()) {
+                } else if (role === 'assistant' && content.trim()) {
+                    this.messages.push({ role: 'assistant', content });
                     const div = document.createElement('div');
                     div.className = 'assistant-bubble assistant-bubble-assistant mb-6';
                     div.innerHTML = `<div class="assistant-bubble-content markdown-body">${this._markdown(content, false)}</div>`;
                     this.messagesEl.appendChild(div);
                 }
-                renderedAssistants = Math.max(0, renderedAssistants - 1);
-                this.messages.push({ role: 'assistant', content });
             }
         }
 

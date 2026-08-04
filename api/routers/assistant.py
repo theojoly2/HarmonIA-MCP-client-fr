@@ -256,6 +256,10 @@ async def assistant_stream_generator(
     # Remember the model attached to this session so we can reopen it later.
     if model_name:
         history.assistant_model_name = model_name
+
+    # Persist the user message as a display event so the timeline can be replayed exactly.
+    history.add_display_event({"kind": "user", "content": user_input})
+
     state = {
         "user": username,
         "name": model_name or session_name,
