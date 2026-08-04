@@ -1006,14 +1006,17 @@ class AssistantApp extends AppBase {
         this._streamAbortController?.abort();
         this._streamAbortController = new AbortController();
 
-        // Streaming markdown renderer: tokens appear one by one as plain text, but
-        // the markdown is re-rendered only at "structure breakpoints" (spaces,
-        // newlines, punctuation, markdown markers). This keeps the animation smooth
-        // while the visible formatting stays mostly up-to-date.
-        const STRUCTURE_CHARS = new Set(' \n\r\t.,;:!?*`_#-+=~[](){}|\'"\/<>');
-        const MIN_REPARSE_MS = 80;
+        // Streaming markdown renderer: tokens appear as they arrive from the LLM,
+        // but the markdown is re-rendered at "structure breakpoints" so the visible
+        // formatting stays mostly up-to-date without freezing the UI. A token that
+        // ends with a space, newline, or markdown marker triggers a re-render; in the
+        // fast path the token is simply appended as raw text.
+        const STRUCTURE_RE = /[ \n\r\t.,;:!?*`_#\-+=~\[\](){}|'"\\/<>.]/;
+        const MIN_REPARSE_MS = 60;
+        const MAX_PLAIN_MS = 300;
         let lastReparsedAt = 0;
         let pendingPlain = '';
+        let lastPlainAt = 0;
         const typewriter = this._createTypewriter((chunk) => {
             currentText += chunk;
             pendingPlain += chunk;
@@ -1023,11 +1026,15 @@ class AssistantApp extends AppBase {
                 this._closeAssistantBubble();
                 currentBubble = this._ensureAssistantBubble();
                 currentBubble.innerHTML = '';
+                lastReparsedAt = performance.now();
+                lastPlainAt = lastReparsedAt;
             }
 
             const now = performance.now();
-            const isBreakpoint = chunk.length === 1 && STRUCTURE_CHARS.has(chunk);
-            const shouldReparse = isBreakpoint && (now - lastReparsedAt > MIN_REPARSE_MS);
+            const lastChar = chunk.slice(-1);
+            const isBreakpoint = STRUCTURE_RE.test(lastChar);
+            const tooLongPlain = (now - lastPlainAt > MAX_PLAIN_MS) && (now - lastReparsedAt > MIN_REPARSE_MS);
+            const shouldReparse = (isBreakpoint || tooLongPlain) && (now - lastReparsedAt > MIN_REPARSE_MS);
 
             if (shouldReparse) {
                 // Flush any pending plain text first so it is not lost when we
@@ -1038,6 +1045,7 @@ class AssistantApp extends AppBase {
                 }
                 currentBubble.innerHTML = this._markdown(currentText, false);
                 lastReparsedAt = now;
+                lastPlainAt = now;
                 this._throttledReflow();
                 this._throttledScrollToBottom();
             } else if (currentBubble) {
@@ -1051,6 +1059,7 @@ class AssistantApp extends AppBase {
                         currentBubble.appendChild(document.createTextNode(pendingPlain));
                     }
                     pendingPlain = '';
+                    lastPlainAt = now;
                 }
                 this._throttledReflow();
                 this._throttledScrollToBottom();
