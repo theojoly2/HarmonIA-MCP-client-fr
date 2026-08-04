@@ -571,13 +571,13 @@
 /* SVG model card */
 .assistant-svg-card {
     background: #ffffff;
-    border: 1px solid #f0abfc;
+    border: 1px solid #d8b4fe;
     border-radius: 0.75rem;
     overflow: hidden;
     width: 42rem;
     max-width: 100%;
     margin: 0.75rem 0;
-    box-shadow: 0 4px 6px -1px rgba(192, 38, 211, 0.08);
+    box-shadow: 0 4px 6px -1px rgba(147, 51, 234, 0.08);
 }
 
 .assistant-svg-header {
@@ -585,20 +585,21 @@
     align-items: center;
     gap: 0.5rem;
     padding: 0.75rem 1rem;
-    border-bottom: 1px solid #f5d0fe;
-    background: #fdf4ff;
+    border-bottom: 1px solid #e9d5ff;
+    background: #faf5ff;
 }
 
 .assistant-svg-header svg {
     width: 1rem;
     height: 1rem;
     flex-shrink: 0;
+    color: #7e22ce;
 }
 
 .assistant-svg-header span {
     font-size: 0.9rem;
     font-weight: 700;
-    color: #a21caf;
+    color: #7e22ce;
 }
 
 .assistant-svg-body {
