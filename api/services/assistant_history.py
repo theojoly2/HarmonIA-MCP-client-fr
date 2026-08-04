@@ -115,7 +115,6 @@ class AssistantHistory:
         self.display_messages.append(
             ChatCompletionUserMessageParam(role="user", content=content)
         )
-        self.add_display_event({"kind": "user", "content": content})
         self._append_recent_message("user", content)
         if track_trace:
             self.current_request_trace.append({"type": "user_message", "content": content})
@@ -127,12 +126,15 @@ class AssistantHistory:
         add_to_llm_request: bool = True,
         track_trace: bool = True,
         add_to_display: bool = True,
+        add_to_events: bool = True,
     ) -> None:
         message = ChatCompletionAssistantMessageParam(role="assistant", content=content)
         if tool_calls:
             message["tool_calls"] = deepcopy(tool_calls)
         if add_to_display:
             self.display_messages.append(message)
+        if add_to_events and content.strip() and not tool_calls:
+            self.display_events.append({"kind": "assistant_message", "content": content})
         if add_to_llm_request:
             self.current_request_llm_messages.append(deepcopy(message))
         self._append_recent_message("assistant", content or "")

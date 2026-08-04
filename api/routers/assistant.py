@@ -257,9 +257,6 @@ async def assistant_stream_generator(
     if model_name:
         history.assistant_model_name = model_name
 
-    # Persist the user message as a display event so the timeline can be replayed exactly.
-    history.add_display_event({"kind": "user", "content": user_input})
-
     state = {
         "user": username,
         "name": model_name or session_name,
@@ -374,9 +371,6 @@ async def assistant_stream_generator(
                     if stage == "text":
                         streamed_any_text = True
                         content += str(payload)
-                        # Persist every streamed chunk as a separate display event so
-                        # intermediate assistant messages are visible when reloading.
-                        history.add_display_event({"kind": "assistant_text", "content": str(payload)})
                         yield _event("assistant_text", {"content": str(payload)})
                         async for line in _drain_out_queue():
                             yield line
@@ -636,7 +630,6 @@ async def assistant_stream_generator(
                                     report = tool_results
                             if report:
                                 history.add_assistant_message(report)
-                                history.add_display_event({"kind": "assistant_text", "content": report})
                                 history.add_display_event({"kind": "assistant_done", "content": report})
                                 yield _event("assistant_text", {"content": report})
                                 async for line in _drain_out_queue():
@@ -679,8 +672,6 @@ async def assistant_stream_generator(
 
                 else:
                     history.add_assistant_message(content)
-                    if content.strip():
-                        history.add_display_event({"kind": "assistant_text", "content": content})
                     history.add_display_event({"kind": "assistant_done", "content": content})
                     yield _event("assistant_done", {"content": ""})
                     break
