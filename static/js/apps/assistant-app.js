@@ -297,55 +297,88 @@ class AssistantApp extends AppBase {
         // the original conversation.
         const events = Array.isArray(data.display_events) ? data.display_events : [];
         let currentText = '';
+        let replayBubble = null;
+        let lastRole = null;
+
+        const closeReplayBubble = () => {
+            if (replayBubble && replayBubble.dataset.active === 'true') {
+                replayBubble.dataset.active = 'false';
+            }
+            replayBubble = null;
+            currentText = '';
+        };
+
+        const ensureReplayBubble = () => {
+            if (!replayBubble || replayBubble.dataset.active !== 'true') {
+                closeReplayBubble();
+                replayBubble = document.createElement('div');
+                replayBubble.className = 'assistant-bubble assistant-bubble-assistant mb-6';
+                replayBubble.dataset.role = 'assistant';
+                replayBubble.dataset.active = 'true';
+                replayBubble.innerHTML = `<div class="assistant-bubble-content markdown-body"></div>`;
+                this.messagesEl.appendChild(replayBubble);
+            }
+            return replayBubble.querySelector('.assistant-bubble-content');
+        };
 
         const renderEvent = (event) => {
             const kind = event.kind;
             if (kind === 'user') {
+                closeReplayBubble();
+                this.activeSvgCard = null;
+                this.activeSvgViewer = null;
+                this._removeThinkingPlaceholder();
                 this.messages.push({ role: 'user', content: event.content || '' });
                 this._appendUserMessage(event.content || '');
+                lastRole = 'user';
                 return;
             }
             if (kind === 'assistant_text') {
-                if (!currentText) {
-                    this._ensureAssistantBubble().innerHTML = '';
+                if (lastRole !== 'assistant') {
+                    closeReplayBubble();
                 }
                 currentText += event.content || '';
-                const bubble = this._ensureAssistantBubble();
+                const bubble = ensureReplayBubble();
                 bubble.innerHTML = this._markdown(currentText, false);
+                lastRole = 'assistant';
                 return;
             }
             if (kind === 'assistant_done') {
-                const bubble = this._ensureAssistantBubble();
                 if (event.content && !currentText) {
                     currentText = event.content;
+                    const bubble = ensureReplayBubble();
                     bubble.innerHTML = this._markdown(currentText, false);
                 }
-                this._closeAssistantBubble();
-                currentText = '';
+                closeReplayBubble();
                 this.activeSvgCard = null;
                 this.activeSvgViewer = null;
+                this._removeThinkingPlaceholder();
+                lastRole = 'assistant';
                 return;
             }
             if (kind === 'assistant_tool_calls') {
-                this._closeAssistantBubble();
-                currentText = '';
+                closeReplayBubble();
+                this._hideAllSparkles();
                 this.messages.push({ role: 'assistant_tool_calls', tool_calls: event.tool_calls });
+                lastRole = 'tool';
                 return;
             }
             if (kind === 'tool_start') {
-                this._closeAssistantBubble();
-                currentText = '';
+                closeReplayBubble();
                 this._hideAllSparkles();
+                this._removeThinkingPlaceholder();
                 if (event.name === 'retrieve_documents') {
                     this._appendSearchCard(event.arguments?.search_terms || '', null);
                 }
+                lastRole = 'tool';
                 return;
             }
             if (kind === 'progress_start') {
-                this._closeAssistantBubble();
-                currentText = '';
+                closeReplayBubble();
                 this._hideAllSparkles();
+                this._removeThinkingPlaceholder();
                 this._appendProgressCard(event.card_id, event.tool_name);
+                lastRole = 'tool';
                 return;
             }
             if (kind === 'progress_update') {
@@ -358,8 +391,7 @@ class AssistantApp extends AppBase {
                 return;
             }
             if (kind === 'tool_result') {
-                this._closeAssistantBubble();
-                currentText = '';
+                closeReplayBubble();
                 if (event.name === 'plan_workflow_with_tools') {
                     this._renderPlan(event.result);
                 } else if (event.name === 'retrieve_documents') {
@@ -367,6 +399,7 @@ class AssistantApp extends AppBase {
                 } else {
                     this._fillToolResult(event.name, event.result, event.display);
                 }
+                lastRole = 'tool';
                 return;
             }
             if (kind === 'model_svg') {
@@ -374,8 +407,9 @@ class AssistantApp extends AppBase {
                 return;
             }
             if (kind === 'loop_done') {
-                this._closeAssistantBubble();
-                currentText = '';
+                closeReplayBubble();
+                this.activeSvgCard = null;
+                this.activeSvgViewer = null;
                 return;
             }
             if (kind === 'thinking') {
@@ -384,35 +418,38 @@ class AssistantApp extends AppBase {
                 return;
             }
             if (kind === 'error') {
-                this._closeAssistantBubble();
-                currentText = '';
-                const bubble = this._ensureAssistantBubble();
+                closeReplayBubble();
+                const bubble = ensureReplayBubble();
                 bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(event.message || '')}</em>`;
+                lastRole = 'assistant';
                 return;
             }
         };
 
         events.forEach(renderEvent);
+        closeReplayBubble();
+        this._removeThinkingPlaceholder();
 
         // Fallback: render any legacy display_messages that were not covered by events.
+        let renderedUsers = this.messagesEl.querySelectorAll('.assistant-bubble-user').length;
+        let renderedAssistants = this.messagesEl.querySelectorAll('.assistant-bubble-assistant').length;
         for (const msg of data.messages) {
             const role = msg.role;
             const content = msg.content || '';
             if (role === 'user') {
-                const already = this.messagesEl.querySelectorAll('.assistant-bubble-user').length;
-                const expected = events.filter((e) => e.kind === 'user').length;
-                if (already < expected + 1) {
+                if (renderedUsers === 0) {
                     this.messages.push({ role: 'user', content });
                     this._appendUserMessage(content);
                 }
+                renderedUsers = Math.max(0, renderedUsers - 1);
             } else if (role === 'assistant') {
-                const already = this.messagesEl.querySelectorAll('.assistant-bubble-assistant').length;
-                if (already === 0 || content.trim()) {
+                if (renderedAssistants === 0 && content.trim()) {
                     const div = document.createElement('div');
                     div.className = 'assistant-bubble assistant-bubble-assistant mb-6';
                     div.innerHTML = `<div class="assistant-bubble-content markdown-body">${this._markdown(content, false)}</div>`;
                     this.messagesEl.appendChild(div);
                 }
+                renderedAssistants = Math.max(0, renderedAssistants - 1);
                 this.messages.push({ role: 'assistant', content });
             }
         }
@@ -526,10 +563,6 @@ class AssistantApp extends AppBase {
         const last = this.chatEl.lastElementChild;
         if (last && last.dataset.role === 'assistant' && last.dataset.active === 'true') {
             last.dataset.active = 'false';
-        }
-        // Also close the replay bubble used when restoring history.
-        if (this._replayBubble && this._replayBubble.dataset.active === 'true') {
-            this._replayBubble.dataset.active = 'false';
         }
     }
 
