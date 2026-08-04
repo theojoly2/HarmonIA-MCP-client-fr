@@ -767,7 +767,7 @@ class AssistantApp extends AppBase {
         div.dataset.svgCard = 'true';
         div.innerHTML = `
             <div class="assistant-svg-header">
-                <svg class="text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="text-violet-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
                 </svg>
@@ -1006,23 +1006,52 @@ class AssistantApp extends AppBase {
         this._streamAbortController?.abort();
         this._streamAbortController = new AbortController();
 
-        // Streaming text renderer: append plain text chunks to a live text node
-        // instead of re-parsing markdown on every frame. This avoids UI freezes
-        // during long assistant answers. We only run the final markdown parse
-        // once the stream is complete.
-        let streamingNode = null;
+        // Streaming markdown renderer: tokens appear one by one as plain text, but
+        // the markdown is re-rendered only at "structure breakpoints" (spaces,
+        // newlines, punctuation, markdown markers). This keeps the animation smooth
+        // while the visible formatting stays mostly up-to-date.
+        const STRUCTURE_CHARS = new Set(' \n\r\t.,;:!?*`_#-+=~[](){}|\'"\/<>');
+        const MIN_REPARSE_MS = 80;
+        let lastReparsedAt = 0;
+        let pendingPlain = '';
         const typewriter = this._createTypewriter((chunk) => {
             currentText += chunk;
+            pendingPlain += chunk;
+
             if (!currentBubble) {
                 this._removeThinkingPlaceholder();
                 this._closeAssistantBubble();
                 currentBubble = this._ensureAssistantBubble();
                 currentBubble.innerHTML = '';
-                streamingNode = document.createTextNode('');
-                currentBubble.appendChild(streamingNode);
             }
-            if (streamingNode) {
-                streamingNode.textContent += chunk;
+
+            const now = performance.now();
+            const isBreakpoint = chunk.length === 1 && STRUCTURE_CHARS.has(chunk);
+            const shouldReparse = isBreakpoint && (now - lastReparsedAt > MIN_REPARSE_MS);
+
+            if (shouldReparse) {
+                // Flush any pending plain text first so it is not lost when we
+                // replace the bubble HTML with the parsed markdown.
+                if (pendingPlain) {
+                    currentText += pendingPlain;
+                    pendingPlain = '';
+                }
+                currentBubble.innerHTML = this._markdown(currentText, false);
+                lastReparsedAt = now;
+                this._throttledReflow();
+                this._throttledScrollToBottom();
+            } else if (currentBubble) {
+                // Fast path: append raw text to the live DOM without re-parsing
+                // markdown. We insert pendingPlain if any to keep the DOM minimal.
+                if (pendingPlain) {
+                    const tail = currentBubble.lastChild;
+                    if (tail && tail.nodeType === Node.TEXT_NODE) {
+                        tail.textContent += pendingPlain;
+                    } else {
+                        currentBubble.appendChild(document.createTextNode(pendingPlain));
+                    }
+                    pendingPlain = '';
+                }
                 this._throttledReflow();
                 this._throttledScrollToBottom();
             }
@@ -1032,23 +1061,21 @@ class AssistantApp extends AppBase {
             typewriter.flush();
             if (currentBubble) {
                 // Yield to the browser so the progress-done transition / last chunks
-                // are painted before the expensive final markdown parse.
+                // are painted before the final markdown parse.
                 await new Promise((resolve) => requestAnimationFrame(resolve));
                 currentBubble.innerHTML = this._markdown(currentText, false);
                 this._forceReflow();
             }
-            streamingNode = null;
         };
 
         const resetBubble = () => {
             typewriter.flush();
-            if (currentBubble && streamingNode) {
-                // Convert the streaming plain-text view into the final markdown
-                // render before closing this bubble, so the next bubble starts
-                // clean and formatted.
+            if (currentBubble) {
+                // Convert the streaming view into the final markdown render before
+                // closing this bubble so the next bubble starts clean and formatted.
                 currentBubble.innerHTML = this._markdown(currentText, false);
             }
-            streamingNode = null;
+            pendingPlain = '';
             currentBubble = null;
             currentText = '';
             this._closeAssistantBubble();
@@ -1189,12 +1216,6 @@ class AssistantApp extends AppBase {
                         if (event.content && !currentText && !currentBubble) {
                             currentText = event.content;
                             currentBubble = this._ensureAssistantBubble();
-                            currentBubble.innerHTML = this._markdown(currentText, false);
-                            this._forceReflow();
-                        } else if (currentBubble && currentText) {
-                            // Ensure the final proper markdown render happens, but yield to
-                            // the browser first so the progress-done transition is visible.
-                            await new Promise((resolve) => requestAnimationFrame(resolve));
                             currentBubble.innerHTML = this._markdown(currentText, false);
                             this._forceReflow();
                         }
