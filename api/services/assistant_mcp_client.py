@@ -203,7 +203,13 @@ class AssistantMCPClient:
         }
 
         if name not in EXPOSED_TOOLS:
-            payload["tool_results"] = f"Tool '{name}' is not exposed."
+            payload["tool_results"] = {
+                "error": True,
+                "invalid_tool_called": name,
+                "available_tools": sorted(EXPOSED_TOOLS),
+                "message": f"ATTENTION - VOUS AVEZ FAIT UNE ERREUR : l'outil '{name}' n'existe pas dans le catalogue des outils disponibles. Vous NE DEVEZ PAS rappeler '{name}'. Corrigez votre erreur en choisissant un outil VALIDE parmi ceux disponibles, puis poursuivez l'exécution du plan.",
+            }
+            payload.pop("progress_handler", None)
             return json.dumps(payload, ensure_ascii=False)
 
         # Map the LLM-facing alias back to the internal MCP tool name.
@@ -215,7 +221,13 @@ class AssistantMCPClient:
 
         wrapper = getattr(self, f"_{name}", None)
         if wrapper is None:
-            payload["tool_results"] = f"No wrapper implemented for '{name}'."
+            payload["tool_results"] = {
+                "error": True,
+                "invalid_tool_called": name,
+                "available_tools": sorted(EXPOSED_TOOLS),
+                "message": f"ATTENTION - VOUS AVEZ FAIT UNE ERREUR : l'outil '{name}' n'a pas d'implémentation côté serveur. Vous NE DEVEZ PAS rappeler '{name}'. Corrigez votre erreur en choisissant un outil VALIDE parmi ceux disponibles, puis poursuivez l'exécution du plan.",
+            }
+            payload.pop("progress_handler", None)
             return json.dumps(payload, ensure_ascii=False)
 
         try:
@@ -224,7 +236,7 @@ class AssistantMCPClient:
             payload["tool_name"] = name
         except Exception as e:
             logger.exception("call_tool failed for %s: %s", name, e)
-            payload["tool_results"] = f"Error calling tool '{name}': {e}"
+            payload["tool_results"] = {"error": True, "message": f"Error calling tool '{name}': {e}"}
 
         payload.pop("progress_handler", None)
         return json.dumps(payload, ensure_ascii=False)

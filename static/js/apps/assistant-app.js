@@ -1158,19 +1158,12 @@ class AssistantApp extends AppBase {
                         // sparkle/"Réflexion" label stays at the bottom of the current step.
                         if (event.name === 'retrieve_documents') {
                             this._appendSearchCard(event.arguments?.search_terms || '', null);
-                        } else if (
-                            event.name !== 'plan_workflow_with_tools' &&
-                            event.name !== 'add_class' &&
-                            event.name !== 'add_attribute' &&
-                            event.name !== 'add_connector' &&
-                            event.name !== 'metadata_checker' &&
-                            event.name !== 'reuse_check' &&
-                            event.name !== 'style_guide_check' &&
-                            event.name !== 'validator_check'
-                        ) {
-                            const card = this._createToolCard(event.name, event.arguments || {});
-                            this._markToolRunning(card, true);
+                        } else if (event.name === 'display_model_visualization') {
+                            // SVG cards are created/updated by the model_svg event, no extra card here.
                         }
+                        // Tool cards (JSON dumps) are intentionally hidden for all tools,
+                        // including unknown ones. Only progress cards, plan card, search
+                        // results and SVG visualizations remain visible.
                         // Show a transient status label while the tool runs. The helper
                         // removes any previous placeholder first.
                         placeholder = this._appendThinkingPlaceholder(this._toolStatusLabel(event.name));
