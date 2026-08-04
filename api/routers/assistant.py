@@ -253,6 +253,9 @@ async def assistant_stream_generator(
     )
 
     model_name = request.model_name.strip()
+    # Remember the model attached to this session so we can reopen it later.
+    if model_name:
+        history.assistant_model_name = model_name
     state = {
         "user": username,
         "name": model_name or session_name,
@@ -881,7 +884,42 @@ async def test_stream():
 
 @router.get("/sessions")
 async def list_assistant_sessions(username: str = Depends(require_user)):
-    return {"sessions": AssistantHistory.list_sessions(username)}
+    sessions = []
+    for session in AssistantHistory.list_sessions(username):
+        h = AssistantHistory(user=username, session=session)
+        # Use the display file mtime as the last activity timestamp.
+        mtime = 0
+        if h.display_fp.exists():
+            mtime = int(h.display_fp.stat().st_mtime * 1000)
+
+        # Build a short preview from the first user message in display_messages.
+        preview = ""
+        for msg in h.display_messages:
+            if msg.get("role") == "user" and msg.get("content"):
+                preview = str(msg["content"]).strip().replace("\n", " ")[:80]
+                break
+
+        sessions.append({
+            "name": session,
+            "last_opened_at": mtime,
+            "preview": preview,
+            "model_name": h.assistant_model_name,
+        })
+    sessions.sort(key=lambda s: s["last_opened_at"], reverse=True)
+    return {"sessions": sessions}
+
+
+@router.delete("/sessions/{session}")
+async def delete_assistant_session(
+    session: str,
+    username: str = Depends(require_user),
+):
+    history = AssistantHistory(user=username, session=session)
+    if history.display_fp.exists():
+        history.display_fp.unlink()
+    if history.llm_fp.exists():
+        history.llm_fp.unlink()
+    return {"ok": True}
 
 
 @router.get("/history")
@@ -891,4 +929,8 @@ async def get_assistant_history(
 ):
     history = AssistantHistory(user=username, session=session)
     messages = history.load_display_messages()
-    return {"session": session, "messages": messages}
+    return {
+        "session": session,
+        "messages": messages,
+        "model_name": history.assistant_model_name,
+    }

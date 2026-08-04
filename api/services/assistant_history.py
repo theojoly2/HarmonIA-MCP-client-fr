@@ -58,6 +58,7 @@ class AssistantHistory:
         self.last_execution_plan_full: str = ""
         self.retained_retrieve_documents: list[dict[str, Any]] = []
         self.last_tool_observations_compact: list[dict[str, Any]] = []
+        self.assistant_model_name: str = ""
 
         self.display_dir = BASE_DIR / user
         self.llm_dir = BASE_DIR / user / "llm"
@@ -321,6 +322,7 @@ class AssistantHistory:
                     "last_execution_plan_full": self.last_execution_plan_full,
                     "retained_retrieve_documents": self.retained_retrieve_documents,
                     "last_tool_observations_compact": self.last_tool_observations_compact,
+                    "assistant_model_name": self.assistant_model_name,
                 },
                 f,
                 ensure_ascii=False,
@@ -346,6 +348,7 @@ class AssistantHistory:
                 self.last_execution_plan_full = data.get("last_execution_plan_full", "")
                 self.retained_retrieve_documents = data.get("retained_retrieve_documents", [])
                 self.last_tool_observations_compact = data.get("last_tool_observations_compact", [])
+                self.assistant_model_name = data.get("assistant_model_name", "")
         if not self.system_messages:
             self._init_prompts(None, None)
 
@@ -374,6 +377,7 @@ class AssistantHistory:
                 self.last_execution_plan_full = data.get("last_execution_plan_full", "")
                 self.retained_retrieve_documents = data.get("retained_retrieve_documents", [])
                 self.last_tool_observations_compact = data.get("last_tool_observations_compact", [])
+                self.assistant_model_name = data.get("assistant_model_name", "")
         if not self.system_messages:
             self._init_prompts(None, None)
 

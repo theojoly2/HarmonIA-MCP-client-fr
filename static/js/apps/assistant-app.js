@@ -134,6 +134,19 @@ class AssistantApp extends AppBase {
         });
     }
 
+    async mount(container) {
+        await super.mount(container);
+        // If this instance was created from the history panel with a session,
+        // load the persisted messages into the UI.
+        if (this.props.session && this.props.fromHistory) {
+            try {
+                await this.loadHistory(this.props.session);
+            } catch (err) {
+                console.error('Assistant load history on mount error', err);
+            }
+        }
+    }
+
     _escape(text) {
         return String(text || '')
             .replace(/&/g, '&amp;')
@@ -258,6 +271,36 @@ class AssistantApp extends AppBase {
             <div class="assistant-bubble-content markdown-body">${this._markdown(text)}</div>
         `;
         this.messagesEl.appendChild(div);
+        this._scrollToBottom();
+    }
+
+    async loadHistory(session) {
+        const data = await ApiClient.getAssistantHistory(session);
+        if (!data || !Array.isArray(data.messages)) return;
+
+        this.session = session;
+        this.modelName = data.model_name || this.modelName || '';
+        this.messages = [];
+        this.messagesEl.innerHTML = '';
+        this._switchToChatMode();
+
+        for (const msg of data.messages) {
+            const role = msg.role;
+            const content = msg.content || '';
+            if (role === 'user') {
+                this.messages.push({ role: 'user', content });
+                this._appendUserMessage(content);
+            } else if (role === 'assistant') {
+                this.messages.push({ role: 'assistant', content });
+                const div = document.createElement('div');
+                div.className = 'assistant-bubble assistant-bubble-assistant mb-6';
+                div.innerHTML = `<div class="assistant-bubble-content markdown-body">${this._markdown(content, false)}</div>`;
+                this.messagesEl.appendChild(div);
+            } else if (role === 'tool_start' || role === 'tool_result' || role === 'assistant_tool_calls') {
+                // Persisted tool events are kept in memory but not re-rendered as cards.
+                this.messages.push(msg);
+            }
+        }
         this._scrollToBottom();
     }
 

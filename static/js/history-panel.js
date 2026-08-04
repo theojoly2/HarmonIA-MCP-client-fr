@@ -66,19 +66,28 @@ class HistoryPanel {
             return;
         }
         try {
-            const [modelsRes, searchesRes] = await Promise.all([
+            const [modelsRes, searchesRes, assistantRes] = await Promise.all([
                 fetch("api/models", { credentials: "same-origin" }),
                 fetch("api/searches", { credentials: "same-origin" }),
+                ApiClient.getAssistantSessions(),
             ]);
             let models = [];
             let searches = [];
+            let conversations = [];
             if (modelsRes.ok) {
                 const data = await modelsRes.json();
-                models = (data.models || []).map((m) => ({
-                    ...m,
-                    kind: "model",
-                    sortKey: Number(m.last_opened_at) || 0,
-                }));
+                // Exclude models that are linked to an assistant session (imported
+                // through the assistant). Those are tied to their conversation.
+                const assistantModelNames = new Set(
+                    (assistantRes.sessions || []).map((s) => s.model_name).filter(Boolean)
+                );
+                models = (data.models || [])
+                    .filter((m) => !assistantModelNames.has(m.name))
+                    .map((m) => ({
+                        ...m,
+                        kind: "model",
+                        sortKey: Number(m.last_opened_at) || 0,
+                    }));
             }
             if (searchesRes.ok) {
                 const data = await searchesRes.json();
@@ -90,7 +99,17 @@ class HistoryPanel {
                     sortKey: Number(s.last_opened_at) || 0,
                 }));
             }
-            this.items = [...models, ...searches].sort((a, b) => b.sortKey - a.sortKey);
+            if (assistantRes && assistantRes.sessions) {
+                conversations = assistantRes.sessions.map((s) => ({
+                    ...s,
+                    kind: "assistant",
+                    name: s.name,
+                    display_name: s.preview || s.name,
+                    source_format: "conversation",
+                    sortKey: Number(s.last_opened_at) || 0,
+                }));
+            }
+            this.items = [...models, ...searches, ...conversations].sort((a, b) => b.sortKey - a.sortKey);
         } catch (err) {
             console.error("History load error", err);
             this.items = [];
@@ -107,6 +126,7 @@ class HistoryPanel {
         this.emptyEl.classList.add("hidden");
         this.items.forEach((item) => {
             const isSearch = item.kind === "search";
+            const isAssistant = item.kind === "assistant";
             const storedName = item.name || "";
             const displayName = item.display_name || storedName;
             const li = document.createElement("li");
@@ -114,9 +134,10 @@ class HistoryPanel {
             li.dataset.itemName = storedName;
             li.dataset.itemKind = item.kind;
             if (isSearch) li.dataset.searchId = item.id;
+            if (isAssistant) li.dataset.modelName = item.model_name || "";
             li.innerHTML = `
                 <div class="history-item-icon">
-                    ${isSearch ? this._searchIcon() : this._modelerIcon()}
+                    ${isSearch ? this._searchIcon() : isAssistant ? this._assistantIcon() : this._modelerIcon()}
                 </div>
                 <div class="history-item-info">
                     <span class="history-item-name">${this._escape(displayName)}</span>
@@ -130,6 +151,7 @@ class HistoryPanel {
             li.addEventListener("click", (e) => {
                 if (e.target.closest(".history-action-more, .history-menu")) return;
                 if (isSearch) this._runSearch(storedName, (item.tags || "").split(",").filter(Boolean), item.id);
+                else if (isAssistant) this._openAssistant(storedName, item.model_name || "");
                 else this._openModel(storedName);
             });
             const moreBtn = li.querySelector(".history-action-more");
@@ -144,6 +166,12 @@ class HistoryPanel {
     _searchIcon() {
         return `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+        </svg>`;
+    }
+
+    _assistantIcon() {
+        return `<svg class="w-4 h-4 overflow-visible" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"/>
         </svg>`;
     }
 
@@ -166,9 +194,10 @@ class HistoryPanel {
         // Remove any existing menu
         this._closeMenu();
         const isSearch = item.kind === "search";
+        const isAssistant = item.kind === "assistant";
         const menu = document.createElement("div");
         menu.className = "history-menu";
-        menu.innerHTML = isSearch
+        menu.innerHTML = isSearch || isAssistant
             ? `<button type="button" class="history-menu-item history-menu-delete">Supprimer</button>`
             : `
                 <button type="button" class="history-menu-item history-menu-rename">Renommer</button>
@@ -180,7 +209,7 @@ class HistoryPanel {
         document.body.appendChild(menu);
         this._activeMenu = menu;
 
-        if (!isSearch) {
+        if (!isSearch && !isAssistant) {
             menu.querySelector(".history-menu-rename").addEventListener("click", (e) => {
                 e.stopPropagation();
                 this._closeMenu();
@@ -189,10 +218,12 @@ class HistoryPanel {
                 if (nameEl) this._startInlineRename(nameEl, item.name, item.display_name || item.name);
             });
         }
-        menu.querySelector(".history-menu-delete").addEventListener("click", (e) => {
-            e.stopPropagation();
-            this._showDeleteConfirm(menu, item);
-        });
+        if (menu.querySelector(".history-menu-delete")) {
+            menu.querySelector(".history-menu-delete").addEventListener("click", (e) => {
+                e.stopPropagation();
+                this._showDeleteConfirm(menu, item);
+            });
+        }
 
         // Close on next click anywhere
         requestAnimationFrame(() => {
@@ -214,7 +245,8 @@ class HistoryPanel {
 
     _showDeleteConfirm(menu, item) {
         const isSearch = item.kind === "search";
-        const label = isSearch ? "recherche" : "modèle";
+        const isAssistant = item.kind === "assistant";
+        const label = isSearch ? "recherche" : isAssistant ? "conversation" : "modèle";
         menu.innerHTML = `
             <div class="history-menu-text">Supprimer cette ${label} ?</div>
             <button type="button" class="history-menu-item history-menu-cancel">Annuler</button>
@@ -226,6 +258,13 @@ class HistoryPanel {
             try {
                 if (isSearch) {
                     await ApiClient.deleteSearch(item.id);
+                } else if (isAssistant) {
+                    const encodedSession = encodeURIComponent(item.name);
+                    const res = await fetch(`api/assistant/sessions/${encodedSession}`, {
+                        method: "DELETE",
+                        credentials: "same-origin",
+                    });
+                    if (!res.ok) throw new Error("delete_failed");
                 } else {
                     const encodedName = encodeURIComponent(item.name);
                     const res = await fetch(`api/models/${encodedName}`, {
@@ -237,7 +276,7 @@ class HistoryPanel {
                 await this.load();
             } catch (err) {
                 console.error("Delete history item error", err);
-                alert(`Impossible de supprimer ${isSearch ? "la recherche" : "le modèle"}.`);
+                alert(`Impossible de supprimer ${isSearch ? "la recherche" : isAssistant ? "la conversation" : "le modèle"}.`);
             }
         });
         menu.querySelector(".history-menu-cancel").addEventListener("click", (e) => {
@@ -348,6 +387,31 @@ class HistoryPanel {
         } catch (err) {
             console.error("Open model error", err);
             alert("Impossible d'ouvrir le modèle : " + (err.message || err));
+        }
+    }
+
+    async _openAssistant(sessionName, modelName) {
+        this.close();
+        try {
+            const existingAssistant = AppState.listInstances().find((i) => i.appId === "assistant");
+            if (existingAssistant) {
+                AppState.removeInstance(existingAssistant.instanceId);
+            }
+            const assistantInstance = AppState.createInstance("assistant", {
+                mode: "tab",
+                session: sessionName,
+                modelName: modelName,
+                fromHistory: true,
+            });
+            await windowManager._mountTab(assistantInstance.instance);
+            AppState.setActiveInstance(assistantInstance.instanceId);
+            if (assistantInstance.instance.loadHistory) {
+                await assistantInstance.instance.loadHistory(sessionName);
+            }
+            await this.load();
+        } catch (err) {
+            console.error("Open assistant conversation error", err);
+            alert("Impossible d'ouvrir la conversation : " + (err.message || err));
         }
     }
 
