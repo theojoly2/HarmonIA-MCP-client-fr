@@ -21,9 +21,6 @@ class AssistantApp extends AppBase {
         this.messages = [];
         this.isStreaming = false;
         this.messagesHtml = '';
-        this._pendingEvents = [];
-        this._lastRenderedEventIndex = -1;
-        this._backgroundRenderLoopId = null;
     }
 
     render(container) {
@@ -172,11 +169,6 @@ class AssistantApp extends AppBase {
         if (this.chatEl && state.chatMode) {
             this.chatEl.classList.add('assistant-chat-mode');
         }
-        if (state._pendingEvents) {
-            this._pendingEvents = state._pendingEvents;
-            this._lastRenderedEventIndex = state._lastRenderedEventIndex ?? -1;
-        }
-        this._startBackgroundRenderLoop();
         if (this.chatEl && state.messagesHtml) {
             requestAnimationFrame(() => {
                 this.chatEl.scrollTo({ top: this.chatEl.scrollHeight, behavior: 'auto' });
@@ -195,7 +187,6 @@ class AssistantApp extends AppBase {
                 console.error('Assistant load history on mount error', err);
             }
         }
-        this._startBackgroundRenderLoop();
     }
 
     unmount() {
@@ -205,213 +196,6 @@ class AssistantApp extends AppBase {
         this.mounted = false;
         if (this._resizeObserver) this._resizeObserver.disconnect();
         this._resizeObserver = null;
-        if (this._backgroundRenderLoopId) {
-            cancelAnimationFrame(this._backgroundRenderLoopId);
-            this._backgroundRenderLoopId = null;
-        }
-    }
-
-    _renderPendingEventsUpTo(index) {
-        // noop by default; the live stream handler renders directly. This method
-        // is overridden during background streaming to catch up missed events.
-        this._lastRenderedEventIndex = index;
-    }
-
-    _startBackgroundRenderLoop() {
-        if (!this.isStreaming) return;
-        if (this._backgroundRenderLoopId) return;
-
-        const loop = () => {
-            if (!this.isStreaming || !this.mounted || !this.messagesEl) {
-                this._backgroundRenderLoopId = null;
-                return;
-            }
-            // Re-render the whole timeline from display events whenever new events
-            // arrived while the tab was in the background. This is cheaper than
-            // maintaining complex DOM patching and guarantees consistency.
-            const lastIndex = this._pendingEvents.length - 1;
-            if (lastIndex > this._lastRenderedEventIndex) {
-                this._renderTimelineFromPendingEvents();
-                this._lastRenderedEventIndex = lastIndex;
-            }
-            this._backgroundRenderLoopId = requestAnimationFrame(loop);
-        };
-        this._backgroundRenderLoopId = requestAnimationFrame(loop);
-    }
-
-    _renderTimelineFromPendingEvents() {
-        if (!this.messagesEl) return;
-        const wasAtBottom = this.chatEl
-            ? this.chatEl.scrollTop + this.chatEl.clientHeight >= this.chatEl.scrollHeight - 10
-            : true;
-        this.messagesEl.innerHTML = '';
-        this.activeSvgCard = null;
-        this.activeSvgViewer = null;
-
-        let currentText = '';
-        let replayBubble = null;
-        let lastRole = null;
-
-        const closeReplayBubble = () => {
-            if (replayBubble && replayBubble.dataset.active === 'true') {
-                replayBubble.dataset.active = 'false';
-            }
-            replayBubble = null;
-            currentText = '';
-        };
-
-        const ensureReplayBubble = () => {
-            if (!replayBubble || replayBubble.dataset.active !== 'true') {
-                closeReplayBubble();
-                replayBubble = document.createElement('div');
-                replayBubble.className = 'assistant-bubble assistant-bubble-assistant mb-6';
-                replayBubble.dataset.role = 'assistant';
-                replayBubble.dataset.active = 'true';
-                replayBubble.innerHTML = `<div class="assistant-bubble-content markdown-body"></div>`;
-                this.messagesEl.appendChild(replayBubble);
-            }
-            return replayBubble.querySelector('.assistant-bubble-content');
-        };
-
-        const renderEvent = (event) => {
-            const kind = event.kind;
-            if (kind === 'user') {
-                closeReplayBubble();
-                this.activeSvgCard = null;
-                this.activeSvgViewer = null;
-                this._removeThinkingPlaceholder();
-                this.messages.push({ role: 'user', content: event.content || '' });
-                this._appendUserMessage(event.content || '');
-                lastRole = 'user';
-                return;
-            }
-            if (kind === 'assistant_text') {
-                if (lastRole !== 'assistant') {
-                    closeReplayBubble();
-                }
-                currentText += event.content || '';
-                const bubble = ensureReplayBubble();
-                bubble.innerHTML = this._markdown(currentText, false);
-                lastRole = 'assistant';
-                return;
-            }
-            if (kind === 'assistant_done') {
-                if (event.content && !currentText) {
-                    currentText = event.content;
-                    const bubble = ensureReplayBubble();
-                    bubble.innerHTML = this._markdown(currentText, false);
-                }
-                closeReplayBubble();
-                this.activeSvgCard = null;
-                this.activeSvgViewer = null;
-                this._removeThinkingPlaceholder();
-                lastRole = 'assistant';
-                return;
-            }
-            if (kind === 'assistant_message') {
-                closeReplayBubble();
-                this._hideAllSparkles();
-                this._removeThinkingPlaceholder();
-                const bubble = ensureReplayBubble();
-                bubble.innerHTML = this._markdown(event.content || '', false);
-                closeReplayBubble();
-                lastRole = 'assistant';
-                return;
-            }
-            if (kind === 'assistant_tool_calls') {
-                closeReplayBubble();
-                this._hideAllSparkles();
-                this.messages.push({ role: 'assistant_tool_calls', tool_calls: event.tool_calls });
-                lastRole = 'tool';
-                return;
-            }
-            if (kind === 'tool_start') {
-                closeReplayBubble();
-                this._hideAllSparkles();
-                this._removeThinkingPlaceholder();
-                if (event.name === 'retrieve_documents') {
-                    this._appendSearchCard(event.arguments?.search_terms || '', null);
-                }
-                lastRole = 'tool';
-                return;
-            }
-            if (kind === 'progress_start') {
-                closeReplayBubble();
-                this._hideAllSparkles();
-                this._removeThinkingPlaceholder();
-                this._appendProgressCard(event.card_id, event.tool_name);
-                lastRole = 'tool';
-                return;
-            }
-            if (kind === 'progress_update') {
-                this._updateProgressCard(event.card_id, event.percent, event.message);
-                return;
-            }
-            if (kind === 'progress_done') {
-                this._completeProgressCard(event.card_id);
-                this._removeProgressStatus(event.card_id);
-                return;
-            }
-            if (kind === 'tool_result') {
-                closeReplayBubble();
-                if (event.name === 'plan_workflow_with_tools') {
-                    this._renderPlan(event.result);
-                } else if (event.name === 'retrieve_documents') {
-                    this._fillSearchCard(event.display?.query || '', event.display?.results_html || '');
-                } else {
-                    this._fillToolResult(event.name, event.result, event.display);
-                }
-                lastRole = 'tool';
-                return;
-            }
-            if (kind === 'model_svg') {
-                this._updateCurrentSvgCard(event.svg, event.model_name || 'Visualisation du modèle');
-                return;
-            }
-            if (kind === 'loop_done') {
-                closeReplayBubble();
-                this.activeSvgCard = null;
-                this.activeSvgViewer = null;
-                return;
-            }
-            if (kind === 'thinking') {
-                this._removeThinkingPlaceholder();
-                this._appendThinkingPlaceholder('Réflexion...');
-                return;
-            }
-            if (kind === 'error') {
-                closeReplayBubble();
-                const bubble = ensureReplayBubble();
-                bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(event.message || '')}</em>`;
-                lastRole = 'assistant';
-                return;
-            }
-        };
-
-        this._pendingEvents.forEach(renderEvent);
-        closeReplayBubble();
-        this._removeThinkingPlaceholder();
-
-        const lastAssistant = this.messagesEl.lastElementChild;
-        if (lastAssistant && lastAssistant.dataset.role === 'assistant') {
-            if (!lastAssistant.querySelector('.ai-avatar-row')) {
-                lastAssistant.innerHTML += `
-                    <div class="ai-avatar-row flex items-center gap-2">
-                        <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic" data-hidden="false">
-                            ${this._sparkleSvg()}
-                        </div>
-                    </div>
-                `;
-            }
-        }
-
-        if (wasAtBottom && this.chatEl) {
-            requestAnimationFrame(() => {
-                this.chatEl.scrollTo({ top: this.chatEl.scrollHeight, behavior: 'auto' });
-            });
-        }
-
-        this.messagesHtml = this.messagesEl.innerHTML;
     }
 
     _escape(text) {
@@ -1454,14 +1238,6 @@ class AssistantApp extends AppBase {
         this.messages.push({ role: 'user', content: text });
         this._appendUserMessage(text);
         this.isStreaming = true;
-        if (!this._pendingEvents.length) {
-            this._pendingEvents = [];
-            this._lastRenderedEventIndex = -1;
-        }
-        if (this._backgroundRenderLoopId) {
-            cancelAnimationFrame(this._backgroundRenderLoopId);
-            this._backgroundRenderLoopId = null;
-        }
 
         // Start with a clean thinking placeholder. Hide stale sparkles first,
         // because a new user message begins a new assistant turn.
