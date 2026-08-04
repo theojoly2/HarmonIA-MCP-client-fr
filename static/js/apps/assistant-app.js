@@ -21,6 +21,7 @@ class AssistantApp extends AppBase {
         this.messages = [];
         this.isStreaming = false;
         this.messagesHtml = '';
+        this._displayEventsSnapshot = [];
     }
 
     render(container) {
@@ -150,6 +151,7 @@ class AssistantApp extends AppBase {
             heroHidden: this.heroEl ? this.heroEl.classList.contains('assistant-hero-hidden') : false,
             chatMode: this.chatEl ? this.chatEl.classList.contains('assistant-chat-mode') : false,
             isStreaming: this.isStreaming,
+            _displayEventsSnapshot: this._displayEventsSnapshot,
         };
     }
 
@@ -168,6 +170,16 @@ class AssistantApp extends AppBase {
         }
         if (this.chatEl && state.chatMode) {
             this.chatEl.classList.add('assistant-chat-mode');
+        }
+        // Restore pending display events so the replay renderer can pick them up
+        // if a background stream is still running when the user switches back.
+        if (state._displayEventsSnapshot) {
+            this._displayEventsSnapshot = state._displayEventsSnapshot;
+        }
+        if (this.chatEl && state.messagesHtml) {
+            requestAnimationFrame(() => {
+                this.chatEl.scrollTo({ top: this.chatEl.scrollHeight, behavior: 'auto' });
+            });
         }
     }
 
@@ -189,6 +201,8 @@ class AssistantApp extends AppBase {
         // stream handler updates this.messagesHtml on every event so the UI can
         // be restored on the next mount.
         this.mounted = false;
+        if (this._resizeObserver) this._resizeObserver.disconnect();
+        this._resizeObserver = null;
     }
 
     _escape(text) {
@@ -1376,6 +1390,8 @@ class AssistantApp extends AppBase {
                     this._streamAliveTimeout = setTimeout(() => {
                         this._streamAbortController?.abort();
                     }, 120000);
+
+                    this._displayEventsSnapshot.push(event);
 
                     if (event.kind === 'user') {
                         if (event.session) this.session = event.session;

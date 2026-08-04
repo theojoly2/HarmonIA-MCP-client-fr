@@ -212,7 +212,7 @@ def _slugify_session_name(text: str) -> str:
     if not slug:
         slug = "session"
     from datetime import datetime
-    return f"{slug}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{datetime.now().microsecond // 1000:03d}"
+    return f"{slug}"
 
 
 def _generate_model_svg(model_data: dict[str, Any]) -> str:
