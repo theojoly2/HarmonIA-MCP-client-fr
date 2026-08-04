@@ -25,6 +25,10 @@ class AssistantApp extends AppBase {
         // back, setState will replay the missed events into the new DOM.
         this._pendingEvents = [];
         this._lastRenderedEventIndex = -1;
+        // Text accumulated for the assistant message currently being streamed. Stored
+        // on the instance so it survives a tab switch (the old DOM is discarded and
+        // rebuilt from the HTML snapshot).
+        this._currentStreamingText = '';
     }
 
     render(container) {
@@ -173,23 +177,6 @@ class AssistantApp extends AppBase {
         if (this.chatEl && state.chatMode) {
             this.chatEl.classList.add('assistant-chat-mode');
         }
-        // If the stream is still running, catch up events that arrived while the
-        // tab was hidden by replaying them on the new DOM.
-        if (this.isStreaming && this._pendingEvents.length && this.messagesEl) {
-            const eventsToReplay = this._pendingEvents.slice(this._lastRenderedEventIndex + 1);
-            this._lastRenderedEventIndex = this._pendingEvents.length - 1;
-            for (const ev of eventsToReplay) {
-                this._processEvent(ev, {
-                    typewriter: null,
-                    resetBubble: () => {},
-                    finalizeText: () => {},
-                    saveHtmlSnapshot: () => {
-                        if (this.messagesEl) this.messagesHtml = this.messagesEl.innerHTML;
-                    },
-                    placeholderRef: { value: null },
-                });
-            }
-        }
         if (this.chatEl && state.messagesHtml) {
             requestAnimationFrame(() => {
                 this.chatEl.scrollTo({ top: this.chatEl.scrollHeight, behavior: 'auto' });
@@ -206,23 +193,6 @@ class AssistantApp extends AppBase {
                 await this.loadHistory(this.props.session);
             } catch (err) {
                 console.error('Assistant load history on mount error', err);
-            }
-        }
-        // After restoring the saved HTML, catch up any stream events that arrived
-        // while this tab was hidden.
-        if (this.isStreaming && this._pendingEvents.length && this.messagesEl) {
-            const eventsToReplay = this._pendingEvents.slice(this._lastRenderedEventIndex + 1);
-            this._lastRenderedEventIndex = this._pendingEvents.length - 1;
-            for (const ev of eventsToReplay) {
-                this._processEvent(ev, {
-                    typewriter: null,
-                    resetBubble: () => {},
-                    finalizeText: () => {},
-                    saveHtmlSnapshot: () => {
-                        if (this.messagesEl) this.messagesHtml = this.messagesEl.innerHTML;
-                    },
-                    placeholderRef: { value: null },
-                });
             }
         }
     }
@@ -1296,7 +1266,6 @@ class AssistantApp extends AppBase {
         }, 1200);
 
         let currentBubble = null;
-        let currentText = '';
 
         // Abort controller lets the client survive long waits and prevents duplicate streams.
         this._streamAbortController?.abort();
@@ -1329,8 +1298,17 @@ class AssistantApp extends AppBase {
             return false;
         };
 
-        const typewriter = this._createTypewriter((chunk) => {
+        // Track streaming text on the instance too, so it survives tab switches.
+        let currentText = this._currentStreamingText || '';
+        this._currentStreamingText = currentText;
+
+        const updateCurrentText = (chunk) => {
             currentText += chunk;
+            this._currentStreamingText = currentText;
+        };
+
+        const typewriter = this._createTypewriter((chunk) => {
+            updateCurrentText(chunk);
             pendingPlain += chunk;
 
             if (!currentBubble) {
@@ -1395,6 +1373,7 @@ class AssistantApp extends AppBase {
             pendingPlain = '';
             currentBubble = null;
             currentText = '';
+            this._currentStreamingText = '';
             this._closeAssistantBubble();
         };
 
@@ -1411,15 +1390,15 @@ class AssistantApp extends AppBase {
                 this._pendingEvents.push(event);
                 return;
             }
-            if (this._pendingEvents.length) {
-                // Catch up any events that arrived while unmounted before handling the
-                // current event, so the timeline stays in order.
-                const eventsToReplay = this._pendingEvents.slice(this._lastRenderedEventIndex + 1);
-                this._lastRenderedEventIndex = this._pendingEvents.length - 1;
-                for (const ev of eventsToReplay) {
-                    this._processEvent(ev, { typewriter, resetBubble, finalizeText, saveHtmlSnapshot, placeholderRef: { value: placeholder } });
-                }
+
+            // Always process the current event live. If there are also queued events
+            // from the background, replay them first so the timeline order is preserved.
+            const eventsToReplay = this._pendingEvents.slice(this._lastRenderedEventIndex + 1);
+            this._lastRenderedEventIndex = this._pendingEvents.length - 1;
+            for (const ev of eventsToReplay) {
+                this._processEvent(ev, { typewriter, resetBubble, finalizeText, saveHtmlSnapshot, placeholderRef: { value: placeholder } });
             }
+
             this._processEvent(event, { typewriter, resetBubble, finalizeText, saveHtmlSnapshot, placeholderRef: { value: placeholder } });
         };
 
@@ -1483,7 +1462,16 @@ class AssistantApp extends AppBase {
         }
 
         if (event.kind === 'assistant_text') {
-            typewriter.append(event.content || '');
+            if (typewriter) {
+                typewriter.append(event.content || '');
+            } else {
+                // Fallback during background replay (no live typewriter available).
+                const bubble = this._ensureAssistantBubble();
+                this._currentStreamingText = (this._currentStreamingText || '') + (event.content || '');
+                bubble.innerHTML = this._markdown(this._currentStreamingText, false);
+                this._throttledReflow();
+                this._throttledScrollToBottom();
+            }
             saveHtmlSnapshot();
             return;
         }
@@ -1575,10 +1563,10 @@ class AssistantApp extends AppBase {
             this._removeThinkingPlaceholder();
             // If the backend only sent the final message inside assistant_done
             // (no preceding assistant_text chunks), render it now.
-            if (event.content && !currentText && !currentBubble) {
-                currentText = event.content;
-                currentBubble = this._ensureAssistantBubble();
-                currentBubble.innerHTML = this._markdown(currentText, false);
+            if (event.content && !this._currentStreamingText && !currentBubble) {
+                const bubble = this._ensureAssistantBubble();
+                bubble.innerHTML = this._markdown(event.content, false);
+                this._currentStreamingText = event.content;
                 this._forceReflow();
             }
             this._closeAssistantBubble();
@@ -1591,6 +1579,7 @@ class AssistantApp extends AppBase {
             const bubble = this._ensureAssistantBubble();
             bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(event.message || '')}</em>`;
             saveHtmlSnapshot();
+            return;
         }
     }
 
@@ -1659,6 +1648,8 @@ class AssistantApp extends AppBase {
     unmount() {
         if (this._resizeObserver) this._resizeObserver.disconnect();
         this._resizeObserver = null;
+        // Keep container reference so the live DOM can keep receiving stream updates
+        // while the tab is hidden.
         this.mounted = false;
     }
 }
