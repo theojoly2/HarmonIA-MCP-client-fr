@@ -1007,16 +1007,32 @@ class AssistantApp extends AppBase {
         this._streamAbortController = new AbortController();
 
         // Streaming markdown renderer: tokens appear as they arrive from the LLM,
-        // but the markdown is re-rendered at "structure breakpoints" so the visible
-        // formatting stays mostly up-to-date without freezing the UI. A token that
-        // ends with a space, newline, or markdown marker triggers a re-render; in the
-        // fast path the token is simply appended as raw text.
+        // but the markdown is re-rendered only when safe (no unclosed markdown
+        // markers) and at "structure breakpoints" so the visible formatting stays
+        // mostly up-to-date without freezing the UI. Tokens are appended as raw text
+        // between two re-renders, which prevents the duplication seen when mixing
+        // plain-text DOM nodes with full HTML replacement.
         const STRUCTURE_RE = /[ \n\r\t.,;:!?*`_#\-+=~\[\](){}|'"\\/<>.]/;
         const MIN_REPARSE_MS = 60;
         const MAX_PLAIN_MS = 300;
         let lastReparsedAt = 0;
         let pendingPlain = '';
         let lastPlainAt = 0;
+
+        const hasUnclosedMarkdown = (txt) => {
+            // Count backticks: odd means an inline code span is open.
+            const backticks = (txt.match(/`/g) || []).length;
+            if (backticks % 2 !== 0) return true;
+            // Count double-asterisks (bold). Odd count means an opener/closer is pending.
+            const doubleStars = (txt.match(/\*\*/g) || []).length;
+            if (doubleStars % 2 !== 0) return true;
+            // Single underscores/asterisks used as emphasis markers. Approximation: if the
+            // total count of unescaped emphasis markers is odd, an emphasis span is open.
+            const emphasis = (txt.match(/(^|[^\\])[_*](?=[^\s]|$)/g) || []).length;
+            if (emphasis % 2 !== 0) return true;
+            return false;
+        };
+
         const typewriter = this._createTypewriter((chunk) => {
             currentText += chunk;
             pendingPlain += chunk;
@@ -1034,16 +1050,12 @@ class AssistantApp extends AppBase {
             const lastChar = chunk.slice(-1);
             const isBreakpoint = STRUCTURE_RE.test(lastChar);
             const tooLongPlain = (now - lastPlainAt > MAX_PLAIN_MS) && (now - lastReparsedAt > MIN_REPARSE_MS);
-            const shouldReparse = (isBreakpoint || tooLongPlain) && (now - lastReparsedAt > MIN_REPARSE_MS);
+            const safeToRender = !hasUnclosedMarkdown(currentText);
+            const shouldReparse = (isBreakpoint || tooLongPlain) && safeToRender && (now - lastReparsedAt > MIN_REPARSE_MS);
 
             if (shouldReparse) {
-                // Flush any pending plain text first so it is not lost when we
-                // replace the bubble HTML with the parsed markdown.
-                if (pendingPlain) {
-                    currentText += pendingPlain;
-                    pendingPlain = '';
-                }
                 currentBubble.innerHTML = this._markdown(currentText, false);
+                pendingPlain = '';
                 lastReparsedAt = now;
                 lastPlainAt = now;
                 this._throttledReflow();
