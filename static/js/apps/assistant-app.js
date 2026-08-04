@@ -447,6 +447,21 @@ class AssistantApp extends AppBase {
         closeReplayBubble();
         this._removeThinkingPlaceholder();
 
+        // Add a sparkle avatar under the last assistant message so the replayed
+        // conversation visually matches the live streaming state.
+        const lastAssistant = this.messagesEl.lastElementChild;
+        if (lastAssistant && lastAssistant.dataset.role === 'assistant') {
+            if (!lastAssistant.querySelector('.ai-avatar-row')) {
+                lastAssistant.innerHTML += `
+                    <div class="ai-avatar-row flex items-center gap-2">
+                        <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic" data-hidden="false">
+                            ${this._sparkleSvg()}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
         // Ensure the view is scrolled all the way to the bottom after rendering.
         requestAnimationFrame(() => {
             this.chatEl.scrollTo({ top: this.chatEl.scrollHeight, behavior: 'auto' });
