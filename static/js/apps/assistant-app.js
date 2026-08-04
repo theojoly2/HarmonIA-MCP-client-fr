@@ -21,6 +21,10 @@ class AssistantApp extends AppBase {
         this.messages = [];
         this.isStreaming = false;
         this.messagesHtml = '';
+        // Capture new events while the app is unmounted. When the user switches
+        // back, setState will replay the missed events into the new DOM.
+        this._pendingEvents = [];
+        this._lastRenderedEventIndex = -1;
     }
 
     render(container) {
@@ -169,6 +173,23 @@ class AssistantApp extends AppBase {
         if (this.chatEl && state.chatMode) {
             this.chatEl.classList.add('assistant-chat-mode');
         }
+        // If the stream is still running, catch up events that arrived while the
+        // tab was hidden by replaying them on the new DOM.
+        if (this.isStreaming && this._pendingEvents.length && this.messagesEl) {
+            const eventsToReplay = this._pendingEvents.slice(this._lastRenderedEventIndex + 1);
+            this._lastRenderedEventIndex = this._pendingEvents.length - 1;
+            for (const ev of eventsToReplay) {
+                this._processEvent(ev, {
+                    typewriter: null,
+                    resetBubble: () => {},
+                    finalizeText: () => {},
+                    saveHtmlSnapshot: () => {
+                        if (this.messagesEl) this.messagesHtml = this.messagesEl.innerHTML;
+                    },
+                    placeholderRef: { value: null },
+                });
+            }
+        }
         if (this.chatEl && state.messagesHtml) {
             requestAnimationFrame(() => {
                 this.chatEl.scrollTo({ top: this.chatEl.scrollHeight, behavior: 'auto' });
@@ -187,15 +208,29 @@ class AssistantApp extends AppBase {
                 console.error('Assistant load history on mount error', err);
             }
         }
+        // After restoring the saved HTML, catch up any stream events that arrived
+        // while this tab was hidden.
+        if (this.isStreaming && this._pendingEvents.length && this.messagesEl) {
+            const eventsToReplay = this._pendingEvents.slice(this._lastRenderedEventIndex + 1);
+            this._lastRenderedEventIndex = this._pendingEvents.length - 1;
+            for (const ev of eventsToReplay) {
+                this._processEvent(ev, {
+                    typewriter: null,
+                    resetBubble: () => {},
+                    finalizeText: () => {},
+                    saveHtmlSnapshot: () => {
+                        if (this.messagesEl) this.messagesHtml = this.messagesEl.innerHTML;
+                    },
+                    placeholderRef: { value: null },
+                });
+            }
+        }
     }
 
     unmount() {
-        // Keep the streaming generation alive when the user switches tabs. The
-        // stream handler updates this.messagesHtml on every event so the UI can
-        // be restored on the next mount.
-        this.mounted = false;
         if (this._resizeObserver) this._resizeObserver.disconnect();
         this._resizeObserver = null;
+        this.mounted = false;
     }
 
     _escape(text) {
@@ -1238,7 +1273,9 @@ class AssistantApp extends AppBase {
         this.messages.push({ role: 'user', content: text });
         this._appendUserMessage(text);
         this.isStreaming = true;
-
+        // Reset the background event queue for each new turn.
+        this._pendingEvents = [];
+        this._lastRenderedEventIndex = -1;
         // Start with a clean thinking placeholder. Hide stale sparkles first,
         // because a new user message begins a new assistant turn.
         this._hideAllSparkles();
@@ -1361,170 +1398,38 @@ class AssistantApp extends AppBase {
             this._closeAssistantBubble();
         };
 
-
-
         const saveHtmlSnapshot = () => {
             if (this.messagesEl) {
                 this.messagesHtml = this.messagesEl.innerHTML;
             }
         };
 
-
+        const liveHandler = async (event) => {
+            if (!this.mounted || !this.messagesEl) {
+                // The user switched away from this tab while the stream was running.
+                // Queue the event for replay when the tab is restored.
+                this._pendingEvents.push(event);
+                return;
+            }
+            if (this._pendingEvents.length) {
+                // Catch up any events that arrived while unmounted before handling the
+                // current event, so the timeline stays in order.
+                const eventsToReplay = this._pendingEvents.slice(this._lastRenderedEventIndex + 1);
+                this._lastRenderedEventIndex = this._pendingEvents.length - 1;
+                for (const ev of eventsToReplay) {
+                    this._processEvent(ev, { typewriter, resetBubble, finalizeText, saveHtmlSnapshot, placeholderRef: { value: placeholder } });
+                }
+            }
+            this._processEvent(event, { typewriter, resetBubble, finalizeText, saveHtmlSnapshot, placeholderRef: { value: placeholder } });
+        };
 
         try {
             await ApiClient.streamAssistant(
                 sessionToSend,
                 text,
                 this.modelName,
-                async (event) => {
-                    if (this._streamAliveTimeout) {
-                        clearTimeout(this._streamAliveTimeout);
-                        this._streamAliveTimeout = null;
-                    }
-                    // Restart the watchdog each time something arrives (2 min silence = dead).
-                    this._streamAliveTimeout = setTimeout(() => {
-                        this._streamAbortController?.abort();
-                    }, 120000);
-
-                    this._pendingEvents.push(event);
-
-                    if (event.kind === 'user') {
-                        if (event.session) this.session = event.session;
-                        // A new user message starts a new turn: freeze any previous SVG card
-                        // immediately so mutations in this turn create a fresh visualization card.
-                        this._freezeCurrentSvgCard();
-                        saveHtmlSnapshot();
-                        return;
-                    }
-
-                    if (event.kind === 'thinking') {
-                        // Each thinking event starts a new reasoning step. The helper
-                        // removes any previous placeholder before creating a fresh one,
-                        // so stale sparkles from earlier phases do not linger on screen.
-                        this._removeThinkingPlaceholder();
-                        placeholder = this._appendThinkingPlaceholder('Réflexion...');
-                        saveHtmlSnapshot();
-                        return;
-                    }
-
-                    if (event.kind === 'assistant_text') {
-                        typewriter.append(event.content || '');
-                        saveHtmlSnapshot();
-                        return;
-                    }
-
-                    if (event.kind === 'assistant_tool_calls') {
-                        resetBubble();
-                        // Hide the verbose tool-call list; only progress cards (and the
-                        // plan card) give the user feedback now.
-                        this.messages.push({ role: 'assistant_tool_calls', tool_calls: event.tool_calls });
-                        saveHtmlSnapshot();
-                        return;
-                    }
-
-                    if (event.kind === 'tool_start') {
-                        resetBubble();
-                        // Hide the sparkle on any previous assistant bubble as soon as a new
-                        // tool starts, so it does not stay under an intermediate message.
-                        this._hideAllSparkles();
-                        // Render the tool card/search card BEFORE the placeholder so the
-                        // sparkle/"Réflexion" label stays at the bottom of the current step.
-                        if (event.name === 'retrieve_documents') {
-                            this._appendSearchCard(event.arguments?.search_terms || '', null);
-                        } else if (event.name === 'display_model_visualization') {
-                            // SVG cards are created/updated by the model_svg event, no extra card here.
-                        }
-                        // Tool cards (JSON dumps) are intentionally hidden for all tools,
-                        // including unknown ones. Only progress cards, plan card, search
-                        // results and SVG visualizations remain visible.
-                        // Show a transient status label while the tool runs. The helper
-                        // removes any previous placeholder first.
-                        placeholder = this._appendThinkingPlaceholder(this._toolStatusLabel(event.name));
-                        saveHtmlSnapshot();
-                        return;
-                    }
-
-                    if (event.kind === 'progress_start') {
-                        resetBubble();
-                        this._hideAllSparkles();
-                        this._appendProgressCard(event.card_id, event.tool_name);
-                        saveHtmlSnapshot();
-                        return;
-                    }
-
-                    if (event.kind === 'progress_update') {
-                        this._updateProgressCard(event.card_id, event.percent, event.message);
-                        saveHtmlSnapshot();
-                        return;
-                    }
-
-                    if (event.kind === 'progress_done') {
-                        this._completeProgressCard(event.card_id);
-                        this._removeProgressStatus(event.card_id);
-                        saveHtmlSnapshot();
-                        return;
-                    }
-
-                    if (event.kind === 'tool_result') {
-                        resetBubble();
-                        if (event.name === 'plan_workflow_with_tools') {
-                            this._renderPlan(event.result);
-                        } else if (event.name === 'retrieve_documents') {
-                            this._fillSearchCard(event.display?.query || '', event.display?.results_html || '');
-                        } else {
-                            this._fillToolResult(event.name, event.result, event.display);
-                        }
-                        saveHtmlSnapshot();
-                        return;
-                    }
-
-                    if (event.kind === 'loop_done') {
-                        resetBubble();
-                        saveHtmlSnapshot();
-                        return;
-                    }
-
-                    if (event.kind === 'model_svg') {
-                        // Update the active SVG card if one exists; otherwise create a new one.
-                        // The active card is frozen (and detached) on every new user message, so
-                        // a new user request always starts with a fresh visualization card.
-                        // Multiple model_svg events within the same turn update that same card.
-                        this._updateCurrentSvgCard(event.svg, event.label || 'Visualisation du modèle');
-                        saveHtmlSnapshot();
-                        return;
-                    }
-
-                    if (event.kind === 'user') {
-                        // Handled at the top of the event handler.
-                        return;
-                    }
-
-                    if (event.kind === 'assistant_done') {
-                        resetBubble();
-                        // Remove any lingering thinking placeholder before rendering the final answer.
-                        this._removeThinkingPlaceholder();
-                        // If the backend only sent the final message inside assistant_done
-                        // (no preceding assistant_text chunks), render it now.
-                        if (event.content && !currentText && !currentBubble) {
-                            currentText = event.content;
-                            currentBubble = this._ensureAssistantBubble();
-                            currentBubble.innerHTML = this._markdown(currentText, false);
-                            this._forceReflow();
-                        }
-                        this._closeAssistantBubble();
-                        saveHtmlSnapshot();
-                        return;
-                    }
-
-                    if (event.kind === 'error') {
-                        resetBubble();
-                        const bubble = this._ensureAssistantBubble();
-                        bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(event.message || '')}</em>`;
-                        saveHtmlSnapshot();
-                    }
-                }
+                liveHandler
             );
-
         } catch (err) {
             console.error('Assistant stream error', err);
             this._appendThinkingPlaceholder(); // ensures any previous one is removed first
@@ -1540,7 +1445,152 @@ class AssistantApp extends AppBase {
                 this.messages.push({ role: 'assistant', content: currentText });
             }
 
+            this._removeThinkingPlaceholder();
+            this._updateFinalSparkle();
+            saveHtmlSnapshot();
+            clearTimeout(this._streamAliveTimeout);
+            this._streamAliveTimeout = null;
+        }
+    }
 
+    _processEvent(event, { typewriter, resetBubble, finalizeText, saveHtmlSnapshot, placeholderRef }) {
+        if (this._streamAliveTimeout) {
+            clearTimeout(this._streamAliveTimeout);
+            this._streamAliveTimeout = null;
+        }
+        // Restart the watchdog each time something arrives (2 min silence = dead).
+        this._streamAliveTimeout = setTimeout(() => {
+            this._streamAbortController?.abort();
+        }, 120000);
+
+        if (event.kind === 'user') {
+            if (event.session) this.session = event.session;
+            // A new user message starts a new turn: freeze any previous SVG card
+            // immediately so mutations in this turn create a fresh visualization card.
+            this._freezeCurrentSvgCard();
+            saveHtmlSnapshot();
+            return;
+        }
+
+        if (event.kind === 'thinking') {
+            // Each thinking event starts a new reasoning step. The helper
+            // removes any previous placeholder first, so stale sparkles from
+            // earlier phases do not linger on screen.
+            this._removeThinkingPlaceholder();
+            placeholderRef.value = this._appendThinkingPlaceholder('Réflexion...');
+            saveHtmlSnapshot();
+            return;
+        }
+
+        if (event.kind === 'assistant_text') {
+            typewriter.append(event.content || '');
+            saveHtmlSnapshot();
+            return;
+        }
+
+        if (event.kind === 'assistant_tool_calls') {
+            resetBubble();
+            // Hide the verbose tool-call list; only progress cards (and the
+            // plan card) give the user feedback now.
+            this.messages.push({ role: 'assistant_tool_calls', tool_calls: event.tool_calls });
+            saveHtmlSnapshot();
+            return;
+        }
+
+        if (event.kind === 'tool_start') {
+            resetBubble();
+            // Hide the sparkle on any previous assistant bubble as soon as a new
+            // tool starts, so it does not stay under an intermediate message.
+            this._hideAllSparkles();
+            // Render the tool card/search card BEFORE the placeholder so the
+            // sparkle/"Réflexion" label stays at the bottom of the current step.
+            if (event.name === 'retrieve_documents') {
+                this._appendSearchCard(event.arguments?.search_terms || '', null);
+            } else if (event.name === 'display_model_visualization') {
+                // SVG cards are created/updated by the model_svg event, no extra card here.
+            }
+            // Tool cards (JSON dumps) are intentionally hidden for all tools,
+            // including unknown ones. Only progress cards, plan card, search
+            // results and SVG visualizations remain visible.
+            // Show a transient status label while the tool runs. The helper
+            // removes any previous placeholder first.
+            placeholderRef.value = this._appendThinkingPlaceholder(this._toolStatusLabel(event.name));
+            saveHtmlSnapshot();
+            return;
+        }
+
+        if (event.kind === 'progress_start') {
+            resetBubble();
+            this._hideAllSparkles();
+            this._appendProgressCard(event.card_id, event.tool_name);
+            saveHtmlSnapshot();
+            return;
+        }
+
+        if (event.kind === 'progress_update') {
+            this._updateProgressCard(event.card_id, event.percent, event.message);
+            saveHtmlSnapshot();
+            return;
+        }
+
+        if (event.kind === 'progress_done') {
+            this._completeProgressCard(event.card_id);
+            this._removeProgressStatus(event.card_id);
+            saveHtmlSnapshot();
+            return;
+        }
+
+        if (event.kind === 'tool_result') {
+            resetBubble();
+            if (event.name === 'plan_workflow_with_tools') {
+                this._renderPlan(event.result);
+            } else if (event.name === 'retrieve_documents') {
+                this._fillSearchCard(event.display?.query || '', event.display?.results_html || '');
+            } else {
+                this._fillToolResult(event.name, event.result, event.display);
+            }
+            saveHtmlSnapshot();
+            return;
+        }
+
+        if (event.kind === 'loop_done') {
+            resetBubble();
+            saveHtmlSnapshot();
+            return;
+        }
+
+        if (event.kind === 'model_svg') {
+            // Update the active SVG card if one exists; otherwise create a new one.
+            // The active card is frozen (and detached) on every new user message, so
+            // a new user request always starts with a fresh visualization card.
+            // Multiple model_svg events within the same turn update that same card.
+            this._updateCurrentSvgCard(event.svg, event.label || 'Visualisation du modèle');
+            saveHtmlSnapshot();
+            return;
+        }
+
+        if (event.kind === 'assistant_done') {
+            resetBubble();
+            // Remove any lingering thinking placeholder before rendering the final answer.
+            this._removeThinkingPlaceholder();
+            // If the backend only sent the final message inside assistant_done
+            // (no preceding assistant_text chunks), render it now.
+            if (event.content && !currentText && !currentBubble) {
+                currentText = event.content;
+                currentBubble = this._ensureAssistantBubble();
+                currentBubble.innerHTML = this._markdown(currentText, false);
+                this._forceReflow();
+            }
+            this._closeAssistantBubble();
+            saveHtmlSnapshot();
+            return;
+        }
+
+        if (event.kind === 'error') {
+            resetBubble();
+            const bubble = this._ensureAssistantBubble();
+            bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(event.message || '')}</em>`;
+            saveHtmlSnapshot();
         }
     }
 
@@ -1609,7 +1659,7 @@ class AssistantApp extends AppBase {
     unmount() {
         if (this._resizeObserver) this._resizeObserver.disconnect();
         this._resizeObserver = null;
-        super.unmount();
+        this.mounted = false;
     }
 }
 
