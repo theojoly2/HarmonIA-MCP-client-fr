@@ -257,6 +257,9 @@ async def assistant_stream_generator(
     if model_name:
         history.assistant_model_name = model_name
 
+    # Persist the user message as a display event so the timeline can be replayed exactly.
+    history.add_display_event({"kind": "user", "content": user_input})
+
     state = {
         "user": username,
         "name": model_name or session_name,
@@ -521,6 +524,7 @@ async def assistant_stream_generator(
                                     add_to_llm_request=True,
                                     track_trace=False,
                                     add_to_display=False,
+                                    add_to_events=False,
                                 )
 
                         display_payload: dict[str, Any] | None = None
@@ -597,6 +601,7 @@ async def assistant_stream_generator(
                             add_to_llm_request=True,
                             track_trace=False,
                             add_to_display=False,
+                            add_to_events=False,
                         )
 
                         mcp_client.tool_results[name] = (
@@ -653,6 +658,7 @@ async def assistant_stream_generator(
                             add_to_llm_request=True,
                             track_trace=False,
                             add_to_display=False,
+                            add_to_events=False,
                         )
                     elif all_tools_were_analysis and analysis_success_count > 0:
                         names = sorted({tc['function']['name'] for tc in tool_calls})
@@ -666,13 +672,13 @@ async def assistant_stream_generator(
                             add_to_llm_request=True,
                             track_trace=False,
                             add_to_display=False,
+                            add_to_events=False,
                         )
 
                     continue
 
                 else:
                     history.add_assistant_message(content)
-                    history.add_display_event({"kind": "assistant_done", "content": content})
                     yield _event("assistant_done", {"content": ""})
                     break
 
