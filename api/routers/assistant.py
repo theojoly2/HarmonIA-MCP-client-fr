@@ -391,6 +391,8 @@ async def assistant_stream_generator(
 
                 if tool_calls:
                     print(f"[loop {loop_count}] tool_calls={[tc['function']['name'] for tc in tool_calls]}", flush=True)
+                    if content.strip():
+                        history.add_assistant_message(content, add_to_llm_request=False, track_trace=False)
                     history.add_assistant_message(content, tool_calls=tool_calls)
                     history.add_display_event({"kind": "assistant_tool_calls", "tool_calls": tool_calls})
                     yield _event("assistant_tool_calls", {"tool_calls": tool_calls})
