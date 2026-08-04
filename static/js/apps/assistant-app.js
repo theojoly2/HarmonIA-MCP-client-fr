@@ -288,27 +288,135 @@ class AssistantApp extends AppBase {
         this.modelName = data.model_name || this.modelName || '';
         this.messages = [];
         this.messagesEl.innerHTML = '';
+        this.activeSvgCard = null;
+        this.activeSvgViewer = null;
         this._switchToChatMode();
 
+        // Rebuild the visible timeline from persisted display events. Events are
+        // emitted in stream order and map 1:1 to the renderer methods used during
+        // the original conversation.
+        const events = Array.isArray(data.display_events) ? data.display_events : [];
+        let currentText = '';
+
+        const renderEvent = (event) => {
+            const kind = event.kind;
+            if (kind === 'user') {
+                this.messages.push({ role: 'user', content: event.content || '' });
+                this._appendUserMessage(event.content || '');
+                return;
+            }
+            if (kind === 'assistant_text') {
+                if (!currentText) {
+                    this._ensureAssistantBubble().innerHTML = '';
+                }
+                currentText += event.content || '';
+                const bubble = this._ensureAssistantBubble();
+                bubble.innerHTML = this._markdown(currentText, false);
+                return;
+            }
+            if (kind === 'assistant_done') {
+                const bubble = this._ensureAssistantBubble();
+                if (event.content && !currentText) {
+                    currentText = event.content;
+                    bubble.innerHTML = this._markdown(currentText, false);
+                }
+                this._closeAssistantBubble();
+                currentText = '';
+                this.activeSvgCard = null;
+                this.activeSvgViewer = null;
+                return;
+            }
+            if (kind === 'assistant_tool_calls') {
+                this._closeAssistantBubble();
+                currentText = '';
+                this.messages.push({ role: 'assistant_tool_calls', tool_calls: event.tool_calls });
+                return;
+            }
+            if (kind === 'tool_start') {
+                this._closeAssistantBubble();
+                currentText = '';
+                this._hideAllSparkles();
+                if (event.name === 'retrieve_documents') {
+                    this._appendSearchCard(event.arguments?.search_terms || '', null);
+                }
+                return;
+            }
+            if (kind === 'progress_start') {
+                this._closeAssistantBubble();
+                currentText = '';
+                this._hideAllSparkles();
+                this._appendProgressCard(event.card_id, event.tool_name);
+                return;
+            }
+            if (kind === 'progress_update') {
+                this._updateProgressCard(event.card_id, event.percent, event.message);
+                return;
+            }
+            if (kind === 'progress_done') {
+                this._completeProgressCard(event.card_id);
+                this._removeProgressStatus(event.card_id);
+                return;
+            }
+            if (kind === 'tool_result') {
+                this._closeAssistantBubble();
+                currentText = '';
+                if (event.name === 'plan_workflow_with_tools') {
+                    this._renderPlan(event.result);
+                } else if (event.name === 'retrieve_documents') {
+                    this._fillSearchCard(event.display?.query || '', event.display?.results_html || '');
+                } else {
+                    this._fillToolResult(event.name, event.result, event.display);
+                }
+                return;
+            }
+            if (kind === 'model_svg') {
+                this._updateCurrentSvgCard(event.svg, event.model_name || 'Visualisation du modèle');
+                return;
+            }
+            if (kind === 'loop_done') {
+                this._closeAssistantBubble();
+                currentText = '';
+                return;
+            }
+            if (kind === 'thinking') {
+                this._removeThinkingPlaceholder();
+                this._appendThinkingPlaceholder('Réflexion...');
+                return;
+            }
+            if (kind === 'error') {
+                this._closeAssistantBubble();
+                currentText = '';
+                const bubble = this._ensureAssistantBubble();
+                bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(event.message || '')}</em>`;
+                return;
+            }
+        };
+
+        events.forEach(renderEvent);
+
+        // Fallback: render any legacy display_messages that were not covered by events.
         for (const msg of data.messages) {
             const role = msg.role;
             const content = msg.content || '';
             if (role === 'user') {
-                this.messages.push({ role: 'user', content });
-                this._appendUserMessage(content);
+                const already = this.messagesEl.querySelectorAll('.assistant-bubble-user').length;
+                const expected = events.filter((e) => e.kind === 'user').length;
+                if (already < expected + 1) {
+                    this.messages.push({ role: 'user', content });
+                    this._appendUserMessage(content);
+                }
             } else if (role === 'assistant') {
+                const already = this.messagesEl.querySelectorAll('.assistant-bubble-assistant').length;
+                if (already === 0 || content.trim()) {
+                    const div = document.createElement('div');
+                    div.className = 'assistant-bubble assistant-bubble-assistant mb-6';
+                    div.innerHTML = `<div class="assistant-bubble-content markdown-body">${this._markdown(content, false)}</div>`;
+                    this.messagesEl.appendChild(div);
+                }
                 this.messages.push({ role: 'assistant', content });
-                const div = document.createElement('div');
-                div.className = 'assistant-bubble assistant-bubble-assistant mb-6';
-                div.innerHTML = `<div class="assistant-bubble-content markdown-body">${this._markdown(content, false)}</div>`;
-                this.messagesEl.appendChild(div);
-            } else if (role === 'tool_start' || role === 'tool_result' || role === 'assistant_tool_calls') {
-                // Persisted tool events are kept in memory but not re-rendered as cards.
-                this.messages.push(msg);
-            } else {
-                console.warn('[AssistantApp] unknown history role', role, msg);
             }
         }
+
         // Ensure the view is scrolled all the way to the bottom after rendering.
         requestAnimationFrame(() => {
             this.chatEl.scrollTo({ top: this.chatEl.scrollHeight, behavior: 'auto' });
@@ -418,6 +526,10 @@ class AssistantApp extends AppBase {
         const last = this.chatEl.lastElementChild;
         if (last && last.dataset.role === 'assistant' && last.dataset.active === 'true') {
             last.dataset.active = 'false';
+        }
+        // Also close the replay bubble used when restoring history.
+        if (this._replayBubble && this._replayBubble.dataset.active === 'true') {
+            this._replayBubble.dataset.active = 'false';
         }
     }
 
@@ -1222,7 +1334,6 @@ class AssistantApp extends AppBase {
                         // Show a transient status label while the tool runs. The helper
                         // removes any previous placeholder first.
                         placeholder = this._appendThinkingPlaceholder(this._toolStatusLabel(event.name));
-                        this.messages.push({ role: 'tool_start', name: event.name, arguments: event.arguments });
                         return;
                     }
 
@@ -1253,7 +1364,6 @@ class AssistantApp extends AppBase {
                         } else {
                             this._fillToolResult(event.name, event.result, event.display);
                         }
-                        this.messages.push({ role: 'tool_result', name: event.name, result: event.result, display: event.display });
                         return;
                     }
 

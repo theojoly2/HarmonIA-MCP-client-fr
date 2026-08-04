@@ -49,6 +49,7 @@ class AssistantHistory:
         self.session = session
 
         self.display_messages: list[ChatCompletionMessageParam] = []
+        self.display_events: list[dict[str, Any]] = []
         self.system_messages: list[ChatCompletionMessageParam] = []
         self.conversation_summary: list[str] = []
         self.current_request_trace: list[dict[str, Any]] = []
@@ -105,6 +106,10 @@ class AssistantHistory:
         self.current_request_user_input = user_input
         self.current_request_trace = []
         self.current_request_llm_messages = []
+
+    def add_display_event(self, event: dict[str, Any]) -> None:
+        """Persist a UI event (tool_start, progress_*, tool_result, model_svg) for replay on reload."""
+        self.display_events.append(deepcopy(event))
 
     def add_user_message(self, content: str, track_trace: bool = False) -> None:
         self.display_messages.append(
@@ -305,7 +310,7 @@ class AssistantHistory:
         self.llm_dir.mkdir(parents=True, exist_ok=True)
 
         with open(self.display_fp, "w", encoding="utf-8") as f:
-            json.dump({"display_messages": self.display_messages}, f, ensure_ascii=False, indent=2)
+            json.dump({"display_messages": self.display_messages, "display_events": self.display_events}, f, ensure_ascii=False, indent=2)
 
         with open(self.llm_fp, "w", encoding="utf-8") as f:
             json.dump(
@@ -319,6 +324,7 @@ class AssistantHistory:
                     "last_execution_plan_full": self.last_execution_plan_full,
                     "retained_retrieve_documents": self.retained_retrieve_documents,
                     "last_tool_observations_compact": self.last_tool_observations_compact,
+                    "display_events": self.display_events,
                     "assistant_model_name": self.assistant_model_name,
                 },
                 f,
@@ -333,6 +339,7 @@ class AssistantHistory:
             with open(self.display_fp, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 self.display_messages = data.get("display_messages", [])
+                self.display_events = data.get("display_events", [])
         if self.llm_fp.exists():
             with open(self.llm_fp, "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -345,6 +352,7 @@ class AssistantHistory:
                 self.last_execution_plan_full = data.get("last_execution_plan_full", "")
                 self.retained_retrieve_documents = data.get("retained_retrieve_documents", [])
                 self.last_tool_observations_compact = data.get("last_tool_observations_compact", [])
+                self.display_events = data.get("display_events", [])
                 self.assistant_model_name = data.get("assistant_model_name", "")
         if not self.system_messages:
             self._init_prompts(None, None)
@@ -374,6 +382,7 @@ class AssistantHistory:
                 self.last_execution_plan_full = data.get("last_execution_plan_full", "")
                 self.retained_retrieve_documents = data.get("retained_retrieve_documents", [])
                 self.last_tool_observations_compact = data.get("last_tool_observations_compact", [])
+                self.display_events = data.get("display_events", [])
                 self.assistant_model_name = data.get("assistant_model_name", "")
         if not self.system_messages:
             self._init_prompts(None, None)

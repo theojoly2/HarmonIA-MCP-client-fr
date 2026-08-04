@@ -388,6 +388,7 @@ async def assistant_stream_generator(
                 if tool_calls:
                     print(f"[loop {loop_count}] tool_calls={[tc['function']['name'] for tc in tool_calls]}", flush=True)
                     history.add_assistant_message(content, tool_calls=tool_calls)
+                    history.add_display_event({"kind": "assistant_tool_calls", "tool_calls": tool_calls})
                     yield _event("assistant_tool_calls", {"tool_calls": tool_calls})
                     async for line in _drain_out_queue():
                         yield line
@@ -408,6 +409,7 @@ async def assistant_stream_generator(
                         if not isinstance(arguments, dict):
                             arguments = {}
 
+                        history.add_display_event({"kind": "tool_start", "name": name, "arguments": arguments})
                         yield _event("tool_start", {"name": name, "arguments": arguments})
                         async for line in _drain_out_queue():
                             yield line
@@ -427,6 +429,7 @@ async def assistant_stream_generator(
                             progress_card_id: str | None = None
                             if name in {"metadata_checker", "reuse_check", "validator_check", "style_guide_check"}:
                                 progress_card_id = f"progress-{name}-{uuid4().hex[:8]}"
+                                history.add_display_event({"kind": "progress_start", "card_id": progress_card_id, "tool_name": name})
                                 yield _event("progress_start", {"card_id": progress_card_id, "tool_name": name})
                                 async for line in _drain_out_queue():
                                     yield line
@@ -475,6 +478,7 @@ async def assistant_stream_generator(
                                     yield line
 
                             if progress_card_id is not None:
+                                history.add_display_event({"kind": "progress_done", "card_id": progress_card_id, "tool_name": name})
                                 yield _event("progress_done", {"card_id": progress_card_id, "tool_name": name})
                                 async for line in _drain_out_queue():
                                     yield line
@@ -540,6 +544,7 @@ async def assistant_stream_generator(
                                 display_payload = {"type": "search", "query": query_terms, "results_html": f"<div class=\"text-red-600 p-4\">Erreur rendu recherche: {exc}</div>"}
 
 
+                        history.add_display_event({"kind": "tool_result", "name": name, "result": parsed_tool, "display": display_payload})
                         yield _event("tool_result", {"name": name, "result": parsed_tool, "display": display_payload})
                         async for line in _drain_out_queue():
                             yield line
@@ -607,6 +612,7 @@ async def assistant_stream_generator(
                                 if current_model:
                                     svg_text = _generate_model_svg(current_model)
                                     if svg_text:
+                                        history.add_display_event({"kind": "model_svg", "svg": svg_text, "model_name": model_name, "source": name})
                                         yield _event("model_svg", {"svg": svg_text, "model_name": model_name, "source": name})
                                         async for line in _drain_out_queue():
                                             yield line
@@ -929,8 +935,10 @@ async def get_assistant_history(
 ):
     history = AssistantHistory(user=username, session=session)
     messages = history.load_display_messages()
+    display_events = history.display_events
     return {
         "session": session,
         "messages": messages,
+        "display_events": display_events,
         "model_name": history.assistant_model_name,
     }
