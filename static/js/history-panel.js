@@ -405,9 +405,6 @@ class HistoryPanel {
             });
             await windowManager._mountTab(assistantInstance.instance);
             AppState.setActiveInstance(assistantInstance.instanceId);
-            if (assistantInstance.instance.loadHistory) {
-                await assistantInstance.instance.loadHistory(sessionName);
-            }
             await this.load();
         } catch (err) {
             console.error("Open assistant conversation error", err);

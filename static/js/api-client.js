@@ -283,10 +283,12 @@ const ApiClient = (() => {
     }
 
     async function getAssistantHistory(session) {
-        // History is loaded directly from the JSON persistence in the backend;
-        // for now the assistant app re-creates messages from display_messages.
-        // This helper can be extended if a dedicated endpoint is added.
-        return { messages: [] };
+        if (!session) return { messages: [] };
+        const res = await fetch(apiUrl(`assistant/history?session=${encodeURIComponent(session)}`), {
+            credentials: "same-origin",
+        });
+        if (!res.ok) throw new Error(`Assistant history failed: ${res.status}`);
+        return res.json();
     }
 
     return {
