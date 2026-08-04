@@ -560,7 +560,7 @@ class AssistantApp extends AppBase {
     }
 
     _closeAssistantBubble() {
-        const last = this.chatEl.lastElementChild;
+        const last = this.messagesEl.lastElementChild;
         if (last && last.dataset.role === 'assistant' && last.dataset.active === 'true') {
             last.dataset.active = 'false';
         }
@@ -610,7 +610,7 @@ class AssistantApp extends AppBase {
                 </div>
             </div>
         `;
-        this.chatEl.appendChild(div);
+        this.messagesEl.appendChild(div);
         this._scrollToBottom();
         return div;
     }
@@ -772,7 +772,7 @@ class AssistantApp extends AppBase {
             return null;
         }
 
-        const cards = this.chatEl.querySelectorAll('[data-tool-name]');
+        const cards = this.messagesEl.querySelectorAll('[data-tool-name]');
         let card = null;
         for (let i = cards.length - 1; i >= 0; i--) {
             if (cards[i].dataset.toolName === name && !cards[i].dataset.filled) {
