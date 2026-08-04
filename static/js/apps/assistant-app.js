@@ -426,7 +426,7 @@ class AssistantApp extends AppBase {
             metadata_checker: 'Vérification des métadonnées',
             validator_check: 'Validation guide de style',
             reuse_check: 'Vérification de réutilisation',
-            style_guide_check: 'Vérification du guide de style',
+            style_guide_check: 'Synthèse de la réponse',
         };
         const label = labels[toolName] || toolName;
         const div = document.createElement('div');
@@ -541,9 +541,18 @@ class AssistantApp extends AppBase {
             return null;
         }
 
-        // Mutation tools are silent: no JSON card is shown. The SVG card is updated
-        // instead by the backend's model_svg event.
-        if (name === 'add_class' || name === 'add_attribute' || name === 'add_connector') {
+        // Mutation and analysis tools are silent: no JSON card is shown. Mutations
+        // update the SVG card; analysis results flow into the assistant's answer.
+        const silentTools = {
+            add_class: true,
+            add_attribute: true,
+            add_connector: true,
+            metadata_checker: true,
+            reuse_check: true,
+            style_guide_check: true,
+            validator_check: true,
+        };
+        if (silentTools[name]) {
             return null;
         }
 
@@ -1035,7 +1044,7 @@ class AssistantApp extends AppBase {
             add_class: 'Création de la classe...',
             add_attribute: "Ajout d'un attribut...",
             add_connector: 'Création de la relation...',
-            style_guide_check: 'Vérification du style...',
+            style_guide_check: 'Synthèse de la réponse...',
         };
         return labels[name] || `${name}...`;
     }
@@ -1178,6 +1187,8 @@ class AssistantApp extends AppBase {
 
                     if (event.kind === 'assistant_tool_calls') {
                         resetBubble();
+                        // Hide the verbose tool-call list; only progress cards (and the
+                        // plan card) give the user feedback now.
                         this.messages.push({ role: 'assistant_tool_calls', tool_calls: event.tool_calls });
                         return;
                     }
@@ -1191,7 +1202,16 @@ class AssistantApp extends AppBase {
                         // sparkle/"Réflexion" label stays at the bottom of the current step.
                         if (event.name === 'retrieve_documents') {
                             this._appendSearchCard(event.arguments?.search_terms || '', null);
-                        } else if (event.name !== 'plan_workflow_with_tools' && event.name !== 'add_class' && event.name !== 'add_attribute' && event.name !== 'add_connector') {
+                        } else if (
+                            event.name !== 'plan_workflow_with_tools' &&
+                            event.name !== 'add_class' &&
+                            event.name !== 'add_attribute' &&
+                            event.name !== 'add_connector' &&
+                            event.name !== 'metadata_checker' &&
+                            event.name !== 'reuse_check' &&
+                            event.name !== 'style_guide_check' &&
+                            event.name !== 'validator_check'
+                        ) {
                             const card = this._createToolCard(event.name, event.arguments || {});
                             this._markToolRunning(card, true);
                         }
