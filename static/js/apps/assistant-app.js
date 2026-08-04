@@ -1250,22 +1250,36 @@ class AssistantApp extends AppBase {
         }
     }
 
-    _createTypewriter(onChunk) {
+    _createTypewriter(onChunk, options = {}) {
+        // By default, render each append() as a whole token/word. This matches how
+        // the backend streams LLM tokens and avoids the artificial "character by
+        // character" feel. Very long tokens are still split at spaces to keep the
+        // UI responsive.
+        const maxTokenLength = options.maxTokenLength || 80;
+
         let buffer = '';
         let rafId = null;
         let running = false;
-        const CHUNK_SIZE = 3;
+
+        const emitNext = () => {
+            if (buffer === '') return;
+            // Prefer emitting whole words/tokens. If a token is too long, split on
+            // spaces; if there are no spaces, take the whole chunk.
+            let chunk = buffer;
+            if (chunk.length > maxTokenLength) {
+                const cut = chunk.lastIndexOf(' ', maxTokenLength);
+                const splitAt = cut > 0 ? cut : maxTokenLength;
+                chunk = chunk.slice(0, splitAt);
+            }
+            buffer = buffer.slice(chunk.length);
+            if (chunk) onChunk(chunk);
+        };
 
         const schedule = () => {
             if (running || rafId) return;
             running = true;
             rafId = requestAnimationFrame(() => {
-                // One paint per frame: render a small chunk then schedule the next.
-                const chunk = buffer.slice(0, CHUNK_SIZE);
-                if (chunk) {
-                    buffer = buffer.slice(CHUNK_SIZE);
-                    onChunk(chunk);
-                }
+                emitNext();
                 rafId = null;
                 running = false;
                 if (buffer !== '') schedule();
@@ -1284,9 +1298,7 @@ class AssistantApp extends AppBase {
                 }
                 running = false;
                 while (buffer !== '') {
-                    const chunk = buffer.slice(0, CHUNK_SIZE);
-                    buffer = buffer.slice(CHUNK_SIZE);
-                    onChunk(chunk);
+                    emitNext();
                 }
             },
             stop: () => {
