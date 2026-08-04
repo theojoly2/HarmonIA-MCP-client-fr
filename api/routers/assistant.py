@@ -247,6 +247,12 @@ async def assistant_stream_generator(
     session_name = request.session.strip() or _slugify_session_name(user_input)
     is_new_session = not request.session.strip()
 
+    # Make the session name unique by appending a timestamp when it comes from
+    # a fresh user message, exactly like the modeler does for imported files.
+    if is_new_session:
+        from datetime import datetime
+        session_name = f"{session_name}__{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+
     history = AssistantHistory(
         user=username,
         session=session_name,
@@ -753,8 +759,7 @@ async def import_assistant_model(
     filename = file.filename or "model.txt"
     display_name = (name or filename).strip() or "imported_model"
     from datetime import datetime
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
-    session_name = f"{_model_name_from_filename(display_name)}_{timestamp}"
+    session_name = f"{_model_name_from_filename(display_name)}__{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
 
     try:
         from data_model_utils import _detect_file_type
