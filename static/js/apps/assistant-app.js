@@ -330,6 +330,22 @@ class AssistantApp extends AppBase {
         }
     }
 
+    _throttledReflow() {
+        if (this._reflowRaf) return;
+        this._reflowRaf = requestAnimationFrame(() => {
+            this._reflowRaf = null;
+            this._forceReflow();
+        });
+    }
+
+    _throttledScrollToBottom() {
+        if (this._scrollRaf) return;
+        this._scrollRaf = requestAnimationFrame(() => {
+            this._scrollRaf = null;
+            this._scrollToBottom();
+        });
+    }
+
     _hideAllSparkles() {
         this.chatEl.querySelectorAll('.sparkle-container').forEach((container) => {
             const avatar = container.closest('.ai-avatar-wrapper') || container;
@@ -833,208 +849,84 @@ class AssistantApp extends AppBase {
                 return clean ? `↔ ${clean}` : '↔';
             }
         );
-        const replacements = [
-            [/\\rightarrow/g, '→'],
-            [/\\leftarrow/g, '←'],
-            [/\\leftrightarrow/g, '↔'],
-            [/\\Rightarrow/g, '⇒'],
-            [/\\Leftarrow/g, '⇐'],
-            [/\\Leftrightarrow/g, '⇔'],
-            [/\\longrightarrow/g, '⟶'],
-            [/\\longleftarrow/g, '⟵'],
-            [/\\mapsto/g, '↦'],
-            [/\\to/g, '→'],
-            [/\\gets/g, '←'],
-            [/\\iff/g, '⇔'],
-            [/\\implies/g, '⇒'],
-            [/\\impliedby/g, '⇐'],
-            [/\\uparrow/g, '↑'],
-            [/\\downarrow/g, '↓'],
-            [/\\nearrow/g, '↗'],
-            [/\\searrow/g, '↘'],
-            [/\\swarrow/g, '↙'],
-            [/\\nwarrow/g, '↖'],
-            [/\\alpha/g, 'α'],
-            [/\\beta/g, 'β'],
-            [/\\gamma/g, 'γ'],
-            [/\\delta/g, 'δ'],
-            [/\\epsilon/g, 'ε'],
-            [/\\zeta/g, 'ζ'],
-            [/\\eta/g, 'η'],
-            [/\\theta/g, 'θ'],
-            [/\\iota/g, 'ι'],
-            [/\\kappa/g, 'κ'],
-            [/\\lambda/g, 'λ'],
-            [/\\mu/g, 'μ'],
-            [/\\nu/g, 'ν'],
-            [/\\xi/g, 'ξ'],
-            [/\\pi/g, 'π'],
-            [/\\rho/g, 'ρ'],
-            [/\\sigma/g, 'σ'],
-            [/\\tau/g, 'τ'],
-            [/\\upsilon/g, 'υ'],
-            [/\\phi/g, 'φ'],
-            [/\\chi/g, 'χ'],
-            [/\\psi/g, 'ψ'],
-            [/\\omega/g, 'ω'],
-            [/\\Gamma/g, 'Γ'],
-            [/\\Delta/g, 'Δ'],
-            [/\\Theta/g, 'Θ'],
-            [/\\Lambda/g, 'Λ'],
-            [/\\Xi/g, 'Ξ'],
-            [/\\Pi/g, 'Π'],
-            [/\\Sigma/g, 'Σ'],
-            [/\\Phi/g, 'Φ'],
-            [/\\Psi/g, 'Ψ'],
-            [/\\Omega/g, 'Ω'],
-            [/\\cdot/g, '·'],
-            [/\\times/g, '×'],
-            [/\\div/g, '÷'],
-            [/\\pm/g, '±'],
-            [/\\mp/g, '∓'],
-            [/\\leq/g, '≤'],
-            [/\\le/g, '≤'],
-            [/\\geq/g, '≥'],
-            [/\\ge/g, '≥'],
-            [/\\neq/g, '≠'],
-            [/\\approx/g, '≈'],
-            [/\\sim/g, '∼'],
-            [/\\cong/g, '≅'],
-            [/\\equiv/g, '≡'],
-            [/\\propto/g, '∝'],
-            [/\\infty/g, '∞'],
-            [/\\partial/g, '∂'],
-            [/\\nabla/g, '∇'],
-            [/\\sum/g, 'Σ'],
-            [/\\prod/g, 'Π'],
-            [/\\int/g, '∫'],
-            [/\\oint/g, '∮'],
-            [/\\sqrt/g, '√'],
-            [/\\forall/g, '∀'],
-            [/\\exists/g, '∃'],
-            [/\\in/g, '∈'],
-            [/\\notin/g, '∉'],
-            [/\\subset/g, '⊂'],
-            [/\\supset/g, '⊃'],
-            [/\\subseteq/g, '⊆'],
-            [/\\supseteq/g, '⊇'],
-            [/\\cup/g, '∪'],
-            [/\\cap/g, '∩'],
-            [/\\emptyset/g, '∅'],
-            [/\\varnothing/g, '∅'],
-            [/\\setminus/g, '\\'],
-            [/\\backslash/g, '\\'],
-            [/\\wedge/g, '∧'],
-            [/\\vee/g, '∨'],
-            [/\\neg/g, '¬'],
-            [/\\lnot/g, '¬'],
-            [/\\top/g, '⊤'],
-            [/\\bot/g, '⊥'],
-            [/\\angle/g, '∠'],
-            [/\\perp/g, '⊥'],
-            [/\\parallel/g, '∥'],
-            [/\\mid/g, '|'],
-            [/\\dots/g, '…'],
-            [/\\cdots/g, '⋯'],
-            [/\\vdots/g, '⋮'],
-            [/\\ddots/g, '⋱'],
-            [/\\ldots/g, '…'],
-            [/\\prime/g, '′'],
-            [/\\circ/g, '°'],
-            [/\\bullet/g, '•'],
-            [/\\star/g, '★'],
-            [/\\ast/g, '*'],
-            [/\\dagger/g, '†'],
-            [/\\ddagger/g, '‡'],
-            [/\\S/g, '§'],
-            [/\\P/g, '¶'],
-            [/\\copyright/g, '©'],
-            [/\\pounds/g, '£'],
-            [/\\euro/g, '€'],
-            [/\\textdegree/g, '°'],
-            [/\\textcelsius/g, '°C'],
-            [/\\texteuro/g, '€'],
-            [/\\textleftarrow/g, '←'],
-            [/\\textrightarrow/g, '→'],
-            [/\\textuparrow/g, '↑'],
-            [/\\textdownarrow/g, '↓'],
-            [/\\textbullet/g, '•'],
-            [/\\textasteriskcentered/g, '*'],
-            [/\\textbardbl/g, '‖'],
-            [/\\textbigcircle/g, '○'],
-            [/\\textblank/g, '␣'],
-            [/\\textbrokenbar/g, '¦'],
-            [/\\textcelsius/g, '°C'],
-            [/\\textcent/g, '¢'],
-            [/\\textcopyright/g, '©'],
-            [/\\textcurrency/g, '¤'],
-            [/\\textdagger/g, '†'],
-            [/\\textdaggerdbl/g, '‡'],
-            [/\\textdegree/g, '°'],
-            [/\\textdiscount/g, '⁒'],
-            [/\\textdivorced/g, '⚮'],
-            [/\\textestimated/g, '℮'],
-            [/\\texteuro/g, '€'],
-            [/\\textfractionsolidus/g, '⁄'],
-            [/\\textgravedbl/g, '̏'],
-            [/\\textinterrobang/g, '‽'],
-            [/\\textlangle/g, '⟨'],
-            [/\\textlbrackdbl/g, '⟦'],
-            [/\\textleftarrow/g, '←'],
-            [/\\textlnot/g, '¬'],
-            [/\\textmarried/g, '⚭'],
-            [/\\textmusicalnote/g, '♪'],
-            [/\\textnineoldstyle/g, '9'],
-            [/\\textnumero/g, '№'],
-            [/\\textopenbullet/g, '◦'],
-            [/\\textparagraph/g, '¶'],
-            [/\\textperiodcentered/g, '·'],
-            [/\\textpertenthousand/g, '‱'],
-            [/\\textperthousand/g, '‰'],
-            [/\\textphi/g, 'φ'],
-            [/\\textpilcrow/g, '¶'],
-            [/\\textpm/g, '±'],
-            [/\\textquestiondown/g, '¿'],
-            [/\\textrangle/g, '⟩'],
-            [/\\textrbrackdbl/g, '⟧'],
-            [/\\textrecipe/g, '℞'],
-            [/\\textreferencemark/g, '※'],
-            [/\\textregistered/g, '®'],
-            [/\\textrightarrow/g, '→'],
-            [/\\textsection/g, '§'],
-            [/\\textservicemark/g, '℠'],
-            [/\\textsevenoldstyle/g, '7'],
-            [/\\textsixoldstyle/g, '6'],
-            [/\\textsterling/g, '£'],
-            [/\\textthreeoldstyle/g, '3'],
-            [/\\textthreesuperior/g, '³'],
-            [/\\texttildelow/g, '˜'],
-            [/\\texttimes/g, '×'],
-            [/\\texttrademark/g, '™'],
-            [/\\texttwooldstyle/g, '2'],
-            [/\\texttwosuperior/g, '²'],
-            [/\\textunderscore/g, '_'],
-            [/\\textuparrow/g, '↑'],
-            [/\\textvisiblespace/g, '␣'],
-            [/\\textwon/g, '₩'],
-            [/\\textyen/g, '¥'],
-            [/\\$/g, ''], // strip lone $ delimiters after commands are replaced
-        ];
-        let result = text;
-        for (const [regex, replacement] of replacements) {
-            result = result.replace(regex, replacement);
-        }
+        // Single-pass replacement table for common LaTeX commands.
+        // Using one regex with a lookup map is much faster than chaining 200+
+        // .replace() calls on long assistant answers.
+        const latexMap = {
+            rightarrow: '→', leftarrow: '←', leftrightarrow: '↔',
+            Rightarrow: '⇒', Leftarrow: '⇐', Leftrightarrow: '⇔',
+            longrightarrow: '⟶', longleftarrow: '⟵', mapsto: '↦',
+            to: '→', gets: '←', iff: '⇔', implies: '⇒', impliedby: '⇐',
+            uparrow: '↑', downarrow: '↓', nearrow: '↗', searrow: '↘',
+            swarrow: '↙', nwarrow: '↖',
+            alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', epsilon: 'ε',
+            zeta: 'ζ', eta: 'η', theta: 'θ', iota: 'ι', kappa: 'κ',
+            lambda: 'λ', mu: 'μ', nu: 'ν', xi: 'ξ', pi: 'π', rho: 'ρ',
+            sigma: 'σ', tau: 'τ', upsilon: 'υ', phi: 'φ', chi: 'χ', psi: 'ψ',
+            omega: 'ω',
+            Gamma: 'Γ', Delta: 'Δ', Theta: 'Θ', Lambda: 'Λ', Xi: 'Ξ', Pi: 'Π',
+            Sigma: 'Σ', Phi: 'Φ', Psi: 'Ψ', Omega: 'Ω',
+            cdot: '·', times: '×', div: '÷', pm: '±', mp: '∓',
+            leq: '≤', le: '≤', geq: '≥', ge: '≥', neq: '≠',
+            approx: '≈', sim: '∼', cong: '≅', equiv: '≡', propto: '∝',
+            infty: '∞', partial: '∂', nabla: '∇',
+            sum: 'Σ', prod: 'Π', int: '∫', oint: '∮', sqrt: '√',
+            forall: '∀', exists: '∃', in: '∈', notin: '∉',
+            subset: '⊂', supset: '⊃', subseteq: '⊆', supseteq: '⊇',
+            cup: '∪', cap: '∩', emptyset: '∅', varnothing: '∅',
+            setminus: '\\', backslash: '\\',
+            wedge: '∧', vee: '∨', neg: '¬', lnot: '¬',
+            top: '⊤', bot: '⊥', angle: '∠', perp: '⊥', parallel: '∥', mid: '|',
+            dots: '…', cdots: '⋯', vdots: '⋮', ddots: '⋱', ldots: '…',
+            prime: '′', circ: '°', bullet: '•', star: '★', ast: '*',
+            dagger: '†', ddagger: '‡', S: '§', P: '¶', copyright: '©',
+            pounds: '£', euro: '€',
+            textdegree: '°', textcelsius: '°C', texteuro: '€',
+            textleftarrow: '←', textrightarrow: '→', textuparrow: '↑',
+            textdownarrow: '↓', textbullet: '•', textasteriskcentered: '*',
+            textbardbl: '‖', textbigcircle: '○', textblank: '␣',
+            textbrokenbar: '¦', textcent: '¢', textcopyright: '©',
+            textcurrency: '¤', textdagger: '†', textdaggerdbl: '‡',
+            textdiscount: '⁒', textdivorced: '⚮', textestimated: '℮',
+            textfractionsolidus: '⁄', textgravedbl: '̏', textinterrobang: '‽',
+            textlangle: '⟨', textlbrackdbl: '⟦', textlnot: '¬',
+            textmarried: '⚭', textmusicalnote: '♪', textnineoldstyle: '9',
+            textnumero: '№', textopenbullet: '◦', textparagraph: '¶',
+            textperiodcentered: '·', textpertenthousand: '‱',
+            textperthousand: '‰', textphi: 'φ', textpilcrow: '¶', textpm: '±',
+            textquestiondown: '¿', textrangle: '⟩', textrbrackdbl: '⟧',
+            textrecipe: '℞', textreferencemark: '※', textregistered: '®',
+            textsection: '§', textservicemark: '℠', textsevenoldstyle: '7',
+            textsixoldstyle: '6', textsterling: '£', textthreeoldstyle: '3',
+            textthreesuperior: '³', texttildelow: '˜', texttimes: '×',
+            texttrademark: '™', texttwooldstyle: '2', texttwosuperior: '²',
+            textunderscore: '_', textuparrow: '↑', textvisiblespace: '␣',
+            textwon: '₩', textyen: '¥',
+        };
+        const latexRegex = /\\([A-Za-z]+|\$)/g;
+        text = text.replace(latexRegex, (match, command) => {
+            if (command === '$') return '';
+            return latexMap[command] !== undefined ? latexMap[command] : match;
+        });
+
         // Remove remaining inline math delimiters and their content if simple
-        result = result.replace(/\$([^$]+)\$/g, '$1');
-        return result;
+        text = text.replace(/\$([^$]+)\$/g, '$1');
+        return text;
     }
 
-    _markdown(text) {
+    _markdown(text, streaming = false) {
         if (!text) return '';
-        if (typeof marked !== 'undefined') {
-            return marked.parse(this._preprocessLatex(text), { breaks: true, gfm: true });
+        if (typeof marked === 'undefined') {
+            return this._escape(text).replace(/\n/g, '<br>');
         }
-        return this._escape(text).replace(/\n/g, '<br>');
+        // During streaming, skip the expensive full re-parse of markdown and
+        // just render plain escaped text with line breaks. This avoids UI
+        // freezes when the assistant produces a long final answer. We do a final
+        // proper markdown render once streaming ends.
+        if (streaming) {
+            return this._escape(text).replace(/\n/g, '<br>');
+        }
+        return marked.parse(this._preprocessLatex(text), { breaks: true, gfm: true });
     }
 
     _toolStatusLabel(name) {
@@ -1114,33 +1006,49 @@ class AssistantApp extends AppBase {
         this._streamAbortController?.abort();
         this._streamAbortController = new AbortController();
 
-        // Typewriter: stream markdown progressively. We keep a hidden raw text accumulator
-        // and render parsed markdown on every chunk so formatting appears immediately.
+        // Streaming text renderer: append plain text chunks to a live text node
+        // instead of re-parsing markdown on every frame. This avoids UI freezes
+        // during long assistant answers. We only run the final markdown parse
+        // once the stream is complete.
+        let streamingNode = null;
         const typewriter = this._createTypewriter((chunk) => {
             currentText += chunk;
             if (!currentBubble) {
-                // Remove the thinking placeholder as soon as real text starts so it
-                // does not stay above the final answer.
                 this._removeThinkingPlaceholder();
                 this._closeAssistantBubble();
                 currentBubble = this._ensureAssistantBubble();
+                currentBubble.innerHTML = '';
+                streamingNode = document.createTextNode('');
+                currentBubble.appendChild(streamingNode);
             }
-            if (currentBubble) {
-                currentBubble.innerHTML = this._markdown(currentText);
-                this._forceReflow();
+            if (streamingNode) {
+                streamingNode.textContent += chunk;
+                this._throttledReflow();
+                this._throttledScrollToBottom();
             }
         });
 
-        const finalizeText = () => {
+        const finalizeText = async () => {
             typewriter.flush();
             if (currentBubble) {
-                currentBubble.innerHTML = this._markdown(currentText);
+                // Yield to the browser so the progress-done transition / last chunks
+                // are painted before the expensive final markdown parse.
+                await new Promise((resolve) => requestAnimationFrame(resolve));
+                currentBubble.innerHTML = this._markdown(currentText, false);
                 this._forceReflow();
             }
+            streamingNode = null;
         };
 
         const resetBubble = () => {
-            finalizeText();
+            typewriter.flush();
+            if (currentBubble && streamingNode) {
+                // Convert the streaming plain-text view into the final markdown
+                // render before closing this bubble, so the next bubble starts
+                // clean and formatted.
+                currentBubble.innerHTML = this._markdown(currentText, false);
+            }
+            streamingNode = null;
             currentBubble = null;
             currentText = '';
             this._closeAssistantBubble();
@@ -1281,7 +1189,13 @@ class AssistantApp extends AppBase {
                         if (event.content && !currentText && !currentBubble) {
                             currentText = event.content;
                             currentBubble = this._ensureAssistantBubble();
-                            currentBubble.innerHTML = this._markdown(currentText);
+                            currentBubble.innerHTML = this._markdown(currentText, false);
+                            this._forceReflow();
+                        } else if (currentBubble && currentText) {
+                            // Ensure the final proper markdown render happens, but yield to
+                            // the browser first so the progress-done transition is visible.
+                            await new Promise((resolve) => requestAnimationFrame(resolve));
+                            currentBubble.innerHTML = this._markdown(currentText, false);
                             this._forceReflow();
                         }
                         this._closeAssistantBubble();
