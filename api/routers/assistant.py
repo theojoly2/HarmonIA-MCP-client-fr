@@ -391,6 +391,8 @@ async def assistant_stream_generator(
 
                 if tool_calls:
                     print(f"[loop {loop_count}] tool_calls={[tc['function']['name'] for tc in tool_calls]}", flush=True)
+                    if content.strip():
+                        history.add_display_event({"kind": "assistant_text", "content": content})
                     history.add_assistant_message(content, tool_calls=tool_calls)
                     history.add_display_event({"kind": "assistant_tool_calls", "tool_calls": tool_calls})
                     yield _event("assistant_tool_calls", {"tool_calls": tool_calls})
@@ -633,6 +635,8 @@ async def assistant_stream_generator(
                                     report = tool_results
                             if report:
                                 history.add_assistant_message(report)
+                                history.add_display_event({"kind": "assistant_text", "content": report})
+                                history.add_display_event({"kind": "assistant_done", "content": report})
                                 yield _event("assistant_text", {"content": report})
                                 async for line in _drain_out_queue():
                                     yield line
@@ -641,6 +645,10 @@ async def assistant_stream_generator(
 
                     # After processing all tool calls, signal loop completion so the UI
                     # can render this iteration before the next LLM call starts.
+                    # Persist any assistant text produced during this loop so it is
+                    # visible when the conversation is reloaded.
+                    if content.strip():
+                        history.add_display_event({"kind": "assistant_text", "content": content})
                     yield _event("loop_done", {"loop": loop_count})
                     async for line in _drain_out_queue():
                         yield line
@@ -674,6 +682,9 @@ async def assistant_stream_generator(
 
                 else:
                     history.add_assistant_message(content)
+                    if content.strip():
+                        history.add_display_event({"kind": "assistant_text", "content": content})
+                    history.add_display_event({"kind": "assistant_done", "content": content})
                     yield _event("assistant_done", {"content": ""})
                     break
 
