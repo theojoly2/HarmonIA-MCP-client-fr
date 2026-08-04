@@ -275,8 +275,13 @@ class AssistantApp extends AppBase {
     }
 
     async loadHistory(session) {
+        console.log('[AssistantApp] loadHistory', session);
         const data = await ApiClient.getAssistantHistory(session);
-        if (!data || !Array.isArray(data.messages)) return;
+        console.log('[AssistantApp] history data', data);
+        if (!data || !Array.isArray(data.messages)) {
+            console.warn('[AssistantApp] no messages in history data');
+            return;
+        }
 
         this.session = session;
         this.modelName = data.model_name || this.modelName || '';
@@ -299,9 +304,12 @@ class AssistantApp extends AppBase {
             } else if (role === 'tool_start' || role === 'tool_result' || role === 'assistant_tool_calls') {
                 // Persisted tool events are kept in memory but not re-rendered as cards.
                 this.messages.push(msg);
+            } else {
+                console.warn('[AssistantApp] unknown history role', role, msg);
             }
         }
         this._scrollToBottom();
+        console.log('[AssistantApp] loaded messages count', this.messages.length);
     }
 
     _appendUserMessage(text) {
