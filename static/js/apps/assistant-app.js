@@ -1182,6 +1182,10 @@ class AssistantApp extends AppBase {
     async _send(text) {
         if (!this.session) {
             this.session = this._slugify(text);
+            // The session name is only a base slug; the backend appends a unique
+            // timestamp when it sees an empty session, exactly like imported
+            // models. We rely on the backend's first `user` event to learn the
+            // final session name.
         }
 
         this.messages.push({ role: 'user', content: text });
