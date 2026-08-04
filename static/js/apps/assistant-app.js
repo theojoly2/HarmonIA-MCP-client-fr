@@ -20,6 +20,7 @@ class AssistantApp extends AppBase {
         this.modelName = props.modelName || '';
         this.messages = [];
         this.isStreaming = false;
+        this.messagesHtml = '';
     }
 
     render(container) {
@@ -148,6 +149,7 @@ class AssistantApp extends AppBase {
             messagesHtml: this.messagesEl ? this.messagesEl.innerHTML : '',
             heroHidden: this.heroEl ? this.heroEl.classList.contains('assistant-hero-hidden') : false,
             chatMode: this.chatEl ? this.chatEl.classList.contains('assistant-chat-mode') : false,
+            isStreaming: this.isStreaming,
         };
     }
 
@@ -155,6 +157,7 @@ class AssistantApp extends AppBase {
         if (!state || !Object.keys(state).length) return;
         if (state.session !== undefined) this.session = state.session;
         if (state.modelName !== undefined) this.modelName = state.modelName;
+        if (state.isStreaming !== undefined) this.isStreaming = state.isStreaming;
         if (this.messagesEl && state.messagesHtml !== undefined) {
             this.messagesEl.innerHTML = state.messagesHtml;
         }
@@ -177,6 +180,13 @@ class AssistantApp extends AppBase {
                 console.error('Assistant load history on mount error', err);
             }
         }
+    }
+
+    unmount() {
+        // Keep the streaming generation alive when the user switches tabs. The
+        // stream handler updates this.messagesHtml on every event so the UI can
+        // be restored on the next mount.
+        this.mounted = false;
     }
 
     _escape(text) {
@@ -1344,6 +1354,12 @@ class AssistantApp extends AppBase {
 
 
 
+        const saveHtmlSnapshot = () => {
+            if (this.messagesEl) {
+                this.messagesHtml = this.messagesEl.innerHTML;
+            }
+        };
+
         try {
             await ApiClient.streamAssistant(
                 sessionToSend,
@@ -1364,6 +1380,7 @@ class AssistantApp extends AppBase {
                         // A new user message starts a new turn: freeze any previous SVG card
                         // immediately so mutations in this turn create a fresh visualization card.
                         this._freezeCurrentSvgCard();
+                        saveHtmlSnapshot();
                         return;
                     }
 
@@ -1373,11 +1390,13 @@ class AssistantApp extends AppBase {
                         // so stale sparkles from earlier phases do not linger on screen.
                         this._removeThinkingPlaceholder();
                         placeholder = this._appendThinkingPlaceholder('Réflexion...');
+                        saveHtmlSnapshot();
                         return;
                     }
 
                     if (event.kind === 'assistant_text') {
                         typewriter.append(event.content || '');
+                        saveHtmlSnapshot();
                         return;
                     }
 
@@ -1386,6 +1405,7 @@ class AssistantApp extends AppBase {
                         // Hide the verbose tool-call list; only progress cards (and the
                         // plan card) give the user feedback now.
                         this.messages.push({ role: 'assistant_tool_calls', tool_calls: event.tool_calls });
+                        saveHtmlSnapshot();
                         return;
                     }
 
@@ -1407,6 +1427,7 @@ class AssistantApp extends AppBase {
                         // Show a transient status label while the tool runs. The helper
                         // removes any previous placeholder first.
                         placeholder = this._appendThinkingPlaceholder(this._toolStatusLabel(event.name));
+                        saveHtmlSnapshot();
                         return;
                     }
 
@@ -1414,17 +1435,20 @@ class AssistantApp extends AppBase {
                         resetBubble();
                         this._hideAllSparkles();
                         this._appendProgressCard(event.card_id, event.tool_name);
+                        saveHtmlSnapshot();
                         return;
                     }
 
                     if (event.kind === 'progress_update') {
                         this._updateProgressCard(event.card_id, event.percent, event.message);
+                        saveHtmlSnapshot();
                         return;
                     }
 
                     if (event.kind === 'progress_done') {
                         this._completeProgressCard(event.card_id);
                         this._removeProgressStatus(event.card_id);
+                        saveHtmlSnapshot();
                         return;
                     }
 
@@ -1437,11 +1461,13 @@ class AssistantApp extends AppBase {
                         } else {
                             this._fillToolResult(event.name, event.result, event.display);
                         }
+                        saveHtmlSnapshot();
                         return;
                     }
 
                     if (event.kind === 'loop_done') {
                         resetBubble();
+                        saveHtmlSnapshot();
                         return;
                     }
 
@@ -1451,6 +1477,7 @@ class AssistantApp extends AppBase {
                         // a new user request always starts with a fresh visualization card.
                         // Multiple model_svg events within the same turn update that same card.
                         this._updateCurrentSvgCard(event.svg, event.label || 'Visualisation du modèle');
+                        saveHtmlSnapshot();
                         return;
                     }
 
@@ -1472,6 +1499,7 @@ class AssistantApp extends AppBase {
                             this._forceReflow();
                         }
                         this._closeAssistantBubble();
+                        saveHtmlSnapshot();
                         return;
                     }
 
@@ -1479,6 +1507,7 @@ class AssistantApp extends AppBase {
                         resetBubble();
                         const bubble = this._ensureAssistantBubble();
                         bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(event.message || '')}</em>`;
+                        saveHtmlSnapshot();
                     }
                 }
             );
