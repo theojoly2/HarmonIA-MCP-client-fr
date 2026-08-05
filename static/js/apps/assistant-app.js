@@ -42,15 +42,12 @@ class AssistantApp extends AppBase {
                         </button>
                     </h1>
                 </div>
-                <div id="assistant-chat" class="flex-1 overflow-y-auto">
-                    <div class="assistant-hero" id="assistant-hero">
-                        <div class="assistant-hero-subtitle text-center text-sm text-gray-500 max-w-md">
-                            Décrivez le modèle que vous souhaitez construire ou posez une question sur vos données.
-                        </div>
+                <div id="assistant-chat" class="flex-1 flex flex-col overflow-hidden relative">
+                    <div class="assistant-hero flex-1 flex flex-col items-center justify-center" id="assistant-hero">
                     </div>
-                    <div class="assistant-messages" id="assistant-messages"></div>
+                    <div class="assistant-messages flex-1 overflow-y-auto hidden" id="assistant-messages"></div>
                 </div>
-                <div class="assistant-input-area p-3 flex-shrink-0" id="assistant-input-area">
+                <div class="assistant-input-area p-3 flex-shrink-0 z-10" id="assistant-input-area">
                     <div class="assistant-input-wrapper mx-auto rounded-xl border-2 border-gray-300 focus-within:border-black bg-white transition-colors shadow-sm" id="assistant-input-box">
                         <form id="assistant-form" class="flex flex-col">
                             <textarea id="assistant-input" rows="1" autocomplete="off"
@@ -133,6 +130,12 @@ class AssistantApp extends AppBase {
         requestAnimationFrame(() => {
             requestAnimationFrame(() => this._applyCentering(true));
         });
+
+        // Focus the input automatically when the assistant opens so the user can
+        // start typing immediately.
+        setTimeout(() => {
+            if (this.inputEl) this.inputEl.focus();
+        }, 100);
 
     }
 
@@ -229,29 +232,35 @@ class AssistantApp extends AppBase {
         this.modelName = '';
         this.messages = [];
         this.messagesEl.innerHTML = '';
+        this.messagesEl.classList.add('hidden');
+        this.messagesEl.classList.remove('block');
         this.chatEl.classList.remove('assistant-chat-mode');
         this.headerEl.classList.remove('assistant-header-compact');
+        this.headerEl.classList.remove('assistant-header-at-top');
         this.heroEl.classList.remove('assistant-hero-hidden');
         this.inputArea.classList.remove('assistant-input-area-chat');
         this.inputBox.classList.remove('assistant-input-box-chat');
         this.inputEl.value = '';
         this.inputEl.style.height = 'auto';
-        this.heroEl.style.paddingTop = '';
-        this.inputArea.style.top = '';
-        this.inputArea.style.width = '';
-        this.inputArea.style.position = '';
         requestAnimationFrame(() => {
             requestAnimationFrame(() => this._applyCentering(true));
         });
+        setTimeout(() => {
+            if (this.inputEl) this.inputEl.focus();
+        }, 100);
     }
 
     _switchToChatMode() {
         const hadFocus = document.activeElement === this.inputEl;
         this.chatEl.classList.add('assistant-chat-mode');
-        this.headerEl.classList.add('assistant-header-compact');
         this.heroEl.classList.add('assistant-hero-hidden');
+        this.messagesEl.classList.remove('hidden');
+        this.messagesEl.classList.add('block');
         this.inputArea.classList.add('assistant-input-area-chat');
         this.inputBox.classList.add('assistant-input-box-chat');
+        // Animate the title up and the input area down by adding compact classes.
+        // The hero area collapses, leaving the header at the top and the input at the bottom.
+        this.headerEl.classList.add('assistant-header-compact');
         if (hadFocus) {
             setTimeout(() => this.inputEl.focus(), 550);
         }
@@ -271,24 +280,24 @@ class AssistantApp extends AppBase {
     }
 
     _applyCentering(skipTransition) {
-        if (!this.heroEl || !this.container) return;
-        const was = this.heroEl.style.transition;
-        if (skipTransition) this.heroEl.style.transition = 'none';
+        if (!this.container) return;
+        const isChat = this.chatEl.classList.contains('assistant-chat-mode');
 
-        if (this.chatEl.classList.contains('assistant-chat-mode')) {
-            this.heroEl.style.paddingTop = '0';
-            this.heroEl.style.paddingBottom = '0';
-        } else {
-            const contentHeight = this._measureHeroContentHeight();
-            const available = Math.max(this.container.clientHeight, contentHeight);
-            const offset = Math.max(0, (available - contentHeight) / 2);
+        // Center the header + hero content vertically on the welcome screen.
+        if (!isChat && this.heroEl && this.headerEl) {
+            const total = this.container.clientHeight;
+            const headerH = this.headerEl.offsetHeight || 0;
+            const contentHeight = this.heroEl.offsetHeight || 0;
+            const available = Math.max(0, total - headerH - contentHeight);
+            const offset = Math.max(0, available / 2);
+            if (skipTransition) {
+                this.heroEl.style.transition = 'none';
+            }
             this.heroEl.style.paddingTop = offset + 'px';
-            this.heroEl.style.paddingBottom = '0';
-        }
-
-        if (skipTransition) {
-            this.heroEl.offsetHeight;
-            this.heroEl.style.transition = was;
+            if (skipTransition) {
+                this.heroEl.offsetHeight;
+                this.heroEl.style.transition = '';
+            }
         }
     }
 

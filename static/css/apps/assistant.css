@@ -640,14 +640,14 @@
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(4px);
     border-bottom: 1px solid transparent;
-    transition: padding 0.55s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.35s ease;
+    transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1), padding 0.55s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.35s ease;
     flex-shrink: 0;
+    transform: translateY(0);
 }
 
 .assistant-header-title {
     margin: 0;
     font-size: clamp(1rem, 2vw, 1.5rem);
-    transition: font-size 0.55s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .assistant-title-reset {
@@ -667,33 +667,27 @@
     border-bottom-color: #f3f4f6;
 }
 
-.assistant-header-compact .assistant-header-title {
-    font-size: clamp(0.875rem, 1.6vw, 1.15rem);
-}
-
 /* Chat scroll area */
 #assistant-chat {
     padding-left: calc((100% - 42rem) / 2);
     padding-right: calc((100% - 42rem) / 2);
-    padding-bottom: 10rem;
 }
 
 .assistant-hero {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: flex-start;
-    transition: padding-top 0.7s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.45s ease;
+    justify-content: center;
+    transition: opacity 0.45s ease, flex 0.7s cubic-bezier(0.4, 0, 0.2, 1);
     min-height: 100%;
 }
 
 .assistant-hero-hidden {
     opacity: 0;
     pointer-events: none;
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
     min-height: 0 !important;
     overflow: hidden;
+    flex: 0 0 0 !important;
 }
 
 .assistant-hero-subtitle {
@@ -731,13 +725,11 @@
     display: flex;
     justify-content: center;
     z-index: 30;
-    will-change: top, left, right, width, transform;
-    transition: top 0.7s cubic-bezier(0.4, 0, 0.2, 1), left 0.7s cubic-bezier(0.4, 0, 0.2, 1), right 0.7s cubic-bezier(0.4, 0, 0.2, 1), width 0.7s cubic-bezier(0.4, 0, 0.2, 1), padding 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: top 0.7s cubic-bezier(0.4, 0, 0.2, 1), left 0.7s cubic-bezier(0.4, 0, 0.2, 1), right 0.7s cubic-bezier(0.4, 0, 0.2, 1), width 0.7s cubic-bezier(0.4, 0, 0.2, 1), padding 0.7s cubic-bezier(0.4, 0, 0.2, 1), transform 0.7s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.45s ease;
 }
 
 .assistant-input-area-chat {
-    position: fixed;
-    top: auto;
+    position: absolute;
     bottom: 0;
     left: 0;
     right: 0;
