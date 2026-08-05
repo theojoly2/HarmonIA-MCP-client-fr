@@ -65,7 +65,7 @@ class AssistantApp extends AppBase {
                                         </svg>
                                         <span id="assistant-sources-label">Sources</span>
                                     </button>
-                                    <button type="submit" class="magic-btn assistant-send-btn flex-shrink-0 w-8 h-8 text-white bg-black hover:bg-gray-800 rounded-xl flex items-center justify-center transition-colors">
+                                    <button type="submit" id="assistant-send" class="magic-btn assistant-send-btn flex-shrink-0 w-8 h-8 text-white bg-black hover:bg-gray-800 rounded-xl flex items-center justify-center transition-colors">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19V5M5 12l7-7 7 7"></path>
                                         </svg>
@@ -91,6 +91,7 @@ class AssistantApp extends AppBase {
         this.sourcesBtn = container.querySelector('#assistant-sources');
         this.sourcesLabel = container.querySelector('#assistant-sources-label');
         this.sourcesMenu = container.querySelector('#assistant-sources-menu');
+        this.sendBtn = container.querySelector('#assistant-send');
         this.selectedTags = [];
         this.tagsHtml = '';
         this._tagsReady = false;
@@ -257,6 +258,12 @@ class AssistantApp extends AppBase {
             .slice(0, 8)
             .join('_')
             .substring(0, 80) || 'session';
+    }
+
+    _setSendEnabled(enabled) {
+        if (!this.sendBtn) return;
+        this.sendBtn.disabled = !enabled;
+        this.sendBtn.classList.toggle('assistant-send-btn-disabled', !enabled);
     }
 
     _newSession() {
@@ -1414,6 +1421,7 @@ class AssistantApp extends AppBase {
         this.messages.push({ role: 'user', content: text });
         this._appendUserMessage(text);
         this.isStreaming = true;
+        this._setSendEnabled(false);
         // Reset the background event queue for each new turn.
         this._pendingEvents = [];
         this._lastRenderedEventIndex = -1;
@@ -1605,6 +1613,7 @@ class AssistantApp extends AppBase {
             clearInterval(loadingInterval);
             typewriter.stop();
             this.isStreaming = false;
+            this._setSendEnabled(true);
             this._closeAssistantBubble();
 
             if (currentText) {
