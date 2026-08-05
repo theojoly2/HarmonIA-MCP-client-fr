@@ -242,18 +242,22 @@ class AssistantApp extends AppBase {
         this.session = '';
         this.modelName = '';
         this.messages = [];
-        this.messagesEl.innerHTML = '';
-        this.chatEl.classList.remove('assistant-chat-mode');
         this.welcomeEl.classList.remove('assistant-welcome-top');
         this.inputArea.classList.remove('assistant-input-area-chat');
         this.inputEl.value = '';
         this.inputEl.style.height = 'auto';
         // Animate back to the welcome layout: the title slides down and the
         // input follows it from the bottom back to the centered position.
+        // Keep the chat mode class (and the messages) during the transition so
+        // the inverse animation is visible, then clear the chat at the end.
         this._applyCentering(false);
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => this._applyCentering(true));
-        });
+        setTimeout(() => {
+            this.messagesEl.innerHTML = '';
+            this.chatEl.classList.remove('assistant-chat-mode');
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => this._applyCentering(true));
+            });
+        }, 560);
     }
 
     _switchToChatMode() {
