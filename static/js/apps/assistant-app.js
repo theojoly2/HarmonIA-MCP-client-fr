@@ -325,7 +325,9 @@ class AssistantApp extends AppBase {
         const contentHeight = this._measureWelcomeContentHeight();
         const available = Math.max(containerRect.height, contentHeight);
         const offset = Math.max(0, (available - contentHeight) / 2);
-        this.welcomeEl.style.paddingTop = offset + 'px';
+        // Shift the welcome block slightly downward so the title feels lower.
+        const lowerOffset = Math.min(offset + contentHeight * 0.08, available - contentHeight);
+        this.welcomeEl.style.paddingTop = lowerOffset + 'px';
         this.welcomeEl.style.paddingBottom = '0';
 
         if (skipTransition) {
