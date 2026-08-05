@@ -42,11 +42,14 @@ class AssistantApp extends AppBase {
                         </button>
                     </h1>
                 </div>
-                <div id="assistant-chat" class="flex-1 overflow-y-auto">
-                    <div class="assistant-hero" id="assistant-hero">
-                        <div class="assistant-hero-subtitle text-center text-sm text-gray-500 max-w-md">
-                            Décrivez le modèle que vous souhaitez construire ou posez une question sur vos données.
-                        </div>
+                <div id="assistant-chat" class="flex-1 overflow-y-auto relative">
+                    <div class="assistant-welcome" id="assistant-welcome">
+                        <h1 class="assistant-welcome-title text-center">
+                            <button type="button" id="assistant-reset" class="assistant-title-reset" title="Nouvelle conversation">
+                                <span class="assistant-title-glow title-glow">Assistant Sémantique</span>
+                            </button>
+                        </h1>
+                        <div class="assistant-welcome-input" id="assistant-welcome-input"></div>
                     </div>
                     <div class="assistant-messages" id="assistant-messages"></div>
                 </div>
@@ -77,7 +80,8 @@ class AssistantApp extends AppBase {
 
         this.chatEl = container.querySelector('#assistant-chat');
         this.headerEl = container.querySelector('#assistant-header');
-        this.heroEl = container.querySelector('#assistant-hero');
+        this.welcomeEl = container.querySelector('#assistant-welcome');
+        this.welcomeInputSlot = container.querySelector('#assistant-welcome-input');
         this.messagesEl = container.querySelector('#assistant-messages');
         this.inputArea = container.querySelector('#assistant-input-area');
         this.inputBox = container.querySelector('#assistant-input-box');
@@ -133,6 +137,10 @@ class AssistantApp extends AppBase {
         requestAnimationFrame(() => {
             requestAnimationFrame(() => this._applyCentering(true));
         });
+        // Place the input inside the centered welcome area by default.
+        if (this.welcomeInputSlot && this.inputArea.parentElement !== this.welcomeInputSlot) {
+            this.welcomeInputSlot.appendChild(this.inputArea);
+        }
 
     }
 
@@ -155,7 +163,7 @@ class AssistantApp extends AppBase {
             session: this.session,
             modelName: this.modelName,
             messagesHtml: this.messagesEl ? this.messagesEl.innerHTML : '',
-            heroHidden: this.heroEl ? this.heroEl.classList.contains('assistant-hero-hidden') : false,
+            welcomeVisible: this.welcomeEl ? !this.welcomeEl.classList.contains('assistant-welcome-hidden') : true,
             chatMode: this.chatEl ? this.chatEl.classList.contains('assistant-chat-mode') : false,
             isStreaming: this.isStreaming,
         };
@@ -171,8 +179,8 @@ class AssistantApp extends AppBase {
         if (this.messagesEl && state.messagesHtml) {
             this.messagesEl.innerHTML = state.messagesHtml;
         }
-        if (this.heroEl && state.heroHidden) {
-            this.heroEl.classList.add('assistant-hero-hidden');
+        if (this.welcomeEl && state.welcomeVisible === false) {
+            this.welcomeEl.classList.add('assistant-welcome-hidden');
         }
         if (this.chatEl && state.chatMode) {
             this.chatEl.classList.add('assistant-chat-mode');
@@ -193,6 +201,27 @@ class AssistantApp extends AppBase {
                 await this.loadHistory(this.props.session);
             } catch (err) {
                 console.error('Assistant load history on mount error', err);
+            }
+        }
+        // After loading history, if messages exist switch to chat mode layout.
+        if (this.messagesEl && this.messagesEl.children.length > 0) {
+            this.chatEl.classList.add('assistant-chat-mode');
+            this.headerEl.classList.add('assistant-header-visible');
+            this.welcomeEl.classList.add('assistant-welcome-hidden');
+            this.inputArea.classList.add('assistant-input-area-chat');
+            this.inputBox.classList.add('assistant-input-box-chat');
+            if (this.inputArea.parentElement !== this.container) {
+                this.container.appendChild(this.inputArea);
+            }
+        }
+        // Restore correct input location depending on whether we are in chat mode.
+        if (this.chatEl.classList.contains('assistant-chat-mode')) {
+            if (this.inputArea.parentElement !== this.container) {
+                this.container.appendChild(this.inputArea);
+            }
+        } else {
+            if (this.welcomeInputSlot && this.inputArea.parentElement !== this.welcomeInputSlot) {
+                this.welcomeInputSlot.appendChild(this.inputArea);
             }
         }
     }
@@ -230,16 +259,16 @@ class AssistantApp extends AppBase {
         this.messages = [];
         this.messagesEl.innerHTML = '';
         this.chatEl.classList.remove('assistant-chat-mode');
-        this.headerEl.classList.remove('assistant-header-compact');
-        this.heroEl.classList.remove('assistant-hero-hidden');
+        this.headerEl.classList.remove('assistant-header-visible');
+        this.welcomeEl.classList.remove('assistant-welcome-hidden');
         this.inputArea.classList.remove('assistant-input-area-chat');
         this.inputBox.classList.remove('assistant-input-box-chat');
+        // Move input area back into the centered welcome slot.
+        if (this.welcomeInputSlot && this.inputArea.parentElement !== this.welcomeInputSlot) {
+            this.welcomeInputSlot.appendChild(this.inputArea);
+        }
         this.inputEl.value = '';
         this.inputEl.style.height = 'auto';
-        this.heroEl.style.paddingTop = '';
-        this.inputArea.style.top = '';
-        this.inputArea.style.width = '';
-        this.inputArea.style.position = '';
         requestAnimationFrame(() => {
             requestAnimationFrame(() => this._applyCentering(true));
         });
@@ -247,9 +276,13 @@ class AssistantApp extends AppBase {
 
     _switchToChatMode() {
         const hadFocus = document.activeElement === this.inputEl;
+        // Move the input area back into the absolute bottom slot before animating.
+        if (this.inputArea.parentElement !== this.container) {
+            this.container.appendChild(this.inputArea);
+        }
         this.chatEl.classList.add('assistant-chat-mode');
-        this.headerEl.classList.add('assistant-header-compact');
-        this.heroEl.classList.add('assistant-hero-hidden');
+        this.headerEl.classList.add('assistant-header-visible');
+        this.welcomeEl.classList.add('assistant-welcome-hidden');
         this.inputArea.classList.add('assistant-input-area-chat');
         this.inputBox.classList.add('assistant-input-box-chat');
         if (hadFocus) {
@@ -257,10 +290,10 @@ class AssistantApp extends AppBase {
         }
     }
 
-    _measureHeroContentHeight() {
-        if (!this.heroEl) return 360;
+    _measureWelcomeContentHeight() {
+        if (!this.welcomeEl) return 360;
         let height = 0;
-        for (const child of this.heroEl.children) {
+        for (const child of this.welcomeEl.children) {
             const rect = child.getBoundingClientRect();
             const styles = getComputedStyle(child);
             const marginTop = parseFloat(styles.marginTop) || 0;
@@ -271,24 +304,20 @@ class AssistantApp extends AppBase {
     }
 
     _applyCentering(skipTransition) {
-        if (!this.heroEl || !this.container) return;
-        const was = this.heroEl.style.transition;
-        if (skipTransition) this.heroEl.style.transition = 'none';
+        if (!this.welcomeEl || !this.container) return;
+        if (this.chatEl.classList.contains('assistant-chat-mode')) return;
+        const was = this.welcomeEl.style.transition;
+        if (skipTransition) this.welcomeEl.style.transition = 'none';
 
-        if (this.chatEl.classList.contains('assistant-chat-mode')) {
-            this.heroEl.style.paddingTop = '0';
-            this.heroEl.style.paddingBottom = '0';
-        } else {
-            const contentHeight = this._measureHeroContentHeight();
-            const available = Math.max(this.container.clientHeight, contentHeight);
-            const offset = Math.max(0, (available - contentHeight) / 2);
-            this.heroEl.style.paddingTop = offset + 'px';
-            this.heroEl.style.paddingBottom = '0';
-        }
+        const contentHeight = this._measureWelcomeContentHeight();
+        const available = Math.max(this.container.clientHeight, contentHeight);
+        const offset = Math.max(0, (available - contentHeight) / 2);
+        this.welcomeEl.style.paddingTop = offset + 'px';
+        this.welcomeEl.style.paddingBottom = '0';
 
         if (skipTransition) {
-            this.heroEl.offsetHeight;
-            this.heroEl.style.transition = was;
+            this.welcomeEl.offsetHeight;
+            this.welcomeEl.style.transition = was;
         }
     }
 
