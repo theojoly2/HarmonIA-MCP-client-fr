@@ -685,20 +685,17 @@
 }
 
 .assistant-welcome-input {
+    /* The real input area is position:fixed and positioned separately so it can
+       slide down in sync with the title. This slot is kept only as a sizing
+       reference and is otherwise invisible. */
     width: 100%;
     display: flex;
     justify-content: center;
     margin-top: 1.25rem;
-    transition: opacity 0.45s ease, transform 0.55s cubic-bezier(0.4, 0, 0.2, 1), margin 0.35s ease, height 0.35s ease;
-}
-
-.assistant-welcome-top .assistant-welcome-input {
     opacity: 0;
     pointer-events: none;
-    transform: translateY(1.5rem);
-    margin-top: 0;
-    margin-bottom: 0;
     height: 0;
+    overflow: hidden;
 }
 
 .assistant-title-glow {
@@ -716,6 +713,10 @@
 }
 
 .assistant-input-area {
+    position: fixed;
+    top: var(--assistant-input-top, 50%);
+    left: 0;
+    right: 0;
     width: 100%;
     max-width: none;
     padding: 0 0 0.35rem;
@@ -724,48 +725,14 @@
     display: flex;
     justify-content: center;
     z-index: 30;
-    will-change: top, left, right, width, transform;
-    transition: top 0.55s cubic-bezier(0.4, 0, 0.2, 1), left 0.55s cubic-bezier(0.4, 0, 0.2, 1), right 0.55s cubic-bezier(0.4, 0, 0.2, 1), width 0.55s cubic-bezier(0.4, 0, 0.2, 1), padding 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease, transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-}
-
-.assistant-input-area-sliding {
-    position: fixed;
-    top: auto;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    width: 100%;
-    padding: 0 0 0.35rem;
-    display: flex;
-    justify-content: center;
-    z-index: 30;
+    will-change: top;
     transform: translateY(0);
-    animation: assistant-input-slide-down 0.55s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-@keyframes assistant-input-slide-down {
-    from {
-        transform: translateY(-60vh);
-        opacity: 0.5;
-    }
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
+    transition: top 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease;
 }
 
 .assistant-input-area-chat {
-    position: fixed;
-    top: auto;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    width: 100%;
-    padding: 0 0 0.35rem;
-    display: flex;
-    justify-content: center;
-    z-index: 30;
+    /* In chat mode the JS sets --assistant-input-top so the input sits on the
+       bottom with its existing padding preserved. */
 }
 
 .assistant-input-wrapper {
@@ -813,7 +780,7 @@
 }
 
 .assistant-app .assistant-input-area {
-    position: relative;
+    position: fixed;
 }
 
 .assistant-messages {

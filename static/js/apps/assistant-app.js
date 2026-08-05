@@ -125,11 +125,9 @@ class AssistantApp extends AppBase {
             }
         });
 
-        // Place the input inside the centered welcome area by default, then center.
-        if (this.welcomeInputSlot && this.inputArea.parentElement !== this.welcomeInputSlot) {
-            this.welcomeInputSlot.appendChild(this.inputArea);
-        }
-        // Initial centering after layout is ready.
+        // The input area is fixed and positioned with a CSS variable so it can
+        // slide down in sync with the title when the first message is sent.
+        // Use two rAFs so the initial layout is stable before measuring.
         requestAnimationFrame(() => {
             requestAnimationFrame(() => this._applyCentering(true));
         });
@@ -141,6 +139,7 @@ class AssistantApp extends AppBase {
         this.inputEl.addEventListener('input', () => {
             this.inputEl.style.height = 'auto';
             this.inputEl.style.height = Math.min(this.inputEl.scrollHeight, 160) + 'px';
+            this._applyCentering(true);
         });
         this.inputEl.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -158,7 +157,6 @@ class AssistantApp extends AppBase {
             welcomeTop: this.welcomeEl ? this.welcomeEl.classList.contains('assistant-welcome-top') : false,
             chatMode: this.chatEl ? this.chatEl.classList.contains('assistant-chat-mode') : false,
             inputAreaChat: this.inputArea ? this.inputArea.classList.contains('assistant-input-area-chat') : false,
-            inputBoxChat: this.inputBox ? this.inputBox.classList.contains('assistant-input-box-chat') : false,
             isStreaming: this.isStreaming,
         };
     }
@@ -182,26 +180,14 @@ class AssistantApp extends AppBase {
         if (this.inputArea && state.inputAreaChat) {
             this.inputArea.classList.add('assistant-input-area-chat');
         }
-        if (this.inputBox && state.inputBoxChat) {
-            this.inputBox.classList.add('assistant-input-box-chat');
-        }
         if (this.chatEl && state.messagesHtml) {
             requestAnimationFrame(() => {
                 this.chatEl.scrollTo({ top: this.chatEl.scrollHeight, behavior: 'auto' });
             });
         }
-        // After restoring the saved HTML, relocate the input area to its proper
-        // container. Use requestAnimationFrame so the DOM is fully rebuilt.
+        // Re-apply the welcome centering/positioning once the DOM is rebuilt.
         requestAnimationFrame(() => {
-            if (this.chatEl?.classList.contains('assistant-chat-mode')) {
-                if (this.inputArea && this.inputArea.parentElement !== this.container) {
-                    this.container.appendChild(this.inputArea);
-                }
-            } else {
-                if (this.welcomeInputSlot && this.inputArea && this.inputArea.parentElement !== this.welcomeInputSlot) {
-                    this.welcomeInputSlot.appendChild(this.inputArea);
-                }
-            }
+            requestAnimationFrame(() => this._applyCentering(true));
         });
     }
 
@@ -221,21 +207,8 @@ class AssistantApp extends AppBase {
             this.chatEl.classList.add('assistant-chat-mode');
             this.welcomeEl.classList.add('assistant-welcome-top');
             this.inputArea.classList.add('assistant-input-area-chat');
-            this.inputBox.classList.add('assistant-input-box-chat');
-            if (this.inputArea.parentElement !== this.container) {
-                this.container.appendChild(this.inputArea);
-            }
         }
-        // Restore correct input location depending on whether we are in chat mode.
-        if (this.chatEl.classList.contains('assistant-chat-mode')) {
-            if (this.inputArea.parentElement !== this.container) {
-                this.container.appendChild(this.inputArea);
-            }
-        } else {
-            if (this.welcomeInputSlot && this.inputArea.parentElement !== this.welcomeInputSlot) {
-                this.welcomeInputSlot.appendChild(this.inputArea);
-            }
-        }
+        this._applyCentering(true);
     }
 
     unmount() {
@@ -273,13 +246,11 @@ class AssistantApp extends AppBase {
         this.chatEl.classList.remove('assistant-chat-mode');
         this.welcomeEl.classList.remove('assistant-welcome-top');
         this.inputArea.classList.remove('assistant-input-area-chat');
-        this.inputBox.classList.remove('assistant-input-box-chat');
-        // Move input area back into the centered welcome slot.
-        if (this.welcomeInputSlot && this.inputArea.parentElement !== this.welcomeInputSlot) {
-            this.welcomeInputSlot.appendChild(this.inputArea);
-        }
         this.inputEl.value = '';
         this.inputEl.style.height = 'auto';
+        // Animate back to the welcome layout: the title slides down and the
+        // input follows it from the bottom back to the centered position.
+        this._applyCentering(false);
         requestAnimationFrame(() => {
             requestAnimationFrame(() => this._applyCentering(true));
         });
@@ -289,19 +260,13 @@ class AssistantApp extends AppBase {
         const hadFocus = document.activeElement === this.inputEl;
         this.chatEl.classList.add('assistant-chat-mode');
         this.welcomeEl.classList.add('assistant-welcome-top');
-        this.inputArea.classList.add('assistant-input-area-sliding');
-        // After the slide animation finishes, move the input to the fixed bottom
-        // container and switch to the chat positioning classes.
-        setTimeout(() => {
-            if (this.inputArea.parentElement !== this.container) {
-                this.container.appendChild(this.inputArea);
-            }
-            this.inputArea.classList.remove('assistant-input-area-sliding');
-            this.inputArea.classList.add('assistant-input-area-chat');
-            this.inputBox.classList.add('assistant-input-box-chat');
-        }, 550);
+        this.inputArea.classList.add('assistant-input-area-chat');
+        // Recalculate positions so the fixed input area animates from its
+        // welcome spot down to the bottom in lockstep with the title.
+        this._applyCentering(false);
         if (hadFocus) {
-            setTimeout(() => this.inputEl.focus(), 600);
+            // Keep focus while animating; re-focus after the slide settles.
+            setTimeout(() => this.inputEl.focus(), 560);
         }
     }
 
@@ -319,25 +284,61 @@ class AssistantApp extends AppBase {
     }
 
     _applyCentering(skipTransition) {
-        if (!this.welcomeEl || !this.container) return;
-        if (this.welcomeEl.classList.contains('assistant-welcome-top')) return;
-        const was = this.welcomeEl.style.transition;
-        if (skipTransition) this.welcomeEl.style.transition = 'none';
+        if (!this.welcomeEl || !this.container || !this.inputArea) return;
 
-        // Center the whole welcome block (title + input) in the container.
-        const welcomeRect = this.welcomeEl.getBoundingClientRect();
-        const containerRect = this.container.getBoundingClientRect();
-        const contentHeight = this._measureWelcomeContentHeight();
-        const available = Math.max(containerRect.height, contentHeight);
-        const offset = Math.max(0, (available - contentHeight) / 2);
-        // Shift the welcome block slightly downward so the title feels lower.
-        const lowerOffset = Math.min(offset + contentHeight * 0.08, available - contentHeight);
-        this.welcomeEl.style.paddingTop = lowerOffset + 'px';
-        this.welcomeEl.style.paddingBottom = '0';
+        const welcomeTop = this.welcomeEl.classList.contains('assistant-welcome-top');
+        const chatMode = this.chatEl?.classList.contains('assistant-chat-mode');
+        const was = this.welcomeEl.style.transition;
+        const inputWas = this.inputArea.style.transition;
+        if (skipTransition) {
+            this.welcomeEl.style.transition = 'none';
+            this.inputArea.style.transition = 'none';
+        }
+
+        if (!welcomeTop) {
+            // Center the title block in the container.
+            const title = this.welcomeEl.querySelector('.assistant-welcome-title');
+            const slot = this.welcomeInputSlot;
+            const titleRect = title ? title.getBoundingClientRect() : { top: 0, height: 0 };
+            const slotRect = slot ? slot.getBoundingClientRect() : { height: 0 };
+            const containerRect = this.container.getBoundingClientRect();
+            const titleHeight = titleRect.height;
+            const inputHeight = Math.max(slotRect.height, this.inputArea.getBoundingClientRect().height);
+            const marginTop = parseFloat(getComputedStyle(slot).marginTop) || 0;
+            const contentHeight = titleHeight + marginTop + inputHeight;
+            const available = Math.max(containerRect.height, contentHeight);
+            const offset = Math.max(0, (available - contentHeight) / 2);
+            // Shift the title slightly downward so it feels centered/lower.
+            const lowerOffset = Math.min(offset + contentHeight * 0.08, available - contentHeight);
+            this.welcomeEl.style.paddingTop = lowerOffset + 'px';
+            this.welcomeEl.style.paddingBottom = '0';
+
+            // Position the fixed input area just under the title, keeping the
+            // 1.25rem gap defined in CSS. This lets it slide together with the
+            // title when the first message is sent.
+            const topY = titleRect.bottom + marginTop;
+            this.inputArea.style.setProperty('--assistant-input-top', topY + 'px');
+        } else if (chatMode) {
+            // In chat mode the title is sticky at the top and the input sits at
+            // the bottom, preserving its bottom padding.
+            this.welcomeEl.style.paddingTop = '';
+            this.welcomeEl.style.paddingBottom = '';
+            const containerRect = this.container.getBoundingClientRect();
+            const inputHeight = this.inputArea.getBoundingClientRect().height;
+            const bottomPadding = 0.35 * parseFloat(getComputedStyle(document.documentElement).fontSize || 16);
+            const topY = containerRect.height - inputHeight - bottomPadding;
+            this.inputArea.style.setProperty('--assistant-input-top', topY + 'px');
+        } else {
+            // Fallback: clear explicit padding if neither state is fully active.
+            this.welcomeEl.style.paddingTop = '';
+            this.welcomeEl.style.paddingBottom = '';
+        }
 
         if (skipTransition) {
             this.welcomeEl.offsetHeight;
+            this.inputArea.offsetHeight;
             this.welcomeEl.style.transition = was;
+            this.inputArea.style.transition = inputWas;
         }
     }
 
@@ -345,9 +346,9 @@ class AssistantApp extends AppBase {
         if (this._resizeObserver) this._resizeObserver.disconnect();
         if (!this.container || typeof ResizeObserver === 'undefined') return;
         this._resizeObserver = new ResizeObserver(() => {
-            if (!this.welcomeEl.classList.contains('assistant-welcome-top')) {
-                this._applyCentering(true);
-            }
+            // Recalculate the input position in both welcome and chat modes so
+            // the fixed input area stays correctly placed after a resize.
+            this._applyCentering(true);
         });
         this._resizeObserver.observe(this.container);
     }
