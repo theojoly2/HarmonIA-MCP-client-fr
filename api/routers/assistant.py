@@ -777,10 +777,11 @@ async def _emit_progress_queue(
 @router.post("/stream")
 async def stream_assistant_response(
     request: AssistantStreamRequest,
+    http_request: Request,
     username: str = Depends(require_user),
 ):
     async def _cancel_check() -> bool:
-        return await request.is_disconnected()
+        return await http_request.is_disconnected()
 
     return StreamingResponse(
         assistant_stream_generator(request, username, cancel_check=_cancel_check),
