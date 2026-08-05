@@ -681,7 +681,7 @@
 .assistant-welcome-title {
     margin: 0;
     font-size: clamp(1rem, 2vw, 1.5rem);
-    line-height: 1.25;
+    line-height: 1.4;
 }
 
 .assistant-welcome-input {
