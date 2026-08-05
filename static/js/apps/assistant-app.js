@@ -35,13 +35,6 @@ class AssistantApp extends AppBase {
         this.container = container;
         container.innerHTML = `
             <div class="assistant-app h-full w-full flex flex-col bg-white rounded-[1.25rem] overflow-hidden relative">
-                <div class="assistant-header" id="assistant-header">
-                    <h1 class="assistant-header-title text-center">
-                        <button type="button" id="assistant-reset" class="assistant-title-reset" title="Nouvelle conversation">
-                            <span class="assistant-title-glow title-glow">Assistant Sémantique</span>
-                        </button>
-                    </h1>
-                </div>
                 <div id="assistant-chat" class="flex-1 overflow-y-auto relative">
                     <div class="assistant-welcome" id="assistant-welcome">
                         <h1 class="assistant-welcome-title text-center">
@@ -79,7 +72,6 @@ class AssistantApp extends AppBase {
         `;
 
         this.chatEl = container.querySelector('#assistant-chat');
-        this.headerEl = container.querySelector('#assistant-header');
         this.welcomeEl = container.querySelector('#assistant-welcome');
         this.welcomeInputSlot = container.querySelector('#assistant-welcome-input');
         this.messagesEl = container.querySelector('#assistant-messages');
@@ -163,7 +155,7 @@ class AssistantApp extends AppBase {
             session: this.session,
             modelName: this.modelName,
             messagesHtml: this.messagesEl ? this.messagesEl.innerHTML : '',
-            welcomeVisible: this.welcomeEl ? !this.welcomeEl.classList.contains('assistant-welcome-hidden') : true,
+            welcomeTop: this.welcomeEl ? this.welcomeEl.classList.contains('assistant-welcome-top') : false,
             chatMode: this.chatEl ? this.chatEl.classList.contains('assistant-chat-mode') : false,
             isStreaming: this.isStreaming,
         };
@@ -179,8 +171,8 @@ class AssistantApp extends AppBase {
         if (this.messagesEl && state.messagesHtml) {
             this.messagesEl.innerHTML = state.messagesHtml;
         }
-        if (this.welcomeEl && state.welcomeVisible === false) {
-            this.welcomeEl.classList.add('assistant-welcome-hidden');
+        if (this.welcomeEl && state.welcomeTop) {
+            this.welcomeEl.classList.add('assistant-welcome-top');
         }
         if (this.chatEl && state.chatMode) {
             this.chatEl.classList.add('assistant-chat-mode');
@@ -206,8 +198,7 @@ class AssistantApp extends AppBase {
         // After loading history, if messages exist switch to chat mode layout.
         if (this.messagesEl && this.messagesEl.children.length > 0) {
             this.chatEl.classList.add('assistant-chat-mode');
-            this.headerEl.classList.add('assistant-header-visible');
-            this.welcomeEl.classList.add('assistant-welcome-hidden');
+            this.welcomeEl.classList.add('assistant-welcome-top');
             this.inputArea.classList.add('assistant-input-area-chat');
             this.inputBox.classList.add('assistant-input-box-chat');
             if (this.inputArea.parentElement !== this.container) {
@@ -259,8 +250,7 @@ class AssistantApp extends AppBase {
         this.messages = [];
         this.messagesEl.innerHTML = '';
         this.chatEl.classList.remove('assistant-chat-mode');
-        this.headerEl.classList.remove('assistant-header-visible');
-        this.welcomeEl.classList.remove('assistant-welcome-hidden');
+        this.welcomeEl.classList.remove('assistant-welcome-top');
         this.inputArea.classList.remove('assistant-input-area-chat');
         this.inputBox.classList.remove('assistant-input-box-chat');
         // Move input area back into the centered welcome slot.
@@ -281,8 +271,7 @@ class AssistantApp extends AppBase {
             this.container.appendChild(this.inputArea);
         }
         this.chatEl.classList.add('assistant-chat-mode');
-        this.headerEl.classList.add('assistant-header-visible');
-        this.welcomeEl.classList.add('assistant-welcome-hidden');
+        this.welcomeEl.classList.add('assistant-welcome-top');
         this.inputArea.classList.add('assistant-input-area-chat');
         this.inputBox.classList.add('assistant-input-box-chat');
         if (hadFocus) {
@@ -305,7 +294,7 @@ class AssistantApp extends AppBase {
 
     _applyCentering(skipTransition) {
         if (!this.welcomeEl || !this.container) return;
-        if (this.chatEl.classList.contains('assistant-chat-mode')) return;
+        if (this.welcomeEl.classList.contains('assistant-welcome-top')) return;
         const was = this.welcomeEl.style.transition;
         if (skipTransition) this.welcomeEl.style.transition = 'none';
 
@@ -325,7 +314,7 @@ class AssistantApp extends AppBase {
         if (this._resizeObserver) this._resizeObserver.disconnect();
         if (!this.container || typeof ResizeObserver === 'undefined') return;
         this._resizeObserver = new ResizeObserver(() => {
-            if (!this.chatEl.classList.contains('assistant-chat-mode')) {
+            if (!this.welcomeEl.classList.contains('assistant-welcome-top')) {
                 this._applyCentering(true);
             }
         });

@@ -626,39 +626,7 @@
     z-index: 2;
 }
 
-/* Sticky header */
-.assistant-header {
-    position: sticky;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 20;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.35rem 0.75rem;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(4px);
-    border-bottom: 1px solid transparent;
-    transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease, border-color 0.3s ease;
-    flex-shrink: 0;
-    transform: translateY(-100%);
-    opacity: 0;
-    pointer-events: none;
-}
-
-.assistant-header-visible {
-    transform: translateY(0);
-    opacity: 1;
-    pointer-events: auto;
-    border-bottom-color: #f3f4f6;
-}
-
-.assistant-header-title {
-    margin: 0;
-    font-size: clamp(1rem, 2vw, 1.5rem);
-}
-
+/* Title / reset button */
 .assistant-title-reset {
     background: none;
     border: none;
@@ -683,31 +651,26 @@
     align-items: center;
     justify-content: flex-start;
     min-height: 100%;
-    transition: opacity 0.45s ease, padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
-    transform: translateY(0);
+    padding-top: 0;
+    padding-bottom: 0;
+    flex-shrink: 0;
+    transition: padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.45s ease;
     opacity: 1;
+    position: relative;
+    z-index: 25;
 }
 
-.assistant-welcome-hidden {
-    opacity: 0;
-    pointer-events: none;
-    padding-top: 0 !important;
+.assistant-welcome-top {
+    justify-content: flex-start;
+    padding-top: 1.25rem !important;
     padding-bottom: 0 !important;
-    min-height: 0 !important;
-    overflow: hidden;
-    flex: 0 0 0 !important;
-    transform: translateY(-2rem);
+    min-height: auto !important;
+    opacity: 1;
 }
 
 .assistant-welcome-title {
     margin: 0;
     font-size: clamp(1rem, 2vw, 1.5rem);
-    transition: opacity 0.35s ease, transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.assistant-welcome-hidden .assistant-welcome-title {
-    transform: translateY(-4rem);
-    opacity: 0;
 }
 
 .assistant-welcome-input {
@@ -715,12 +678,13 @@
     display: flex;
     justify-content: center;
     margin-top: 2.5rem;
-    transition: opacity 0.35s ease, transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.45s ease, transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.assistant-welcome-hidden .assistant-welcome-input {
-    transform: translateY(2rem);
+.assistant-welcome-top .assistant-welcome-input {
     opacity: 0;
+    pointer-events: none;
+    transform: translateY(1.5rem);
 }
 
 .assistant-title-glow {
@@ -747,7 +711,8 @@
     justify-content: center;
     z-index: 30;
     will-change: top, left, right, width, transform;
-    transition: top 0.55s cubic-bezier(0.4, 0, 0.2, 1), left 0.55s cubic-bezier(0.4, 0, 0.2, 1), right 0.55s cubic-bezier(0.4, 0, 0.2, 1), width 0.55s cubic-bezier(0.4, 0, 0.2, 1), padding 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease;
+    transition: top 0.55s cubic-bezier(0.4, 0, 0.2, 1), left 0.55s cubic-bezier(0.4, 0, 0.2, 1), right 0.55s cubic-bezier(0.4, 0, 0.2, 1), width 0.55s cubic-bezier(0.4, 0, 0.2, 1), padding 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease, transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
 }
 
 .assistant-input-area-chat {
