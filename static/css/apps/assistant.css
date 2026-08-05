@@ -642,9 +642,11 @@
 #assistant-chat {
     padding-left: calc((100% - 42rem) / 2);
     padding-right: calc((100% - 42rem) / 2);
+    overflow: hidden;
 }
 
-.assistant-chat-mode {
+#assistant-chat.assistant-chat-mode {
+    overflow-y: auto;
     padding-bottom: 5rem;
 }
 
