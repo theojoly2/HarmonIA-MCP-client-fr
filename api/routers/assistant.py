@@ -11,7 +11,7 @@ import json
 import re
 from collections import defaultdict
 from io import BytesIO
-from typing import Any, AsyncGenerator, Callable, Optional
+from typing import Any, AsyncGenerator, Awaitable, Callable, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Request, UploadFile, File, Form, HTTPException
@@ -239,11 +239,20 @@ def _generate_model_svg(model_data: dict[str, Any]) -> str:
 async def assistant_stream_generator(
     request: AssistantStreamRequest,
     username: str,
+    cancel_check: Callable[[], Awaitable[bool]] | None = None,
 ) -> AsyncGenerator[str, None]:
     user_input = request.user_message.strip()
     if not user_input:
         yield _event("error", {"message": "Message vide."})
         return
+
+    async def _is_cancelled() -> bool:
+        if cancel_check is None:
+            return False
+        try:
+            return await cancel_check()
+        except Exception:
+            return False
 
     is_new_session = not request.session.strip()
     session_name = request.session.strip() or _slugify_session_name(user_input)
@@ -320,6 +329,11 @@ async def assistant_stream_generator(
             last_flush = asyncio.get_event_loop().time()
             yield out_queue.get_nowait()
 
+    async def _maybe_cancelled() -> bool:
+        if await _is_cancelled():
+            return True
+        return False
+
 
 
     try:
@@ -349,6 +363,8 @@ async def assistant_stream_generator(
             call_results: dict[str, dict[str, Any]] = {}
 
             while loop_count < max_loops:
+                if await _maybe_cancelled():
+                    break
                 loop_count += 1
                 is_last_loop = loop_count >= max_loops
                 elapsed = asyncio.get_event_loop().time() - stream_started_at
@@ -479,6 +495,13 @@ async def assistant_stream_generator(
                                 progress_task = asyncio.create_task(_emit_progress_queue(queue, out_queue))
                             try:
                                 while not call_task.done():
+                                    if await _maybe_cancelled():
+                                        call_task.cancel()
+                                        try:
+                                            await call_task
+                                        except asyncio.CancelledError:
+                                            pass
+                                        raise asyncio.CancelledError("Client disconnected")
                                     async for line in _drain_out_queue():
                                         yield line
                                     await asyncio.sleep(0.05)
@@ -701,6 +724,9 @@ async def assistant_stream_generator(
         print(f"[Assistant stream error] {type(e).__name__}: {e}")
         yield _event("error", {"message": f"{type(e).__name__}: {e}"})
         return
+    except asyncio.CancelledError:
+        # Client disconnected (e.g. stop button); do not save an incomplete turn.
+        return
     finally:
         heartbeat_task.cancel()
         try:
@@ -734,8 +760,11 @@ async def stream_assistant_response(
     request: AssistantStreamRequest,
     username: str = Depends(require_user),
 ):
+    async def _cancel_check() -> bool:
+        return await request.is_disconnected()
+
     return StreamingResponse(
-        assistant_stream_generator(request, username),
+        assistant_stream_generator(request, username, cancel_check=_cancel_check),
         media_type="text/event-stream",
         headers={
             "X-Accel-Buffering": "no",
