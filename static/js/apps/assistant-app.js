@@ -248,11 +248,18 @@ class AssistantApp extends AppBase {
         this.inputArea.classList.remove('assistant-input-area-chat');
         this.inputEl.value = '';
         this.inputEl.style.height = 'auto';
-        // Animate back to the welcome layout: the title slides down and the
-        // input follows it from the bottom back to the centered position.
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => this._applyCentering(true));
-        });
+        // Reset the layout without animation to avoid the jarring inverse
+        // transition: the chat is cleared and the welcome/input snap cleanly
+        // back to the centered home position.
+        const welcomeWas = this.welcomeEl.style.transition;
+        const inputWas = this.inputArea.style.transition;
+        this.welcomeEl.style.transition = 'none';
+        this.inputArea.style.transition = 'none';
+        this._applyCentering(true);
+        void this.welcomeEl.offsetHeight;
+        void this.inputArea.offsetHeight;
+        this.welcomeEl.style.transition = welcomeWas;
+        this.inputArea.style.transition = inputWas;
     }
 
     _switchToChatMode() {
