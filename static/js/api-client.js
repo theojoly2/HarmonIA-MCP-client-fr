@@ -212,6 +212,18 @@ const ApiClient = (() => {
         const reader = res.body.getReader();
         const decoder = new TextDecoder("utf-8");
         let buffer = "";
+        let aborted = false;
+
+        if (signal) {
+            signal.addEventListener("abort", () => {
+                aborted = true;
+                try {
+                    reader.cancel();
+                } catch (e) {
+                    // reader.cancel may throw if already closed; ignore.
+                }
+            }, { once: true });
+        }
 
         // Force a real browser paint. requestAnimationFrame alone is not enough when
         // events arrive in a burst; the style->macro-task->paint sequence guarantees
@@ -243,7 +255,7 @@ const ApiClient = (() => {
             }
         };
 
-        while (true) {
+        while (!aborted) {
             const { done, value } = await reader.read();
             if (done) break;
             buffer += decoder.decode(value, { stream: true });

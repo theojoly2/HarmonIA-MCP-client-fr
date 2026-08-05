@@ -1628,10 +1628,16 @@ class AssistantApp extends AppBase {
                 liveHandler
             );
         } catch (err) {
-            console.error('Assistant stream error', err);
-            this._appendThinkingPlaceholder(); // ensures any previous one is removed first
-            const bubble = this._ensureAssistantBubble();
-            bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(err.message)}</em>`;
+            // When the user clicks the stop button we abort the fetch reader on
+            // purpose; do not show a red error message for that case.
+            if (err.name === 'AbortError' || err.message?.includes('aborted')) {
+                console.log('[Assistant] stream aborted by user');
+            } else {
+                console.error('Assistant stream error', err);
+                this._appendThinkingPlaceholder(); // ensures any previous one is removed first
+                const bubble = this._ensureAssistantBubble();
+                bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(err.message)}</em>`;
+            }
         } finally {
             clearInterval(loadingInterval);
             typewriter.stop();
