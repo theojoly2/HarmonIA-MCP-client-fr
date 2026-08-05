@@ -666,6 +666,11 @@
     padding-bottom: 0 !important;
     min-height: auto !important;
     opacity: 1;
+    position: sticky;
+    top: 0;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(4px);
+    z-index: 20;
 }
 
 .assistant-welcome-title {
