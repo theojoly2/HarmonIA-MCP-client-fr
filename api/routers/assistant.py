@@ -93,6 +93,7 @@ async def _create_completion_streaming(
     llm_messages: list[dict[str, str]],
     tools: list[dict[str, Any]],
     tool_choice: str = "auto",
+    cancel_event: asyncio.Event | None = None,
 ) -> AsyncGenerator[tuple[str, Any], None]:
     """Stream assistant text in real-time and finish with tool calls summary.
 
@@ -118,7 +119,17 @@ async def _create_completion_streaming(
         lambda: {"id": "", "type": "function", "function": {"name": "", "arguments": ""}}
     )
 
-    async for chunk in stream:
+    stream_iterator = stream.__aiter__()
+    while True:
+        try:
+            chunk = await asyncio.wait_for(stream_iterator.__anext__(), timeout=0.2)
+        except asyncio.TimeoutError:
+            if cancel_event is not None and cancel_event.is_set():
+                break
+            continue
+        except StopAsyncIteration:
+            break
+
         choices = getattr(chunk, "choices", None) or []
         if not choices:
             continue
@@ -247,10 +258,15 @@ async def assistant_stream_generator(
         return
 
     async def _is_cancelled() -> bool:
+        if cancel_event.is_set():
+            return True
         if cancel_check is None:
             return False
         try:
-            return await cancel_check()
+            cancelled = await cancel_check()
+            if cancelled:
+                cancel_event.set()
+            return cancelled
         except Exception:
             return False
 
@@ -279,6 +295,8 @@ async def assistant_stream_generator(
     history.add_display_event({"kind": "user", "content": user_input})
     if selected_tags:
         history.add_display_event({"kind": "selected_tags", "tags": selected_tags})
+
+    cancel_event = asyncio.Event()
 
     state = {
         "user": username,
@@ -397,6 +415,7 @@ async def assistant_stream_generator(
                     llm_messages=llm_messages,
                     tools=effective_tool_schemas,
                     tool_choice=effective_tool_choice,
+                    cancel_event=cancel_event,
                 ):
                     if stage == "text":
                         streamed_any_text = True
