@@ -1266,6 +1266,8 @@ class AssistantApp extends AppBase {
         }, 1200);
 
         let currentBubble = null;
+        let currentText = this._currentStreamingText || '';
+        this._currentStreamingText = currentText;
 
         // Abort controller lets the client survive long waits and prevents duplicate streams.
         this._streamAbortController?.abort();
@@ -1297,10 +1299,6 @@ class AssistantApp extends AppBase {
             if (emphasis % 2 !== 0) return true;
             return false;
         };
-
-        // Track streaming text on the instance too, so it survives tab switches.
-        let currentText = this._currentStreamingText || '';
-        this._currentStreamingText = currentText;
 
         const updateCurrentText = (chunk) => {
             currentText += chunk;
@@ -1400,6 +1398,23 @@ class AssistantApp extends AppBase {
             }
 
             this._processEvent(event, { typewriter, resetBubble, finalizeText, saveHtmlSnapshot, placeholderRef: { value: placeholder } });
+
+            // Re-attach currentBubble to the new DOM after a tab switch. The snapshot
+            // HTML is restored into a fresh messagesEl, so the previous bubble
+            // reference is stale. Find it again by matching the accumulated text.
+            if (this._currentStreamingText && (!currentBubble || !currentBubble.isConnected)) {
+                const wrappers = Array.from(this.messagesEl.querySelectorAll('[data-role="assistant"][data-active="true"]'));
+                const match = wrappers.find((w) => {
+                    const content = w.querySelector('.assistant-bubble-content');
+                    if (!content) return false;
+                    const text = content.textContent || '';
+                    return this._currentStreamingText.startsWith(text.trimStart().slice(0, 60)) ||
+                           text.trimStart().startsWith(this._currentStreamingText.slice(0, 60));
+                });
+                if (match) {
+                    currentBubble = match.querySelector('.assistant-bubble-content');
+                }
+            }
         };
 
         try {
