@@ -668,7 +668,7 @@
 .assistant-welcome-top {
     justify-content: flex-start;
     padding-top: 0.35rem !important;
-    padding-bottom: 0.15rem !important;
+    padding-bottom: 0 !important;
     min-height: auto !important;
     opacity: 1;
     position: sticky;
