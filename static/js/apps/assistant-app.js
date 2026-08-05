@@ -182,6 +182,18 @@ class AssistantApp extends AppBase {
                 this.chatEl.scrollTo({ top: this.chatEl.scrollHeight, behavior: 'auto' });
             });
         }
+        // After restoring the saved HTML, relocate the input area to its proper
+        // container. When the DOM was rebuilt the input area may still be inside
+        // the welcome wrapper or absent from the flow.
+        if (this.chatEl?.classList.contains('assistant-chat-mode')) {
+            if (this.inputArea && this.inputArea.parentElement !== this.container) {
+                this.container.appendChild(this.inputArea);
+            }
+        } else {
+            if (this.welcomeInputSlot && this.inputArea && this.inputArea.parentElement !== this.welcomeInputSlot) {
+                this.welcomeInputSlot.appendChild(this.inputArea);
+            }
+        }
     }
 
     async mount(container) {
