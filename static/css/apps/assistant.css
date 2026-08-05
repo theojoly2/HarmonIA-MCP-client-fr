@@ -662,8 +662,8 @@
 
 .assistant-welcome-top {
     justify-content: flex-start;
-    padding-top: 0.35rem !important;
-    padding-bottom: 0.35rem !important;
+    padding-top: 0.15rem !important;
+    padding-bottom: 0.15rem !important;
     min-height: auto !important;
     opacity: 1;
     position: sticky;
@@ -676,6 +676,7 @@
 .assistant-welcome-title {
     margin: 0;
     font-size: clamp(1rem, 2vw, 1.5rem);
+    line-height: 1.1;
 }
 
 .assistant-welcome-input {
@@ -683,13 +684,17 @@
     display: flex;
     justify-content: center;
     margin-top: 2.5rem;
-    transition: opacity 0.45s ease, transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.45s ease, transform 0.55s cubic-bezier(0.4, 0, 0.2, 1), margin 0.35s ease, height 0.35s ease;
 }
 
 .assistant-welcome-top .assistant-welcome-input {
     opacity: 0;
     pointer-events: none;
     transform: translateY(1.5rem);
+    margin-top: 0;
+    margin-bottom: 0;
+    height: 0;
+    overflow: hidden;
 }
 
 .assistant-title-glow {
