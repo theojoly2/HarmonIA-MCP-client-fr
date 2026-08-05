@@ -287,16 +287,21 @@ class AssistantApp extends AppBase {
 
     _switchToChatMode() {
         const hadFocus = document.activeElement === this.inputEl;
-        // Move the input area back into the absolute bottom slot before animating.
-        if (this.inputArea.parentElement !== this.container) {
-            this.container.appendChild(this.inputArea);
-        }
         this.chatEl.classList.add('assistant-chat-mode');
         this.welcomeEl.classList.add('assistant-welcome-top');
-        this.inputArea.classList.add('assistant-input-area-chat');
-        this.inputBox.classList.add('assistant-input-box-chat');
+        this.inputArea.classList.add('assistant-input-area-sliding');
+        // After the slide animation finishes, move the input to the fixed bottom
+        // container and switch to the chat positioning classes.
+        setTimeout(() => {
+            if (this.inputArea.parentElement !== this.container) {
+                this.container.appendChild(this.inputArea);
+            }
+            this.inputArea.classList.remove('assistant-input-area-sliding');
+            this.inputArea.classList.add('assistant-input-area-chat');
+            this.inputBox.classList.add('assistant-input-box-chat');
+        }, 550);
         if (hadFocus) {
-            setTimeout(() => this.inputEl.focus(), 550);
+            setTimeout(() => this.inputEl.focus(), 600);
         }
     }
 

@@ -729,6 +729,32 @@
     position: relative;
 }
 
+.assistant-input-area-sliding {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    padding: 0 0 0.35rem;
+    display: flex;
+    justify-content: center;
+    z-index: 30;
+    transform: translateY(0);
+    animation: assistant-input-slide-down 0.55s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes assistant-input-slide-down {
+    from {
+        transform: translateY(-60vh);
+        opacity: 0.5;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
 .assistant-input-area-chat {
     position: fixed;
     top: auto;
