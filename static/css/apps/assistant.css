@@ -698,6 +698,10 @@
     overflow: hidden;
 }
 
+.assistant-welcome-top .assistant-welcome-input {
+    margin-top: 0;
+}
+
 .assistant-title-glow {
     display: inline-block;
     background-color: #111827;
