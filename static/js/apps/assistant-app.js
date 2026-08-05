@@ -157,6 +157,8 @@ class AssistantApp extends AppBase {
             messagesHtml: this.messagesEl ? this.messagesEl.innerHTML : '',
             welcomeTop: this.welcomeEl ? this.welcomeEl.classList.contains('assistant-welcome-top') : false,
             chatMode: this.chatEl ? this.chatEl.classList.contains('assistant-chat-mode') : false,
+            inputAreaChat: this.inputArea ? this.inputArea.classList.contains('assistant-input-area-chat') : false,
+            inputBoxChat: this.inputBox ? this.inputBox.classList.contains('assistant-input-box-chat') : false,
             isStreaming: this.isStreaming,
         };
     }
@@ -177,23 +179,30 @@ class AssistantApp extends AppBase {
         if (this.chatEl && state.chatMode) {
             this.chatEl.classList.add('assistant-chat-mode');
         }
+        if (this.inputArea && state.inputAreaChat) {
+            this.inputArea.classList.add('assistant-input-area-chat');
+        }
+        if (this.inputBox && state.inputBoxChat) {
+            this.inputBox.classList.add('assistant-input-box-chat');
+        }
         if (this.chatEl && state.messagesHtml) {
             requestAnimationFrame(() => {
                 this.chatEl.scrollTo({ top: this.chatEl.scrollHeight, behavior: 'auto' });
             });
         }
         // After restoring the saved HTML, relocate the input area to its proper
-        // container. When the DOM was rebuilt the input area may still be inside
-        // the welcome wrapper or absent from the flow.
-        if (this.chatEl?.classList.contains('assistant-chat-mode')) {
-            if (this.inputArea && this.inputArea.parentElement !== this.container) {
-                this.container.appendChild(this.inputArea);
+        // container. Use requestAnimationFrame so the DOM is fully rebuilt.
+        requestAnimationFrame(() => {
+            if (this.chatEl?.classList.contains('assistant-chat-mode')) {
+                if (this.inputArea && this.inputArea.parentElement !== this.container) {
+                    this.container.appendChild(this.inputArea);
+                }
+            } else {
+                if (this.welcomeInputSlot && this.inputArea && this.inputArea.parentElement !== this.welcomeInputSlot) {
+                    this.welcomeInputSlot.appendChild(this.inputArea);
+                }
             }
-        } else {
-            if (this.welcomeInputSlot && this.inputArea && this.inputArea.parentElement !== this.welcomeInputSlot) {
-                this.welcomeInputSlot.appendChild(this.inputArea);
-            }
-        }
+        });
     }
 
     async mount(container) {
