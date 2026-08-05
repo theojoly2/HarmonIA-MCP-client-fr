@@ -196,12 +196,12 @@ const ApiClient = (() => {
         return res.body.getReader();
     }
 
-    async function streamAssistant(session, userMessage, modelName, onEvent, signal) {
+    async function streamAssistant(session, userMessage, modelName, tags, onEvent, signal) {
         const res = await fetch(apiUrl("assistant/stream"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "same-origin",
-            body: JSON.stringify({ session, user_message: userMessage, model_name: modelName || "" }),
+            body: JSON.stringify({ session, user_message: userMessage, model_name: modelName || "", tags: tags || [] }),
             signal,
         });
         if (!res.ok || !res.body) throw new Error(`Assistant stream failed: ${res.status}`);

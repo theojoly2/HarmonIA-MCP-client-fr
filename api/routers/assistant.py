@@ -35,6 +35,7 @@ class AssistantStreamRequest(BaseModel):
     session: str = "default"
     user_message: str
     model_name: str = ""
+    tags: list[str] = []
 
 
 class AssistantSessionRequest(BaseModel):
@@ -259,12 +260,16 @@ async def assistant_stream_generator(
     )
 
     model_name = request.model_name.strip()
+    selected_tags = request.tags or []
     # Remember the model attached to this session so we can reopen it later.
     if model_name:
         history.assistant_model_name = model_name
 
-    # Persist the user message as a display event so the timeline can be replayed exactly.
+    # Persist the user message (and selected source tags) as display events so
+    # the timeline can be replayed exactly.
     history.add_display_event({"kind": "user", "content": user_input})
+    if selected_tags:
+        history.add_display_event({"kind": "selected_tags", "tags": selected_tags})
 
     state = {
         "user": username,
@@ -544,7 +549,7 @@ async def assistant_stream_generator(
                             except Exception:
                                 limit = 20
                             try:
-                                search_rows = await fetch_search(query_terms, [], limit)
+                                search_rows = await fetch_search(query_terms, selected_tags, limit)
                                 if search_rows == "TIMEOUT":
                                     search_rows = []
                                 rendered = render_results(search_rows, query=query_terms)

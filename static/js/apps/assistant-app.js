@@ -58,11 +58,19 @@ class AssistantApp extends AppBase {
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                                     </svg>
                                 </button>
-                                <button type="submit" class="magic-btn assistant-send-btn flex-shrink-0 w-8 h-8 text-white bg-black hover:bg-gray-800 rounded-xl flex items-center justify-center transition-colors">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19V5M5 12l7-7 7 7"></path>
-                                    </svg>
-                                </button>
+                                <div class="flex items-center gap-1.5">
+                                    <button type="submit" class="magic-btn assistant-send-btn flex-shrink-0 w-8 h-8 text-white bg-black hover:bg-gray-800 rounded-xl flex items-center justify-center transition-colors">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19V5M5 12l7-7 7 7"></path>
+                                        </svg>
+                                    </button>
+                                    <button type="button" id="assistant-sources" class="magic-btn flex-shrink-0 h-8 px-2.5 flex items-center gap-1.5 rounded-xl text-gray-600 hover:text-black hover:bg-gray-100 transition-colors text-xs font-semibold" title="Sélectionner les sources">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+                                        </svg>
+                                        <span id="assistant-sources-label">Sources</span>
+                                    </button>
+                                </div>
                             </div>
                         </form>
                     </div>
@@ -79,6 +87,12 @@ class AssistantApp extends AppBase {
         this.inputBox = container.querySelector('#assistant-input-box');
         this.fileInput = container.querySelector('#assistant-model-file');
         this.inputEl = container.querySelector('#assistant-input');
+        this.sourcesBtn = container.querySelector('#assistant-sources');
+        this.sourcesLabel = container.querySelector('#assistant-sources-label');
+        this.sourcesMenu = null;
+        this.selectedTags = [];
+        this.tagsHtml = '';
+        this._tagsReady = false;
 
         this._bindInputEvents();
         this._observeResize();
@@ -109,6 +123,8 @@ class AssistantApp extends AppBase {
             const file = e.target.files?.[0];
             if (file) this._importModel(file);
         });
+
+        this.sourcesBtn.addEventListener('click', () => this._toggleSourcesMenu());
 
         // Delegate clicks for embedded search result actions (preview / chat).
         this.messagesEl.addEventListener('click', (e) => {
@@ -157,6 +173,7 @@ class AssistantApp extends AppBase {
             welcomeTop: this.welcomeEl ? this.welcomeEl.classList.contains('assistant-welcome-top') : false,
             chatMode: this.chatEl ? this.chatEl.classList.contains('assistant-chat-mode') : false,
             inputAreaChat: this.inputArea ? this.inputArea.classList.contains('assistant-input-area-chat') : false,
+            selectedTags: this.selectedTags || [],
             isStreaming: this.isStreaming,
         };
     }
@@ -179,6 +196,9 @@ class AssistantApp extends AppBase {
         }
         if (this.inputArea && state.inputAreaChat) {
             this.inputArea.classList.add('assistant-input-area-chat');
+        }
+        if (state.selectedTags && Array.isArray(state.selectedTags)) {
+            this.selectedTags = state.selectedTags;
         }
         if (this.chatEl && state.messagesHtml) {
             requestAnimationFrame(() => {
@@ -375,6 +395,95 @@ class AssistantApp extends AppBase {
             this._appendSystemMessage(`Erreur lors de l'import du modèle : ${this._escape(err.message)}`);
         }
         if (this.fileInput) this.fileInput.value = '';
+    }
+
+    _buildTagsHtml(tags) {
+        if (!tags || !tags.length) return '';
+        return tags.map((t) => {
+            const tagName = (typeof t === 'object' ? t.tag : t) || '';
+            const isChecked = this.selectedTags.includes(tagName) ? 'checked' : '';
+            return `
+                <label class="cursor-pointer select-none assistant-tag-label" title="${this._escape(tagName)}">
+                    <input type="checkbox" name="assistant-tag" value="${this._escape(tagName)}" class="peer hidden" ${isChecked}>
+                    <span class="inline-flex items-center rounded-full font-bold border-2 border-gray-200 text-gray-700 peer-checked:bg-black peer-checked:text-white peer-checked:border-black hover:border-gray-400 transition-colors overflow-hidden relative px-2.5 py-1 text-xs">
+                        <svg class="icon-unchecked w-3.5 h-3.5 mr-1.5 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4"></path></svg>
+                        <svg class="icon-checked w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M5 13l4 4L19 7"></path></svg>
+                        ${this._escape(tagName)}
+                    </span>
+                </label>
+            `;
+        }).join('');
+    }
+
+    async _loadTags() {
+        if (this._tagsReady) return;
+        try {
+            const data = await ApiClient.getTags();
+            const tags = data.tags || [];
+            this.tagsHtml = this._buildTagsHtml(tags);
+            this._tagsReady = true;
+        } catch (e) {
+            console.error('Erreur chargement tags assistant', e);
+            this.tagsHtml = '';
+            this._tagsReady = true;
+        }
+    }
+
+    _updateSourcesLabel() {
+        if (!this.sourcesLabel) return;
+        const count = this.selectedTags.length;
+        this.sourcesLabel.textContent = count > 0 ? `Sources (${count})` : 'Sources';
+    }
+
+    _toggleSourcesMenu() {
+        if (this.sourcesMenu && this.sourcesMenu.isConnected) {
+            this.sourcesMenu.remove();
+            this.sourcesMenu = null;
+            return;
+        }
+        this._showSourcesMenu();
+    }
+
+    async _showSourcesMenu() {
+        await this._loadTags();
+        if (!this.sourcesBtn || !this.inputArea) return;
+        const rect = this.sourcesBtn.getBoundingClientRect();
+        const menu = document.createElement('div');
+        menu.className = 'assistant-sources-menu';
+        menu.style.position = 'fixed';
+        menu.style.left = 'auto';
+        menu.style.right = `${window.innerWidth - rect.right}px`;
+        menu.style.bottom = `${window.innerHeight - rect.top + 6}px`;
+        menu.innerHTML = `
+            <div class="assistant-sources-header">Sources</div>
+            <div class="assistant-sources-list">
+                ${this.tagsHtml || '<span class="text-gray-500 text-sm px-2">Aucune source disponible.</span>'}
+            </div>
+        `;
+        document.body.appendChild(menu);
+        this.sourcesMenu = menu;
+        this._updateSourcesLabel();
+
+        menu.addEventListener('change', (e) => {
+            if (e.target.name === 'assistant-tag') {
+                this.selectedTags = Array.from(menu.querySelectorAll('input[name="assistant-tag"]:checked')).map((cb) => cb.value);
+                this._updateSourcesLabel();
+            }
+        });
+
+        const closeOnClickOutside = (e) => {
+            if (!menu.contains(e.target) && e.target !== this.sourcesBtn && !this.sourcesBtn.contains(e.target)) {
+                menu.remove();
+                this.sourcesMenu = null;
+                document.removeEventListener('mousedown', closeOnClickOutside);
+                document.removeEventListener('touchstart', closeOnClickOutside);
+            }
+        };
+        // Delay so the click that opened the menu does not close it immediately.
+        setTimeout(() => {
+            document.addEventListener('mousedown', closeOnClickOutside);
+            document.addEventListener('touchstart', closeOnClickOutside);
+        }, 50);
     }
 
     _appendSystemMessage(text) {
@@ -1479,6 +1588,7 @@ class AssistantApp extends AppBase {
                 sessionToSend,
                 text,
                 this.modelName,
+                this.selectedTags || [],
                 liveHandler
             );
         } catch (err) {
