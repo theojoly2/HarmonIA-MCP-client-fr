@@ -58,18 +58,19 @@ class AssistantApp extends AppBase {
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                                     </svg>
                                 </button>
-                                <div class="flex items-center gap-1.5">
-                                    <button type="submit" class="magic-btn assistant-send-btn flex-shrink-0 w-8 h-8 text-white bg-black hover:bg-gray-800 rounded-xl flex items-center justify-center transition-colors">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19V5M5 12l7-7 7 7"></path>
-                                        </svg>
-                                    </button>
+                                <div class="flex items-center gap-1.5 relative">
                                     <button type="button" id="assistant-sources" class="magic-btn flex-shrink-0 h-8 px-2.5 flex items-center gap-1.5 rounded-xl text-gray-600 hover:text-black hover:bg-gray-100 transition-colors text-xs font-semibold" title="Sélectionner les sources">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
                                         </svg>
                                         <span id="assistant-sources-label">Sources</span>
                                     </button>
+                                    <button type="submit" class="magic-btn assistant-send-btn flex-shrink-0 w-8 h-8 text-white bg-black hover:bg-gray-800 rounded-xl flex items-center justify-center transition-colors">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19V5M5 12l7-7 7 7"></path>
+                                        </svg>
+                                    </button>
+                                    <div id="assistant-sources-menu" class="assistant-sources-menu hidden"></div>
                                 </div>
                             </div>
                         </form>
@@ -89,7 +90,7 @@ class AssistantApp extends AppBase {
         this.inputEl = container.querySelector('#assistant-input');
         this.sourcesBtn = container.querySelector('#assistant-sources');
         this.sourcesLabel = container.querySelector('#assistant-sources-label');
-        this.sourcesMenu = null;
+        this.sourcesMenu = container.querySelector('#assistant-sources-menu');
         this.selectedTags = [];
         this.tagsHtml = '';
         this._tagsReady = false;
@@ -436,9 +437,10 @@ class AssistantApp extends AppBase {
     }
 
     _toggleSourcesMenu() {
-        if (this.sourcesMenu && this.sourcesMenu.isConnected) {
-            this.sourcesMenu.remove();
-            this.sourcesMenu = null;
+        if (!this.sourcesMenu) return;
+        const isOpen = !this.sourcesMenu.classList.contains('hidden');
+        if (isOpen) {
+            this.sourcesMenu.classList.add('hidden');
             return;
         }
         this._showSourcesMenu();
@@ -446,35 +448,26 @@ class AssistantApp extends AppBase {
 
     async _showSourcesMenu() {
         await this._loadTags();
-        if (!this.sourcesBtn || !this.inputArea) return;
-        const rect = this.sourcesBtn.getBoundingClientRect();
-        const menu = document.createElement('div');
-        menu.className = 'assistant-sources-menu';
-        menu.style.position = 'fixed';
-        menu.style.left = 'auto';
-        menu.style.right = `${window.innerWidth - rect.right}px`;
-        menu.style.bottom = `${window.innerHeight - rect.top + 6}px`;
-        menu.innerHTML = `
+        if (!this.sourcesMenu || !this.sourcesBtn) return;
+        this.sourcesMenu.innerHTML = `
             <div class="assistant-sources-header">Sources</div>
             <div class="assistant-sources-list">
                 ${this.tagsHtml || '<span class="text-gray-500 text-sm px-2">Aucune source disponible.</span>'}
             </div>
         `;
-        document.body.appendChild(menu);
-        this.sourcesMenu = menu;
+        this.sourcesMenu.classList.remove('hidden');
         this._updateSourcesLabel();
 
-        menu.addEventListener('change', (e) => {
+        this.sourcesMenu.addEventListener('change', (e) => {
             if (e.target.name === 'assistant-tag') {
-                this.selectedTags = Array.from(menu.querySelectorAll('input[name="assistant-tag"]:checked')).map((cb) => cb.value);
+                this.selectedTags = Array.from(this.sourcesMenu.querySelectorAll('input[name="assistant-tag"]:checked')).map((cb) => cb.value);
                 this._updateSourcesLabel();
             }
         });
 
         const closeOnClickOutside = (e) => {
-            if (!menu.contains(e.target) && e.target !== this.sourcesBtn && !this.sourcesBtn.contains(e.target)) {
-                menu.remove();
-                this.sourcesMenu = null;
+            if (!this.sourcesMenu.contains(e.target) && e.target !== this.sourcesBtn && !this.sourcesBtn.contains(e.target)) {
+                this.sourcesMenu.classList.add('hidden');
                 document.removeEventListener('mousedown', closeOnClickOutside);
                 document.removeEventListener('touchstart', closeOnClickOutside);
             }

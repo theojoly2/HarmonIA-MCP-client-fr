@@ -739,6 +739,59 @@
        bottom with its existing padding preserved. */
 }
 
+.assistant-sources-menu {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    right: 0;
+    min-width: 14rem;
+    max-width: 18rem;
+    max-height: 18rem;
+    overflow-y: auto;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+    padding: 0.5rem;
+    z-index: 50;
+}
+
+.assistant-sources-menu.hidden {
+    display: none;
+}
+
+.assistant-sources-header {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+    padding: 0.35rem 0.5rem 0.5rem;
+    border-bottom: 1px solid #f3f4f6;
+    margin-bottom: 0.25rem;
+}
+
+.assistant-sources-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.assistant-tag-label .icon-checked {
+    display: none;
+}
+
+.assistant-tag-label .icon-unchecked {
+    display: inline-block;
+}
+
+.assistant-tag-label input:checked + span .icon-checked {
+    display: inline-block;
+}
+
+.assistant-tag-label input:checked + span .icon-unchecked {
+    display: none;
+}
+
 .assistant-input-wrapper {
     width: 42rem;
     max-width: calc(100% - 2rem);
