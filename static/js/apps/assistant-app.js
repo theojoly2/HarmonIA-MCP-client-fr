@@ -243,6 +243,10 @@ class AssistantApp extends AppBase {
         this.modelName = '';
         this.messages = [];
         this.messagesEl.innerHTML = '';
+        // Prevent the history session from being reloaded when the tab is
+        // restored after a switch.
+        this.props.session = '';
+        this.props.fromHistory = false;
         this.chatEl.classList.remove('assistant-chat-mode');
         this.welcomeEl.classList.remove('assistant-welcome-top');
         this.inputArea.classList.remove('assistant-input-area-chat');
