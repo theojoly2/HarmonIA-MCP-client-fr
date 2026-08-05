@@ -313,7 +313,7 @@ class AssistantApp extends AppBase {
             const marginTop = parseFloat(getComputedStyle(slot).marginTop) || 0;
             const contentHeight = titleHeight + marginTop + inputHeight;
             const available = Math.max(containerRect.height, contentHeight);
-            const offset = Math.max(0, (available - contentHeight) / 2);
+            const offset = Math.max(0, (available - contentHeight) / 2 - contentHeight * 0.08);
             this.welcomeEl.style.paddingTop = offset + 'px';
             this.welcomeEl.style.paddingBottom = '0';
 
