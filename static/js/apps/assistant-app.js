@@ -125,14 +125,14 @@ class AssistantApp extends AppBase {
             }
         });
 
+        // Place the input inside the centered welcome area by default, then center.
+        if (this.welcomeInputSlot && this.inputArea.parentElement !== this.welcomeInputSlot) {
+            this.welcomeInputSlot.appendChild(this.inputArea);
+        }
         // Initial centering after layout is ready.
         requestAnimationFrame(() => {
             requestAnimationFrame(() => this._applyCentering(true));
         });
-        // Place the input inside the centered welcome area by default.
-        if (this.welcomeInputSlot && this.inputArea.parentElement !== this.welcomeInputSlot) {
-            this.welcomeInputSlot.appendChild(this.inputArea);
-        }
 
     }
 
@@ -319,8 +319,11 @@ class AssistantApp extends AppBase {
         const was = this.welcomeEl.style.transition;
         if (skipTransition) this.welcomeEl.style.transition = 'none';
 
+        // Center the whole welcome block (title + input) in the container.
+        const welcomeRect = this.welcomeEl.getBoundingClientRect();
+        const containerRect = this.container.getBoundingClientRect();
         const contentHeight = this._measureWelcomeContentHeight();
-        const available = Math.max(this.container.clientHeight, contentHeight);
+        const available = Math.max(containerRect.height, contentHeight);
         const offset = Math.max(0, (available - contentHeight) / 2);
         this.welcomeEl.style.paddingTop = offset + 'px';
         this.welcomeEl.style.paddingBottom = '0';
