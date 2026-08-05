@@ -11,7 +11,7 @@ import json
 import re
 from collections import defaultdict
 from io import BytesIO
-from typing import Any, AsyncGenerator, Awaitable, Callable, Optional
+from typing import Any, AsyncGenerator, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Request, UploadFile, File, Form, HTTPException
@@ -93,7 +93,6 @@ async def _create_completion_streaming(
     llm_messages: list[dict[str, str]],
     tools: list[dict[str, Any]],
     tool_choice: str = "auto",
-    cancel_event: asyncio.Event | None = None,
 ) -> AsyncGenerator[tuple[str, Any], None]:
     """Stream assistant text in real-time and finish with tool calls summary.
 
@@ -119,17 +118,7 @@ async def _create_completion_streaming(
         lambda: {"id": "", "type": "function", "function": {"name": "", "arguments": ""}}
     )
 
-    stream_iterator = stream.__aiter__()
-    while True:
-        try:
-            chunk = await asyncio.wait_for(stream_iterator.__anext__(), timeout=0.2)
-        except asyncio.TimeoutError:
-            if cancel_event is not None and cancel_event.is_set():
-                break
-            continue
-        except StopAsyncIteration:
-            break
-
+    async for chunk in stream:
         choices = getattr(chunk, "choices", None) or []
         if not choices:
             continue
@@ -250,25 +239,11 @@ def _generate_model_svg(model_data: dict[str, Any]) -> str:
 async def assistant_stream_generator(
     request: AssistantStreamRequest,
     username: str,
-    cancel_check: Callable[[], Awaitable[bool]] | None = None,
 ) -> AsyncGenerator[str, None]:
     user_input = request.user_message.strip()
     if not user_input:
         yield _event("error", {"message": "Message vide."})
         return
-
-    async def _is_cancelled() -> bool:
-        if cancel_event.is_set():
-            return True
-        if cancel_check is None:
-            return False
-        try:
-            cancelled = await cancel_check()
-            if cancelled:
-                cancel_event.set()
-            return cancelled
-        except Exception:
-            return False
 
     is_new_session = not request.session.strip()
     session_name = request.session.strip() or _slugify_session_name(user_input)
@@ -295,8 +270,6 @@ async def assistant_stream_generator(
     history.add_display_event({"kind": "user", "content": user_input})
     if selected_tags:
         history.add_display_event({"kind": "selected_tags", "tags": selected_tags})
-
-    cancel_event = asyncio.Event()
 
     state = {
         "user": username,
@@ -347,11 +320,6 @@ async def assistant_stream_generator(
             last_flush = asyncio.get_event_loop().time()
             yield out_queue.get_nowait()
 
-    async def _maybe_cancelled() -> bool:
-        if await _is_cancelled():
-            return True
-        return False
-
 
 
     try:
@@ -381,8 +349,6 @@ async def assistant_stream_generator(
             call_results: dict[str, dict[str, Any]] = {}
 
             while loop_count < max_loops:
-                if await _maybe_cancelled():
-                    break
                 loop_count += 1
                 is_last_loop = loop_count >= max_loops
                 elapsed = asyncio.get_event_loop().time() - stream_started_at
@@ -415,7 +381,6 @@ async def assistant_stream_generator(
                     llm_messages=llm_messages,
                     tools=effective_tool_schemas,
                     tool_choice=effective_tool_choice,
-                    cancel_event=cancel_event,
                 ):
                     if stage == "text":
                         streamed_any_text = True
@@ -514,13 +479,6 @@ async def assistant_stream_generator(
                                 progress_task = asyncio.create_task(_emit_progress_queue(queue, out_queue))
                             try:
                                 while not call_task.done():
-                                    if await _maybe_cancelled():
-                                        call_task.cancel()
-                                        try:
-                                            await call_task
-                                        except asyncio.CancelledError:
-                                            pass
-                                        raise asyncio.CancelledError("Client disconnected")
                                     async for line in _drain_out_queue():
                                         yield line
                                     await asyncio.sleep(0.05)
@@ -743,9 +701,6 @@ async def assistant_stream_generator(
         print(f"[Assistant stream error] {type(e).__name__}: {e}")
         yield _event("error", {"message": f"{type(e).__name__}: {e}"})
         return
-    except asyncio.CancelledError:
-        # Client disconnected (e.g. stop button); do not save an incomplete turn.
-        return
     finally:
         heartbeat_task.cancel()
         try:
@@ -777,14 +732,10 @@ async def _emit_progress_queue(
 @router.post("/stream")
 async def stream_assistant_response(
     request: AssistantStreamRequest,
-    http_request: Request,
     username: str = Depends(require_user),
 ):
-    async def _cancel_check() -> bool:
-        return await http_request.is_disconnected()
-
     return StreamingResponse(
-        assistant_stream_generator(request, username, cancel_check=_cancel_check),
+        assistant_stream_generator(request, username),
         media_type="text/event-stream",
         headers={
             "X-Accel-Buffering": "no",

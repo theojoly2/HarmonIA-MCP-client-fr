@@ -65,8 +65,8 @@ class AssistantApp extends AppBase {
                                         </svg>
                                         <span id="assistant-sources-label">Sources</span>
                                     </button>
-                                    <button type="submit" id="assistant-send" class="magic-btn assistant-send-btn flex-shrink-0 w-8 h-8 text-white bg-black hover:bg-gray-800 rounded-xl flex items-center justify-center transition-colors">
-                                        <svg id="assistant-send-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <button type="submit" class="magic-btn assistant-send-btn flex-shrink-0 w-8 h-8 text-white bg-black hover:bg-gray-800 rounded-xl flex items-center justify-center transition-colors">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19V5M5 12l7-7 7 7"></path>
                                         </svg>
                                     </button>
@@ -91,8 +91,6 @@ class AssistantApp extends AppBase {
         this.sourcesBtn = container.querySelector('#assistant-sources');
         this.sourcesLabel = container.querySelector('#assistant-sources-label');
         this.sourcesMenu = container.querySelector('#assistant-sources-menu');
-        this.sendBtn = container.querySelector('#assistant-send');
-        this.sendIcon = container.querySelector('#assistant-send-icon');
         this.selectedTags = [];
         this.tagsHtml = '';
         this._tagsReady = false;
@@ -103,11 +101,7 @@ class AssistantApp extends AppBase {
         container.querySelector('#assistant-form').addEventListener('submit', (e) => {
             e.preventDefault();
             const text = this.inputEl.value.trim();
-            if (this.isStreaming) {
-                this._stopStream();
-                return;
-            }
-            if (!text) return;
+            if (!text || this.isStreaming) return;
             this.inputEl.value = '';
             this.inputEl.style.height = 'auto';
             this._switchToChatMode();
@@ -263,30 +257,6 @@ class AssistantApp extends AppBase {
             .slice(0, 8)
             .join('_')
             .substring(0, 80) || 'session';
-    }
-
-    _stopStream() {
-        if (this._streamAbortController) {
-            this._streamAbortController.abort();
-            this._streamAbortController = null;
-        }
-        this.isStreaming = false;
-        this._setSendButtonLoading(false);
-    }
-
-    _setSendButtonLoading(loading) {
-        if (!this.sendBtn || !this.sendIcon) return;
-        if (loading) {
-            this.sendBtn.title = 'Arrêter la génération';
-            this.sendIcon.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <rect x="6" y="6" width="12" height="12" rx="2" stroke-width="2"></rect>
-            </svg>`;
-        } else {
-            this.sendBtn.title = 'Envoyer';
-            this.sendIcon.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19V5M5 12l7-7 7 7"></path>
-            </svg>`;
-        }
     }
 
     _newSession() {
@@ -1444,7 +1414,6 @@ class AssistantApp extends AppBase {
         this.messages.push({ role: 'user', content: text });
         this._appendUserMessage(text);
         this.isStreaming = true;
-        this._setSendButtonLoading(true);
         // Reset the background event queue for each new turn.
         this._pendingEvents = [];
         this._lastRenderedEventIndex = -1;
@@ -1628,21 +1597,14 @@ class AssistantApp extends AppBase {
                 liveHandler
             );
         } catch (err) {
-            // When the user clicks the stop button we abort the fetch reader on
-            // purpose; do not show a red error message for that case.
-            if (err.name === 'AbortError' || err.message?.includes('aborted')) {
-                console.log('[Assistant] stream aborted by user');
-            } else {
-                console.error('Assistant stream error', err);
-                this._appendThinkingPlaceholder(); // ensures any previous one is removed first
-                const bubble = this._ensureAssistantBubble();
-                bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(err.message)}</em>`;
-            }
+            console.error('Assistant stream error', err);
+            this._appendThinkingPlaceholder(); // ensures any previous one is removed first
+            const bubble = this._ensureAssistantBubble();
+            bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(err.message)}</em>`;
         } finally {
             clearInterval(loadingInterval);
             typewriter.stop();
             this.isStreaming = false;
-            this._setSendButtonLoading(false);
             this._closeAssistantBubble();
 
             if (currentText) {
