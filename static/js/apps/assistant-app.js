@@ -46,7 +46,7 @@ class AssistantApp extends AppBase {
                     </div>
                     <div class="assistant-messages" id="assistant-messages"></div>
                 </div>
-                <div class="assistant-input-area p-3 flex-shrink-0" id="assistant-input-area">
+                <div class="assistant-input-area flex-shrink-0" id="assistant-input-area">
                     <div class="assistant-input-wrapper mx-auto rounded-xl border-2 border-gray-300 focus-within:border-black bg-white transition-colors shadow-sm" id="assistant-input-box">
                         <form id="assistant-form" class="flex flex-col">
                             <textarea id="assistant-input" rows="1" autocomplete="off"
@@ -296,7 +296,7 @@ class AssistantApp extends AppBase {
         }
 
         if (!welcomeTop) {
-            // Center the title block in the container.
+            // Center the whole title+input block vertically in the visible area.
             const title = this.welcomeEl.querySelector('.assistant-welcome-title');
             const slot = this.welcomeInputSlot;
             const titleRect = title ? title.getBoundingClientRect() : { top: 0, height: 0 };
@@ -308,25 +308,23 @@ class AssistantApp extends AppBase {
             const contentHeight = titleHeight + marginTop + inputHeight;
             const available = Math.max(containerRect.height, contentHeight);
             const offset = Math.max(0, (available - contentHeight) / 2);
-            // Shift the title slightly downward so it feels centered/lower.
-            const lowerOffset = Math.min(offset + contentHeight * 0.08, available - contentHeight);
-            this.welcomeEl.style.paddingTop = lowerOffset + 'px';
+            this.welcomeEl.style.paddingTop = offset + 'px';
             this.welcomeEl.style.paddingBottom = '0';
 
-            // Position the fixed input area just under the title, keeping the
-            // 1.25rem gap defined in CSS. This lets it slide together with the
-            // title when the first message is sent.
-            const topY = titleRect.bottom + marginTop;
+            // Re-measure the title after applying the padding so the fixed input
+            // sits exactly under the centered title.
+            const centeredTitleRect = title ? title.getBoundingClientRect() : titleRect;
+            const topY = centeredTitleRect.bottom + marginTop;
             this.inputArea.style.setProperty('--assistant-input-top', topY + 'px');
         } else if (chatMode) {
             // In chat mode the title is sticky at the top and the input sits at
-            // the bottom, preserving its bottom padding.
+            // the bottom of the visible window, preserving its bottom padding.
             this.welcomeEl.style.paddingTop = '';
             this.welcomeEl.style.paddingBottom = '';
-            const containerRect = this.container.getBoundingClientRect();
             const inputHeight = this.inputArea.getBoundingClientRect().height;
             const bottomPadding = 0.35 * parseFloat(getComputedStyle(document.documentElement).fontSize || 16);
-            const topY = containerRect.height - inputHeight - bottomPadding;
+            // Position relative to the viewport bottom because the input is fixed.
+            const topY = window.innerHeight - inputHeight - bottomPadding;
             this.inputArea.style.setProperty('--assistant-input-top', topY + 'px');
         } else {
             // Fallback: clear explicit padding if neither state is fully active.

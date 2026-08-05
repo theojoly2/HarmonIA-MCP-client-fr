@@ -713,13 +713,13 @@
 }
 
 .assistant-input-area {
-    position: fixed;
+    position: fixed !important;
     top: var(--assistant-input-top, 50%);
     left: 0;
     right: 0;
     width: 100%;
     max-width: none;
-    padding: 0 0 0.35rem;
+    padding: 0 0 0.35rem !important;
     background: transparent;
     border-top: none;
     display: flex;
