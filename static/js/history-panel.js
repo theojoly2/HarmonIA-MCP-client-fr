@@ -409,6 +409,12 @@ class HistoryPanel {
     async _openAssistant(sessionName, modelName) {
         this.close();
         try {
+            // Touch the session on the backend so it moves to the top of the
+            // history list even when it is just reopened without a new message.
+            await fetch(`api/assistant/sessions/${encodeURIComponent(sessionName)}/open`, {
+                method: "POST",
+                credentials: "same-origin",
+            });
             const existingAssistant = AppState.listInstances().find((i) => i.appId === "assistant");
             if (existingAssistant) {
                 AppState.removeInstance(existingAssistant.instanceId);

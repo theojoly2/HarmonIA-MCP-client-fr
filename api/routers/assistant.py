@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
 from collections import defaultdict
 from io import BytesIO
@@ -956,6 +957,20 @@ async def delete_assistant_session(
             await delete_model_mcp(username, linked_model)
         except Exception as e:
             print(f"[Assistant delete session] failed to delete linked model {linked_model}: {e}", flush=True)
+    return {"ok": True}
+
+
+@router.post("/sessions/{session}/open")
+async def touch_assistant_session(
+    session: str,
+    username: str = Depends(require_user),
+):
+    """Update the session file mtime so it bubbles to the top of the history list."""
+    history = AssistantHistory(user=username, session=session)
+    now = asyncio.get_event_loop().time()
+    for fp in (history.display_fp, history.llm_fp):
+        if fp.exists():
+            os.utime(fp, (now, now))
     return {"ok": True}
 
 
