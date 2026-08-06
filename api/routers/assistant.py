@@ -39,6 +39,10 @@ class AssistantStreamRequest(BaseModel):
     tags: list[str] = []
 
 
+class AssistantRenameBody(BaseModel):
+    name: str
+
+
 class AssistantSessionRequest(BaseModel):
     session: str = "default"
 
@@ -973,6 +977,45 @@ async def touch_assistant_session(
             # system time. The listing endpoint reads st_mtime * 1000 (ms).
             os.utime(fp, None)
     return {"ok": True}
+
+
+@router.patch("/sessions/{session}/rename")
+async def rename_assistant_session(
+    session: str,
+    body: AssistantRenameBody,
+    username: str = Depends(require_user),
+):
+    """Rename an assistant session by moving its display and llm files."""
+    old_history = AssistantHistory(user=username, session=session)
+    if not old_history._session_exists():
+        raise HTTPException(status_code=404, detail="Session inconnue")
+
+    new_name = _slugify_session_name(body.name)
+    # Append a timestamp suffix to keep the name unique, just like new sessions.
+    from datetime import datetime
+    new_name = f"{new_name}__{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+
+    new_history = AssistantHistory(user=username, session=new_name)
+    new_history.display_messages = old_history.display_messages
+    new_history.display_events = old_history.display_events
+    new_history.system_messages = old_history.system_messages
+    new_history.conversation_summary = old_history.conversation_summary
+    new_history.current_request_trace = old_history.current_request_trace
+    new_history.current_request_llm_messages = old_history.current_request_llm_messages
+    new_history.current_request_user_input = old_history.current_request_user_input
+    new_history.last_two_messages_fullish = old_history.last_two_messages_fullish
+    new_history.last_execution_plan_full = old_history.last_execution_plan_full
+    new_history.retained_retrieve_documents = old_history.retained_retrieve_documents
+    new_history.last_tool_observations_compact = old_history.last_tool_observations_compact
+    new_history.assistant_model_name = old_history.assistant_model_name
+    new_history.save()
+
+    if old_history.display_fp.exists():
+        old_history.display_fp.unlink()
+    if old_history.llm_fp.exists():
+        old_history.llm_fp.unlink()
+
+    return {"name": new_name}
 
 
 @router.get("/history")

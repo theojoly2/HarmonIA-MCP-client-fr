@@ -195,7 +195,7 @@ class HistoryPanel {
         const isAssistant = item.kind === "assistant";
         const menu = document.createElement("div");
         menu.className = "history-menu";
-        menu.innerHTML = isSearch || isAssistant
+        menu.innerHTML = isSearch
             ? `<button type="button" class="history-menu-item history-menu-delete">Supprimer</button>`
             : `
                 <button type="button" class="history-menu-item history-menu-rename">Renommer</button>
@@ -213,13 +213,13 @@ class HistoryPanel {
         menu.style.right = `${document.body.clientWidth - rect.right}px`;
         this._activeMenu = menu;
 
-        if (!isSearch && !isAssistant) {
+        if (!isSearch) {
             menu.querySelector(".history-menu-rename").addEventListener("click", (e) => {
                 e.stopPropagation();
                 this._closeMenu();
-                const li = this.listEl.querySelector(`li[data-item-name="${CSS.escape(item.name)}"][data-item-kind="model"]`) || anchorBtn.closest(".history-item");
+                const li = this.listEl.querySelector(`li[data-item-name="${CSS.escape(item.name)}"][data-item-kind="${item.kind}"]`) || anchorBtn.closest(".history-item");
                 const nameEl = li?.querySelector(".history-item-name");
-                if (nameEl) this._startInlineRename(nameEl, item.name, item.display_name || item.name);
+                if (nameEl) this._startInlineRename(nameEl, item.name, item.display_name || item.name, item.kind);
             });
         }
         if (menu.querySelector(".history-menu-delete")) {
@@ -301,9 +301,9 @@ class HistoryPanel {
         });
     }
 
-    _startInlineRename(nameEl, modelName, displayName) {
+    _startInlineRename(nameEl, storedName, displayName, kind = "model") {
         if (nameEl.querySelector("input")) return;
-        const initialName = displayName || modelName;
+        const initialName = displayName || storedName;
         const input = document.createElement("input");
         input.type = "text";
         input.value = initialName;
@@ -322,35 +322,47 @@ class HistoryPanel {
             }
             nameEl.textContent = newName;
             try {
-                const encodedName = encodeURIComponent(modelName);
-                const res = await fetch(`api/models/${encodedName}/rename`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    credentials: "same-origin",
-                    body: JSON.stringify({ name: newName }),
-                });
-                if (!res.ok) throw new Error("rename_failed");
-                const result = await res.json().catch(() => ({}));
-                const newStoredName = result.name || modelName;
-                // If the renamed model is currently open in the Modeler, update its
-                // stored name and refresh the SVG so the displayed package/model name
-                // matches the new display name.
-                AppState.listInstances().forEach((info) => {
-                    if (info.appId !== "modeler") return;
-                    const inst = AppState.getInstance(info.instanceId);
-                    if (inst && inst.updateModelName && (inst.storedName === modelName || inst.fileName === initialName)) {
-                        inst.updateModelName(newStoredName, newName);
-                        if (inst._reloadSvgFromServer) {
-                            inst._reloadSvgFromServer().catch((err) => console.error("Refresh SVG after rename error", err));
+                let res;
+                if (kind === "assistant") {
+                    const encodedSession = encodeURIComponent(storedName);
+                    res = await fetch(`api/assistant/sessions/${encodedSession}/rename`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "same-origin",
+                        body: JSON.stringify({ name: newName }),
+                    });
+                    if (!res.ok) throw new Error("rename_failed");
+                } else {
+                    const encodedName = encodeURIComponent(storedName);
+                    res = await fetch(`api/models/${encodedName}/rename`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "same-origin",
+                        body: JSON.stringify({ name: newName }),
+                    });
+                    if (!res.ok) throw new Error("rename_failed");
+                    const result = await res.json().catch(() => ({}));
+                    const newStoredName = result.name || storedName;
+                    // If the renamed model is currently open in the Modeler, update its
+                    // stored name and refresh the SVG so the displayed package/model name
+                    // matches the new display name.
+                    AppState.listInstances().forEach((info) => {
+                        if (info.appId !== "modeler") return;
+                        const inst = AppState.getInstance(info.instanceId);
+                        if (inst && inst.updateModelName && (inst.storedName === storedName || inst.fileName === initialName)) {
+                            inst.updateModelName(newStoredName, newName);
+                            if (inst._reloadSvgFromServer) {
+                                inst._reloadSvgFromServer().catch((err) => console.error("Refresh SVG after rename error", err));
+                            }
                         }
-                    }
-                });
+                    });
+                }
                 // Keep displayed text; refresh list silently in background to sync ordering
                 this.load();
             } catch (err) {
-                console.error("Rename model error", err);
+                console.error(`Rename ${kind} error`, err);
                 nameEl.textContent = initialName;
-                alert("Impossible de renommer le modèle.");
+                alert(kind === "assistant" ? "Impossible de renommer la conversation." : "Impossible de renommer le modèle.");
             }
         };
 
