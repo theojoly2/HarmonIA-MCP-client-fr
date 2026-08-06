@@ -493,14 +493,12 @@ class ModelerApp extends AppBase {
     async _showModéliseurHome() {
         const existing = this._findAssistantSplitInstance();
         if (existing) {
-            await window.windowManager?.switchTab(this.instanceId);
-            window.windowManager?.close(existing.instanceId);
-            await window.windowManager?.switchTab(this.instanceId);
+            window.windowManager?.collapseSplitTo(this.instanceId, existing.instanceId);
         }
-        const home = this.container.querySelector('#modeler-home');
-        const importContainer = this.container.querySelector('#modeler-import-container');
-        const viewer = this.container.querySelector('#modeler-viewer');
-        const app = this.container.querySelector('.modeler-app');
+        const home = this.container?.querySelector('#modeler-home');
+        const importContainer = this.container?.querySelector('#modeler-import-container');
+        const viewer = this.container?.querySelector('#modeler-viewer');
+        const app = this.container?.querySelector('.modeler-app');
 
         if (app) app.classList.remove('modeler-loading-layout');
 
@@ -671,17 +669,21 @@ class ModelerApp extends AppBase {
         btn.classList.toggle('hidden', !!existing);
     }
 
+    _closeAssistantSplit() {
+        const existing = this._findAssistantSplitInstance();
+        if (!existing || !window.windowManager) return;
+        // Collapse the split around the modeler pane, then remove the assistant
+        // instance. The helper explicitly remounts the modeler in a fresh tab
+        // container so its DOM reference stays valid.
+        window.windowManager.collapseSplitTo(this.instanceId, existing.instanceId);
+        this._updateAssistantToggleVisibility();
+    }
+
     async _toggleAssistantSplit() {
         if (!this.storedName || !window.windowManager) return;
         const existing = this._findAssistantSplitInstance();
         if (existing) {
-            // Close: collapse the split to a single modeler tab first, then remove
-            // the assistant instance. Order matters: removeLeaf after the target has
-            // a real DOM container avoids an empty shell.
-            await window.windowManager.switchTab(this.instanceId);
-            window.windowManager.close(existing.instanceId);
-            await window.windowManager.switchTab(this.instanceId);
-            this._updateAssistantToggleVisibility();
+            this._closeAssistantSplit();
             return;
         }
         // Open: create the assistant in a real split panel next to the modeler.

@@ -259,6 +259,31 @@ class WindowManager {
         AppState.setActiveInstance(instanceId);
     }
 
+    /**
+     * Collapse a split so only `keepInstanceId` remains, then remove
+     * `removeInstanceId` and remount `keepInstanceId` as a full tab.
+     * Use this when closing a split panel without leaving an empty shell.
+     */
+    async collapseSplitTo(keepInstanceId, removeInstanceId) {
+        const keepInstance = AppState.getInstance(keepInstanceId);
+        const removeRecord = AppState.getRecord(removeInstanceId);
+        if (!keepInstance) return;
+        if (removeRecord && removeRecord.mode === 'split') {
+            this.splitManager.unregisterRenderer(removeInstanceId);
+            this.splitManager.removeLeaf(removeInstanceId);
+        }
+        this.splitManager.unregisterRenderer(keepInstanceId);
+        this.splitManager.setTree({ type: 'pane', instanceId: keepInstanceId });
+        this.shellElement.innerHTML = '';
+        AppState.saveInstanceState(keepInstanceId);
+        await this._mountTab(keepInstance);
+        AppState.setActiveInstance(keepInstanceId);
+        this.splitManager.unregisterRenderer(removeInstanceId);
+        if (removeRecord && removeRecord.mode === 'split') {
+            AppState.removeInstance(removeInstanceId);
+        }
+    }
+
     async moveToFloat(instanceId, props = {}) {
         const instance = AppState.getInstance(instanceId);
         if (!instance) return;
