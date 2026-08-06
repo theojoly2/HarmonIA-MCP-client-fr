@@ -888,6 +888,12 @@ async def import_assistant_model(
             if not server_model:
                 raise ModelProcessingError("MCP Server Error", "Model upload returned None.")
 
+        # Mark models imported through the assistant so the history panel can
+        # hide the standalone model entry and surface only the conversation.
+        json_data["imported_from_assistant"] = True
+        async with AssistantMCPClient(state={"user": username, "name": session_name, "package": ""}) as mcp_client:
+            await mcp_client.upload_model({"model": json_data})
+
     except ModelProcessingError as e:
         raise HTTPException(status_code=400, detail={"title": e.title, "details": e.details}) from e
     except Exception as e:

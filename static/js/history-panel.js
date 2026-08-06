@@ -88,16 +88,20 @@ class HistoryPanel {
                         assistantSessionByModel.set(s.model_name, s);
                     }
                 });
-                models = (modelsData.models || []).map((m) => {
-                    const linked = assistantSessionByModel.get(m.name);
-                    return {
-                        ...m,
-                        kind: "model",
-                        sortKey: Number(m.last_opened_at) || 0,
-                        assistant_session: linked?.name || "",
-                        assistant_display_name: linked?.display_name || "",
-                    };
-                });
+                // Hide models that were imported through the assistant: their
+                // conversation entry in the assistant history is the entry point.
+                models = (modelsData.models || [])
+                    .filter((m) => !m.imported_from_assistant)
+                    .map((m) => {
+                        const linked = assistantSessionByModel.get(m.name);
+                        return {
+                            ...m,
+                            kind: "model",
+                            sortKey: Number(m.last_opened_at) || 0,
+                            assistant_session: linked?.name || "",
+                            assistant_display_name: linked?.display_name || "",
+                        };
+                    });
             }
             if (searchesRes.ok) {
                 const data = await searchesRes.json();
@@ -110,21 +114,17 @@ class HistoryPanel {
                 }));
             }
             if (assistantRes && assistantRes.sessions) {
-                // Conversations linked to a model are accessed through the modeler
-                // item, so hide them from the standalone assistant history.
-                const linkedModelNames = modelsRes.ok && modelsData.models
-                    ? new Set(modelsData.models.map((m) => m.name))
-                    : new Set();
-                conversations = assistantRes.sessions
-                    .filter((s) => !s.model_name || !linkedModelNames.has(s.model_name))
-                    .map((s) => ({
-                        ...s,
-                        kind: "assistant",
-                        name: s.name,
-                        display_name: s.display_name || s.preview || s.name,
-                        source_format: "conversation",
-                        sortKey: Number(s.last_opened_at) || 0,
-                    }));
+                // Conversations are always shown in the assistant history.
+                // Models imported through the assistant are hidden from the
+                // modeler history below; their conversation entry is the entry point.
+                conversations = assistantRes.sessions.map((s) => ({
+                    ...s,
+                    kind: "assistant",
+                    name: s.name,
+                    display_name: s.display_name || s.preview || s.name,
+                    source_format: "conversation",
+                    sortKey: Number(s.last_opened_at) || 0,
+                }));
             }
             this.items = [...models, ...searches, ...conversations].sort((a, b) => b.sortKey - a.sortKey);
         } catch (err) {
