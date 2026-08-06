@@ -29,12 +29,6 @@
     z-index: 25;
     min-height: auto !important;
 }
-    padding-bottom: 0;
-    flex-shrink: 0;
-    position: relative;
-    z-index: 25;
-    min-height: auto !important;
-}
 
 .modeler-loading-layout #modeler-home {
     padding-top: 0 !important;

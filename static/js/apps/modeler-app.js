@@ -499,98 +499,40 @@ class ModelerApp extends AppBase {
     }
 
     async _showModéliseurHome() {
+        // Cancel any in-flight animation.
+        if (this._homeTimeout) {
+            clearTimeout(this._homeTimeout);
+            this._homeTimeout = null;
+        }
+
+        // Reset model state first so the next render knows we are in home mode.
+        this.svgText = '';
+        this.fileName = '';
+        this.mainClassName = '';
+        this.loading = false;
+        this.viewerState = { scale: 1, x: 0, y: 0 };
+        if (this.viewer) {
+            this.viewer.destroy();
+            this.viewer = null;
+        }
+
         const existing = this._findAssistantSplitInstance();
         if (existing) {
             await window.windowManager?.collapseSplitTo(this.instanceId, existing.instanceId);
-        }
-        const liveContainer = document.querySelector(`.app-container[data-instance-id="${this.instanceId}"]`);
-        if (liveContainer) this.container = liveContainer;
-        this._runHomeTransition();
-    }
-
-    _runHomeTransition() {
-        const home = this.container?.querySelector('#modeler-home');
-        const importContainer = this.container?.querySelector('#modeler-import-container');
-        const viewer = this.container?.querySelector('#modeler-viewer');
-        const app = this.container?.querySelector('.modeler-app');
-
-        if (app) {
-            app.classList.remove('modeler-loading-layout');
-            app.classList.add('returning-home');
+            // collapseSplitTo remounts the modeler in a fresh tab container.
+            const liveContainer = document.querySelector(`.app-container[data-instance-id="${this.instanceId}"]`);
+            if (liveContainer) this.container = liveContainer;
         }
 
-        if (!home || !viewer || viewer.classList.contains('hidden')) {
-            this._finalizeHomeAndCenter(true);
-            return;
+        this._finalizeHomeAndCenter(true);
+        this.setTitle(this.constructor.title);
+
+        // Re-bind events because collapseSplitTo created a fresh DOM.
+        if (existing) {
+            this._bindEvents();
+            this._bindAssistantToggle();
+            this._observeResize();
         }
-
-        // Compute final centered offset for the home view.
-        const contentHeight = this._measureHomeContentHeight(home);
-        const available = Math.max(this.container.clientHeight, contentHeight);
-        const finalOffset = Math.max(0, (available - contentHeight) / 2);
-
-        // Prepare the import container to fade in.
-        if (importContainer) {
-            importContainer.classList.remove('modeler-import-hidden');
-            importContainer.style.display = '';
-            importContainer.style.transition = 'none';
-            importContainer.style.opacity = '0';
-            importContainer.style.transform = 'translateY(-16px)';
-        }
-
-        // Start from the compact top state so the paddingTop animation moves the
-        // title down from the top bar.
-        home.classList.add('modeler-top');
-        home.style.transition = 'none';
-        home.style.paddingTop = '0px';
-        home.style.paddingBottom = '0px';
-        home.style.justifyContent = 'flex-start';
-        void home.offsetHeight;
-
-        requestAnimationFrame(() => {
-            // Kick off the downward glide. Let the returning-home class handle
-            // vertical centering so the animation only slides the title via padding.
-            home.style.transition = 'padding-top 0.7s cubic-bezier(0.4, 0, 0.2, 1)';
-            home.classList.remove('modeler-top');
-            home.style.paddingTop = finalOffset + 'px';
-        });
-
-        // Fade in the import container so it is fully visible when the title reaches center.
-        if (importContainer) {
-            const dropZone = importContainer.querySelector('#modeler-drop-zone');
-            setTimeout(() => {
-                if (dropZone) {
-                    dropZone.style.display = '';
-                }
-                void importContainer.offsetHeight;
-                importContainer.style.transition = 'opacity 0.55s ease, transform 0.55s cubic-bezier(0.16, 1, 0.3, 1)';
-                requestAnimationFrame(() => {
-                    importContainer.style.opacity = '1';
-                    importContainer.style.transform = 'translateY(0)';
-                });
-            }, 250);
-        }
-
-        // When the fade-out completes, clean up state and lock the home layout.
-        this._homeTimeout = setTimeout(() => {
-            this._homeTimeout = null;
-            // Clear SVG state before calling _updateHomeVisibility so it switches
-            // to home mode and shows the import container.
-            this.svgText = '';
-            this.fileName = '';
-            this.mainClassName = '';
-            this.loading = false;
-            this.viewerState = { scale: 1, x: 0, y: 0 };
-            if (this.viewer) {
-                this.viewer.destroy();
-                this.viewer = null;
-            }
-            if (app) app.classList.remove('returning-home');
-            this._updateHomeVisibility(true);
-            this.setTitle(this.constructor.title);
-            const dropZone = this.container?.querySelector('#modeler-drop-zone');
-            if (dropZone) dropZone.style.display = '';
-        }, 700);
     }
 
     _finalizeHomeAndCenter(skipTransition) {
