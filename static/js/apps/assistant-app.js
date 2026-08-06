@@ -1759,11 +1759,17 @@ class AssistantApp extends AppBase {
         }
 
         if (event.kind === 'model_svg') {
-            // Update the active SVG card if one exists; otherwise create a new one.
-            // The active card is frozen (and detached) on every new user message, so
-            // a new user request always starts with a fresh visualization card.
-            // Multiple model_svg events within the same turn update that same card.
-            this._updateCurrentSvgCard(event.svg, event.label || 'Visualisation du modèle');
+            // In standalone assistant mode, update the active SVG card inside the chat.
+            // When the assistant is opened as a split panel next to the modeler, the
+            // visualization lives in the modeler's main canvas instead.
+            if (this.props.linkedModelerInstanceId && this.props.modelName) {
+                const modeler = AppState.getInstance(this.props.linkedModelerInstanceId);
+                if (modeler && typeof modeler._reloadSvgFromServer === 'function') {
+                    modeler._reloadSvgFromServer();
+                }
+            } else {
+                this._updateCurrentSvgCard(event.svg, event.label || 'Visualisation du modèle');
+            }
             saveHtmlSnapshot();
             return;
         }
