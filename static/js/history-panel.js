@@ -109,14 +109,22 @@ class HistoryPanel {
                 }));
             }
             if (assistantRes && assistantRes.sessions) {
-                conversations = assistantRes.sessions.map((s) => ({
-                    ...s,
-                    kind: "assistant",
-                    name: s.name,
-                    display_name: s.display_name || s.preview || s.name,
-                    source_format: "conversation",
-                    sortKey: Number(s.last_opened_at) || 0,
-                }));
+                // Conversations linked to a model are accessed through the modeler
+                // item, so hide them from the standalone assistant history.
+                const linkedModelNames = new Set(
+                    (modelsRes.ok ? (await modelsRes.clone().json()).models || [] : [])
+                        .map((m) => m.name)
+                );
+                conversations = assistantRes.sessions
+                    .filter((s) => !s.model_name || !linkedModelNames.has(s.model_name))
+                    .map((s) => ({
+                        ...s,
+                        kind: "assistant",
+                        name: s.name,
+                        display_name: s.display_name || s.preview || s.name,
+                        source_format: "conversation",
+                        sortKey: Number(s.last_opened_at) || 0,
+                    }));
             }
             this.items = [...models, ...searches, ...conversations].sort((a, b) => b.sortKey - a.sortKey);
         } catch (err) {
