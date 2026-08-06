@@ -104,7 +104,7 @@ class HistoryPanel {
                     ...s,
                     kind: "assistant",
                     name: s.name,
-                    display_name: s.preview || s.name,
+                    display_name: s.display_name || s.preview || s.name,
                     source_format: "conversation",
                     sortKey: Number(s.last_opened_at) || 0,
                 }));
