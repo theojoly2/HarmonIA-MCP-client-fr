@@ -8,6 +8,17 @@
 }
 .modeler-home.hidden { display: none; }
 
+/* When animating back from viewer to centered home, the viewer is already
+ * fading out; hide it immediately so the home panel does not try to share
+ * vertical space with an empty diagram pane. */
+.modeler-app.returning-home #modeler-viewer {
+    display: none !important;
+}
+.modeler-app.returning-home #modeler-home {
+    flex: 1 1 auto;
+    justify-content: center;
+}
+
 /* Home panel in viewer mode (compact top bar). */
 .modeler-top {
     justify-content: flex-start;
@@ -18,20 +29,6 @@
     z-index: 25;
     min-height: auto !important;
 }
-
-/* When animating back from viewer to centered home, the viewer is already
- * fading out; hide it immediately so the home panel does not try to share
- * vertical space with an empty diagram pane. */
-.modeler-app.returning-home #modeler-viewer {
-    display: none !important;
-}
-.modeler-app.returning-home #modeler-home {
-    flex: 1 1 auto;
-}
-
-.modeler-top {
-    justify-content: flex-start;
-    padding-top: 0;
     padding-bottom: 0;
     flex-shrink: 0;
     position: relative;

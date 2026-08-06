@@ -544,10 +544,12 @@ class ModelerApp extends AppBase {
         home.style.transition = 'none';
         home.style.paddingTop = '0px';
         home.style.paddingBottom = '0px';
+        home.style.justifyContent = 'flex-start';
         void home.offsetHeight;
 
         requestAnimationFrame(() => {
-            // Kick off the downward glide.
+            // Kick off the downward glide. Let the returning-home class handle
+            // vertical centering so the animation only slides the title via padding.
             home.style.transition = 'padding-top 0.7s cubic-bezier(0.4, 0, 0.2, 1)';
             home.classList.remove('modeler-top');
             home.style.paddingTop = finalOffset + 'px';
