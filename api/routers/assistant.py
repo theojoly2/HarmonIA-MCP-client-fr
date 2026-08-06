@@ -289,8 +289,15 @@ async def assistant_stream_generator(
         try:
             model_data = await get_model_mcp(username, model_name)
             if model_data:
-                short_model = shorten_json(model_data)
-                current_model_prompt = "[CURRENT MODEL]\n" + json.dumps(short_model, ensure_ascii=False, indent=2) + "\n\n[CURRENT USER MESSAGE]\n\n"
+                # The model stored by the modeler contains a rich "xmi" wrapper.
+                # Pass that canonical structure to the LLM so it sees classes,
+                # attributes and connectors, not just a flat summary.
+                xmi = model_data.get("xmi") if isinstance(model_data.get("xmi"), dict) else model_data
+                current_model_prompt = (
+                    "[CURRENT MODEL - JSON STRUCTURE]\n"
+                    + json.dumps(xmi, ensure_ascii=False, indent=2)
+                    + "\n\n[CURRENT USER MESSAGE]\n\n"
+                )
         except Exception as e:
             print(f"[Assistant] Failed to load model context for {model_name}: {e}")
 

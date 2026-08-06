@@ -625,7 +625,7 @@ class ModelerApp extends AppBase {
         await window.windowManager.splitPanel(this.instanceId, 'assistant', {
             modelName: this.storedName,
             linkedModelerInstanceId: this.instanceId,
-        }, { ratio: [55, 45] });
+        }, { ratio: [50, 50] });
     }
 
     _updateEditButtonStates() {

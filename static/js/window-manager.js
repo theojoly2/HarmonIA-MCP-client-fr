@@ -314,7 +314,7 @@ class WindowManager {
         this.splitManager.unregisterRenderer(targetInstanceId);
         this.splitManager.unregisterRenderer(instanceId);
 
-        const ratio = options.ratio || [55, 45];
+        const ratio = options.ratio || [50, 50];
         this.splitManager.setTree({
             type: 'split',
             direction: 'horizontal',
