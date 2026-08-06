@@ -88,10 +88,16 @@ class HistoryPanel {
                         assistantSessionByModel.set(s.model_name, s);
                     }
                 });
-                // Hide models that were imported through the assistant: their
-                // conversation entry in the assistant history is the entry point.
+                // A model imported through the modeler tab is shown as a modeler
+                // item, and its linked conversation is hidden. A model imported
+                // through the assistant tab is shown as an assistant item, and
+                // its standalone model entry is hidden.
                 models = (modelsData.models || [])
-                    .filter((m) => !m.imported_from_assistant)
+                    .filter((m) => {
+                        const linked = assistantSessionByModel.get(m.name);
+                        if (m.imported_from_assistant) return false;
+                        return true;
+                    })
                     .map((m) => {
                         const linked = assistantSessionByModel.get(m.name);
                         return {
@@ -114,17 +120,37 @@ class HistoryPanel {
                 }));
             }
             if (assistantRes && assistantRes.sessions) {
-                // Conversations are always shown in the assistant history.
-                // Models imported through the assistant are hidden from the
-                // modeler history below; their conversation entry is the entry point.
-                conversations = assistantRes.sessions.map((s) => ({
-                    ...s,
-                    kind: "assistant",
-                    name: s.name,
-                    display_name: s.display_name || s.preview || s.name,
-                    source_format: "conversation",
-                    sortKey: Number(s.last_opened_at) || 0,
-                }));
+                // Show the conversation in assistant history. If the model
+                // linked to this conversation was imported through the modeler
+                // tab, hide the assistant item (the modeler item is the entry
+                // point). If the linked model was imported through the
+                // assistant tab, keep the assistant item and hide the modeler
+                // item.
+                const modelImportedFromAssistant = new Set(
+                    (modelsData.models || [])
+                        .filter((m) => m.imported_from_assistant)
+                        .map((m) => m.name)
+                );
+                const modelImportedFromModeler = new Set(
+                    (modelsData.models || [])
+                        .filter((m) => !m.imported_from_assistant)
+                        .map((m) => m.name)
+                );
+                conversations = assistantRes.sessions
+                    .filter((s) => {
+                        if (!s.model_name) return true;
+                        if (modelImportedFromModeler.has(s.model_name)) return false;
+                        if (modelImportedFromAssistant.has(s.model_name)) return true;
+                        return true;
+                    })
+                    .map((s) => ({
+                        ...s,
+                        kind: "assistant",
+                        name: s.name,
+                        display_name: s.display_name || s.preview || s.name,
+                        source_format: "conversation",
+                        sortKey: Number(s.last_opened_at) || 0,
+                    }));
             }
             this.items = [...models, ...searches, ...conversations].sort((a, b) => b.sortKey - a.sortKey);
         } catch (err) {
