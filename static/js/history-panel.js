@@ -317,6 +317,14 @@ class HistoryPanel {
                         credentials: "same-origin",
                     });
                     if (!res.ok) throw new Error("delete_failed");
+                    // If this conversation is linked to a model, also delete the
+                    // linked model so the hidden modeler entry is cleaned up.
+                    if (item.model_name) {
+                        await fetch(`api/models/${encodeURIComponent(item.model_name)}`, {
+                            method: "DELETE",
+                            credentials: "same-origin",
+                        }).catch((err) => console.error("Delete linked model error", err));
+                    }
                 } else {
                     const encodedName = encodeURIComponent(item.name);
                     const res = await fetch(`api/models/${encodedName}`, {
@@ -324,6 +332,14 @@ class HistoryPanel {
                         credentials: "same-origin",
                     });
                     if (!res.ok) throw new Error("delete_failed");
+                    // If this model has a linked assistant session, also delete it
+                    // so the hidden assistant entry is cleaned up.
+                    if (item.assistant_session) {
+                        await fetch(`api/assistant/sessions/${encodeURIComponent(item.assistant_session)}`, {
+                            method: "DELETE",
+                            credentials: "same-origin",
+                        }).catch((err) => console.error("Delete linked assistant error", err));
+                    }
                 }
                 await this.load();
             } catch (err) {
