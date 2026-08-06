@@ -137,7 +137,10 @@ class AssistantApp extends AppBase {
                 this.embeddedIntroEl.classList.remove('hidden');
             }
             if (this.modelPillSlotEl && this.modelName) {
-                const displayName = this.props.display_name || this.modelName;
+                const rawName = this.props.display_name || this.modelName;
+                const displayName = rawName.includes('__')
+                    ? rawName.split('__').slice(0, -1).join('__')
+                    : rawName;
                 this.modelPillSlotEl.innerHTML = `
                     <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 border border-gray-200 text-xs font-semibold text-gray-700">
                         <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -825,7 +825,10 @@
 }
 
 .assistant-app.assistant-embedded .assistant-embedded-intro .assistant-bubble {
-    width: 100%;
+    width: 42rem;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .assistant-app.assistant-embedded .assistant-embedded-intro .assistant-bubble-content {
