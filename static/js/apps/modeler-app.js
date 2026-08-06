@@ -1102,6 +1102,7 @@ class ModelerApp extends AppBase {
             home.classList.add('modeler-top');
             home.style.paddingTop = '0px';
             importContainer.classList.add('modeler-import-hidden');
+            importContainer.style.display = '';
             viewer.classList.remove('hidden');
             viewer.style.opacity = '1';
             viewer.style.transition = '';
@@ -1120,6 +1121,10 @@ class ModelerApp extends AppBase {
                 home.style.transition = was;
             }
             importContainer.classList.remove('modeler-import-hidden');
+            importContainer.style.display = '';
+            importContainer.style.opacity = '1';
+            importContainer.style.transform = 'translateY(0)';
+            importContainer.style.transition = '';
             viewer.classList.add('hidden');
             viewer.style.opacity = '0';
             viewer.style.transition = '';
