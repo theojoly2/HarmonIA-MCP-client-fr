@@ -121,9 +121,15 @@ class WindowManager {
         const targetIsCurrentTab = targetInstanceId &&
             this.shellElement.querySelector(`[data-instance-id="${targetInstanceId}"]`);
         if (targetInstanceId && targetIsCurrentTab) {
-            // The modeler is rendered as a full tab. Replace the shell content
-            // with a fresh split tree so the modeler becomes the left pane.
+            // The modeler is rendered as a full tab. Save its state, replace the
+            // shell content with a fresh split tree so the modeler becomes the
+            // left pane, then remount both panes.
+            AppState.saveInstanceState(targetInstanceId);
+            AppState.saveInstanceState(instance.instanceId);
             this.shellElement.innerHTML = '';
+            // Clear any stale split renderers for the target so it gets a fresh one.
+            this.splitManager.unregisterRenderer(targetInstanceId);
+            this.splitManager.unregisterRenderer(instance.instanceId);
             tree = {
                 type: 'split',
                 direction: 'horizontal',
@@ -134,9 +140,13 @@ class WindowManager {
                 ratios: [55, 45],
             };
             this.splitManager.setTree(tree);
-            this.splitManager.registerRenderer(targetInstanceId, (pane) => {
+            this.splitManager.registerRenderer(targetInstanceId, async (pane) => {
                 const targetInstance = AppState.getInstance(targetInstanceId);
-                if (targetInstance) targetInstance.mount(pane);
+                if (!targetInstance) return;
+                await targetInstance.mount(pane);
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => AppState.restoreInstanceState(targetInstanceId));
+                });
             });
             this.splitManager.registerRenderer(instance.instanceId, async (pane) => {
                 await instance.mount(pane);

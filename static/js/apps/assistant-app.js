@@ -29,14 +29,16 @@ class AssistantApp extends AppBase {
         // on the instance so it survives a tab switch (the old DOM is discarded and
         // rebuilt from the HTML snapshot).
         this._currentStreamingText = '';
-        // When embedded inside the modeler, the modeler instance provides the
-        // canvas so we don't render SVG cards here.
+        // When embedded inside the modeler (inline side panel or split pane), the
+        // modeler instance provides the canvas so we don't render SVG cards here.
         this._linkedModelerInstanceId = props.linkedModelerInstanceId || '';
+        this._embedded = !!(props.embedded || props.linkedModelerInstanceId || this._linkedModelerInstanceId);
     }
 
     render(container) {
         this.container = container;
-        const embeddedClass = (this.props.linkedModelerInstanceId || this._linkedModelerInstanceId) ? 'assistant-embedded' : '';
+        this._embedded = this._embedded || !!(this.props.linkedModelerInstanceId || this._linkedModelerInstanceId);
+        const embeddedClass = this._embedded ? 'assistant-embedded' : '';
         container.innerHTML = `
             <div class="assistant-app h-full w-full flex flex-col bg-white rounded-[1.25rem] overflow-hidden relative ${embeddedClass}">
                 <div id="assistant-chat" class="flex-1 overflow-y-auto relative">
@@ -334,8 +336,9 @@ class AssistantApp extends AppBase {
     _applyCentering(skipTransition) {
         if (!this.welcomeEl || !this.container || !this.inputArea) return;
 
-        const isEmbedded = this.container.closest('#modeler-assistant-panel') !== null ||
-            this.inputArea.classList.contains('assistant-embedded');
+        const isEmbedded = this._embedded ||
+            this.inputArea.classList.contains('assistant-embedded') ||
+            this.container.closest('#modeler-assistant-panel') !== null;
         const welcomeTop = this.welcomeEl.classList.contains('assistant-welcome-top');
         const chatMode = this.chatEl?.classList.contains('assistant-chat-mode');
         const was = this.welcomeEl.style.transition;
@@ -355,6 +358,8 @@ class AssistantApp extends AppBase {
             this.inputArea.style.bottom = '0';
             this.inputArea.style.left = '0';
             this.inputArea.style.right = '0';
+            this.inputArea.style.top = 'auto';
+            this.inputArea.style.width = '100%';
             if (skipTransition) {
                 this.welcomeEl.offsetHeight;
                 this.inputArea.offsetHeight;

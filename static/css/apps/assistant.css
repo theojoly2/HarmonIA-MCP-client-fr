@@ -808,7 +808,8 @@
     width: 100%;
 }
 
-.assistant-app.assistant-embedded .assistant-input-area.assistant-embedded {
+.assistant-app.assistant-embedded .assistant-input-area.assistant-embedded,
+.assistant-app.assistant-embedded #assistant-input-area {
     position: absolute;
     top: auto !important;
     bottom: 0;
@@ -820,7 +821,8 @@
     z-index: 30;
 }
 
-.assistant-app.assistant-embedded .assistant-input-area.assistant-embedded .assistant-input-wrapper {
+.assistant-app.assistant-embedded .assistant-input-area.assistant-embedded .assistant-input-wrapper,
+.assistant-app.assistant-embedded #assistant-input-area .assistant-input-wrapper {
     max-width: 100%;
 }
 
