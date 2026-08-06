@@ -493,7 +493,7 @@ class ModelerApp extends AppBase {
     async _showModéliseurHome() {
         const existing = this._findAssistantSplitInstance();
         if (existing) {
-            window.windowManager?.collapseSplitTo(this.instanceId, existing.instanceId);
+            await window.windowManager?.collapseSplitTo(this.instanceId, existing.instanceId);
         }
         const home = this.container?.querySelector('#modeler-home');
         const importContainer = this.container?.querySelector('#modeler-import-container');
