@@ -45,6 +45,14 @@
 .modeler-loading-layout #modeler-import-container {
     display: none !important;
 }
+
+/* During the title glide the import container should already be in the flow
+   (opacity 0) so it contributes to the centered height calculation. */
+.returning-home #modeler-import-container {
+    display: flex !important;
+    flex-direction: column;
+    opacity: 0;
+}
 .modeler-loading-layout #modeler-viewer {
     flex: 1 1 0%;
     display: flex;

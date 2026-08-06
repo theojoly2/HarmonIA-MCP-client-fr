@@ -574,6 +574,8 @@ class ModelerApp extends AppBase {
         // When the fade-out completes, clean up state and lock the home layout.
         this._homeTimeout = setTimeout(() => {
             this._homeTimeout = null;
+            // Clear SVG state before calling _updateHomeVisibility so it switches
+            // to home mode and shows the import container.
             this.svgText = '';
             this.fileName = '';
             this.mainClassName = '';
@@ -583,13 +585,10 @@ class ModelerApp extends AppBase {
                 this.viewer.destroy();
                 this.viewer = null;
             }
+            if (app) app.classList.remove('returning-home');
             this._updateHomeVisibility(true);
             this.setTitle(this.constructor.title);
-            if (app) app.classList.remove('returning-home');
-            if (importContainer) {
-                importContainer.style.display = '';
-            }
-            const dropZone = this.container.querySelector('#modeler-drop-zone');
+            const dropZone = this.container?.querySelector('#modeler-drop-zone');
             if (dropZone) dropZone.style.display = '';
         }, 700);
     }
