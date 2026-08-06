@@ -366,7 +366,14 @@ class WindowManager {
             const entry = entries[0];
             if (!entry) return;
             const cr = entry.contentRect;
-            const prev = this._lastShellSize || { width: cr.width, height: cr.height };
+            // Ignore the first resize event: the shell has just been created and
+            // the modeler already restored its saved viewer state. We only want
+            // to nudge the SVG when the user drags the split resizer afterwards.
+            if (!this._lastShellSize) {
+                this._lastShellSize = { width: cr.width, height: cr.height };
+                return;
+            }
+            const prev = this._lastShellSize;
             const dx = (cr.width - prev.width) / 2;
             const dy = (cr.height - prev.height) / 2;
             this._lastShellSize = { width: cr.width, height: cr.height };
@@ -376,7 +383,7 @@ class WindowManager {
                 modeler.viewer.applyTransform();
             }
         });
-        this._lastShellSize = this.shellElement.getBoundingClientRect();
+        this._lastShellSize = null;
         this._splitResizeObserver.observe(this.shellElement);
 
         AppState.setActiveInstance(instanceId);

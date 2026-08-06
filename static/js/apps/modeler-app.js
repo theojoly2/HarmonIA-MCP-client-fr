@@ -450,8 +450,13 @@ class ModelerApp extends AppBase {
         this._svgResizeObserver = new ResizeObserver((entries) => {
             if (!this.viewer || !this.svgText || this._centerOnNextShow) return;
             const entry = entries[0];
-            if (!entry || !this._lastSvgContainerSize) return;
+            if (!entry) return;
             const cr = entry.contentRect;
+            // Ignore the first event so the initial mount/restore state is not shifted.
+            if (!this._lastSvgContainerSize) {
+                this._lastSvgContainerSize = { width: cr.width, height: cr.height };
+                return;
+            }
             const prev = this._lastSvgContainerSize;
             const dx = (cr.width - prev.width) / 2;
             const dy = (cr.height - prev.height) / 2;
@@ -460,7 +465,7 @@ class ModelerApp extends AppBase {
             this.viewer.applyTransform();
             this._lastSvgContainerSize = { width: cr.width, height: cr.height };
         });
-        this._lastSvgContainerSize = viewerContainer.getBoundingClientRect();
+        this._lastSvgContainerSize = null;
         this._svgResizeObserver.observe(viewerContainer);
     }
 
