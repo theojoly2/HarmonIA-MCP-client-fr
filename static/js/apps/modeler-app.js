@@ -624,6 +624,11 @@ class ModelerApp extends AppBase {
         });
     }
 
+    _prepareLinkedAssistantSession(session, displayName) {
+        this._pendingAssistantSession = session || '';
+        this._pendingAssistantDisplayName = displayName || '';
+    }
+
     _findAssistantSplitInstance() {
         if (!this.storedName) return null;
         const instances = AppState.listInstances();
@@ -659,6 +664,25 @@ class ModelerApp extends AppBase {
             return;
         }
         // Open: create the assistant in a real split panel next to the modeler.
+        // If a session was prepared from the history panel, reopen that
+        // conversation; otherwise ask the backend for the most recent session
+        // linked to this model, or start a fresh one.
+        let session = this._pendingAssistantSession || '';
+        let displayName = this._pendingAssistantDisplayName || '';
+        if (!session) {
+            try {
+                const data = await ApiClient.findAssistantSessionByModel(this.storedName);
+                if (data.session) {
+                    session = data.session;
+                    displayName = '';
+                }
+            } catch (err) {
+                console.warn('No existing assistant session for model', this.storedName, err);
+            }
+        }
+        this._pendingAssistantSession = '';
+        this._pendingAssistantDisplayName = '';
+
         // Ignore rapid repeated clicks until the split is fully created.
         if (this._openingAssistant) return;
         this._openingAssistant = true;
@@ -666,6 +690,9 @@ class ModelerApp extends AppBase {
             await window.windowManager.splitPanel(this.instanceId, 'assistant', {
                 modelName: this.storedName,
                 linkedModelerInstanceId: this.instanceId,
+                session,
+                display_name: displayName,
+                fromModeler: true,
             }, { ratio: [70, 30] });
             this._updateAssistantToggleVisibility();
         } finally {

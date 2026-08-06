@@ -76,18 +76,27 @@ class HistoryPanel {
             let conversations = [];
             if (modelsRes.ok) {
                 const data = await modelsRes.json();
-                // Exclude models that are linked to an assistant session (imported
-                // through the assistant). Those are tied to their conversation.
-                const assistantModelNames = new Set(
-                    (assistantRes.sessions || []).map((s) => s.model_name).filter(Boolean)
-                );
-                models = (data.models || [])
-                    .filter((m) => !assistantModelNames.has(m.name))
-                    .map((m) => ({
+                // Build a map from model name to assistant session so modeler items
+                // know which conversation to reopen when the user opens the chat split.
+                const assistantSessionByModel = new Map();
+                (assistantRes.sessions || []).forEach((s) => {
+                    if (!s.model_name) return;
+                    // Keep the most recently touched session for each model.
+                    const existing = assistantSessionByModel.get(s.model_name);
+                    if (!existing || (s.last_opened_at || 0) > (existing.last_opened_at || 0)) {
+                        assistantSessionByModel.set(s.model_name, s);
+                    }
+                });
+                models = (data.models || []).map((m) => {
+                    const linked = assistantSessionByModel.get(m.name);
+                    return {
                         ...m,
                         kind: "model",
                         sortKey: Number(m.last_opened_at) || 0,
-                    }));
+                        assistant_session: linked?.name || "",
+                        assistant_display_name: linked?.display_name || "",
+                    };
+                });
             }
             if (searchesRes.ok) {
                 const data = await searchesRes.json();
@@ -135,6 +144,10 @@ class HistoryPanel {
             li.dataset.itemKind = item.kind;
             if (isSearch) li.dataset.searchId = item.id;
             if (isAssistant) li.dataset.modelName = item.model_name || "";
+            if (!isSearch && !isAssistant) {
+                li.dataset.assistantSession = item.assistant_session || "";
+                li.dataset.assistantDisplayName = item.assistant_display_name || "";
+            }
             li.innerHTML = `
                 <div class="history-item-icon">
                     ${isSearch ? this._searchIcon() : isAssistant ? this._assistantIcon() : this._modelerIcon()}
@@ -429,6 +442,16 @@ class HistoryPanel {
             const displayName = returnedName || modelName;
             if (modelerInstance.instance.loadSvg) {
                 await modelerInstance.instance.loadSvg(svgText, displayName, (svgText.match(match) || ["", ""])[1], modelName);
+            }
+
+            // If this model has a linked assistant conversation, prepare the
+            // modeler so its assistant split reopens that session instead of
+            // creating a blank one.
+            const li = this.listEl.querySelector(`li[data-item-name="${CSS.escape(modelName)}"][data-item-kind="model"]`);
+            const linkedSession = li?.dataset.assistantSession;
+            const linkedDisplayName = li?.dataset.assistantDisplayName;
+            if (linkedSession && modelerInstance.instance._prepareLinkedAssistantSession) {
+                modelerInstance.instance._prepareLinkedAssistantSession(linkedSession, linkedDisplayName);
             }
 
             await this.load();

@@ -286,9 +286,9 @@ class AssistantApp extends AppBase {
 
     async mount(container) {
         await super.mount(container);
-        // If this instance was created from the history panel with a session,
-        // load the persisted messages into the UI.
-        if (this.props.session && this.props.fromHistory) {
+        // If this instance was created from the history panel or from a modeler
+        // split with a session, load the persisted messages into the UI.
+        if (this.props.session && (this.props.fromHistory || this.props.fromModeler)) {
             try {
                 await this.loadHistory(this.props.session);
             } catch (err) {
