@@ -26,6 +26,7 @@ class ModelerApp extends AppBase {
         this._loadingTimeout = null;
         this._resizeObserver = null;
         this._svgResizeObserver = null;
+        this._lastSvgContainerSize = null;
         this._skipNextTransition = false;
     }
 
@@ -446,11 +447,20 @@ class ModelerApp extends AppBase {
         const viewerContainer = this.container?.querySelector('#modeler-svg-viewer');
         if (!viewerContainer || typeof ResizeObserver === 'undefined') return;
         if (this._svgResizeObserver) this._svgResizeObserver.disconnect();
-        this._svgResizeObserver = new ResizeObserver(() => {
-            if (this.viewer && this.svgText && !this._centerOnNextShow) {
-                this.viewer.restoreResizeAnchor();
-            }
+        this._svgResizeObserver = new ResizeObserver((entries) => {
+            if (!this.viewer || !this.svgText || this._centerOnNextShow) return;
+            const entry = entries[0];
+            if (!entry || !this._lastSvgContainerSize) return;
+            const cr = entry.contentRect;
+            const prev = this._lastSvgContainerSize;
+            const dx = (cr.width - prev.width) / 2;
+            const dy = (cr.height - prev.height) / 2;
+            this.viewer.state.x += dx;
+            this.viewer.state.y += dy;
+            this.viewer.applyTransform();
+            this._lastSvgContainerSize = { width: cr.width, height: cr.height };
         });
+        this._lastSvgContainerSize = viewerContainer.getBoundingClientRect();
         this._svgResizeObserver.observe(viewerContainer);
     }
 

@@ -15,6 +15,7 @@ class WindowManager {
         this.options = options;
         this._viewportHandler = () => this._clampAllFloating();
         this._splitResizeObserver = null;
+        this._lastShellSize = null;
         window.addEventListener('resize', this._viewportHandler);
     }
 
@@ -359,12 +360,23 @@ class WindowManager {
         // Whenever the split panes are resized, ask the modeler to keep its SVG
         // anchored to the pane center, just like a floating preview window does.
         if (this._splitResizeObserver) this._splitResizeObserver.disconnect();
-        this._splitResizeObserver = new ResizeObserver(() => {
+        this._splitResizeObserver = new ResizeObserver((entries) => {
             const modeler = AppState.getInstance(targetInstanceId);
-            if (modeler && typeof modeler._centerSvgInPane === 'function') {
-                modeler._centerSvgInPane();
+            if (!modeler) return;
+            const entry = entries[0];
+            if (!entry) return;
+            const cr = entry.contentRect;
+            const prev = this._lastShellSize || { width: cr.width, height: cr.height };
+            const dx = (cr.width - prev.width) / 2;
+            const dy = (cr.height - prev.height) / 2;
+            this._lastShellSize = { width: cr.width, height: cr.height };
+            if (modeler.viewer && modeler.svgText) {
+                modeler.viewer.state.x += dx;
+                modeler.viewer.state.y += dy;
+                modeler.viewer.applyTransform();
             }
         });
+        this._lastShellSize = this.shellElement.getBoundingClientRect();
         this._splitResizeObserver.observe(this.shellElement);
 
         AppState.setActiveInstance(instanceId);

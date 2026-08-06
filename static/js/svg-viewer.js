@@ -276,6 +276,16 @@ class SvgViewer {
         this.applyTransform();
     }
 
+    fitResize() {
+        const rect = this.container.getBoundingClientRect();
+        if (this._resizeAnchorX === undefined || this._resizeAnchorY === undefined) {
+            this.saveResizeAnchor();
+        }
+        this.state.x = (rect.width / 2) - this._resizeAnchorX * this.state.scale;
+        this.state.y = (rect.height / 2) - this._resizeAnchorY * this.state.scale;
+        this.applyTransform();
+    }
+
     destroy() {
         this._listeners.forEach(({ target, event, handler, options }) => {
             target.removeEventListener(event, handler, options);
