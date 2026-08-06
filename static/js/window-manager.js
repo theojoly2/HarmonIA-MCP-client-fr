@@ -356,8 +356,8 @@ class WindowManager {
 
         this.splitManager.render();
 
-        // Whenever the split panes are resized, ask the modeler to re-center its
-        // SVG in the new pane geometry, just like a floating preview window does.
+        // Whenever the split panes are resized, ask the modeler to keep its SVG
+        // anchored to the pane center, just like a floating preview window does.
         if (this._splitResizeObserver) this._splitResizeObserver.disconnect();
         this._splitResizeObserver = new ResizeObserver(() => {
             const modeler = AppState.getInstance(targetInstanceId);

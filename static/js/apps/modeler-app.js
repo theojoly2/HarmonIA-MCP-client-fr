@@ -448,7 +448,7 @@ class ModelerApp extends AppBase {
         if (this._svgResizeObserver) this._svgResizeObserver.disconnect();
         this._svgResizeObserver = new ResizeObserver(() => {
             if (this.viewer && this.svgText && !this._centerOnNextShow) {
-                this.viewer.centerDiagram(this.mainClassName);
+                this.viewer.restoreResizeAnchor();
             }
         });
         this._svgResizeObserver.observe(viewerContainer);
@@ -456,7 +456,7 @@ class ModelerApp extends AppBase {
 
     _centerSvgInPane() {
         if (this.viewer && this.svgText) {
-            this.viewer.centerDiagram(this.mainClassName);
+            this.viewer.restoreResizeAnchor();
         }
     }
 
