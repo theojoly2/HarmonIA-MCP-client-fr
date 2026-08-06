@@ -855,7 +855,7 @@
 .assistant-app.assistant-embedded .assistant-input-area.assistant-embedded .assistant-input-wrapper,
 .assistant-app.assistant-embedded #assistant-input-area .assistant-input-wrapper {
     max-width: 100%;
-    background: transparent;
+    background: #ffffff;
 }
 
 .assistant-sources-header {
