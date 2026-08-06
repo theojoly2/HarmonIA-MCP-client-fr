@@ -51,6 +51,7 @@ class AssistantApp extends AppBase {
                         <p class="assistant-welcome-subtitle">Importez un modèle ou posez une question pour démarrer.</p>
                         <div class="assistant-welcome-input" id="assistant-welcome-input"></div>
                     </div>
+                    <div class="assistant-embedded-intro" id="assistant-embedded-intro"></div>
                     <div class="assistant-messages" id="assistant-messages"></div>
                 </div>
                 <div class="assistant-input-area flex-shrink-0 ${embeddedClass}" id="assistant-input-area">
@@ -91,6 +92,7 @@ class AssistantApp extends AppBase {
         this.welcomeEl = container.querySelector('#assistant-welcome');
         this.welcomeInputSlot = container.querySelector('#assistant-welcome-input');
         this.messagesEl = container.querySelector('#assistant-messages');
+        this.embeddedIntroEl = container.querySelector('#assistant-embedded-intro');
         this.inputArea = container.querySelector('#assistant-input-area');
         this.inputBox = container.querySelector('#assistant-input-box');
         this.fileInput = container.querySelector('#assistant-model-file');
@@ -115,6 +117,17 @@ class AssistantApp extends AppBase {
             this._switchToChatMode();
             this._send(text);
         });
+
+        if (this._embedded && this.embeddedIntroEl) {
+            this.embeddedIntroEl.innerHTML = `
+                <div class="assistant-bubble assistant-bubble-assistant mb-4">
+                    <div class="assistant-bubble-content markdown-body">
+                        Je peux vous aider à explorer ou modifier le modèle affiché dans le canvas. Posez-moi une question ou demandez une modification.
+                    </div>
+                </div>
+            `;
+            this.embeddedIntroEl.classList.remove('hidden');
+        }
 
         if (window.GlowEffects && typeof window.GlowEffects.scanAndBind === 'function') {
             window.GlowEffects.scanAndBind(container);

@@ -820,6 +820,18 @@
     display: none !important;
 }
 
+.assistant-app.assistant-embedded .assistant-embedded-intro {
+    padding: 0.75rem 0.75rem 0;
+}
+
+.assistant-app.assistant-embedded .assistant-embedded-intro .assistant-bubble {
+    width: 100%;
+}
+
+.assistant-app.assistant-embedded .assistant-embedded-intro .assistant-bubble-content {
+    font-size: 0.9rem;
+}
+
 .assistant-app.assistant-embedded .assistant-bubble,
 .assistant-app.assistant-embedded .assistant-tool-card,
 .assistant-app.assistant-embedded .assistant-plan-card,
@@ -836,14 +848,15 @@
     left: 0;
     right: 0;
     padding: 0.5rem 0.75rem 0.75rem !important;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(4px);
+    background: transparent;
     z-index: 30;
 }
 
 .assistant-app.assistant-embedded .assistant-input-area.assistant-embedded .assistant-input-wrapper,
 .assistant-app.assistant-embedded #assistant-input-area .assistant-input-wrapper {
     max-width: 100%;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(4px);
 }
 
 .assistant-sources-header {
