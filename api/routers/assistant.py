@@ -944,6 +944,29 @@ async def list_assistant_sessions(username: str = Depends(require_user)):
     return {"sessions": sessions}
 
 
+@router.get("/sessions/by-model")
+async def find_assistant_session_by_model(
+    model_name: str,
+    username: str = Depends(require_user),
+):
+    """Return the most recently touched assistant session linked to a model."""
+    best_session = ""
+    best_mtime = 0
+    for session in AssistantHistory.list_sessions(username):
+        h = AssistantHistory(user=username, session=session)
+        if h.assistant_model_name != model_name:
+            continue
+        mtime = 0
+        if h.display_fp.exists():
+            mtime = int(h.display_fp.stat().st_mtime * 1000)
+        if mtime >= best_mtime:
+            best_mtime = mtime
+            best_session = session
+    if not best_session:
+        raise HTTPException(status_code=404, detail="Aucune conversation trouvée pour ce modèle")
+    return {"session": best_session, "model_name": model_name}
+
+
 @router.delete("/sessions/{session}")
 async def delete_assistant_session(
     session: str,

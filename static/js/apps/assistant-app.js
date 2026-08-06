@@ -29,6 +29,9 @@ class AssistantApp extends AppBase {
         // on the instance so it survives a tab switch (the old DOM is discarded and
         // rebuilt from the HTML snapshot).
         this._currentStreamingText = '';
+        // When embedded inside the modeler, the modeler instance provides the
+        // canvas so we don't render SVG cards here.
+        this._linkedModelerInstanceId = props.linkedModelerInstanceId || '';
     }
 
     render(container) {
@@ -178,6 +181,7 @@ class AssistantApp extends AppBase {
             inputAreaChat: this.inputArea ? this.inputArea.classList.contains('assistant-input-area-chat') : false,
             selectedTags: this.selectedTags || [],
             isStreaming: this.isStreaming,
+            linkedModelerInstanceId: this._linkedModelerInstanceId || '',
         };
     }
 
@@ -1760,10 +1764,11 @@ class AssistantApp extends AppBase {
 
         if (event.kind === 'model_svg') {
             // In standalone assistant mode, update the active SVG card inside the chat.
-            // When the assistant is opened as a split panel next to the modeler, the
-            // visualization lives in the modeler's main canvas instead.
-            if (this.props.linkedModelerInstanceId && this.props.modelName) {
-                const modeler = AppState.getInstance(this.props.linkedModelerInstanceId);
+            // When the assistant is embedded next to the modeler, the visualization
+            // lives in the modeler's main canvas instead.
+            const linked = this._linkedModelerInstanceId || this.props.linkedModelerInstanceId;
+            if (linked && this.modelName) {
+                const modeler = AppState.getInstance(linked);
                 if (modeler && typeof modeler._reloadSvgFromServer === 'function') {
                     modeler._reloadSvgFromServer();
                 }

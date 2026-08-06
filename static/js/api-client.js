@@ -281,6 +281,14 @@ const ApiClient = (() => {
         return res.json();
     }
 
+    async function findAssistantSessionByModel(modelName) {
+        const res = await fetch(apiUrl(`assistant/sessions/by-model?model_name=${encodeURIComponent(modelName)}`), {
+            credentials: "same-origin",
+        });
+        if (!res.ok) return { session: "" };
+        return res.json();
+    }
+
     async function getAssistantHistory(session) {
         if (!session) return { messages: [] };
         const res = await fetch(apiUrl(`assistant/history?session=${encodeURIComponent(session)}`), {
@@ -322,6 +330,7 @@ const ApiClient = (() => {
         streamChat,
         streamAssistant,
         getAssistantSessions,
+        findAssistantSessionByModel,
         getAssistantHistory,
         deleteAssistantSession,
     };

@@ -26,6 +26,8 @@ class ModelerApp extends AppBase {
         this._loadingTimeout = null;
         this._resizeObserver = null;
         this._skipNextTransition = false;
+        this._assistantApp = null;
+        this._assistantOpen = false;
     }
 
     static _closeOpenEditDialogs() {
@@ -68,7 +70,17 @@ class ModelerApp extends AppBase {
                     </div>
                 </div>
                 <div id="modeler-viewer" class="hidden flex-1 min-h-0 opacity-0 transition-opacity duration-300 relative">
-                    <div id="modeler-svg-viewer" class="h-full w-full"></div>
+                    <div id="modeler-main" class="h-full w-full flex transition-all duration-300">
+                        <div id="modeler-svg-viewer" class="flex-1 h-full"></div>
+                        <div id="modeler-assistant-panel" class="hidden w-[28rem] max-w-full h-full border-l border-gray-200 bg-white flex flex-col shadow-xl"></div>
+                    </div>
+                    <button type="button" id="modeler-assistant-toggle" class="hidden absolute top-3 right-3 z-30 w-10 h-10 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-700 hover:text-black hover:bg-gray-50 transition-colors" title="Discuter avec l'assistant sémantique">
+                        <svg class="w-5 h-5 overflow-visible" viewBox="0 0 24 24">
+                            <path class="sparkle-main" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
+                            <path class="sparkle-orbit-path" d="M5.5 2.5L6.34 5.16L9 6L6.34 6.84L5.5 9.5L4.66 6.84L2 6L4.66 5.16L5.5 2.5Z"></path>
+                            <path class="sparkle-orbit-path" d="M19.5 15.5L20.34 18.16L23 19L20.34 19.84L19.5 22.5L18.66 19.84L16 19L18.66 18.16L19.5 15.5Z"></path>
+                        </svg>
+                    </button>
                     <div id="modeler-loading" class="hidden absolute inset-0 flex items-center justify-center text-gray-500 z-10 bg-white/80 backdrop-blur-sm transition-opacity duration-300">
                         <svg class="animate-spin h-8 w-8 text-gray-400 mr-3" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -101,18 +113,11 @@ class ModelerApp extends AppBase {
                         </svg>
                         <span class="modeler-edit-label">Relation</span>
                     </button>
-                    <button type="button" id="modeler-assistant-toggle" class="modeler-edit-btn" title="Discuter avec l'assistant sémantique">
-                        <svg class="w-5 h-5 overflow-visible" viewBox="0 0 24 24">
-                            <path class="sparkle-main" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
-                            <path class="sparkle-orbit-path" d="M5.5 2.5L6.34 5.16L9 6L6.34 6.84L5.5 9.5L4.66 6.84L2 6L4.66 5.16L5.5 2.5Z"></path>
-                            <path class="sparkle-orbit-path" d="M19.5 15.5L20.34 18.16L23 19L20.34 19.84L19.5 22.5L18.66 19.84L16 19L18.66 18.16L19.5 15.5Z"></path>
-                        </svg>
-                        <span class="modeler-edit-label">Assistant</span>
-                    </button>
                 </div>
             </div>
         `;
         this._bindEvents();
+        this._bindAssistantToggle();
         if (this.loading) {
             // Loading state (e.g. opened from history): show the compact viewer with spinner immediately,
             // without animating the home panel down from the centered position.
@@ -400,7 +405,9 @@ class ModelerApp extends AppBase {
         const viewer = this.container.querySelector('#modeler-viewer');
         const app = this.container.querySelector('.modeler-app');
         const editActions = this.container.querySelector('#modeler-edit-actions');
+        const assistantToggle = this.container.querySelector('#modeler-assistant-toggle');
         if (app) app.classList.remove('modeler-loading-layout');
+        if (assistantToggle) assistantToggle.classList.toggle('hidden', !this.storedName);
 
         if (!this.viewer) {
             this.viewer = new SvgViewer(viewerContainer, {
@@ -528,6 +535,7 @@ class ModelerApp extends AppBase {
             this.viewer.destroy();
             this.viewer = null;
         }
+        this._tearDownAssistantApp();
         this._updateHomeVisibility(skipTransition);
         this.setTitle(this.constructor.title);
     }
@@ -582,12 +590,90 @@ class ModelerApp extends AppBase {
         const addClassBtn = this.container.querySelector('#modeler-add-class');
         const addAttrBtn = this.container.querySelector('#modeler-add-attr');
         const addConnectorBtn = this.container.querySelector('#modeler-add-connector');
-        const assistantBtn = this.container.querySelector('#modeler-assistant-toggle');
         if (addClassBtn) addClassBtn.addEventListener('click', () => this._showAddClassDialog());
         if (addAttrBtn) addAttrBtn.addEventListener('click', () => this._showAddAttributeDialog());
         if (addConnectorBtn) addConnectorBtn.addEventListener('click', () => this._showAddConnectorDialog());
-        if (assistantBtn) assistantBtn.addEventListener('click', () => this._openAssistantSplit());
         this._updateEditButtonStates();
+    }
+
+    _bindAssistantToggle() {
+        const assistantBtn = this.container?.querySelector('#modeler-assistant-toggle');
+        if (!assistantBtn) return;
+        assistantBtn.addEventListener('click', async () => {
+            this._assistantOpen = !this._assistantOpen;
+            await this._updateAssistantPanel();
+        });
+    }
+
+    async _updateAssistantPanel() {
+        const panel = this.container?.querySelector('#modeler-assistant-panel');
+        const main = this.container?.querySelector('#modeler-main');
+        const btn = this.container?.querySelector('#modeler-assistant-toggle');
+        if (!panel) return;
+        panel.classList.toggle('hidden', !this._assistantOpen);
+        if (btn) {
+            const isRight = this._assistantOpen;
+            btn.style.right = isRight ? 'calc(28rem + 0.75rem)' : '0.75rem';
+        }
+        if (this._assistantOpen) {
+            await this._ensureAssistantApp();
+        } else {
+            this._tearDownAssistantApp();
+        }
+    }
+
+    async _ensureAssistantApp() {
+        if (this._assistantApp) return;
+        const panel = this.container?.querySelector('#modeler-assistant-panel');
+        if (!panel || !this.storedName) return;
+
+        // Try to restore an existing conversation tied to this model.
+        let session = '';
+        let displayName = '';
+        try {
+            const result = await ApiClient.findAssistantSessionByModel(this.storedName);
+            if (result.session) {
+                session = result.session;
+                const history = await ApiClient.getAssistantHistory(session);
+                displayName = history.display_name || '';
+            }
+        } catch (err) {
+            console.error('Find assistant session by model error', err);
+        }
+
+        const props = {
+            modelName: this.storedName,
+            linkedModelerInstanceId: this.instanceId,
+            mode: 'inline',
+        };
+        if (session) {
+            props.session = session;
+            props.fromHistory = true;
+            props.display_name = displayName;
+        }
+        const { instanceId, instance } = AppState.createInstance('assistant', props);
+        this._assistantApp = { instanceId, instance };
+        await instance.mount(panel);
+        if (session) {
+            try {
+                await instance.loadHistory(session);
+                if (displayName) {
+                    instance.setTitle(`Assistant: ${displayName}`);
+                }
+            } catch (err) {
+                console.error('Restore assistant history in modeler panel error', err);
+            }
+        }
+    }
+
+    _tearDownAssistantApp() {
+        if (!this._assistantApp) return;
+        const { instanceId, instance } = this._assistantApp;
+        if (instance && typeof instance.unmount === 'function') {
+            instance.unmount();
+        }
+        AppState.removeInstance(instanceId);
+        this._assistantApp = null;
     }
 
     _updateEditButtonStates() {
@@ -841,28 +927,7 @@ class ModelerApp extends AppBase {
         this._updateEditButtonStates();
     }
 
-    _openAssistantSplit() {
-        if (!this.storedName || !window.windowManager) return;
-        // Look for an existing split assistant already linked to this model.
-        const instances = AppState.listInstances();
-        const existing = instances.find((i) =>
-            i.appId === 'assistant' &&
-            AppState.getRecord(i.instanceId)?.meta?.modelName === this.storedName &&
-            AppState.getRecord(i.instanceId)?.mode === 'split'
-        );
-        if (existing) {
-            AppState.setActiveInstance(existing.instanceId);
-            window.windowManager.renderSplit();
-            return;
-        }
-        window.windowManager.open('assistant', {
-            mode: 'split',
-            targetInstanceId: this.instanceId,
-            direction: 'horizontal',
-            modelName: this.storedName,
-            linkedModelerInstanceId: this.instanceId,
-        });
-    }
+
 
     _showFloatingDialog(title, fields, onSubmit, onOpen) {
         // Close any existing edit dialog first (only one floating edit window at a time).
@@ -1092,6 +1157,7 @@ class ModelerApp extends AppBase {
             this.viewer.destroy();
             this.viewer = null;
         }
+        this._tearDownAssistantApp();
         if (this._resizeObserver) this._resizeObserver.disconnect();
         this._resizeObserver = null;
         super.unmount();
