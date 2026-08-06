@@ -514,7 +514,10 @@ class ModelerApp extends AppBase {
         const viewer = this.container?.querySelector('#modeler-viewer');
         const app = this.container?.querySelector('.modeler-app');
 
-        if (app) app.classList.remove('modeler-loading-layout');
+        if (app) {
+            app.classList.remove('modeler-loading-layout');
+            app.classList.add('returning-home');
+        }
 
         if (!home || !viewer || viewer.classList.contains('hidden')) {
             this._finalizeHomeAndCenter(true);
@@ -535,29 +538,19 @@ class ModelerApp extends AppBase {
             importContainer.style.transform = 'translateY(-16px)';
         }
 
-        // Ensure we start from the compact top state (viewer layout) so the
-        // paddingTop animation really moves the title down from the top bar.
+        // Start from the compact top state so the paddingTop animation moves the
+        // title down from the top bar.
         home.classList.add('modeler-top');
         home.style.transition = 'none';
         home.style.paddingTop = '0px';
         home.style.paddingBottom = '0px';
         void home.offsetHeight;
 
-        // First frame: set the animation origin and make the viewer fully visible
-        // so it can fade out while the title glides down.
-        viewer.style.transition = 'none';
-        viewer.style.opacity = '1';
-        void viewer.offsetHeight;
-
         requestAnimationFrame(() => {
             // Kick off the downward glide.
             home.style.transition = 'padding-top 0.7s cubic-bezier(0.4, 0, 0.2, 1)';
             home.classList.remove('modeler-top');
             home.style.paddingTop = finalOffset + 'px';
-
-            // Fade out the diagram viewer in parallel.
-            viewer.style.transition = 'opacity 0.7s ease';
-            viewer.style.opacity = '0';
         });
 
         // Fade in the import container so it is fully visible when the title reaches center.
@@ -590,6 +583,7 @@ class ModelerApp extends AppBase {
             }
             this._updateHomeVisibility(true);
             this.setTitle(this.constructor.title);
+            if (app) app.classList.remove('returning-home');
             if (importContainer) {
                 importContainer.style.display = '';
             }
