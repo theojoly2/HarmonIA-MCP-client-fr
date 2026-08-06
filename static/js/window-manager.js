@@ -14,6 +14,7 @@ class WindowManager {
         this.activeFloat = null;
         this.options = options;
         this._viewportHandler = () => this._clampAllFloating();
+        this._splitResizeObserver = null;
         window.addEventListener('resize', this._viewportHandler);
     }
 
@@ -354,6 +355,18 @@ class WindowManager {
         });
 
         this.splitManager.render();
+
+        // Whenever the split panes are resized, ask the modeler to re-center its
+        // SVG in the new pane geometry, just like a floating preview window does.
+        if (this._splitResizeObserver) this._splitResizeObserver.disconnect();
+        this._splitResizeObserver = new ResizeObserver(() => {
+            const modeler = AppState.getInstance(targetInstanceId);
+            if (modeler && typeof modeler._centerSvgInPane === 'function') {
+                modeler._centerSvgInPane();
+            }
+        });
+        this._splitResizeObserver.observe(this.shellElement);
+
         AppState.setActiveInstance(instanceId);
         return instanceId;
     }

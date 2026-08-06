@@ -25,6 +25,7 @@ class ModelerApp extends AppBase {
         this._homeTimeout = null;
         this._loadingTimeout = null;
         this._resizeObserver = null;
+        this._svgResizeObserver = null;
         this._skipNextTransition = false;
     }
 
@@ -437,6 +438,25 @@ class ModelerApp extends AppBase {
         } else {
             this.viewer.restoreState(this.viewerState);
             finalize();
+        }
+        this._observeSvgContainerResize();
+    }
+
+    _observeSvgContainerResize() {
+        const viewerContainer = this.container?.querySelector('#modeler-svg-viewer');
+        if (!viewerContainer || typeof ResizeObserver === 'undefined') return;
+        if (this._svgResizeObserver) this._svgResizeObserver.disconnect();
+        this._svgResizeObserver = new ResizeObserver(() => {
+            if (this.viewer && this.svgText && !this._centerOnNextShow) {
+                this.viewer.centerDiagram(this.mainClassName);
+            }
+        });
+        this._svgResizeObserver.observe(viewerContainer);
+    }
+
+    _centerSvgInPane() {
+        if (this.viewer && this.svgText) {
+            this.viewer.centerDiagram(this.mainClassName);
         }
     }
 
@@ -1117,7 +1137,9 @@ class ModelerApp extends AppBase {
             this.viewer = null;
         }
         if (this._resizeObserver) this._resizeObserver.disconnect();
+        if (this._svgResizeObserver) this._svgResizeObserver.disconnect();
         this._resizeObserver = null;
+        this._svgResizeObserver = null;
         super.unmount();
     }
 }
