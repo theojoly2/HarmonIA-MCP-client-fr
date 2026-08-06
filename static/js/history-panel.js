@@ -74,8 +74,9 @@ class HistoryPanel {
             let models = [];
             let searches = [];
             let conversations = [];
+            let modelsData = { models: [] };
             if (modelsRes.ok) {
-                const data = await modelsRes.json();
+                modelsData = await modelsRes.json();
                 // Build a map from model name to assistant session so modeler items
                 // know which conversation to reopen when the user opens the chat split.
                 const assistantSessionByModel = new Map();
@@ -87,7 +88,7 @@ class HistoryPanel {
                         assistantSessionByModel.set(s.model_name, s);
                     }
                 });
-                models = (data.models || []).map((m) => {
+                models = (modelsData.models || []).map((m) => {
                     const linked = assistantSessionByModel.get(m.name);
                     return {
                         ...m,
@@ -111,8 +112,8 @@ class HistoryPanel {
             if (assistantRes && assistantRes.sessions) {
                 // Conversations linked to a model are accessed through the modeler
                 // item, so hide them from the standalone assistant history.
-                const linkedModelNames = modelsRes.ok
-                    ? new Set((data.models || []).map((m) => m.name))
+                const linkedModelNames = modelsRes.ok && modelsData.models
+                    ? new Set(modelsData.models.map((m) => m.name))
                     : new Set();
                 conversations = assistantRes.sessions
                     .filter((s) => !s.model_name || !linkedModelNames.has(s.model_name))
