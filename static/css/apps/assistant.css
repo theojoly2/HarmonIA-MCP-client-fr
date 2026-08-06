@@ -820,6 +820,15 @@
     display: none !important;
 }
 
+.assistant-app.assistant-embedded .assistant-embedded-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0.5rem 0.5rem 0;
+    flex-shrink: 0;
+    z-index: 35;
+}
+
 .assistant-app.assistant-embedded .assistant-embedded-intro {
     padding: 0.75rem 0.75rem 0;
 }

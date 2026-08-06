@@ -662,6 +662,8 @@ class ModelerApp extends AppBase {
         const existing = this._findAssistantSplitInstance();
         if (existing) {
             // Close: restore the modeler to full tab and remove the assistant pane.
+            const btn = this.container?.querySelector('#modeler-assistant-toggle');
+            if (btn) btn.classList.remove('hidden');
             await window.windowManager.switchTab(this.instanceId);
             window.windowManager.close(existing.instanceId);
             return;
@@ -671,6 +673,8 @@ class ModelerApp extends AppBase {
         if (this._openingAssistant) return;
         this._openingAssistant = true;
         try {
+            const btn = this.container?.querySelector('#modeler-assistant-toggle');
+            if (btn) btn.classList.add('hidden');
             await window.windowManager.splitPanel(this.instanceId, 'assistant', {
                 modelName: this.storedName,
                 linkedModelerInstanceId: this.instanceId,

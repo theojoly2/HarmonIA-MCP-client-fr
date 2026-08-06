@@ -41,6 +41,13 @@ class AssistantApp extends AppBase {
         const embeddedClass = this._embedded ? 'assistant-embedded' : '';
         container.innerHTML = `
             <div class="assistant-app h-full w-full flex flex-col bg-white rounded-[1.25rem] overflow-hidden relative ${embeddedClass}">
+                <div class="assistant-embedded-header ${embeddedClass ? '' : 'hidden'}" id="assistant-embedded-header">
+                    <button type="button" id="assistant-close-split" class="w-8 h-8 flex items-center justify-center rounded-full text-gray-500 hover:text-black hover:bg-gray-100 transition-colors" title="Fermer le panneau assistant">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
                 <div id="assistant-chat" class="flex-1 overflow-y-auto relative">
                     <div class="assistant-welcome" id="assistant-welcome">
                         <h1 class="assistant-welcome-title text-center">
@@ -99,6 +106,7 @@ class AssistantApp extends AppBase {
         this.embeddedIntroEl = container.querySelector('#assistant-embedded-intro');
         this.embeddedModelPillEl = container.querySelector('#assistant-embedded-model-pill');
         this.modelPillSlotEl = container.querySelector('#assistant-model-pill-slot');
+        this.embeddedHeader = container.querySelector('#assistant-embedded-header');
         this.inputArea = container.querySelector('#assistant-input-area');
         this.inputBox = container.querySelector('#assistant-input-box');
         this.fileInput = container.querySelector('#assistant-model-file');
@@ -170,6 +178,16 @@ class AssistantApp extends AppBase {
         if (importBtn && !this._embedded) {
             importBtn.addEventListener('click', () => {
                 this.fileInput.click();
+            });
+        }
+
+        const closeSplitBtn = container.querySelector('#assistant-close-split');
+        if (closeSplitBtn && this._embedded && this.props.linkedModelerInstanceId) {
+            closeSplitBtn.addEventListener('click', () => {
+                const modeler = AppState.getInstance(this.props.linkedModelerInstanceId);
+                if (modeler && typeof modeler._toggleAssistantSplit === 'function') {
+                    modeler._toggleAssistantSplit();
+                }
             });
         }
 
