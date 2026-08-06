@@ -62,7 +62,11 @@ class AssistantApp extends AppBase {
                                 placeholder="Interrogez l'assistant sémantique..."
                                 class="w-full resize-none max-h-40 bg-transparent border-none focus:outline-none focus:ring-0 text-sm text-gray-900 placeholder-gray-500 px-2 py-1.5"></textarea>
                             <div class="flex items-center justify-between px-2 pb-1.5 pt-1.5">
-                                <div id="assistant-model-pill-slot" class="flex-shrink-0"></div>
+                                <button type="button" id="assistant-import-model" class="magic-btn flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl text-gray-500 hover:text-black hover:bg-gray-100 transition-colors" title="Importer un modèle">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                    </svg>
+                                </button>
                                 <div class="flex items-center gap-1.5 relative">
                                     <button type="button" id="assistant-sources" class="magic-btn flex-shrink-0 h-8 px-2.5 flex items-center gap-1.5 rounded-xl text-gray-600 hover:text-black hover:bg-gray-100 transition-colors text-xs font-semibold" title="Sélectionner les sources">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -141,6 +145,9 @@ class AssistantApp extends AppBase {
                     </div>
                 `;
             }
+            if (importBtn) {
+                importBtn.style.display = 'none';
+            }
             if (this.embeddedModelPillEl) {
                 this.embeddedModelPillEl.classList.add('hidden');
             }
@@ -154,7 +161,7 @@ class AssistantApp extends AppBase {
             this._newSession();
         });
 
-        if (importBtn) {
+        if (importBtn && !this._embedded) {
             importBtn.addEventListener('click', () => {
                 this.fileInput.click();
             });
