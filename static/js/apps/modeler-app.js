@@ -502,17 +502,9 @@ class ModelerApp extends AppBase {
         const existing = this._findAssistantSplitInstance();
         if (existing) {
             await window.windowManager?.collapseSplitTo(this.instanceId, existing.instanceId);
-            // collapseSplitTo remounts the modeler in a fresh container. Give the
-            // browser two frames, then re-run the home transition with the new DOM.
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    const liveContainer = document.querySelector(`.app-container[data-instance-id="${this.instanceId}"]`);
-                    if (liveContainer) this.container = liveContainer;
-                    this._runHomeTransition();
-                });
-            });
-            return;
         }
+        const liveContainer = document.querySelector(`.app-container[data-instance-id="${this.instanceId}"]`);
+        if (liveContainer) this.container = liveContainer;
         this._runHomeTransition();
     }
 
@@ -534,7 +526,7 @@ class ModelerApp extends AppBase {
         const available = Math.max(this.container.clientHeight, contentHeight);
         const finalOffset = Math.max(0, (available - contentHeight) / 2);
 
-        // Stage the import container hidden so it can fade in later.
+        // Prepare the import container to fade in.
         if (importContainer) {
             importContainer.classList.remove('modeler-import-hidden');
             importContainer.style.display = '';
@@ -543,19 +535,27 @@ class ModelerApp extends AppBase {
             importContainer.style.transform = 'translateY(-16px)';
         }
 
-        // Remove compact class and reset padding so we can animate from the current viewer layout.
-        home.classList.remove('modeler-top');
-
-        // Start the title/diagram descent using paddingTop in the normal flex flow.
+        // Ensure we start from the compact top state (viewer layout) so the
+        // paddingTop animation really moves the title down from the top bar.
+        home.classList.add('modeler-top');
         home.style.transition = 'none';
         home.style.paddingTop = '0px';
+        home.style.paddingBottom = '0px';
         void home.offsetHeight;
 
+        // First frame: set the animation origin and make the viewer fully visible
+        // so it can fade out while the title glides down.
+        viewer.style.transition = 'none';
+        viewer.style.opacity = '1';
+        void viewer.offsetHeight;
+
         requestAnimationFrame(() => {
+            // Kick off the downward glide.
             home.style.transition = 'padding-top 0.7s cubic-bezier(0.4, 0, 0.2, 1)';
+            home.classList.remove('modeler-top');
             home.style.paddingTop = finalOffset + 'px';
 
-            // Fade out the diagram viewer as it follows the title downward naturally.
+            // Fade out the diagram viewer in parallel.
             viewer.style.transition = 'opacity 0.7s ease';
             viewer.style.opacity = '0';
         });
