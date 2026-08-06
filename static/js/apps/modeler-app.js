@@ -26,8 +26,6 @@ class ModelerApp extends AppBase {
         this._loadingTimeout = null;
         this._resizeObserver = null;
         this._skipNextTransition = false;
-        this._assistantApp = null;
-        this._assistantOpen = false;
     }
 
     static _closeOpenEditDialogs() {
@@ -70,7 +68,7 @@ class ModelerApp extends AppBase {
                     </div>
                 </div>
                 <div id="modeler-viewer" class="hidden flex-1 min-h-0 opacity-0 transition-opacity duration-300 relative">
-                    <button type="button" id="modeler-assistant-toggle" class="hidden absolute top-3 right-3 z-40 w-10 h-10 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-700 hover:text-black hover:bg-gray-50 transition-colors" title="Discuter avec l'assistant sémantique">
+                    <button type="button" id="modeler-assistant-toggle" class="hidden absolute top-3 right-3 z-30 w-10 h-10 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-700 hover:text-black hover:bg-gray-50 transition-colors" title="Discuter avec l'assistant sémantique">
                         <svg class="w-5 h-5 overflow-visible" viewBox="0 0 24 24">
                             <path class="sparkle-main" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
                             <path class="sparkle-orbit-path" d="M5.5 2.5L6.34 5.16L9 6L6.34 6.84L5.5 9.5L4.66 6.84L2 6L4.66 5.16L5.5 2.5Z"></path>
@@ -84,11 +82,9 @@ class ModelerApp extends AppBase {
                         </svg>
                         <span class="text-sm font-medium">Génération de la modélisation...</span>
                     </div>
-                    <div id="modeler-main" class="h-full w-full flex transition-all duration-300">
-                        <div id="modeler-svg-wrapper" class="flex-1 h-full relative">
-                            <div id="modeler-svg-viewer" class="absolute inset-0"></div>
-                            <div id="modeler-edit-actions" class="hidden absolute right-3 z-30 flex flex-col gap-3 transition-all duration-300" style="top: calc(50% - (2.75rem + 0.75rem)); transform: translateY(-50%);">
-                                <button type="button" id="modeler-add-class" class="modeler-edit-btn" title="Ajouter une classe">
+                    <div id="modeler-svg-viewer" class="h-full w-full"></div>
+                    <div id="modeler-edit-actions" class="hidden absolute right-3 z-20 flex flex-col gap-3" style="top: calc(50% - (2.75rem + 0.75rem)); transform: translateY(-50%);">
+                        <button type="button" id="modeler-add-class" class="modeler-edit-btn" title="Ajouter une classe">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                                 <rect x="3" y="5" width="18" height="14" rx="2"></rect>
                                 <path d="M12 9v6M9 12h6"></path>
@@ -112,10 +108,7 @@ class ModelerApp extends AppBase {
                         </svg>
                         <span class="modeler-edit-label">Relation</span>
                     </button>
-                            </div>
-                        </div>
-                        <div id="modeler-assistant-panel" class="hidden w-[28rem] max-w-full h-full border-l border-gray-200 bg-white flex flex-col shadow-xl z-20"></div>
-                    </div>
+                </div>
             </div>
         `;
         this._bindEvents();
@@ -448,6 +441,10 @@ class ModelerApp extends AppBase {
     }
 
     _showModéliseurHome() {
+        const existing = this._findAssistantSplitInstance();
+        if (existing) {
+            window.windowManager?.close(existing.instanceId);
+        }
         const home = this.container.querySelector('#modeler-home');
         const importContainer = this.container.querySelector('#modeler-import-container');
         const viewer = this.container.querySelector('#modeler-viewer');
@@ -537,7 +534,6 @@ class ModelerApp extends AppBase {
             this.viewer.destroy();
             this.viewer = null;
         }
-        this._tearDownAssistantApp();
         this._updateHomeVisibility(skipTransition);
         this.setTitle(this.constructor.title);
     }
@@ -602,86 +598,47 @@ class ModelerApp extends AppBase {
         const assistantBtn = this.container?.querySelector('#modeler-assistant-toggle');
         if (!assistantBtn) return;
         assistantBtn.addEventListener('click', () => {
-            this._assistantOpen = !this._assistantOpen;
-            this._updateAssistantPanel();
+            this._toggleAssistantSplit();
         });
     }
 
-    async     _updateAssistantPanel() {
-        const panel = this.container?.querySelector('#modeler-assistant-panel');
-        const main = this.container?.querySelector('#modeler-main');
-        const btn = this.container?.querySelector('#modeler-assistant-toggle');
-        const toolbar = this.container?.querySelector('#modeler-edit-actions');
-        if (!panel) return;
-        panel.classList.toggle('hidden', !this._assistantOpen);
-        main?.classList.toggle('modeler-assistant-open', this._assistantOpen);
-        if (btn) {
-            const isRight = this._assistantOpen;
-            btn.style.right = isRight ? 'calc(28rem + 0.75rem)' : '0.75rem';
-        }
-        if (toolbar) {
-            toolbar.style.right = this._assistantOpen ? 'calc(28rem + 0.75rem)' : '0.75rem';
-        }
-        if (this._assistantOpen) {
-            this._ensureAssistantApp();
-        } else {
-            this._tearDownAssistantApp();
-        }
+    _isAssistantSplitOpen() {
+        if (!this.storedName) return false;
+        const instances = AppState.listInstances();
+        return instances.some((i) =>
+            i.appId === 'assistant' &&
+            AppState.getRecord(i.instanceId)?.meta?.modelName === this.storedName &&
+            AppState.getRecord(i.instanceId)?.mode === 'split'
+        );
     }
 
-    async _ensureAssistantApp() {
-        if (this._assistantApp) return;
-        const panel = this.container?.querySelector('#modeler-assistant-panel');
-        if (!panel || !this.storedName) return;
-
-        // Try to restore an existing conversation tied to this model.
-        let session = '';
-        let displayName = '';
-        try {
-            const result = await ApiClient.findAssistantSessionByModel(this.storedName);
-            if (result.session) {
-                session = result.session;
-                const history = await ApiClient.getAssistantHistory(session);
-                displayName = history.display_name || '';
-            }
-        } catch (err) {
-            console.error('Find assistant session by model error', err);
+    async _toggleAssistantSplit() {
+        if (!this.storedName || !window.windowManager) return;
+        const existing = this._findAssistantSplitInstance();
+        if (existing) {
+            // Close: restore the modeler to full tab and remove the assistant pane.
+            await window.windowManager.switchTab(this.instanceId);
+            window.windowManager.close(existing.instanceId);
+            return;
         }
-
-        const props = {
+        // Open: create the assistant in split mode next to the current modeler tab.
+        window.windowManager.open('assistant', {
+            mode: 'split',
+            targetInstanceId: this.instanceId,
+            direction: 'horizontal',
             modelName: this.storedName,
             linkedModelerInstanceId: this.instanceId,
-            mode: 'inline',
-        };
-        if (session) {
-            props.session = session;
-            props.fromHistory = true;
-            props.display_name = displayName;
-        }
-        const { instanceId, instance } = AppState.createInstance('assistant', props);
-        this._assistantApp = { instanceId, instance };
-        await instance.mount(panel);
-        panel.classList.add('assistant-embedded');
-        if (session) {
-            try {
-                await instance.loadHistory(session);
-                if (displayName) {
-                    instance.setTitle(`Assistant: ${displayName}`);
-                }
-            } catch (err) {
-                console.error('Restore assistant history in modeler panel error', err);
-            }
-        }
+        });
     }
 
-    _tearDownAssistantApp() {
-        if (!this._assistantApp) return;
-        const { instanceId, instance } = this._assistantApp;
-        if (instance && typeof instance.unmount === 'function') {
-            instance.unmount();
-        }
-        AppState.removeInstance(instanceId);
-        this._assistantApp = null;
+    _findAssistantSplitInstance() {
+        if (!this.storedName) return null;
+        const instances = AppState.listInstances();
+        return instances.find((i) =>
+            i.appId === 'assistant' &&
+            AppState.getRecord(i.instanceId)?.meta?.modelName === this.storedName &&
+            AppState.getRecord(i.instanceId)?.mode === 'split'
+        ) || null;
     }
 
     _updateEditButtonStates() {
@@ -1165,7 +1122,6 @@ class ModelerApp extends AppBase {
             this.viewer.destroy();
             this.viewer = null;
         }
-        this._tearDownAssistantApp();
         if (this._resizeObserver) this._resizeObserver.disconnect();
         this._resizeObserver = null;
         super.unmount();

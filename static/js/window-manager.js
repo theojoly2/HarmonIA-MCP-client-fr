@@ -112,6 +112,42 @@ class WindowManager {
             AppState.restoreInstanceState(instance.instanceId);
             return Promise.resolve();
         }
+
+        // When a modeler tab asks for an assistant split panel, we want the
+        // current modeler pane to stay exactly where it is and a new assistant
+        // pane to appear on the right. If the modeler is currently the only
+        // tab in the shell, we create a split root around it; otherwise we split
+        // the modeler's pane directly.
+        const targetIsCurrentTab = targetInstanceId &&
+            this.shellElement.querySelector(`[data-instance-id="${targetInstanceId}"]`);
+        if (targetInstanceId && targetIsCurrentTab) {
+            // The modeler is rendered as a full tab. Replace the shell content
+            // with a fresh split tree so the modeler becomes the left pane.
+            this.shellElement.innerHTML = '';
+            tree = {
+                type: 'split',
+                direction: 'horizontal',
+                children: [
+                    { type: 'pane', instanceId: targetInstanceId },
+                    { type: 'pane', instanceId: instance.instanceId },
+                ],
+                ratios: [55, 45],
+            };
+            this.splitManager.setTree(tree);
+            this.splitManager.registerRenderer(targetInstanceId, (pane) => {
+                const targetInstance = AppState.getInstance(targetInstanceId);
+                if (targetInstance) targetInstance.mount(pane);
+            });
+            this.splitManager.registerRenderer(instance.instanceId, async (pane) => {
+                await instance.mount(pane);
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => AppState.restoreInstanceState(instance.instanceId));
+                });
+            });
+            this.splitManager.render();
+            return Promise.resolve();
+        }
+
         if (targetInstanceId) {
             this.splitManager.splitLeaf(targetInstanceId, direction, { type: 'pane', instanceId: instance.instanceId });
         } else {
@@ -195,6 +231,16 @@ class WindowManager {
         if (!instance) return;
         const record = AppState.getRecord(instanceId);
         if (record) record.mode = 'tab';
+        // If this instance is currently part of a split tree, collapse the tree
+        // to a single tab by removing sibling leaves and turning this leaf into
+        // the only pane.
+        if (this.splitManager.tree) {
+            this.splitManager.unregisterRenderer(instanceId);
+            const leaves = this._collectLeaves(this.splitManager.tree);
+            const keep = leaves.find(l => l.instanceId === instanceId);
+            this.splitManager.setTree(keep || { type: 'pane', instanceId });
+            this.splitManager.render();
+        }
         this.shellElement.innerHTML = '';
         AppState.saveInstanceState(instanceId);
         await this._mountTab(instance);
