@@ -837,7 +837,20 @@
 .assistant-app.assistant-embedded .assistant-plan-card,
 .assistant-app.assistant-embedded .assistant-search-card,
 .assistant-app.assistant-embedded .assistant-tool-calls {
-    width: 100%;
+    width: 42rem;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.assistant-app.assistant-embedded #assistant-chat {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    padding-bottom: 6.5rem;
+}
+
+.assistant-app.assistant-embedded #assistant-chat.assistant-chat-mode {
+    padding-bottom: 6.5rem;
 }
 
 .assistant-app.assistant-embedded .assistant-input-area.assistant-embedded,
