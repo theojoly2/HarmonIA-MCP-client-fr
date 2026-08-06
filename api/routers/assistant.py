@@ -967,10 +967,11 @@ async def touch_assistant_session(
 ):
     """Update the session file mtime so it bubbles to the top of the history list."""
     history = AssistantHistory(user=username, session=session)
-    now = asyncio.get_event_loop().time()
     for fp in (history.display_fp, history.llm_fp):
         if fp.exists():
-            os.utime(fp, (now, now))
+            # Use None so os.utime sets both atime and mtime to the current
+            # system time. The listing endpoint reads st_mtime * 1000 (ms).
+            os.utime(fp, None)
     return {"ok": True}
 
 
