@@ -111,10 +111,9 @@ class HistoryPanel {
             if (assistantRes && assistantRes.sessions) {
                 // Conversations linked to a model are accessed through the modeler
                 // item, so hide them from the standalone assistant history.
-                const linkedModelNames = new Set(
-                    (modelsRes.ok ? (await modelsRes.clone().json()).models || [] : [])
-                        .map((m) => m.name)
-                );
+                const linkedModelNames = modelsRes.ok
+                    ? new Set((data.models || []).map((m) => m.name))
+                    : new Set();
                 conversations = assistantRes.sessions
                     .filter((s) => !s.model_name || !linkedModelNames.has(s.model_name))
                     .map((s) => ({
