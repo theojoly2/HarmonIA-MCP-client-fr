@@ -170,9 +170,7 @@ class HistoryPanel {
     }
 
     _assistantIcon() {
-        return `<svg class="w-4 h-4 overflow-visible" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"/>
-        </svg>`;
+        return AssistantApp.iconSvg;
     }
 
     _modelerIcon() {
@@ -252,10 +250,10 @@ class HistoryPanel {
     _showDeleteConfirm(menu, item) {
         const isSearch = item.kind === "search";
         const isAssistant = item.kind === "assistant";
-        const label = isSearch ? "recherche" : isAssistant ? "conversation" : "modèle";
+        const label = isSearch ? "cette recherche" : isAssistant ? "cette conversation" : "ce modèle";
         const currentTop = parseFloat(menu.style.top) || 0;
         menu.innerHTML = `
-            <div class="history-menu-text">Supprimer cette ${label} ?</div>
+            <div class="history-menu-text">Supprimer ${label} ?</div>
             <button type="button" class="history-menu-item history-menu-cancel">Annuler</button>
             <button type="button" class="history-menu-item history-menu-confirm-delete">Supprimer</button>
         `;
