@@ -204,7 +204,9 @@ class ModelerApp extends AppBase {
         const titleBtn = this.container.querySelector('#modeler-home .interactive-title');
 
         if (titleBtn) {
-            titleBtn.addEventListener('click', () => this._showModéliseurHome());
+            titleBtn.addEventListener('click', async () => {
+                await this._showModéliseurHome();
+            });
         }
 
         if (newEmptyBtn) {
@@ -488,10 +490,12 @@ class ModelerApp extends AppBase {
         }
     }
 
-    _showModéliseurHome() {
+    async _showModéliseurHome() {
         const existing = this._findAssistantSplitInstance();
         if (existing) {
+            await window.windowManager?.switchTab(this.instanceId);
             window.windowManager?.close(existing.instanceId);
+            await window.windowManager?.switchTab(this.instanceId);
         }
         const home = this.container.querySelector('#modeler-home');
         const importContainer = this.container.querySelector('#modeler-import-container');
