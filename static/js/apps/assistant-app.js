@@ -36,8 +36,9 @@ class AssistantApp extends AppBase {
 
     render(container) {
         this.container = container;
+        const embeddedClass = (this.props.linkedModelerInstanceId || this._linkedModelerInstanceId) ? 'assistant-embedded' : '';
         container.innerHTML = `
-            <div class="assistant-app h-full w-full flex flex-col bg-white rounded-[1.25rem] overflow-hidden relative">
+            <div class="assistant-app h-full w-full flex flex-col bg-white rounded-[1.25rem] overflow-hidden relative ${embeddedClass}">
                 <div id="assistant-chat" class="flex-1 overflow-y-auto relative">
                     <div class="assistant-welcome" id="assistant-welcome">
                         <h1 class="assistant-welcome-title text-center">
@@ -50,7 +51,7 @@ class AssistantApp extends AppBase {
                     </div>
                     <div class="assistant-messages" id="assistant-messages"></div>
                 </div>
-                <div class="assistant-input-area flex-shrink-0" id="assistant-input-area">
+                <div class="assistant-input-area flex-shrink-0 ${embeddedClass}" id="assistant-input-area">
                     <div class="assistant-input-wrapper mx-auto rounded-xl border-2 border-gray-300 focus-within:border-black bg-white transition-colors shadow-sm" id="assistant-input-box">
                         <form id="assistant-form" class="flex flex-col">
                             <textarea id="assistant-input" rows="1" autocomplete="off"
@@ -333,6 +334,8 @@ class AssistantApp extends AppBase {
     _applyCentering(skipTransition) {
         if (!this.welcomeEl || !this.container || !this.inputArea) return;
 
+        const isEmbedded = this.container.closest('#modeler-assistant-panel') !== null ||
+            this.inputArea.classList.contains('assistant-embedded');
         const welcomeTop = this.welcomeEl.classList.contains('assistant-welcome-top');
         const chatMode = this.chatEl?.classList.contains('assistant-chat-mode');
         const was = this.welcomeEl.style.transition;
@@ -340,6 +343,25 @@ class AssistantApp extends AppBase {
         if (skipTransition) {
             this.welcomeEl.style.transition = 'none';
             this.inputArea.style.transition = 'none';
+        }
+
+        if (isEmbedded) {
+            // Embedded inside the modeler side panel: do not use fixed viewport
+            // positioning. The input stays at the bottom of its flex container.
+            this.welcomeEl.style.paddingTop = '';
+            this.welcomeEl.style.paddingBottom = '';
+            this.inputArea.style.setProperty('--assistant-input-top', 'auto');
+            this.inputArea.style.position = 'absolute';
+            this.inputArea.style.bottom = '0';
+            this.inputArea.style.left = '0';
+            this.inputArea.style.right = '0';
+            if (skipTransition) {
+                this.welcomeEl.offsetHeight;
+                this.inputArea.offsetHeight;
+                this.welcomeEl.style.transition = was;
+                this.inputArea.style.transition = inputWas;
+            }
+            return;
         }
 
         if (!welcomeTop) {

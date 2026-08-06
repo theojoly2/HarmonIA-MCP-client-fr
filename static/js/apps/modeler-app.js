@@ -70,11 +70,7 @@ class ModelerApp extends AppBase {
                     </div>
                 </div>
                 <div id="modeler-viewer" class="hidden flex-1 min-h-0 opacity-0 transition-opacity duration-300 relative">
-                    <div id="modeler-main" class="h-full w-full flex transition-all duration-300">
-                        <div id="modeler-svg-viewer" class="flex-1 h-full"></div>
-                        <div id="modeler-assistant-panel" class="hidden w-[28rem] max-w-full h-full border-l border-gray-200 bg-white flex flex-col shadow-xl"></div>
-                    </div>
-                    <button type="button" id="modeler-assistant-toggle" class="hidden absolute top-3 right-3 z-30 w-10 h-10 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-700 hover:text-black hover:bg-gray-50 transition-colors" title="Discuter avec l'assistant sémantique">
+                    <button type="button" id="modeler-assistant-toggle" class="hidden absolute top-3 right-3 z-40 w-10 h-10 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-700 hover:text-black hover:bg-gray-50 transition-colors" title="Discuter avec l'assistant sémantique">
                         <svg class="w-5 h-5 overflow-visible" viewBox="0 0 24 24">
                             <path class="sparkle-main" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
                             <path class="sparkle-orbit-path" d="M5.5 2.5L6.34 5.16L9 6L6.34 6.84L5.5 9.5L4.66 6.84L2 6L4.66 5.16L5.5 2.5Z"></path>
@@ -88,8 +84,11 @@ class ModelerApp extends AppBase {
                         </svg>
                         <span class="text-sm font-medium">Génération de la modélisation...</span>
                     </div>
-                    <div id="modeler-edit-actions" class="hidden absolute right-3 z-20 flex flex-col gap-3" style="top: calc(50% - (2.75rem + 0.75rem)); transform: translateY(-50%);">
-                        <button type="button" id="modeler-add-class" class="modeler-edit-btn" title="Ajouter une classe">
+                    <div id="modeler-main" class="h-full w-full flex transition-all duration-300">
+                        <div id="modeler-svg-wrapper" class="flex-1 h-full relative">
+                            <div id="modeler-svg-viewer" class="absolute inset-0"></div>
+                            <div id="modeler-edit-actions" class="hidden absolute right-3 z-30 flex flex-col gap-3 transition-all duration-300" style="top: calc(50% - (2.75rem + 0.75rem)); transform: translateY(-50%);">
+                                <button type="button" id="modeler-add-class" class="modeler-edit-btn" title="Ajouter une classe">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                                 <rect x="3" y="5" width="18" height="14" rx="2"></rect>
                                 <path d="M12 9v6M9 12h6"></path>
@@ -113,7 +112,10 @@ class ModelerApp extends AppBase {
                         </svg>
                         <span class="modeler-edit-label">Relation</span>
                     </button>
-                </div>
+                            </div>
+                        </div>
+                        <div id="modeler-assistant-panel" class="hidden w-[28rem] max-w-full h-full border-l border-gray-200 bg-white flex flex-col shadow-xl z-20"></div>
+                    </div>
             </div>
         `;
         this._bindEvents();
@@ -599,24 +601,29 @@ class ModelerApp extends AppBase {
     _bindAssistantToggle() {
         const assistantBtn = this.container?.querySelector('#modeler-assistant-toggle');
         if (!assistantBtn) return;
-        assistantBtn.addEventListener('click', async () => {
+        assistantBtn.addEventListener('click', () => {
             this._assistantOpen = !this._assistantOpen;
-            await this._updateAssistantPanel();
+            this._updateAssistantPanel();
         });
     }
 
-    async _updateAssistantPanel() {
+    async     _updateAssistantPanel() {
         const panel = this.container?.querySelector('#modeler-assistant-panel');
         const main = this.container?.querySelector('#modeler-main');
         const btn = this.container?.querySelector('#modeler-assistant-toggle');
+        const toolbar = this.container?.querySelector('#modeler-edit-actions');
         if (!panel) return;
         panel.classList.toggle('hidden', !this._assistantOpen);
+        main?.classList.toggle('modeler-assistant-open', this._assistantOpen);
         if (btn) {
             const isRight = this._assistantOpen;
             btn.style.right = isRight ? 'calc(28rem + 0.75rem)' : '0.75rem';
         }
+        if (toolbar) {
+            toolbar.style.right = this._assistantOpen ? 'calc(28rem + 0.75rem)' : '0.75rem';
+        }
         if (this._assistantOpen) {
-            await this._ensureAssistantApp();
+            this._ensureAssistantApp();
         } else {
             this._tearDownAssistantApp();
         }
@@ -654,6 +661,7 @@ class ModelerApp extends AppBase {
         const { instanceId, instance } = AppState.createInstance('assistant', props);
         this._assistantApp = { instanceId, instance };
         await instance.mount(panel);
+        panel.classList.add('assistant-embedded');
         if (session) {
             try {
                 await instance.loadHistory(session);
