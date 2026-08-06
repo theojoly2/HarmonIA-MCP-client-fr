@@ -253,6 +253,7 @@ class HistoryPanel {
         const isSearch = item.kind === "search";
         const isAssistant = item.kind === "assistant";
         const label = isSearch ? "recherche" : isAssistant ? "conversation" : "modèle";
+        const currentTop = parseFloat(menu.style.top) || 0;
         menu.innerHTML = `
             <div class="history-menu-text">Supprimer cette ${label} ?</div>
             <button type="button" class="history-menu-item history-menu-cancel">Annuler</button>
@@ -288,6 +289,17 @@ class HistoryPanel {
         menu.querySelector(".history-menu-cancel").addEventListener("click", (e) => {
             e.stopPropagation();
             this._closeMenu();
+        });
+
+        // The delete confirmation may be taller than the original menu; recheck
+        // viewport overflow and flip upwards if needed.
+        requestAnimationFrame(() => {
+            const menuHeight = menu.offsetHeight;
+            const bottom = currentTop + menuHeight;
+            const gap = 4;
+            if (bottom > window.innerHeight) {
+                menu.style.top = `${Math.max(gap, currentTop - (bottom - window.innerHeight))}px`;
+            }
         });
     }
 
