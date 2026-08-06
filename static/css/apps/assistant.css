@@ -691,6 +691,7 @@
     text-align: center;
     max-width: 32rem;
     line-height: 1.5;
+    padding: 0 1rem;
 }
 
 .assistant-welcome-top .assistant-welcome-subtitle {
