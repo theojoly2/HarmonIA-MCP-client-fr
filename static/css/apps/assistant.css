@@ -858,6 +858,14 @@
     background: #ffffff;
 }
 
+.assistant-app.assistant-embedded .assistant-input-area.assistant-embedded .assistant-input-wrapper,
+.assistant-app.assistant-embedded #assistant-input-area .assistant-input-wrapper,
+.assistant-app.assistant-embedded .assistant-input-area.assistant-embedded,
+.assistant-app.assistant-embedded #assistant-input-area {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
 .assistant-sources-header {
     font-size: 0.75rem;
     font-weight: 700;
