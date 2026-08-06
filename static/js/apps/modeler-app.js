@@ -527,6 +527,19 @@ class ModelerApp extends AppBase {
         this._finalizeHomeAndCenter(true);
         this.setTitle(this.constructor.title);
 
+        // The import container may still carry inline styles or a hidden class
+        // from the previous loading/viewer state. Force it visible.
+        const importContainer = this.container?.querySelector('#modeler-import-container');
+        const dropZone = this.container?.querySelector('#modeler-drop-zone');
+        if (importContainer) {
+            importContainer.classList.remove('modeler-import-hidden');
+            importContainer.style.display = '';
+            importContainer.style.opacity = '1';
+            importContainer.style.transform = 'translateY(0)';
+            importContainer.style.transition = '';
+        }
+        if (dropZone) dropZone.style.display = '';
+
         // Re-bind events because collapseSplitTo created a fresh DOM.
         if (existing) {
             this._bindEvents();

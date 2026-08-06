@@ -40,6 +40,12 @@
     display: none !important;
 }
 
+/* Ensure the import UI is never hidden by a stale inline style after returning home. */
+#modeler-import-container:not(.modeler-import-hidden) {
+    display: flex !important;
+    flex-direction: column;
+}
+
 #modeler-viewer {
     flex: 1 1 0%;
     min-height: 0;
