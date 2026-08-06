@@ -404,7 +404,10 @@ class ModelerApp extends AppBase {
         const editActions = this.container.querySelector('#modeler-edit-actions');
         const assistantToggle = this.container.querySelector('#modeler-assistant-toggle');
         if (app) app.classList.remove('modeler-loading-layout');
-        if (assistantToggle) assistantToggle.classList.toggle('hidden', !this.storedName);
+        if (assistantToggle) {
+            const existingSplit = this._findAssistantSplitInstance();
+            assistantToggle.classList.toggle('hidden', !this.storedName || !!existingSplit);
+        }
 
         if (!this.viewer) {
             this.viewer = new SvgViewer(viewerContainer, {
@@ -657,15 +660,24 @@ class ModelerApp extends AppBase {
         ) || null;
     }
 
+    _updateAssistantToggleVisibility() {
+        const btn = this.container?.querySelector('#modeler-assistant-toggle');
+        if (!btn || !this.storedName) return;
+        const existing = this._findAssistantSplitInstance();
+        btn.classList.toggle('hidden', !!existing);
+    }
+
     async _toggleAssistantSplit() {
         if (!this.storedName || !window.windowManager) return;
         const existing = this._findAssistantSplitInstance();
         if (existing) {
-            // Close: restore the modeler to full tab and remove the assistant pane.
-            const btn = this.container?.querySelector('#modeler-assistant-toggle');
-            if (btn) btn.classList.remove('hidden');
+            // Close: collapse the split to a single modeler tab first, then remove
+            // the assistant instance. Order matters: removeLeaf after the target has
+            // a real DOM container avoids an empty shell.
             await window.windowManager.switchTab(this.instanceId);
             window.windowManager.close(existing.instanceId);
+            await window.windowManager.switchTab(this.instanceId);
+            this._updateAssistantToggleVisibility();
             return;
         }
         // Open: create the assistant in a real split panel next to the modeler.
@@ -673,12 +685,11 @@ class ModelerApp extends AppBase {
         if (this._openingAssistant) return;
         this._openingAssistant = true;
         try {
-            const btn = this.container?.querySelector('#modeler-assistant-toggle');
-            if (btn) btn.classList.add('hidden');
             await window.windowManager.splitPanel(this.instanceId, 'assistant', {
                 modelName: this.storedName,
                 linkedModelerInstanceId: this.instanceId,
             }, { ratio: [70, 30] });
+            this._updateAssistantToggleVisibility();
         } finally {
             this._openingAssistant = false;
         }
