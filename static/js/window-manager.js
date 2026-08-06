@@ -268,6 +268,11 @@ class WindowManager {
         const keepInstance = AppState.getInstance(keepInstanceId);
         const removeRecord = AppState.getRecord(removeInstanceId);
         if (!keepInstance) return;
+        // Save modeler state before unmounting it from the split.
+        AppState.saveInstanceState(keepInstanceId);
+        if (typeof keepInstance.unmount === 'function') {
+            keepInstance.unmount();
+        }
         if (removeRecord && removeRecord.mode === 'split') {
             this.splitManager.unregisterRenderer(removeInstanceId);
             this.splitManager.removeLeaf(removeInstanceId);
@@ -275,9 +280,10 @@ class WindowManager {
         this.splitManager.unregisterRenderer(keepInstanceId);
         this.splitManager.setTree({ type: 'pane', instanceId: keepInstanceId });
         this.shellElement.innerHTML = '';
-        AppState.saveInstanceState(keepInstanceId);
         await this._mountTab(keepInstance);
         AppState.setActiveInstance(keepInstanceId);
+        // Restore the saved pan/zoom and svg state after the remount.
+        AppState.restoreInstanceState(keepInstanceId);
         this.splitManager.unregisterRenderer(removeInstanceId);
         if (removeRecord && removeRecord.mode === 'split') {
             AppState.removeInstance(removeInstanceId);
