@@ -622,10 +622,17 @@ class ModelerApp extends AppBase {
             return;
         }
         // Open: create the assistant in a real split panel next to the modeler.
-        await window.windowManager.splitPanel(this.instanceId, 'assistant', {
-            modelName: this.storedName,
-            linkedModelerInstanceId: this.instanceId,
-        }, { ratio: [50, 50] });
+        // Ignore rapid repeated clicks until the split is fully created.
+        if (this._openingAssistant) return;
+        this._openingAssistant = true;
+        try {
+            await window.windowManager.splitPanel(this.instanceId, 'assistant', {
+                modelName: this.storedName,
+                linkedModelerInstanceId: this.instanceId,
+            }, { ratio: [70, 30] });
+        } finally {
+            this._openingAssistant = false;
+        }
     }
 
     _updateEditButtonStates() {

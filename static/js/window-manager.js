@@ -303,6 +303,11 @@ class WindowManager {
         const targetInstance = AppState.getInstance(targetInstanceId);
         if (!targetInstance || !targetRecord) throw new Error('Target instance not found');
 
+        // Cleanly unmount the target from its current container before re-mounting
+        // it inside the split tree. This avoids stale DOM / double-mount issues.
+        if (typeof targetInstance.unmount === 'function') {
+            targetInstance.unmount();
+        }
         AppState.saveInstanceState(targetInstanceId);
 
         const { instanceId, instance } = AppState.createInstance(appId, {
@@ -313,6 +318,7 @@ class WindowManager {
 
         this.splitManager.unregisterRenderer(targetInstanceId);
         this.splitManager.unregisterRenderer(instanceId);
+        this.shellElement.innerHTML = '';
 
         const ratio = options.ratio || [50, 50];
         this.splitManager.setTree({
@@ -325,14 +331,22 @@ class WindowManager {
             ratios: ratio,
         });
 
+        let mountedTarget = false;
         this.splitManager.registerRenderer(targetInstanceId, async (pane) => {
+            if (mountedTarget) return;
+            mountedTarget = true;
+            pane.innerHTML = '';
             await targetInstance.mount(pane);
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => AppState.restoreInstanceState(targetInstanceId));
             });
         });
 
+        let mountedAssistant = false;
         this.splitManager.registerRenderer(instanceId, async (pane) => {
+            if (mountedAssistant) return;
+            mountedAssistant = true;
+            pane.innerHTML = '';
             await instance.mount(pane);
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => AppState.restoreInstanceState(instanceId));
