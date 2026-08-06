@@ -60,6 +60,7 @@ class AssistantHistory:
         self.retained_retrieve_documents: list[dict[str, Any]] = []
         self.last_tool_observations_compact: list[dict[str, Any]] = []
         self.assistant_model_name: str = ""
+        self.display_name: str = ""
 
         self.display_dir = BASE_DIR / user
         self.llm_dir = BASE_DIR / user / "llm"
@@ -313,7 +314,7 @@ class AssistantHistory:
         self.llm_dir.mkdir(parents=True, exist_ok=True)
 
         with open(self.display_fp, "w", encoding="utf-8") as f:
-            json.dump({"display_messages": self.display_messages, "display_events": self.display_events}, f, ensure_ascii=False, indent=2)
+            json.dump({"display_messages": self.display_messages, "display_events": self.display_events, "display_name": self.display_name}, f, ensure_ascii=False, indent=2)
 
         with open(self.llm_fp, "w", encoding="utf-8") as f:
             json.dump(
@@ -329,6 +330,7 @@ class AssistantHistory:
                     "last_tool_observations_compact": self.last_tool_observations_compact,
                     "display_events": self.display_events,
                     "assistant_model_name": self.assistant_model_name,
+                    "display_name": self.display_name,
                 },
                 f,
                 ensure_ascii=False,
@@ -343,6 +345,7 @@ class AssistantHistory:
                 data = json.load(f)
                 self.display_messages = data.get("display_messages", [])
                 self.display_events = data.get("display_events", [])
+                self.display_name = data.get("display_name", "")
         if self.llm_fp.exists():
             with open(self.llm_fp, "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -357,6 +360,7 @@ class AssistantHistory:
                 self.last_tool_observations_compact = data.get("last_tool_observations_compact", [])
                 self.display_events = data.get("display_events", [])
                 self.assistant_model_name = data.get("assistant_model_name", "")
+                self.display_name = data.get("display_name", "")
         if not self.system_messages:
             self._init_prompts(None, None)
 
@@ -387,6 +391,7 @@ class AssistantHistory:
                 self.last_tool_observations_compact = data.get("last_tool_observations_compact", [])
                 self.display_events = data.get("display_events", [])
                 self.assistant_model_name = data.get("assistant_model_name", "")
+                self.display_name = data.get("display_name", "")
         if not self.system_messages:
             self._init_prompts(None, None)
 

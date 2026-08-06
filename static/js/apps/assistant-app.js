@@ -224,6 +224,10 @@ class AssistantApp extends AppBase {
             } catch (err) {
                 console.error('Assistant load history on mount error', err);
             }
+            // Use the saved display name as the user-visible title if available.
+            if (this.props.display_name && this.setTitle) {
+                this.setTitle(`Assistant: ${this.props.display_name}`);
+            }
         }
         // After loading history, if messages exist switch to chat mode layout.
         if (this.messagesEl && this.messagesEl.children.length > 0) {
@@ -529,6 +533,12 @@ class AssistantApp extends AppBase {
 
         this.session = session;
         this.modelName = data.model_name || this.modelName || '';
+        // Persist the display name on the instance props so tab title survives
+        // across remounts and renames from the history panel.
+        if (data.display_name) {
+            this.props.display_name = data.display_name;
+            if (this.setTitle) this.setTitle(`Assistant: ${data.display_name}`);
+        }
         this.messages = [];
         this.messagesEl.innerHTML = '';
         this.activeSvgCard = null;

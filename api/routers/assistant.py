@@ -935,6 +935,7 @@ async def list_assistant_sessions(username: str = Depends(require_user)):
 
         sessions.append({
             "name": session,
+            "display_name": h.display_name or "",
             "last_opened_at": mtime,
             "preview": preview,
             "model_name": h.assistant_model_name,
@@ -990,12 +991,13 @@ async def rename_assistant_session(
     if not old_history._session_exists():
         raise HTTPException(status_code=404, detail="Session inconnue")
 
-    new_name = _slugify_session_name(body.name)
-    # Append a timestamp suffix to keep the name unique, just like new sessions.
+    new_display_name = body.name.strip()
+    new_stored_name = _slugify_session_name(new_display_name)
+    # Append a timestamp suffix to keep the internal name unique, just like new sessions.
     from datetime import datetime
-    new_name = f"{new_name}__{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+    new_stored_name = f"{new_stored_name}__{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
 
-    new_history = AssistantHistory(user=username, session=new_name)
+    new_history = AssistantHistory(user=username, session=new_stored_name)
     new_history.display_messages = old_history.display_messages
     new_history.display_events = old_history.display_events
     new_history.system_messages = old_history.system_messages
@@ -1008,6 +1010,7 @@ async def rename_assistant_session(
     new_history.retained_retrieve_documents = old_history.retained_retrieve_documents
     new_history.last_tool_observations_compact = old_history.last_tool_observations_compact
     new_history.assistant_model_name = old_history.assistant_model_name
+    new_history.display_name = new_display_name
     new_history.save()
 
     if old_history.display_fp.exists():
@@ -1015,7 +1018,7 @@ async def rename_assistant_session(
     if old_history.llm_fp.exists():
         old_history.llm_fp.unlink()
 
-    return {"name": new_name}
+    return {"name": new_stored_name, "display_name": new_display_name}
 
 
 @router.get("/history")
@@ -1028,6 +1031,7 @@ async def get_assistant_history(
     display_events = history.display_events
     return {
         "session": session,
+        "display_name": history.display_name or "",
         "messages": messages,
         "display_events": display_events,
         "model_name": history.assistant_model_name,

@@ -326,12 +326,32 @@ class HistoryPanel {
                 if (kind === "assistant") {
                     const encodedSession = encodeURIComponent(storedName);
                     res = await fetch(`api/assistant/sessions/${encodedSession}/rename`, {
-                        method: "PATCH",
+                    method: "PATCH",
                         headers: { "Content-Type": "application/json" },
                         credentials: "same-origin",
                         body: JSON.stringify({ name: newName }),
                     });
                     if (!res.ok) throw new Error("rename_failed");
+                    const result = await res.json().catch(() => ({}));
+                    const newStoredName = result.name || storedName;
+                    // If the renamed assistant conversation is currently open,
+                    // update the instance props so the next message goes to the
+                    // new session file instead of recreating the old one.
+                    AppState.listInstances().forEach((info) => {
+                        if (info.appId !== "assistant") return;
+                        const inst = AppState.getInstance(info.instanceId);
+                        if (inst && inst.session === storedName) {
+                            inst.session = newStoredName;
+                            inst.session = newStoredName;
+                            inst.props.session = newStoredName;
+                            inst.props.fromHistory = true;
+                            inst.props.display_name = newName;
+                            // Update the displayed title in the tab if it changed.
+                            if (inst.setTitle) {
+                                inst.setTitle(`Assistant: ${newName}`);
+                            }
+                        }
+                    });
                 } else {
                     const encodedName = encodeURIComponent(storedName);
                     res = await fetch(`api/models/${encodedName}/rename`, {
