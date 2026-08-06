@@ -51,6 +51,7 @@ class AssistantApp extends AppBase {
                         <p class="assistant-welcome-subtitle">Importez un modèle ou posez une question pour démarrer.</p>
                         <div class="assistant-welcome-input" id="assistant-welcome-input"></div>
                     </div>
+                    <div class="assistant-embedded-model-pill" id="assistant-embedded-model-pill"></div>
                     <div class="assistant-embedded-intro" id="assistant-embedded-intro"></div>
                     <div class="assistant-messages" id="assistant-messages"></div>
                 </div>
@@ -61,11 +62,7 @@ class AssistantApp extends AppBase {
                                 placeholder="Interrogez l'assistant sémantique..."
                                 class="w-full resize-none max-h-40 bg-transparent border-none focus:outline-none focus:ring-0 text-sm text-gray-900 placeholder-gray-500 px-2 py-1.5"></textarea>
                             <div class="flex items-center justify-between px-2 pb-1.5 pt-1.5">
-                                <button type="button" id="assistant-import-model" class="magic-btn flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl text-gray-500 hover:text-black hover:bg-gray-100 transition-colors" title="Importer un modèle">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                                    </svg>
-                                </button>
+                                <div id="assistant-model-pill-slot" class="flex-shrink-0"></div>
                                 <div class="flex items-center gap-1.5 relative">
                                     <button type="button" id="assistant-sources" class="magic-btn flex-shrink-0 h-8 px-2.5 flex items-center gap-1.5 rounded-xl text-gray-600 hover:text-black hover:bg-gray-100 transition-colors text-xs font-semibold" title="Sélectionner les sources">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -93,6 +90,8 @@ class AssistantApp extends AppBase {
         this.welcomeInputSlot = container.querySelector('#assistant-welcome-input');
         this.messagesEl = container.querySelector('#assistant-messages');
         this.embeddedIntroEl = container.querySelector('#assistant-embedded-intro');
+        this.embeddedModelPillEl = container.querySelector('#assistant-embedded-model-pill');
+        this.modelPillSlotEl = container.querySelector('#assistant-model-pill-slot');
         this.inputArea = container.querySelector('#assistant-input-area');
         this.inputBox = container.querySelector('#assistant-input-box');
         this.fileInput = container.querySelector('#assistant-model-file');
@@ -118,15 +117,33 @@ class AssistantApp extends AppBase {
             this._send(text);
         });
 
-        if (this._embedded && this.embeddedIntroEl) {
-            this.embeddedIntroEl.innerHTML = `
-                <div class="assistant-bubble assistant-bubble-assistant mb-4">
-                    <div class="assistant-bubble-content markdown-body">
-                        Je peux vous aider à explorer ou modifier le modèle affiché dans le canvas. Posez-moi une question ou demandez une modification.
+        const importBtn = container.querySelector('#assistant-import-model');
+        if (this._embedded) {
+            if (this.embeddedIntroEl) {
+                this.embeddedIntroEl.innerHTML = `
+                    <div class="assistant-bubble assistant-bubble-assistant mb-4">
+                        <div class="assistant-bubble-content markdown-body">
+                            Je peux vous aider à explorer ou modifier le modèle affiché dans le canvas. Posez-moi une question ou demandez une modification.
+                        </div>
                     </div>
-                </div>
-            `;
-            this.embeddedIntroEl.classList.remove('hidden');
+                `;
+                this.embeddedIntroEl.classList.remove('hidden');
+            }
+            if (this.modelPillSlotEl && this.modelName) {
+                const displayName = this.props.display_name || this.modelName;
+                this.modelPillSlotEl.innerHTML = `
+                    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 border border-gray-200 text-xs font-semibold text-gray-700">
+                        <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                        </svg>
+                        <span class="truncate max-w-[12rem]" title="${this._escape(displayName)}">${this._escape(displayName)}</span>
+                    </div>
+                `;
+            }
+            if (this.embeddedModelPillEl) {
+                this.embeddedModelPillEl.classList.add('hidden');
+            }
         }
 
         if (window.GlowEffects && typeof window.GlowEffects.scanAndBind === 'function') {
@@ -137,9 +154,11 @@ class AssistantApp extends AppBase {
             this._newSession();
         });
 
-        container.querySelector('#assistant-import-model').addEventListener('click', () => {
-            this.fileInput.click();
-        });
+        if (importBtn) {
+            importBtn.addEventListener('click', () => {
+                this.fileInput.click();
+            });
+        }
 
         this.fileInput.addEventListener('change', (e) => {
             const file = e.target.files?.[0];
