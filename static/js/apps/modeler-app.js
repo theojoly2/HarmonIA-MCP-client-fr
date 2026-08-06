@@ -437,7 +437,17 @@ class ModelerApp extends AppBase {
                 });
             });
         } else {
+            // When the viewer is remounted into a different container size
+            // (e.g. opening the assistant split), re-center from scratch so the
+            // diagram is not offset outside the visible pane.
             this.viewer.restoreState(this.viewerState);
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    if (this.viewer && this.svgText) {
+                        this.viewer.centerDiagram(this.mainClassName);
+                    }
+                });
+            });
             finalize();
         }
         this._observeSvgContainerResize();
@@ -471,7 +481,7 @@ class ModelerApp extends AppBase {
 
     _centerSvgInPane() {
         if (this.viewer && this.svgText) {
-            this.viewer.restoreResizeAnchor();
+            this.viewer.centerDiagram(this.mainClassName);
         }
     }
 
