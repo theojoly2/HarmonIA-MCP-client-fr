@@ -748,6 +748,27 @@
     transition: top 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease;
 }
 
+.assistant-app.assistant-embedded .assistant-input-area,
+.assistant-app.assistant-embedded #assistant-input-area {
+    position: absolute !important;
+    top: auto !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    padding: 0.5rem 0.75rem 0.75rem !important;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(4px);
+    justify-content: center;
+    z-index: 30;
+    transition: none;
+}
+
+.assistant-app.assistant-embedded .assistant-input-area .assistant-input-wrapper,
+.assistant-app.assistant-embedded #assistant-input-area .assistant-input-wrapper {
+    max-width: 100%;
+}
+
 .assistant-input-area-chat {
     /* In chat mode the JS sets --assistant-input-top so the input sits on the
        bottom with its existing padding preserved. */

@@ -293,6 +293,56 @@ class WindowManager {
     renderSplit() {
         this.splitManager.render();
     }
+
+    /**
+     * Open a panel split next to a specific instance.
+     * Guarantees both panes are rendered, even when starting from a full-screen tab.
+     */
+    async splitPanel(targetInstanceId, appId, props = {}, options = {}) {
+        const targetRecord = AppState.getRecord(targetInstanceId);
+        const targetInstance = AppState.getInstance(targetInstanceId);
+        if (!targetInstance || !targetRecord) throw new Error('Target instance not found');
+
+        AppState.saveInstanceState(targetInstanceId);
+
+        const { instanceId, instance } = AppState.createInstance(appId, {
+            ...props,
+            mode: 'split',
+        });
+        AppState.saveInstanceState(instanceId);
+
+        this.splitManager.unregisterRenderer(targetInstanceId);
+        this.splitManager.unregisterRenderer(instanceId);
+
+        const ratio = options.ratio || [55, 45];
+        this.splitManager.setTree({
+            type: 'split',
+            direction: 'horizontal',
+            children: [
+                { type: 'pane', instanceId: targetInstanceId },
+                { type: 'pane', instanceId },
+            ],
+            ratios: ratio,
+        });
+
+        this.splitManager.registerRenderer(targetInstanceId, async (pane) => {
+            await targetInstance.mount(pane);
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => AppState.restoreInstanceState(targetInstanceId));
+            });
+        });
+
+        this.splitManager.registerRenderer(instanceId, async (pane) => {
+            await instance.mount(pane);
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => AppState.restoreInstanceState(instanceId));
+            });
+        });
+
+        this.splitManager.render();
+        AppState.setActiveInstance(instanceId);
+        return instanceId;
+    }
 }
 
 window.WindowManager = WindowManager;

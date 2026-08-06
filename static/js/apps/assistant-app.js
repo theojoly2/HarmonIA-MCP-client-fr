@@ -337,16 +337,11 @@ class AssistantApp extends AppBase {
         if (!this.welcomeEl || !this.container || !this.inputArea) return;
 
         const isEmbedded = this._embedded ||
+            this.container.classList.contains('assistant-embedded') ||
             this.inputArea.classList.contains('assistant-embedded') ||
             this.container.closest('#modeler-assistant-panel') !== null;
         const welcomeTop = this.welcomeEl.classList.contains('assistant-welcome-top');
         const chatMode = this.chatEl?.classList.contains('assistant-chat-mode');
-        const was = this.welcomeEl.style.transition;
-        const inputWas = this.inputArea.style.transition;
-        if (skipTransition) {
-            this.welcomeEl.style.transition = 'none';
-            this.inputArea.style.transition = 'none';
-        }
 
         if (isEmbedded) {
             // Embedded inside the modeler side panel: do not use fixed viewport
@@ -360,12 +355,6 @@ class AssistantApp extends AppBase {
             this.inputArea.style.right = '0';
             this.inputArea.style.top = 'auto';
             this.inputArea.style.width = '100%';
-            if (skipTransition) {
-                this.welcomeEl.offsetHeight;
-                this.inputArea.offsetHeight;
-                this.welcomeEl.style.transition = was;
-                this.inputArea.style.transition = inputWas;
-            }
             return;
         }
 

@@ -602,14 +602,14 @@ class ModelerApp extends AppBase {
         });
     }
 
-    _isAssistantSplitOpen() {
-        if (!this.storedName) return false;
+    _findAssistantSplitInstance() {
+        if (!this.storedName) return null;
         const instances = AppState.listInstances();
-        return instances.some((i) =>
+        return instances.find((i) =>
             i.appId === 'assistant' &&
             AppState.getRecord(i.instanceId)?.meta?.modelName === this.storedName &&
             AppState.getRecord(i.instanceId)?.mode === 'split'
-        );
+        ) || null;
     }
 
     async _toggleAssistantSplit() {
@@ -621,24 +621,11 @@ class ModelerApp extends AppBase {
             window.windowManager.close(existing.instanceId);
             return;
         }
-        // Open: create the assistant in split mode next to the current modeler tab.
-        window.windowManager.open('assistant', {
-            mode: 'split',
-            targetInstanceId: this.instanceId,
-            direction: 'horizontal',
+        // Open: create the assistant in a real split panel next to the modeler.
+        await window.windowManager.splitPanel(this.instanceId, 'assistant', {
             modelName: this.storedName,
             linkedModelerInstanceId: this.instanceId,
-        });
-    }
-
-    _findAssistantSplitInstance() {
-        if (!this.storedName) return null;
-        const instances = AppState.listInstances();
-        return instances.find((i) =>
-            i.appId === 'assistant' &&
-            AppState.getRecord(i.instanceId)?.meta?.modelName === this.storedName &&
-            AppState.getRecord(i.instanceId)?.mode === 'split'
-        ) || null;
+        }, { ratio: [55, 45] });
     }
 
     _updateEditButtonStates() {
