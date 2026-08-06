@@ -204,9 +204,15 @@ class HistoryPanel {
                 <button type="button" class="history-menu-item history-menu-delete">Supprimer</button>
             `;
         const rect = anchorBtn.getBoundingClientRect();
-        menu.style.top = `${rect.bottom + 4}px`;
-        menu.style.right = `${document.body.clientWidth - rect.right}px`;
         document.body.appendChild(menu);
+        const menuHeight = menu.offsetHeight;
+        const gap = 4;
+        // Open upwards when the menu would overflow the viewport bottom.
+        const top = (rect.bottom + menuHeight + gap > window.innerHeight)
+            ? rect.top - menuHeight - gap
+            : rect.bottom + gap;
+        menu.style.top = `${top}px`;
+        menu.style.right = `${document.body.clientWidth - rect.right}px`;
         this._activeMenu = menu;
 
         if (!isSearch && !isAssistant) {
