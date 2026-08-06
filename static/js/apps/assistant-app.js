@@ -42,6 +42,7 @@ class AssistantApp extends AppBase {
                                 <span class="assistant-title-glow title-glow">Assistant Sémantique</span>
                             </button>
                         </h1>
+                        <p class="assistant-welcome-subtitle">Importez un modèle ou posez une question pour démarrer.</p>
                         <div class="assistant-welcome-input" id="assistant-welcome-input"></div>
                     </div>
                     <div class="assistant-messages" id="assistant-messages"></div>

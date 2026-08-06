@@ -684,6 +684,19 @@
     line-height: 1.4;
 }
 
+.assistant-welcome-subtitle {
+    margin: 0.75rem 0 0;
+    font-size: clamp(0.85rem, 1.1vw, 1rem);
+    color: #6b7280;
+    text-align: center;
+    max-width: 32rem;
+    line-height: 1.5;
+}
+
+.assistant-welcome-top .assistant-welcome-subtitle {
+    display: none;
+}
+
 .assistant-welcome-input {
     /* The real input area is position:fixed and positioned separately so it can
        slide down in sync with the title. This slot is kept only as a sizing
