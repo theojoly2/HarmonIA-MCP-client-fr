@@ -280,10 +280,17 @@ class WindowManager {
         this.splitManager.unregisterRenderer(keepInstanceId);
         this.splitManager.setTree({ type: 'pane', instanceId: keepInstanceId });
         this.shellElement.innerHTML = '';
-        await this._mountTab(keepInstance);
-        AppState.setActiveInstance(keepInstanceId);
-        // Restore the saved pan/zoom and svg state after the remount.
+
+        // Restore saved state before mount so render() sees the real svgText.
         AppState.restoreInstanceState(keepInstanceId);
+
+        const container = document.createElement('div');
+        container.className = 'app-container h-full w-full';
+        container.dataset.instanceId = keepInstanceId;
+        this.shellElement.appendChild(container);
+        await keepInstance.mount(container);
+        AppState.setActiveInstance(keepInstanceId);
+
         this.splitManager.unregisterRenderer(removeInstanceId);
         if (removeRecord && removeRecord.mode === 'split') {
             AppState.removeInstance(removeInstanceId);

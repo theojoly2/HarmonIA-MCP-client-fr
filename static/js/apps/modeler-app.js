@@ -204,8 +204,16 @@ class ModelerApp extends AppBase {
         const titleBtn = this.container.querySelector('#modeler-home .interactive-title');
 
         if (titleBtn) {
-            titleBtn.addEventListener('click', async () => {
-                await this._showModéliseurHome();
+            titleBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (this._returningHome) return;
+                this._returningHome = true;
+                try {
+                    await this._showModéliseurHome();
+                } finally {
+                    this._returningHome = false;
+                }
             });
         }
 
@@ -494,7 +502,21 @@ class ModelerApp extends AppBase {
         const existing = this._findAssistantSplitInstance();
         if (existing) {
             await window.windowManager?.collapseSplitTo(this.instanceId, existing.instanceId);
+            // collapseSplitTo remounts the modeler in a fresh container. Give the
+            // browser two frames, then re-run the home transition with the new DOM.
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    const liveContainer = document.querySelector(`.app-container[data-instance-id="${this.instanceId}"]`);
+                    if (liveContainer) this.container = liveContainer;
+                    this._runHomeTransition();
+                });
+            });
+            return;
         }
+        this._runHomeTransition();
+    }
+
+    _runHomeTransition() {
         const home = this.container?.querySelector('#modeler-home');
         const importContainer = this.container?.querySelector('#modeler-import-container');
         const viewer = this.container?.querySelector('#modeler-viewer');
