@@ -578,21 +578,54 @@ class HistoryPanel {
         );
         if (!confirmed) return;
         try {
-            await Promise.all(
-                this.items.map((item) => {
-                    if (item.kind === "search") {
-                        return ApiClient.deleteSearch(item.id);
+            // Track which models/sessions are already deleted by their linked
+            // counterpart so we don't try to delete the same file twice.
+            const deletedModels = new Set();
+            const deletedSessions = new Set();
+            const deletions = [];
+
+            this.items.forEach((item) => {
+                if (item.kind === "search") {
+                    deletions.push(ApiClient.deleteSearch(item.id));
+                    return;
+                }
+                if (item.kind === "assistant") {
+                    if (!deletedSessions.has(item.name)) {
+                        deletedSessions.add(item.name);
+                        deletions.push(ApiClient.deleteAssistantSession(item.name));
                     }
-                    if (item.kind === "assistant") {
-                        return ApiClient.deleteAssistantSession(item.name);
+                    if (item.model_name && !deletedModels.has(item.model_name)) {
+                        deletedModels.add(item.model_name);
+                        deletions.push(
+                            fetch(`api/models/${encodeURIComponent(item.model_name)}`, {
+                                method: "DELETE",
+                                credentials: "same-origin",
+                            }).catch((err) => console.error("Delete all linked model error", err))
+                        );
                     }
-                    const encodedName = encodeURIComponent(item.name);
-                    return fetch(`api/models/${encodedName}`, {
-                        method: "DELETE",
-                        credentials: "same-origin",
-                    });
-                })
-            );
+                    return;
+                }
+                // modeler item
+                if (!deletedModels.has(item.name)) {
+                    deletedModels.add(item.name);
+                    deletions.push(
+                        fetch(`api/models/${encodeURIComponent(item.name)}`, {
+                            method: "DELETE",
+                            credentials: "same-origin",
+                        })
+                    );
+                }
+                if (item.assistant_session && !deletedSessions.has(item.assistant_session)) {
+                    deletedSessions.add(item.assistant_session);
+                    deletions.push(
+                        ApiClient.deleteAssistantSession(item.assistant_session).catch((err) =>
+                            console.error("Delete all linked session error", err)
+                        )
+                    );
+                }
+            });
+
+            await Promise.all(deletions);
             await this.load();
         } catch (err) {
             console.error("Delete all error", err);
