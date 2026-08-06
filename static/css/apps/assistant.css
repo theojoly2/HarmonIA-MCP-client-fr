@@ -866,6 +866,11 @@
     -webkit-backdrop-filter: none !important;
 }
 
+.assistant-app.assistant-embedded #assistant-model-pill-slot .inline-flex {
+    border: 1px solid #e5e7eb;
+    background: #f9fafb;
+}
+
 .assistant-sources-header {
     font-size: 0.75rem;
     font-weight: 700;
