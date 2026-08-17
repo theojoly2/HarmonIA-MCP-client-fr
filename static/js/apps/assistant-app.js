@@ -292,19 +292,16 @@ class AssistantApp extends AppBase {
         if (state.selectedTags && Array.isArray(state.selectedTags)) {
             this.selectedTags = state.selectedTags;
         }
-        // Restore the exact scroll position the user had when the tab was cached.
-        if (this.chatEl && state.chatScrollTop !== undefined) {
-            const scrollTop = state.chatScrollTop;
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    this.chatEl.scrollTop = scrollTop;
-                });
-            });
-        }
         // Re-apply the welcome centering/positioning once the DOM is rebuilt.
         requestAnimationFrame(() => {
             requestAnimationFrame(() => this._applyCentering(true));
         });
+        // For chats (messages present), always scroll to the bottom so the latest
+        // message is visible. Restoring the previous scrollTop is confusing when
+        // new messages arrived while the tab was hidden.
+        if (this.chatEl && this.messagesEl && this.messagesEl.children.length > 0) {
+            this._scrollToBottom(true);
+        }
     }
 
     async mount(container) {
@@ -329,6 +326,7 @@ class AssistantApp extends AppBase {
             this.inputArea.classList.add('assistant-input-area-chat');
         }
         this._applyCentering(true);
+        this._scrollToBottom(true);
     }
 
     unmount() {
@@ -368,45 +366,10 @@ class AssistantApp extends AppBase {
         if (this._resizeObserver) this._resizeObserver.disconnect();
         this._observeResize();
         this._applyCentering(true);
-        // Aggressively force the chat to the bottom after re-activation. We retry
-        // several times and also watch for any late layout changes that could push
-        // content down (images, markdown render, transitions).
-        this._snapToBottom();
-    }
-
-    _snapToBottom() {
-        if (!this.chatEl) return;
-        const tryScroll = () => {
-            if (!this.chatEl) return;
-            this.chatEl.scrollTop = this.chatEl.scrollHeight;
-            const lastMessage = this.messagesEl?.lastElementChild;
-            if (lastMessage) {
-                lastMessage.scrollIntoView({ block: 'end', inline: 'nearest', behavior: 'auto' });
-            }
-        };
-        // Immediate attempts.
-        tryScroll();
-        requestAnimationFrame(tryScroll);
-        requestAnimationFrame(() => requestAnimationFrame(tryScroll));
-        // Delayed attempts to catch CSS transitions / image loads.
-        [50, 150, 300, 500, 800].forEach((delay) => setTimeout(tryScroll, delay));
-        // Watch for any further size changes and scroll while settling.
-        if (this._bottomObserver) this._bottomObserver.disconnect();
-        if (typeof ResizeObserver !== 'undefined' && this.messagesEl) {
-            let settled = false;
-            this._bottomObserver = new ResizeObserver(() => {
-                if (settled) return;
-                tryScroll();
-            });
-            this._bottomObserver.observe(this.messagesEl);
-            setTimeout(() => {
-                settled = true;
-                if (this._bottomObserver) {
-                    this._bottomObserver.disconnect();
-                    this._bottomObserver = null;
-                }
-                tryScroll();
-            }, 1000);
+        // If a chat is present, force-scroll to the bottom so the latest message
+        // is visible after switching back to this tab.
+        if (this.messagesEl && this.messagesEl.children.length > 0) {
+            this._scrollToBottom(true);
         }
     }
 
