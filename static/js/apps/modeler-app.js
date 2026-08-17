@@ -480,9 +480,18 @@ class ModelerApp extends AppBase {
                 this._lastSvgContainerSize = { width: cr.width, height: cr.height };
                 return;
             }
+            // Only nudge the pan when the container size actually changed by a
+            // non-trivial amount (e.g. dragging the split resizer). Tiny changes
+            // from tab visibility switches should not accumulate.
             const prev = this._lastSvgContainerSize;
-            const dx = (cr.width - prev.width) / 2;
-            const dy = (cr.height - prev.height) / 2;
+            const dw = cr.width - prev.width;
+            const dh = cr.height - prev.height;
+            if (Math.abs(dw) < 2 && Math.abs(dh) < 2) {
+                this._lastSvgContainerSize = { width: cr.width, height: cr.height };
+                return;
+            }
+            const dx = dw / 2;
+            const dy = dh / 2;
             this.viewer.state.x += dx;
             this.viewer.state.y += dy;
             this.viewer.applyTransform();
@@ -1196,23 +1205,23 @@ class ModelerApp extends AppBase {
             this.viewer = new SvgViewer(viewerContainer, {
                 onTransform: (state) => { this.viewerState = state; }
             });
-            this.viewer.setSvg(this.svgText, this.mainClassName);
-            // Use the saved state directly; if none was saved default to centered.
-            const hasSavedState = this.viewerState && (this.viewerState.scale !== 1 || this.viewerState.x !== 0 || this.viewerState.y !== 0);
-            if (hasSavedState) {
-                this.viewer.restoreState(this.viewerState);
-            } else {
-                this.viewer.centerDiagram(this.mainClassName);
-            }
-            if (viewerPane) {
-                viewerPane.classList.remove('hidden');
-                viewerPane.style.opacity = '1';
-            }
+            // Wait a frame so the container has its real size before restoring the SVG
+            // and its saved pan/zoom state.
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    if (!this.viewer) return;
+                    this.viewer.setSvgAndRestore(this.svgText, this.mainClassName, this.viewerState);
+                    if (viewerPane) {
+                        viewerPane.classList.remove('hidden');
+                        viewerPane.style.opacity = '1';
+                    }
+                    this._observeSvgContainerResize();
+                    this._svgResizeObserver?.takeRecords();
+                });
+            });
         }
         if (this._resizeObserver) this._resizeObserver.disconnect();
         this._observeResize();
-        if (this._svgResizeObserver) this._svgResizeObserver.disconnect();
-        this._observeSvgContainerResize();
         this._updateAssistantToggleVisibility();
     }
 
