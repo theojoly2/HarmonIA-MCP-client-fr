@@ -61,18 +61,25 @@ const ApiClient = (() => {
         return res.json();
     }
 
+<<<<<<< HEAD
     async function importAssistantModel(file, name, origin = "assistant") {
         const form = new FormData();
         form.append("file", file);
         if (name) form.append("name", name);
         form.append("origin", origin);
+=======
+    async function importAssistantModel(file, name, context = "assistant") {
+        const form = new FormData();
+        form.append("file", file);
+        if (name) form.append("name", name);
+        form.append("context", context);
+>>>>>>> f6b2c3c93cb1b8af013d0423758b3c3e910383e6
         const res = await fetch(apiUrl("assistant/import"), {
             method: "POST",
             credentials: "same-origin",
-            body: formData,
+            body: form,
         });
         if (!res.ok) {
-            if (res.status === 401) throw new Error("not_authenticated");
             const err = await res.json().catch(() => ({}));
             throw new Error(err.detail || `Assistant model import failed: ${res.status}`);
         }
@@ -198,12 +205,20 @@ const ApiClient = (() => {
     }
 
     async function streamAssistant(session, userMessage, modelName, tags, onEvent, options = {}) {
+<<<<<<< HEAD
         const origin = options.origin || "assistant";
+=======
+        const context = options.context || "assistant";
+>>>>>>> f6b2c3c93cb1b8af013d0423758b3c3e910383e6
         const res = await fetch(apiUrl("assistant/stream"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "same-origin",
+<<<<<<< HEAD
             body: JSON.stringify({ session, user_message: userMessage, model_name: modelName || "", tags: tags || [], origin }),
+=======
+            body: JSON.stringify({ session, user_message: userMessage, model_name: modelName || "", tags: tags || [], context }),
+>>>>>>> f6b2c3c93cb1b8af013d0423758b3c3e910383e6
         });
         if (!res.ok || !res.body) throw new Error(`Assistant stream failed: ${res.status}`);
 
@@ -277,36 +292,52 @@ const ApiClient = (() => {
         }
     }
 
-    async function getAssistantSessions() {
-        const res = await fetch(apiUrl("assistant/sessions"), { credentials: "same-origin" });
+    async function getAssistantSessions(context) {
+        const qs = context ? `?context=${encodeURIComponent(context)}` : "";
+        const res = await fetch(apiUrl(`assistant/sessions${qs}`), { credentials: "same-origin" });
         if (!res.ok) throw new Error(`Assistant sessions failed: ${res.status}`);
         return res.json();
     }
 
+<<<<<<< HEAD
     async function findAssistantSessionByModel(modelName, origin = "modeler") {
         const res = await fetch(apiUrl(`assistant/sessions/by-model?model_name=${encodeURIComponent(modelName)}&origin=${encodeURIComponent(origin)}`), {
+=======
+    async function findAssistantSessionByModel(modelName, context = "modeler") {
+        const res = await fetch(apiUrl(`assistant/sessions/by-model?model_name=${encodeURIComponent(modelName)}&context=${encodeURIComponent(context)}`), {
+>>>>>>> f6b2c3c93cb1b8af013d0423758b3c3e910383e6
             credentials: "same-origin",
         });
         if (!res.ok) return { session: "" };
         return res.json();
     }
 
-    async function getAssistantHistory(session) {
+    async function getAssistantHistory(session, context = "assistant") {
         if (!session) return { messages: [] };
-        const res = await fetch(apiUrl(`assistant/history?session=${encodeURIComponent(session)}`), {
+        const res = await fetch(apiUrl(`assistant/history?session=${encodeURIComponent(session)}&context=${encodeURIComponent(context)}`), {
             credentials: "same-origin",
         });
         if (!res.ok) throw new Error(`Assistant history failed: ${res.status}`);
         return res.json();
     }
 
-    async function deleteAssistantSession(session) {
+    async function deleteAssistantSession(session, context = "assistant") {
         if (!session) return { ok: true };
-        const res = await fetch(apiUrl(`assistant/sessions/${encodeURIComponent(session)}`), {
+        const res = await fetch(apiUrl(`assistant/sessions/${encodeURIComponent(session)}?context=${encodeURIComponent(context)}`), {
             method: "DELETE",
             credentials: "same-origin",
         });
         if (!res.ok) throw new Error(`Assistant session delete failed: ${res.status}`);
+        return res.json();
+    }
+
+    async function touchAssistantSession(session, context = "assistant") {
+        if (!session) return { ok: true };
+        const res = await fetch(apiUrl(`assistant/sessions/${encodeURIComponent(session)}/open?context=${encodeURIComponent(context)}`), {
+            method: "POST",
+            credentials: "same-origin",
+        });
+        if (!res.ok) throw new Error(`Assistant session touch failed: ${res.status}`);
         return res.json();
     }
 
@@ -335,6 +366,7 @@ const ApiClient = (() => {
         findAssistantSessionByModel,
         getAssistantHistory,
         deleteAssistantSession,
+        touchAssistantSession,
     };
 })();
 

@@ -66,21 +66,23 @@ class HistoryPanel {
             return;
         }
         try {
-            const [modelsRes, searchesRes, assistantRes] = await Promise.all([
+            const [modelsRes, searchesRes, assistantRes, modelerAssistantRes] = await Promise.all([
                 fetch("api/models", { credentials: "same-origin" }),
                 fetch("api/searches", { credentials: "same-origin" }),
-                ApiClient.getAssistantSessions(),
+                ApiClient.getAssistantSessions("assistant"),
+                ApiClient.getAssistantSessions("modeler"),
             ]);
             let models = [];
             let searches = [];
             let conversations = [];
+            let modelerConversations = [];
             let modelsData = { models: [] };
             if (modelsRes.ok) {
                 modelsData = await modelsRes.json();
-                // Build a map from model name to assistant session so modeler items
+                // Build a map from model name to modeler assistant session so modeler items
                 // know which conversation to reopen when the user opens the chat split.
                 const assistantSessionByModel = new Map();
-                (assistantRes.sessions || []).forEach((s) => {
+                (modelerAssistantRes.sessions || []).forEach((s) => {
                     if (!s.model_name) return;
                     // Keep the most recently touched session for each model.
                     const existing = assistantSessionByModel.get(s.model_name);
@@ -125,10 +127,18 @@ class HistoryPanel {
                 }));
             }
             if (assistantRes && assistantRes.sessions) {
+<<<<<<< HEAD
                 // Show standalone assistant conversations. Modeler-originated
                 // sessions are surfaced through the modeler item, not here.
                 conversations = assistantRes.sessions
                     .filter((s) => s.origin !== "modeler")
+=======
+                // Standalone assistant conversations imported through the
+                // assistant tab. Modeler-linked conversations are listed
+                // separately under the modeler entries.
+                conversations = assistantRes.sessions
+                    .filter((s) => !s.model_name || (modelsData.models || []).some((m) => m.name === s.model_name && m.imported_from_assistant))
+>>>>>>> f6b2c3c93cb1b8af013d0423758b3c3e910383e6
                     .map((s) => ({
                         ...s,
                         kind: "assistant",
@@ -136,9 +146,24 @@ class HistoryPanel {
                         display_name: s.display_name || s.preview || s.name,
                         source_format: "conversation",
                         sortKey: Number(s.last_opened_at) || 0,
+                        context: s.context || "assistant",
                     }));
             }
-            this.items = [...models, ...searches, ...conversations].sort((a, b) => b.sortKey - a.sortKey);
+            if (modelerAssistantRes && modelerAssistantRes.sessions) {
+                // Modeler assistant conversations are attached to their model.
+                // They are shown as assistant sub-entries linked to the modeler
+                // item but sorted independently so they remain visible.
+                modelerConversations = modelerAssistantRes.sessions.map((s) => ({
+                    ...s,
+                    kind: "modeler_assistant",
+                    name: s.name,
+                    display_name: s.display_name || s.preview || s.name,
+                    source_format: "conversation modéliseur",
+                    sortKey: Number(s.last_opened_at) || 0,
+                    context: s.context || "modeler",
+                }));
+            }
+            this.items = [...models, ...searches, ...conversations, ...modelerConversations].sort((a, b) => b.sortKey - a.sortKey);
         } catch (err) {
             console.error("History load error", err);
             this.items = [];
@@ -156,6 +181,7 @@ class HistoryPanel {
         this.items.forEach((item) => {
             const isSearch = item.kind === "search";
             const isAssistant = item.kind === "assistant";
+            const isModelerAssistant = item.kind === "modeler_assistant";
             const storedName = item.name || "";
             const displayName = item.display_name || storedName;
             const li = document.createElement("li");
@@ -163,17 +189,19 @@ class HistoryPanel {
             li.dataset.itemName = storedName;
             li.dataset.itemKind = item.kind;
             if (isSearch) li.dataset.searchId = item.id;
-            if (isAssistant) li.dataset.modelName = item.model_name || "";
-            if (!isSearch && !isAssistant) {
+            if (isAssistant || isModelerAssistant) li.dataset.modelName = item.model_name || "";
+            if (isAssistant || isModelerAssistant) li.dataset.context = item.context || (isModelerAssistant ? "modeler" : "assistant");
+            if (!isSearch && !isAssistant && !isModelerAssistant) {
                 li.dataset.assistantSession = item.assistant_session || "";
                 li.dataset.assistantDisplayName = item.assistant_display_name || "";
             }
             li.innerHTML = `
                 <div class="history-item-icon">
-                    ${isSearch ? this._searchIcon() : isAssistant ? this._assistantIcon() : this._modelerIcon()}
+                    ${isSearch ? this._searchIcon() : (isAssistant || isModelerAssistant) ? this._assistantIcon() : this._modelerIcon()}
                 </div>
                 <div class="history-item-info">
                     <span class="history-item-name">${this._escape(displayName)}</span>
+                    ${isModelerAssistant ? '<span class="history-item-subtitle text-xs text-gray-400">Modéliseur</span>' : ''}
                 </div>
                 <button type="button" class="history-action history-action-more" title="Actions" aria-haspopup="true">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -184,7 +212,8 @@ class HistoryPanel {
             li.addEventListener("click", (e) => {
                 if (e.target.closest(".history-action-more, .history-menu")) return;
                 if (isSearch) this._runSearch(storedName, (item.tags || "").split(",").filter(Boolean), item.id);
-                else if (isAssistant) this._openAssistant(storedName, item.model_name || "");
+                else if (isAssistant) this._openAssistant(storedName, item.model_name || "", "assistant");
+                else if (isModelerAssistant) this._openAssistant(storedName, item.model_name || "", "modeler");
                 else this._openModel(storedName);
             });
             const moreBtn = li.querySelector(".history-action-more");
@@ -226,6 +255,7 @@ class HistoryPanel {
         this._closeMenu();
         const isSearch = item.kind === "search";
         const isAssistant = item.kind === "assistant";
+        const isModelerAssistant = item.kind === "modeler_assistant";
         const menu = document.createElement("div");
         menu.className = "history-menu";
         menu.innerHTML = isSearch
@@ -283,7 +313,14 @@ class HistoryPanel {
     _showDeleteConfirm(menu, item) {
         const isSearch = item.kind === "search";
         const isAssistant = item.kind === "assistant";
-        const label = isSearch ? "cette recherche" : isAssistant ? "cette conversation" : "ce modèle";
+        const isModelerAssistant = item.kind === "modeler_assistant";
+        const label = isSearch
+            ? "cette recherche"
+            : isAssistant
+            ? "cette conversation"
+            : isModelerAssistant
+            ? "cette conversation modéliseur"
+            : "ce modèle";
         const currentTop = parseFloat(menu.style.top) || 0;
         menu.innerHTML = `
             <div class="history-menu-text">Supprimer ${label} ?</div>
@@ -297,20 +334,19 @@ class HistoryPanel {
                 if (isSearch) {
                     await ApiClient.deleteSearch(item.id);
                 } else if (isAssistant) {
-                    const encodedSession = encodeURIComponent(item.name);
-                    const res = await fetch(`api/assistant/sessions/${encodedSession}`, {
-                        method: "DELETE",
-                        credentials: "same-origin",
-                    });
-                    if (!res.ok) throw new Error("delete_failed");
-                    // If this conversation is linked to a model, also delete the
-                    // linked model so the hidden modeler entry is cleaned up.
-                    if (item.model_name) {
+                    const ctx = item.context || "assistant";
+                    await ApiClient.deleteAssistantSession(item.name, ctx);
+                    // If this conversation is linked to a model imported through the
+                    // assistant, also delete the linked model.
+                    if (item.model_name && (modelsData.models || []).some((m) => m.name === item.model_name && m.imported_from_assistant)) {
                         await fetch(`api/models/${encodeURIComponent(item.model_name)}`, {
                             method: "DELETE",
                             credentials: "same-origin",
                         }).catch((err) => console.error("Delete linked model error", err));
                     }
+                } else if (isModelerAssistant) {
+                    const ctx = item.context || "modeler";
+                    await ApiClient.deleteAssistantSession(item.name, ctx);
                 } else {
                     const encodedName = encodeURIComponent(item.name);
                     const res = await fetch(`api/models/${encodedName}`, {
@@ -318,19 +354,17 @@ class HistoryPanel {
                         credentials: "same-origin",
                     });
                     if (!res.ok) throw new Error("delete_failed");
-                    // If this model has a linked assistant session, also delete it
-                    // so the hidden assistant entry is cleaned up.
+                    // If this model has a linked modeler assistant session, also delete it.
                     if (item.assistant_session) {
-                        await fetch(`api/assistant/sessions/${encodeURIComponent(item.assistant_session)}`, {
-                            method: "DELETE",
-                            credentials: "same-origin",
-                        }).catch((err) => console.error("Delete linked assistant error", err));
+                        await ApiClient.deleteAssistantSession(item.assistant_session, "modeler").catch((err) =>
+                            console.error("Delete linked assistant error", err)
+                        );
                     }
                 }
                 await this.load();
             } catch (err) {
                 console.error("Delete history item error", err);
-                alert(`Impossible de supprimer ${isSearch ? "la recherche" : isAssistant ? "la conversation" : "le modèle"}.`);
+                alert(`Impossible de supprimer ${isSearch ? "la recherche" : isAssistant ? "la conversation" : isModelerAssistant ? "la conversation modéliseur" : "le modèle"}.`);
             }
         });
         menu.querySelector(".history-menu-cancel").addEventListener("click", (e) => {
@@ -372,10 +406,11 @@ class HistoryPanel {
             nameEl.textContent = newName;
             try {
                 let res;
-                if (kind === "assistant") {
+                if (kind === "assistant" || kind === "modeler_assistant") {
+                    const ctx = item.context || (kind === "modeler_assistant" ? "modeler" : "assistant");
                     const encodedSession = encodeURIComponent(storedName);
-                    res = await fetch(`api/assistant/sessions/${encodedSession}/rename`, {
-                    method: "PATCH",
+                    res = await fetch(`api/assistant/sessions/${encodedSession}/rename?context=${encodeURIComponent(ctx)}`, {
+                        method: "PATCH",
                         headers: { "Content-Type": "application/json" },
                         credentials: "same-origin",
                         body: JSON.stringify({ name: newName }),
@@ -389,8 +424,7 @@ class HistoryPanel {
                     AppState.listInstances().forEach((info) => {
                         if (info.appId !== "assistant") return;
                         const inst = AppState.getInstance(info.instanceId);
-                        if (inst && inst.session === storedName) {
-                            inst.session = newStoredName;
+                        if (inst && inst.session === storedName && inst.context === ctx) {
                             inst.session = newStoredName;
                             inst.props.session = newStoredName;
                             inst.props.fromHistory = true;
@@ -431,7 +465,7 @@ class HistoryPanel {
             } catch (err) {
                 console.error(`Rename ${kind} error`, err);
                 nameEl.textContent = initialName;
-                alert(kind === "assistant" ? "Impossible de renommer la conversation." : "Impossible de renommer le modèle.");
+                alert(kind === "assistant" || kind === "modeler_assistant" ? "Impossible de renommer la conversation." : "Impossible de renommer le modèle.");
             }
         };
 
@@ -480,7 +514,7 @@ class HistoryPanel {
                 await modelerInstance.instance.loadSvg(svgText, displayName, (svgText.match(match) || ["", ""])[1], modelName);
             }
 
-            // If this model has a linked assistant conversation, prepare the
+            // If this model has a linked modeler assistant conversation, prepare the
             // modeler so its assistant split reopens that session instead of
             // creating a blank one.
             const li = this.listEl.querySelector(`li[data-item-name="${CSS.escape(modelName)}"][data-item-kind="model"]`);
@@ -490,6 +524,16 @@ class HistoryPanel {
                 modelerInstance.instance._prepareLinkedAssistantSession(linkedSession, linkedDisplayName);
             }
 
+            // Also update the modeler assistant sub-entry mtime so it stays in
+            // sync with the model item in the history panel.
+            if (linkedSession) {
+                try {
+                    await ApiClient.touchAssistantSession(linkedSession, "modeler");
+                } catch (err) {
+                    console.error("Touch modeler assistant session error", err);
+                }
+            }
+
             await this.load();
         } catch (err) {
             console.error("Open model error", err);
@@ -497,15 +541,12 @@ class HistoryPanel {
         }
     }
 
-    async _openAssistant(sessionName, modelName) {
+    async _openAssistant(sessionName, modelName, context = "assistant") {
         this.close();
         try {
             // Touch the session on the backend so it moves to the top of the
             // history list even when it is just reopened without a new message.
-            await fetch(`api/assistant/sessions/${encodeURIComponent(sessionName)}/open`, {
-                method: "POST",
-                credentials: "same-origin",
-            });
+            await ApiClient.touchAssistantSession(sessionName, context);
             const existingAssistant = AppState.listInstances().find((i) => i.appId === "assistant");
             if (existingAssistant) {
                 AppState.removeInstance(existingAssistant.instanceId);
@@ -514,6 +555,7 @@ class HistoryPanel {
                 mode: "tab",
                 session: sessionName,
                 modelName: modelName,
+                context: context,
                 fromHistory: true,
             });
             await windowManager._mountTab(assistantInstance.instance);
@@ -576,9 +618,11 @@ class HistoryPanel {
                     return;
                 }
                 if (item.kind === "assistant") {
-                    if (!deletedSessions.has(item.name)) {
-                        deletedSessions.add(item.name);
-                        deletions.push(ApiClient.deleteAssistantSession(item.name));
+                    const ctx = item.context || "assistant";
+                    const sessionKey = `${ctx}__${item.name}`;
+                    if (!deletedSessions.has(sessionKey)) {
+                        deletedSessions.add(sessionKey);
+                        deletions.push(ApiClient.deleteAssistantSession(item.name, ctx));
                     }
                     if (item.model_name && !deletedModels.has(item.model_name)) {
                         deletedModels.add(item.model_name);
@@ -588,6 +632,15 @@ class HistoryPanel {
                                 credentials: "same-origin",
                             }).catch((err) => console.error("Delete all linked model error", err))
                         );
+                    }
+                    return;
+                }
+                if (item.kind === "modeler_assistant") {
+                    const ctx = item.context || "modeler";
+                    const sessionKey = `${ctx}__${item.name}`;
+                    if (!deletedSessions.has(sessionKey)) {
+                        deletedSessions.add(sessionKey);
+                        deletions.push(ApiClient.deleteAssistantSession(item.name, ctx));
                     }
                     return;
                 }
@@ -601,10 +654,10 @@ class HistoryPanel {
                         })
                     );
                 }
-                if (item.assistant_session && !deletedSessions.has(item.assistant_session)) {
-                    deletedSessions.add(item.assistant_session);
+                if (item.assistant_session && !deletedSessions.has(`modeler__${item.assistant_session}`)) {
+                    deletedSessions.add(`modeler__${item.assistant_session}`);
                     deletions.push(
-                        ApiClient.deleteAssistantSession(item.assistant_session).catch((err) =>
+                        ApiClient.deleteAssistantSession(item.assistant_session, "modeler").catch((err) =>
                             console.error("Delete all linked session error", err)
                         )
                     );

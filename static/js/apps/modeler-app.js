@@ -635,6 +635,7 @@ class ModelerApp extends AppBase {
         return instances.find((i) =>
             i.appId === 'assistant' &&
             AppState.getRecord(i.instanceId)?.meta?.modelName === this.storedName &&
+            AppState.getRecord(i.instanceId)?.meta?.context === 'modeler' &&
             AppState.getRecord(i.instanceId)?.mode === 'split'
         ) || null;
     }
@@ -690,7 +691,11 @@ class ModelerApp extends AppBase {
             await window.windowManager.splitPanel(this.instanceId, 'assistant', {
                 modelName: this.storedName,
                 linkedModelerInstanceId: this.instanceId,
+<<<<<<< HEAD
                 origin: 'modeler',
+=======
+                context: 'modeler',
+>>>>>>> f6b2c3c93cb1b8af013d0423758b3c3e910383e6
                 session,
                 display_name: displayName,
                 fromModeler: true,

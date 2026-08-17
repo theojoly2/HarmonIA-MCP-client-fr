@@ -37,7 +37,11 @@ class AssistantStreamRequest(BaseModel):
     user_message: str
     model_name: str = ""
     tags: list[str] = []
+<<<<<<< HEAD
     origin: str = "assistant"
+=======
+    context: str = "assistant"
+>>>>>>> f6b2c3c93cb1b8af013d0423758b3c3e910383e6
 
 
 class AssistantRenameBody(BaseModel):
@@ -251,9 +255,15 @@ async def assistant_stream_generator(
         yield _event("error", {"message": "Message vide."})
         return
 
+<<<<<<< HEAD
     origin = (request.origin or "assistant").strip().lower()
     if origin not in {"assistant", "modeler"}:
         origin = "assistant"
+=======
+    context = (request.context or "assistant").strip().lower()
+    if context not in {"assistant", "modeler"}:
+        context = "assistant"
+>>>>>>> f6b2c3c93cb1b8af013d0423758b3c3e910383e6
 
     is_new_session = not request.session.strip()
     session_name = request.session.strip() or _slugify_session_name(user_input)
@@ -264,10 +274,19 @@ async def assistant_stream_generator(
         from datetime import datetime
         session_name = f"{session_name}__{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
 
+    # Namespace the stored session by context so the standalone assistant and the
+    # modeler assistant never collide.
+    effective_session = f"{context}__{session_name}"
+
     history = AssistantHistory(
         user=username,
+<<<<<<< HEAD
         session=session_name,
         origin=origin,
+=======
+        session=effective_session,
+        context=context,
+>>>>>>> f6b2c3c93cb1b8af013d0423758b3c3e910383e6
     )
 
     model_name = request.model_name.strip()
@@ -317,7 +336,11 @@ async def assistant_stream_generator(
             ChatCompletionSystemMessageParam(role="session_name", content=session_name),
         )
 
+<<<<<<< HEAD
     yield _event("user", {"content": user_input, "session": session_name, "is_new_session": is_new_session, "origin": origin})
+=======
+    yield _event("user", {"content": user_input, "session": session_name, "is_new_session": is_new_session, "context": context})
+>>>>>>> f6b2c3c93cb1b8af013d0423758b3c3e910383e6
 
     # Shared output queue: assistant events, progress updates and heartbeats all go
     # here. A dedicated heartbeat task keeps pushing SSE comment lines so reverse
@@ -768,7 +791,11 @@ async def stream_assistant_response(
 async def import_assistant_model(
     file: UploadFile = File(...),
     name: Optional[str] = Form(None),
+<<<<<<< HEAD
     origin: Optional[str] = Form("assistant"),
+=======
+    context: Optional[str] = Form("assistant"),
+>>>>>>> f6b2c3c93cb1b8af013d0423758b3c3e910383e6
     username: str = Depends(require_user),
 ):
     """
@@ -776,9 +803,15 @@ async def import_assistant_model(
     parse the file locally, build the JSON model, add a 'Generated' package for
     XMI/XML, and upload the model to the MCP server so it becomes context for the LLM.
     """
+<<<<<<< HEAD
     session_origin = (origin or "assistant").strip().lower()
     if session_origin not in {"assistant", "modeler"}:
         session_origin = "assistant"
+=======
+    target_context = (context or "assistant").strip().lower()
+    if target_context not in {"assistant", "modeler"}:
+        target_context = "assistant"
+>>>>>>> f6b2c3c93cb1b8af013d0423758b3c3e910383e6
 
     try:
         file_bytes = await file.read()
@@ -789,6 +822,7 @@ async def import_assistant_model(
     display_name = (name or filename).strip() or "imported_model"
     from datetime import datetime
     session_name = f"{_model_name_from_filename(display_name)}__{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+    effective_session = f"{target_context}__{session_name}"
 
     try:
         from data_model_utils import _detect_file_type
@@ -818,24 +852,24 @@ async def import_assistant_model(
             if not root_model_id:
                 raise ModelProcessingError("Parsed XML root element is missing an ID.")
 
-            async with AssistantMCPClient(state={"user": username, "name": session_name, "package": ""}) as mcp_client:
+            async with AssistantMCPClient(state={"user": username, "name": effective_session, "package": ""}) as mcp_client:
                 generated_id = mcp_client._generate_id()
 
-            elements.append({
-                "name": "Generated",
-                "ID": generated_id,
-                "type": "uml:Package",
-                "package": root_model_id,
-                "tags": [],
-            })
-            json_data["elements"] = elements
-            json_data["xmi"] = {
-                "elements": json_data.get("elements", []),
-                "connectors": json_data.get("connectors", []),
-            }
-            json_data["source_format"] = "xmi"
-            json_data["xmi_raw"] = file_bytes.decode("utf-8", errors="replace")
-            json_data["xmi_xml"] = json_data["xmi_raw"]
+                elements.append({
+                    "name": "Generated",
+                    "ID": generated_id,
+                    "type": "uml:Package",
+                    "package": root_model_id,
+                    "tags": [],
+                })
+                json_data["elements"] = elements
+                json_data["xmi"] = {
+                    "elements": json_data.get("elements", []),
+                    "connectors": json_data.get("connectors", []),
+                }
+                json_data["source_format"] = "xmi"
+                json_data["xmi_raw"] = file_bytes.decode("utf-8", errors="replace")
+                json_data["xmi_xml"] = json_data["xmi_raw"]
         elif kind == "ttl":
             try:
                 json_data = ttl_to_json(BytesIO(file_bytes))
@@ -895,7 +929,7 @@ async def import_assistant_model(
                     "connectors": json_data.get("connectors", []),
                 }
 
-        async with AssistantMCPClient(state={"user": username, "name": session_name, "package": ""}) as mcp_client:
+        async with AssistantMCPClient(state={"user": username, "name": effective_session, "package": ""}) as mcp_client:
             server_model = await mcp_client.upload_model({"model": json_data})
             if not server_model:
                 raise ModelProcessingError("MCP Server Error", "Model upload returned None.")
@@ -903,7 +937,7 @@ async def import_assistant_model(
         # Mark models imported through the assistant so the history panel can
         # hide the standalone model entry and surface only the conversation.
         json_data["imported_from_assistant"] = True
-        async with AssistantMCPClient(state={"user": username, "name": session_name, "package": ""}) as mcp_client:
+        async with AssistantMCPClient(state={"user": username, "name": effective_session, "package": ""}) as mcp_client:
             await mcp_client.upload_model({"model": json_data})
 
     except ModelProcessingError as e:
@@ -915,9 +949,14 @@ async def import_assistant_model(
 
     return JSONResponse({
         "name": session_name,
+        "effective_session": effective_session,
         "display_name": display_name,
         "source_format": kind or "unknown",
+<<<<<<< HEAD
         "origin": session_origin,
+=======
+        "context": target_context,
+>>>>>>> f6b2c3c93cb1b8af013d0423758b3c3e910383e6
     })
 
 
@@ -942,14 +981,32 @@ async def test_stream():
     )
 
 
+def _extract_display_session_name(effective_session: str, context: str) -> str:
+    """Return the user-visible session name without the context prefix."""
+    prefix = f"{context}__"
+    if effective_session.startswith(prefix):
+        return effective_session[len(prefix):]
+    return effective_session
+
+
 @router.get("/sessions")
 async def list_assistant_sessions(
+<<<<<<< HEAD
     origin: Optional[str] = None,
+=======
+    context: Optional[str] = None,
+>>>>>>> f6b2c3c93cb1b8af013d0423758b3c3e910383e6
     username: str = Depends(require_user),
 ):
     sessions = []
     for session in AssistantHistory.list_sessions(username):
         h = AssistantHistory(user=username, session=session)
+        # Filter by context when requested. Existing sessions without context are
+        # treated as standalone assistant sessions.
+        session_context = h.context or "assistant"
+        if context and session_context != context.strip().lower():
+            continue
+
         # Use the display file mtime as the last activity timestamp.
         mtime = 0
         if h.display_fp.exists():
@@ -972,12 +1029,17 @@ async def list_assistant_sessions(
                 break
 
         sessions.append({
-            "name": session,
+            "name": _extract_display_session_name(session, session_context),
+            "effective_session": session,
             "display_name": h.display_name or "",
             "last_opened_at": mtime,
             "preview": preview,
             "model_name": h.assistant_model_name,
+<<<<<<< HEAD
             "origin": session_origin,
+=======
+            "context": session_context,
+>>>>>>> f6b2c3c93cb1b8af013d0423758b3c3e910383e6
         })
     sessions.sort(key=lambda s: s["last_opened_at"], reverse=True)
     return {"sessions": sessions}
@@ -986,22 +1048,38 @@ async def list_assistant_sessions(
 @router.get("/sessions/by-model")
 async def find_assistant_session_by_model(
     model_name: str,
+<<<<<<< HEAD
     origin: str = "modeler",
+=======
+    context: str = "modeler",
+>>>>>>> f6b2c3c93cb1b8af013d0423758b3c3e910383e6
     username: str = Depends(require_user),
 ):
     """Return the most recently touched assistant session linked to a model.
 
+<<<<<<< HEAD
     The origin parameter lets callers scope the search to the modeler assistant
     (default) or to the standalone assistant.
     """
     target_origin = (origin or "modeler").strip().lower()
     if target_origin not in {"assistant", "modeler"}:
         target_origin = "modeler"
+=======
+    The context parameter lets callers scope the search to the modeler assistant
+    (default) or to the standalone assistant.
+    """
+    target_context = (context or "modeler").strip().lower()
+    if target_context not in {"assistant", "modeler"}:
+        target_context = "modeler"
+>>>>>>> f6b2c3c93cb1b8af013d0423758b3c3e910383e6
 
     best_session = ""
     best_mtime = 0
     for session in AssistantHistory.list_sessions(username):
         h = AssistantHistory(user=username, session=session)
+        session_context = h.context or "assistant"
+        if session_context != target_context:
+            continue
         if h.assistant_model_name != model_name:
             continue
         if h.origin != target_origin:
@@ -1014,23 +1092,42 @@ async def find_assistant_session_by_model(
             best_session = session
     if not best_session:
         raise HTTPException(status_code=404, detail="Aucune conversation trouvée pour ce modèle")
+<<<<<<< HEAD
     return {"session": best_session, "model_name": model_name, "origin": target_origin}
+=======
+    return {
+        "session": _extract_display_session_name(best_session, target_context),
+        "effective_session": best_session,
+        "model_name": model_name,
+        "context": target_context,
+    }
+>>>>>>> f6b2c3c93cb1b8af013d0423758b3c3e910383e6
 
 
 @router.delete("/sessions/{session}")
 async def delete_assistant_session(
     session: str,
+    context: str = "assistant",
     username: str = Depends(require_user),
 ):
-    history = AssistantHistory(user=username, session=session)
-    # Also delete the model linked to this assistant session so we do not leave
-    # orphan models behind when a conversation is removed.
+    """Delete an assistant session.
+
+    When context="modeler" the linked model is also removed. For standalone
+    assistant sessions we do not delete the linked model because the same model
+    may be used by the modeler.
+    """
+    target_context = (context or "assistant").strip().lower()
+    if target_context not in {"assistant", "modeler"}:
+        target_context = "assistant"
+    effective_session = f"{target_context}__{session}"
+
+    history = AssistantHistory(user=username, session=effective_session, context=target_context)
     linked_model = history.assistant_model_name
     if history.display_fp.exists():
         history.display_fp.unlink()
     if history.llm_fp.exists():
         history.llm_fp.unlink()
-    if linked_model:
+    if linked_model and target_context == "modeler":
         try:
             await delete_model_mcp(username, linked_model)
         except Exception as e:
@@ -1041,10 +1138,16 @@ async def delete_assistant_session(
 @router.post("/sessions/{session}/open")
 async def touch_assistant_session(
     session: str,
+    context: str = "assistant",
     username: str = Depends(require_user),
 ):
     """Update the session file mtime so it bubbles to the top of the history list."""
-    history = AssistantHistory(user=username, session=session)
+    target_context = (context or "assistant").strip().lower()
+    if target_context not in {"assistant", "modeler"}:
+        target_context = "assistant"
+    effective_session = f"{target_context}__{session}"
+
+    history = AssistantHistory(user=username, session=effective_session, context=target_context)
     for fp in (history.display_fp, history.llm_fp):
         if fp.exists():
             # Use None so os.utime sets both atime and mtime to the current
@@ -1057,10 +1160,16 @@ async def touch_assistant_session(
 async def rename_assistant_session(
     session: str,
     body: AssistantRenameBody,
+    context: str = "assistant",
     username: str = Depends(require_user),
 ):
     """Rename an assistant session by moving its display and llm files."""
-    old_history = AssistantHistory(user=username, session=session)
+    target_context = (context or "assistant").strip().lower()
+    if target_context not in {"assistant", "modeler"}:
+        target_context = "assistant"
+    effective_session = f"{target_context}__{session}"
+
+    old_history = AssistantHistory(user=username, session=effective_session, context=target_context)
     if not old_history._session_exists():
         raise HTTPException(status_code=404, detail="Session inconnue")
 
@@ -1069,8 +1178,9 @@ async def rename_assistant_session(
     # Append a timestamp suffix to keep the internal name unique, just like new sessions.
     from datetime import datetime
     new_stored_name = f"{new_stored_name}__{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+    new_effective_session = f"{target_context}__{new_stored_name}"
 
-    new_history = AssistantHistory(user=username, session=new_stored_name)
+    new_history = AssistantHistory(user=username, session=new_effective_session, context=target_context)
     new_history.display_messages = old_history.display_messages
     new_history.display_events = old_history.display_events
     new_history.system_messages = old_history.system_messages
@@ -1084,6 +1194,7 @@ async def rename_assistant_session(
     new_history.last_tool_observations_compact = old_history.last_tool_observations_compact
     new_history.assistant_model_name = old_history.assistant_model_name
     new_history.display_name = new_display_name
+    new_history.context = target_context
     new_history.save()
 
     if old_history.display_fp.exists():
@@ -1091,21 +1202,34 @@ async def rename_assistant_session(
     if old_history.llm_fp.exists():
         old_history.llm_fp.unlink()
 
-    return {"name": new_stored_name, "display_name": new_display_name}
+    return {
+        "name": _extract_display_session_name(new_effective_session, target_context),
+        "effective_session": new_effective_session,
+        "display_name": new_display_name,
+        "context": target_context,
+    }
 
 
 @router.get("/history")
 async def get_assistant_history(
     session: str,
+    context: str = "assistant",
     username: str = Depends(require_user),
 ):
-    history = AssistantHistory(user=username, session=session)
+    target_context = (context or "assistant").strip().lower()
+    if target_context not in {"assistant", "modeler"}:
+        target_context = "assistant"
+    effective_session = f"{target_context}__{session}"
+
+    history = AssistantHistory(user=username, session=effective_session, context=target_context)
     messages = history.load_display_messages()
     display_events = history.display_events
     return {
-        "session": session,
+        "session": _extract_display_session_name(effective_session, target_context),
+        "effective_session": effective_session,
         "display_name": history.display_name or "",
         "messages": messages,
         "display_events": display_events,
         "model_name": history.assistant_model_name,
+        "context": history.context or target_context,
     }
