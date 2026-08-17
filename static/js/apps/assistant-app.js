@@ -362,11 +362,24 @@ class AssistantApp extends AppBase {
         // tab shows the latest messages instead of jumping back to the top.
         this._applyCentering(true);
         if (this.chatEl) {
+            // Wait for layout transitions to finish, then scroll the last message
+            // into view. We also add a tiny bottom padding transient so the last
+            // message is not hidden behind the fixed input area.
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
-                        this._scrollToBottom(true);
-                    });
+                    setTimeout(() => {
+                        const lastMessage = this.messagesEl?.lastElementChild;
+                        if (lastMessage) {
+                            lastMessage.scrollIntoView({ block: 'end', inline: 'nearest', behavior: 'auto' });
+                        } else if (this.chatEl) {
+                            this.chatEl.scrollTop = this.chatEl.scrollHeight;
+                        }
+                        // Ensure the messages container has enough bottom padding so
+                        // the final message is not covered by the fixed input area.
+                        if (this.messagesEl) {
+                            this.messagesEl.style.paddingBottom = '6rem';
+                        }
+                    }, 120);
                 });
             });
         }
