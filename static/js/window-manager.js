@@ -271,11 +271,30 @@ class WindowManager {
         if (!instance) return;
         const record = AppState.getRecord(instanceId);
         if (record) record.mode = 'tab';
-        // If this instance is currently part of a split tree, collapse the tree
-        // to a single tab by removing sibling leaves and turning this leaf into
-        // the only pane.
+
+        // If the target instance is part of the current split view, just activate
+        // its pane instead of tearing down the split.
+        if (this.splitManager.containsInstance(instanceId)) {
+            const activeInstanceId = AppState.getActiveInstance();
+            if (activeInstanceId !== instanceId) {
+                const activeInstance = AppState.getInstance(activeInstanceId);
+                if (activeInstance && typeof activeInstance.onTabDeactivated === 'function') {
+                    activeInstance.onTabDeactivated();
+                }
+                AppState.saveInstanceState(activeInstanceId);
+                this.splitManager.setActiveLeaf(instanceId);
+                if (typeof instance.onTabActivated === 'function') {
+                    instance.onTabActivated();
+                } else {
+                    AppState.restoreInstanceState(instanceId);
+                }
+            }
+            AppState.setActiveInstance(instanceId);
+            return;
+        }
+
+        // Otherwise, collapse any existing split and switch to a full tab.
         if (this.splitManager.tree) {
-            this.splitManager.unregisterRenderer(instanceId);
             const leaves = this._collectLeaves(this.splitManager.tree);
             const keep = leaves.find(l => l.instanceId === instanceId);
             this.splitManager.setTree(keep || { type: 'pane', instanceId });
