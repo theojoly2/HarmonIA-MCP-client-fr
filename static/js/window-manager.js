@@ -49,10 +49,13 @@ class WindowManager {
         let container = this._tabDomCache.get(instanceId);
         if (container) {
             this.shellElement.appendChild(container);
-            AppState.restoreInstanceState(instanceId);
-            // Notify the app that it is visible again so it can resume UI updates.
+            // The DOM was preserved while the tab was hidden. Notify the app so it
+            // can reconnect observers / resume streaming, but do not call setState
+            // which would rebuild the DOM and destroy live state (e.g. SVG viewer).
             if (typeof instance.onTabActivated === 'function') {
                 instance.onTabActivated();
+            } else {
+                AppState.restoreInstanceState(instanceId);
             }
             return Promise.resolve();
         }
