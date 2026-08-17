@@ -382,7 +382,14 @@ class AssistantApp extends AppBase {
     _snapToBottom() {
         const scroll = () => {
             if (!this.chatEl || !this.messagesEl) return;
-            this.chatEl.scrollTop = this.chatEl.scrollHeight;
+            // Scroll the last message into view; this is far more robust than
+            // setting scrollTop while the container is still settling.
+            const last = this.messagesEl.lastElementChild;
+            if (last) {
+                last.scrollIntoView({ block: 'end', inline: 'nearest', behavior: 'auto' });
+            } else {
+                this.chatEl.scrollTop = this.chatEl.scrollHeight;
+            }
         };
         scroll();
         requestAnimationFrame(scroll);
