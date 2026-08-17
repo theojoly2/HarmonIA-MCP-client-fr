@@ -1013,7 +1013,9 @@ async def find_assistant_session_by_model(
             best_mtime = mtime
             best_session = session
     if not best_session:
-        raise HTTPException(status_code=404, detail="Aucune conversation trouvée pour ce modèle")
+        # Empty result is expected when the model has never been chatted with.
+        # Return 200 so the client can start a fresh session without logging a 404.
+        return {"session": "", "model_name": model_name, "origin": target_origin}
     return {"session": best_session, "model_name": model_name, "origin": target_origin}
 
 
