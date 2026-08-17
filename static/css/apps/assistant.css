@@ -648,9 +648,6 @@
 #assistant-chat.assistant-chat-mode {
     overflow-y: auto;
     padding-bottom: 7rem;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
 }
 
 .assistant-welcome {

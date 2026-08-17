@@ -332,6 +332,10 @@ class AssistantApp extends AppBase {
     unmount() {
         if (this._resizeObserver) this._resizeObserver.disconnect();
         this._resizeObserver = null;
+        if (this._messagesObserver) {
+            this._messagesObserver.disconnect();
+            this._messagesObserver = null;
+        }
         this.mounted = false;
         // Only abort an active SSE stream when the instance is actually closed,
         // not when the tab is simply hidden/cached.
@@ -347,9 +351,9 @@ class AssistantApp extends AppBase {
         this.mounted = false;
         this._visible = false;
         if (this._resizeObserver) this._resizeObserver.disconnect();
-        if (this._bottomObserver) {
-            this._bottomObserver.disconnect();
-            this._bottomObserver = null;
+        if (this._messagesObserver) {
+            this._messagesObserver.disconnect();
+            this._messagesObserver = null;
         }
     }
 
@@ -365,6 +369,7 @@ class AssistantApp extends AppBase {
         }
         if (this._resizeObserver) this._resizeObserver.disconnect();
         this._observeResize();
+        this._observeMessagesScroll();
         this._applyCentering(true);
         // If a chat is present, force-scroll to the bottom so the latest message
         // is visible after switching back to this tab. Retry several times because
@@ -386,6 +391,16 @@ class AssistantApp extends AppBase {
         setTimeout(scroll, 200);
         setTimeout(scroll, 400);
         setTimeout(scroll, 800);
+    }
+
+    _observeMessagesScroll() {
+        if (!this.messagesEl || typeof MutationObserver === 'undefined') return;
+        if (this._messagesObserver) this._messagesObserver.disconnect();
+        this._messagesObserver = new MutationObserver(() => {
+            if (!this.chatEl) return;
+            this._scrollToBottom(false);
+        });
+        this._messagesObserver.observe(this.messagesEl, { childList: true, subtree: true });
     }
 
     _escape(text) {
