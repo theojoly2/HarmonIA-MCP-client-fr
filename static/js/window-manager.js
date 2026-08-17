@@ -47,17 +47,9 @@ class WindowManager {
             })
             .pop();
         if (existing) {
-            this.switchTab(existing.instanceId).then(() => {
-                // Highlight the requested app once the view switch is complete.
-                if (this.options.onSwitchApp) {
-                    this.options.onSwitchApp(appId);
-                }
-            });
+            this.switchTab(existing.instanceId);
         } else {
             this.open(appId, { mode: 'tab' });
-            if (this.options.onSwitchApp) {
-                this.options.onSwitchApp(appId);
-            }
         }
     }
 
