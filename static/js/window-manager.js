@@ -24,9 +24,21 @@ class WindowManager {
     }
 
     open(appId, props = {}) {
+        const mode = props.mode || 'tab';
+        // Avoid creating duplicate tab/split instances for the same app. Reuse the
+        // most recent one instead so the nav buttons always map to a single instance.
+        if (mode === 'tab' || mode === 'split') {
+            const existing = AppState.listInstances()
+                .filter((i) => i.appId === appId && (i.mode === 'tab' || i.mode === 'split'))
+                .pop();
+            if (existing) {
+                this.switchTab(existing.instanceId);
+                return existing.instanceId;
+            }
+        }
+
         const AppClass = AppState.getRecord ? null : null; // not used directly
         const { instanceId, instance } = AppState.createInstance(appId, props);
-        const mode = props.mode || 'tab';
         const record = AppState.getRecord(instanceId);
         if (record) record.mode = mode;
         instance.setTitle(instance.getTitle());
