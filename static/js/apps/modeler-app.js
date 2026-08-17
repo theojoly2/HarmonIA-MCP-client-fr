@@ -440,6 +440,7 @@ class ModelerApp extends AppBase {
                 editActions.classList.remove('hidden');
                 this._updateEditButtonStates();
             }
+            this._setLoading(false);
             this._observeSvgContainerResize();
             this.setTitle(`Modéliseur: ${this.fileName}`);
             return;
@@ -477,13 +478,13 @@ class ModelerApp extends AppBase {
             });
         } else {
             // When the viewer is remounted into a different container size
-            // (e.g. opening the assistant split), re-center from scratch so the
-            // diagram is not offset outside the visible pane.
+            // (e.g. opening the assistant split), restore the saved pan/zoom state.
+            // Do NOT auto-center; the saved state is the user's chosen view.
             this.viewer.restoreState(this.viewerState);
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
                     if (this.viewer && this.svgText) {
-                        this.viewer.centerDiagram(this.mainClassName);
+                        this.viewer.applyTransform();
                     }
                 });
             });
@@ -1138,7 +1139,8 @@ class ModelerApp extends AppBase {
         if (this.container) {
             if (this.container.querySelector('#modeler-svg-viewer') && this.viewer && this.viewer.svg && sameSvg && hadSvg) {
                 // The live DOM already shows the right SVG with the right state.
-                // Just make sure observers are running and the title is updated.
+                // Just make sure observers are running, hide any stale loader and update the title.
+                this._setLoading(false);
                 this._observeResize();
                 this._observeSvgContainerResize();
                 this.setTitle(`Modéliseur: ${this.fileName}`);
