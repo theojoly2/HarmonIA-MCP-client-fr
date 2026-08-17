@@ -515,6 +515,12 @@ class AssistantApp extends AppBase {
             this.inputArea.style.right = '0';
             this.inputArea.style.top = 'auto';
             this.inputArea.style.width = '100%';
+            // Ensure the chat scroll area leaves room for the absolutely positioned
+            // input area so the last message is not hidden behind it.
+            const inputHeight = this.inputArea.getBoundingClientRect().height;
+            if (this.chatEl && inputHeight) {
+                this.chatEl.style.paddingBottom = `${inputHeight + 16}px`;
+            }
             return;
         }
 

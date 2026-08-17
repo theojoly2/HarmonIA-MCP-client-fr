@@ -809,7 +809,8 @@
 .assistant-app.assistant-embedded #assistant-chat.assistant-chat-mode {
     padding-left: 0.75rem;
     padding-right: 0.75rem;
-    padding-bottom: 6.25rem;
+    /* Padding-bottom is set dynamically by JS to match the real input-area height. */
+    padding-bottom: 0;
 }
 
 .assistant-app.assistant-embedded .assistant-welcome {
