@@ -344,6 +344,10 @@ class AssistantApp extends AppBase {
         this.mounted = false;
         this._visible = false;
         if (this._resizeObserver) this._resizeObserver.disconnect();
+        if (this._bottomObserver) {
+            this._bottomObserver.disconnect();
+            this._bottomObserver = null;
+        }
     }
 
     onTabActivated() {
@@ -358,30 +362,46 @@ class AssistantApp extends AppBase {
         }
         if (this._resizeObserver) this._resizeObserver.disconnect();
         this._observeResize();
-        // Apply layout first, then scroll to the very bottom so returning to the
-        // tab shows the latest messages instead of jumping back to the top.
         this._applyCentering(true);
-        if (this.chatEl) {
-            // Wait for layout transitions to finish, then scroll the last message
-            // into view. We also add a tiny bottom padding transient so the last
-            // message is not hidden behind the fixed input area.
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    setTimeout(() => {
-                        const lastMessage = this.messagesEl?.lastElementChild;
-                        if (lastMessage) {
-                            lastMessage.scrollIntoView({ block: 'end', inline: 'nearest', behavior: 'auto' });
-                        } else if (this.chatEl) {
-                            this.chatEl.scrollTop = this.chatEl.scrollHeight;
-                        }
-                        // Ensure the messages container has enough bottom padding so
-                        // the final message is not covered by the fixed input area.
-                        if (this.messagesEl) {
-                            this.messagesEl.style.paddingBottom = '6rem';
-                        }
-                    }, 120);
-                });
+        // Aggressively force the chat to the bottom after re-activation. We retry
+        // several times and also watch for any late layout changes that could push
+        // content down (images, markdown render, transitions).
+        this._snapToBottom();
+    }
+
+    _snapToBottom() {
+        if (!this.chatEl) return;
+        const tryScroll = () => {
+            if (!this.chatEl) return;
+            this.chatEl.scrollTop = this.chatEl.scrollHeight;
+            const lastMessage = this.messagesEl?.lastElementChild;
+            if (lastMessage) {
+                lastMessage.scrollIntoView({ block: 'end', inline: 'nearest', behavior: 'auto' });
+            }
+        };
+        // Immediate attempts.
+        tryScroll();
+        requestAnimationFrame(tryScroll);
+        requestAnimationFrame(() => requestAnimationFrame(tryScroll));
+        // Delayed attempts to catch CSS transitions / image loads.
+        [50, 150, 300, 500, 800].forEach((delay) => setTimeout(tryScroll, delay));
+        // Watch for any further size changes and scroll while settling.
+        if (this._bottomObserver) this._bottomObserver.disconnect();
+        if (typeof ResizeObserver !== 'undefined' && this.messagesEl) {
+            let settled = false;
+            this._bottomObserver = new ResizeObserver(() => {
+                if (settled) return;
+                tryScroll();
             });
+            this._bottomObserver.observe(this.messagesEl);
+            setTimeout(() => {
+                settled = true;
+                if (this._bottomObserver) {
+                    this._bottomObserver.disconnect();
+                    this._bottomObserver = null;
+                }
+                tryScroll();
+            }, 1000);
         }
     }
 
