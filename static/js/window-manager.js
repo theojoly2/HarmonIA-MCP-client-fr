@@ -38,7 +38,7 @@ class WindowManager {
                 if (i.mode !== 'tab' && i.mode !== 'split') return false;
                 // The nav Assistant button must always target a standalone
                 // assistant tab, never the assistant pane embedded in a modeler split.
-                if (appId === 'assistant' && i.mode === 'split') {
+                if (appId === 'assistant') {
                     const rec = AppState.getRecord(i.instanceId);
                     const meta = rec?.meta || {};
                     if (meta.origin === 'modeler' || meta.linkedModelerInstanceId) return false;

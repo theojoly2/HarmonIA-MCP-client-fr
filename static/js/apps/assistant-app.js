@@ -265,6 +265,7 @@ class AssistantApp extends AppBase {
             selectedTags: this.selectedTags || [],
             isStreaming: this.isStreaming,
             linkedModelerInstanceId: this._linkedModelerInstanceId || '',
+            origin: this.origin || 'assistant',
             chatScrollTop: this.chatEl ? this.chatEl.scrollTop : 0,
         };
     }
