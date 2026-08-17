@@ -46,7 +46,12 @@
     });
 
     // Window manager
-    const windowManager = new WindowManager(contentArea, splitManager);
+    function updateActiveTab(appId) {
+        shell.setActiveTab(appId);
+    }
+    const windowManager = new WindowManager(contentArea, splitManager, {
+        onSwitchApp: updateActiveTab,
+    });
     window.historyPanel = historyPanel;
     window.windowManager = windowManager;
 

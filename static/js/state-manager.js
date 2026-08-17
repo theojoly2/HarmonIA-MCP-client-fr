@@ -87,6 +87,12 @@ const AppState = (() => {
         return store.activeInstanceId;
     }
 
+    function getActiveAppId() {
+        if (!store.activeInstanceId) return null;
+        const rec = store.instances.get(store.activeInstanceId);
+        return rec ? rec.appId : null;
+    }
+
     return {
         registerApp,
         createInstance,
@@ -98,6 +104,7 @@ const AppState = (() => {
         listInstances,
         setActiveInstance,
         getActiveInstance,
+        getActiveAppId,
     };
 })();
 

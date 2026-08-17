@@ -47,9 +47,17 @@ class WindowManager {
             })
             .pop();
         if (existing) {
-            this.switchTab(existing.instanceId);
+            this.switchTab(existing.instanceId).then(() => {
+                // Highlight the requested app once the view switch is complete.
+                if (this.options.onSwitchApp) {
+                    this.options.onSwitchApp(appId);
+                }
+            });
         } else {
             this.open(appId, { mode: 'tab' });
+            if (this.options.onSwitchApp) {
+                this.options.onSwitchApp(appId);
+            }
         }
     }
 
@@ -72,6 +80,14 @@ class WindowManager {
             if (existing) {
                 this.switchTab(existing.instanceId);
                 return existing.instanceId;
+            }
+        }
+
+        // Cache whatever is currently visible before replacing it with a new tab.
+        if (mode === 'tab') {
+            const visibleId = this._getVisibleInstanceId();
+            if (visibleId) {
+                this._cacheView(visibleId);
             }
         }
 
@@ -130,13 +146,94 @@ class WindowManager {
             return;
         }
 
-        // Fresh mount as a tab.
+        // If the target is actually a split leaf, rebuild the split tree from
+        // any leaf's cached tree record. We do NOT downgrade it to a tab.
         const record = AppState.getRecord(instanceId);
+        if (record && record.mode === 'split') {
+            await this._restoreSplitLeaf(instanceId);
+            return;
+        }
+
+        // Fresh mount as a tab.
         if (record) record.mode = 'tab';
         this.shellElement.innerHTML = '';
         this.splitManager.setTree(null);
         AppState.saveInstanceState(instanceId);
         await this._mountTab(instance);
+        AppState.setActiveInstance(instanceId);
+    }
+
+    /**
+     * Rebuild the split tree around `instanceId` when its cached DOM has been
+     * discarded (e.g. after a tab/split was converted back to tab by a previous
+     * bug, or when SplitManager lost its tree). Only used as a fallback.
+     */
+    async _restoreSplitLeaf(instanceId) {
+        let splitTree = null;
+        // Try to recover the tree from any leaf instance's saved meta state.
+        AppState.listInstances().forEach((i) => {
+            if (splitTree) return;
+            const rec = AppState.getRecord(i.instanceId);
+            const st = rec?.savedState?.splitTree;
+            if (st && this._collectLeaves(st).some((l) => l.instanceId === instanceId)) {
+                splitTree = st;
+            }
+        });
+        if (!splitTree) {
+            const record = AppState.getRecord(instanceId);
+            if (record?.savedState?.splitTree) {
+                splitTree = record.savedState.splitTree;
+            }
+        }
+        // Reconstruct a two-pane split from the modeler record when possible.
+        if (!splitTree) {
+            const record = AppState.getRecord(instanceId);
+            const assistantId = record?.savedState?.assistantInstanceId;
+            const ratios = record?.savedState?.lastSplitRatios;
+            if (assistantId && AppState.getInstance(assistantId)) {
+                splitTree = {
+                    type: 'split',
+                    direction: 'horizontal',
+                    children: [
+                        { type: 'pane', instanceId },
+                        { type: 'pane', instanceId: assistantId },
+                    ],
+                    ratios: ratios || [70, 30],
+                };
+            }
+        }
+
+        const leaves = [];
+        if (splitTree) {
+            this._collectLeaves(splitTree, leaves);
+        }
+        if (leaves.length === 0) {
+            // Fallback: single pane with the target instance.
+            splitTree = { type: 'pane', instanceId };
+            leaves.push({ type: 'pane', instanceId });
+        }
+
+        this.splitManager.setTree(null);
+        this._clearShell();
+        this.splitManager.setTree(splitTree);
+
+        const mounted = new Set();
+        leaves.forEach((leaf) => {
+            const inst = AppState.getInstance(leaf.instanceId);
+            if (!inst) return;
+            this.splitManager.unregisterRenderer(leaf.instanceId);
+            this.splitManager.registerRenderer(leaf.instanceId, async (pane) => {
+                if (mounted.has(leaf.instanceId)) return;
+                mounted.add(leaf.instanceId);
+                pane.innerHTML = '';
+                await inst.mount(pane);
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => AppState.restoreInstanceState(leaf.instanceId));
+                });
+            });
+        });
+        this.splitManager.setActiveLeaf(instanceId);
+        this.splitManager.render();
         AppState.setActiveInstance(instanceId);
     }
 
@@ -154,9 +251,8 @@ class WindowManager {
             const leaves = this._collectLeaves(this.splitManager.tree);
             const dom = this.shellElement.firstChild;
             if (!dom || !dom.querySelector('.split-pane')) return;
-            // Verify the active pane matches instanceId before caching.
-            const activePane = dom.querySelector('.split-pane.split-pane-active') || dom.querySelector('.split-pane');
-            if (activePane?.dataset.instanceId !== instanceId) return;
+            // Verify the target instance is part of the current split tree.
+            if (!leaves.some((l) => l.instanceId === instanceId)) return;
 
             leaves.forEach((leaf) => {
                 const leafInstance = AppState.getInstance(leaf.instanceId);
@@ -559,6 +655,8 @@ class WindowManager {
         const newRecord = AppState.getRecord(instanceId);
         if (newRecord) newRecord.mode = 'split';
         targetRecord.mode = 'split';
+        targetInstance._assistantInstanceId = instanceId;
+        targetInstance._lastSplitRatios = options.ratio || [50, 50];
         AppState.saveInstanceState(instanceId);
 
         this.splitManager.unregisterRenderer(targetInstanceId);

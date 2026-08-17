@@ -18,6 +18,8 @@ class ModelerApp extends AppBase {
         this.svgText = props.svgText || '';
         this.mainClassName = props.mainClassName || '';
         this.loading = props.loading || false;
+        this._assistantInstanceId = props.assistantInstanceId || '';
+        this._lastSplitRatios = props.lastSplitRatios || [70, 30];
         // New imports/opened models should always start centered/scaled to fit.
         this.viewerState = { scale: 1, x: 0, y: 0 };
         this.viewer = null;
@@ -1121,6 +1123,8 @@ class ModelerApp extends AppBase {
             svgText: this.svgText,
             mainClassName: this.mainClassName,
             viewerState: this.viewer ? this.viewer.getState() : this.viewerState,
+            assistantInstanceId: this._assistantInstanceId || '',
+            lastSplitRatios: this._lastSplitRatios || [70, 30],
         };
     }
 
@@ -1132,6 +1136,8 @@ class ModelerApp extends AppBase {
         const sameSvg = this.svgText === incomingSvg;
         this.svgText = incomingSvg;
         this.mainClassName = state.mainClassName || '';
+        this._assistantInstanceId = state.assistantInstanceId || this._assistantInstanceId || '';
+        this._lastSplitRatios = state.lastSplitRatios || this._lastSplitRatios || [70, 30];
         // Only keep the previous pan/zoom if this is the exact same SVG being
         // restored (e.g. tab switch). A new file from history/preview must reset.
         this.viewerState = sameSvg ? (state.viewerState || this.viewerState || { scale: 1, x: 0, y: 0 }) : { scale: 1, x: 0, y: 0 };
