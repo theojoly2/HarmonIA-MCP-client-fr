@@ -40,7 +40,8 @@ class WindowManager {
                 // assistant tab, never the assistant pane embedded in a modeler split.
                 if (appId === 'assistant' && i.mode === 'split') {
                     const rec = AppState.getRecord(i.instanceId);
-                    if (rec?.meta?.origin === 'modeler' || rec?.meta?.linkedModelerInstanceId) return false;
+                    const meta = rec?.meta || {};
+                    if (meta.origin === 'modeler' || meta.linkedModelerInstanceId) return false;
                 }
                 return true;
             })

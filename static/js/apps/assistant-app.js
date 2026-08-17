@@ -265,6 +265,7 @@ class AssistantApp extends AppBase {
             selectedTags: this.selectedTags || [],
             isStreaming: this.isStreaming,
             linkedModelerInstanceId: this._linkedModelerInstanceId || '',
+            chatScrollTop: this.chatEl ? this.chatEl.scrollTop : 0,
         };
     }
 
@@ -291,9 +292,13 @@ class AssistantApp extends AppBase {
         if (state.selectedTags && Array.isArray(state.selectedTags)) {
             this.selectedTags = state.selectedTags;
         }
-        if (this.chatEl && state.messagesHtml) {
+        // Restore the exact scroll position the user had when the tab was cached.
+        if (this.chatEl && state.chatScrollTop !== undefined) {
+            const scrollTop = state.chatScrollTop;
             requestAnimationFrame(() => {
-                this.chatEl.scrollTo({ top: this.chatEl.scrollHeight, behavior: 'auto' });
+                requestAnimationFrame(() => {
+                    this.chatEl.scrollTop = scrollTop;
+                });
             });
         }
         // Re-apply the welcome centering/positioning once the DOM is rebuilt.
