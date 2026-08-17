@@ -1186,7 +1186,7 @@ class ModelerApp extends AppBase {
         this.mounted = true;
         // The DOM was cached while the tab was hidden. The SVG viewer object was
         // destroyed during unmount, so recreate it for the existing container
-        // and restore the last pan/zoom/scroll state.
+        // and restore the last pan/zoom/scroll state without re-centering.
         const viewerContainer = this.container?.querySelector('#modeler-svg-viewer');
         const viewerPane = this.container?.querySelector('#modeler-viewer');
         if (viewerContainer && this.svgText) {
@@ -1197,18 +1197,17 @@ class ModelerApp extends AppBase {
                 onTransform: (state) => { this.viewerState = state; }
             });
             this.viewer.setSvg(this.svgText, this.mainClassName);
-            this.viewer.restoreState(this.viewerState);
+            // Use the saved state directly; if none was saved default to centered.
+            const hasSavedState = this.viewerState && (this.viewerState.scale !== 1 || this.viewerState.x !== 0 || this.viewerState.y !== 0);
+            if (hasSavedState) {
+                this.viewer.restoreState(this.viewerState);
+            } else {
+                this.viewer.centerDiagram(this.mainClassName);
+            }
             if (viewerPane) {
                 viewerPane.classList.remove('hidden');
                 viewerPane.style.opacity = '1';
             }
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    if (this.viewer && this.svgText) {
-                        this.viewer.centerDiagram(this.mainClassName);
-                    }
-                });
-            });
         }
         if (this._resizeObserver) this._resizeObserver.disconnect();
         this._observeResize();
