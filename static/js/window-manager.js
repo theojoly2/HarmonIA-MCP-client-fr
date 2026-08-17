@@ -537,6 +537,11 @@ class WindowManager {
             ...props,
             mode: 'split',
         });
+        // Both panes of the split are in split mode, so later tab switches can
+        // detect and restore the cached split view.
+        targetRecord.mode = 'split';
+        const newRecord = AppState.getRecord(instanceId);
+        if (newRecord) newRecord.mode = 'split';
         AppState.saveInstanceState(instanceId);
 
         this.splitManager.unregisterRenderer(targetInstanceId);
