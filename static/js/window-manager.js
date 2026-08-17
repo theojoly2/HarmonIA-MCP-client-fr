@@ -332,7 +332,9 @@ class WindowManager {
         }
 
         // 2. Target is in a cached split -> restore the whole split view.
-        if (this._splitDomCache.has(instanceId) && this._splitTreeCache.has(instanceId)) {
+        // We also require the instance record to still be marked as split, so a
+        // standalone tab with the same appId is never mistaken for a split pane.
+        if (record && record.mode === 'split' && this._splitDomCache.has(instanceId) && this._splitTreeCache.has(instanceId)) {
             // Suspend whatever is currently visible before swapping it out.
             if (activeInstanceId && activeInstanceId !== instanceId) {
                 if (activeInstance && typeof activeInstance.onTabDeactivated === 'function') {
@@ -352,19 +354,23 @@ class WindowManager {
                     this.shellElement.removeChild(this.shellElement.firstChild);
                 }
             }
-            this.splitManager.unregisterRenderer(instanceId);
             const splitDom = this._splitDomCache.get(instanceId);
             const splitTree = this._splitTreeCache.get(instanceId);
-            this.shellElement.appendChild(splitDom);
-            this.splitManager.tree = splitTree;
-            // Activate the requested pane; the other pane is already live and
-            // will resume via the active pane notification if needed.
-            this.splitManager.setActiveLeaf(instanceId);
-            if (typeof instance.onTabActivated === 'function') {
-                instance.onTabActivated();
+            if (!splitDom || !splitTree) {
+                // Cache entry is incomplete; fall through to normal tab mount.
+                this._clearSplitCache(instanceId);
+            } else {
+                this.shellElement.appendChild(splitDom);
+                this.splitManager.tree = splitTree;
+                // Activate the requested pane; the other pane is already live and
+                // will resume via the active pane notification if needed.
+                this.splitManager.setActiveLeaf(instanceId);
+                if (typeof instance.onTabActivated === 'function') {
+                    instance.onTabActivated();
+                }
+                AppState.setActiveInstance(instanceId);
+                return;
             }
-            AppState.setActiveInstance(instanceId);
-            return;
         }
 
         // 3. Normal tab switch. If a split is currently visible, cache it first.
@@ -373,7 +379,8 @@ class WindowManager {
             while (this.shellElement.firstChild) {
                 this.shellElement.removeChild(this.shellElement.firstChild);
             }
-        } else if (activeInstanceId && activeInstanceId !== instanceId) {
+        }
+        if (activeInstanceId && activeInstanceId !== instanceId) {
             if (activeInstance && typeof activeInstance.onTabDeactivated === 'function') {
                 activeInstance.onTabDeactivated();
             }
@@ -395,7 +402,8 @@ class WindowManager {
         if (!this.splitManager.tree) return;
         const leaves = this._collectLeaves(this.splitManager.tree);
         const splitDom = this.shellElement.firstChild;
-        if (!splitDom) return;
+        // Safety: only cache if the shell actually contains the split DOM.
+        if (!splitDom || !splitDom.querySelector('.split-pane')) return;
         // Deactivate every leaf so observers/streams are suspended while cached.
         for (const leaf of leaves) {
             const leafInstance = AppState.getInstance(leaf.instanceId);
@@ -408,6 +416,9 @@ class WindowManager {
             this._splitDomCache.set(leaf.instanceId, splitDom);
             this._splitTreeCache.set(leaf.instanceId, this.splitManager.tree);
         }
+        // The DOM is now detached from the shell and stored; clear the live tree
+        // reference so it is not mistaken for the currently visible view.
+        this.splitManager.tree = null;
     }
 
     /**
