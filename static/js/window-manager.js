@@ -281,6 +281,13 @@ class WindowManager {
             this.splitManager.setTree(keep || { type: 'pane', instanceId });
             this.splitManager.render();
         }
+        // Suspend the currently visible tab before caching its DOM so it can stop
+        // expensive observers / streams without losing live state.
+        const activeInstanceId = AppState.getActiveInstance();
+        const activeInstance = activeInstanceId ? AppState.getInstance(activeInstanceId) : null;
+        if (activeInstance && typeof activeInstance.onTabDeactivated === 'function') {
+            activeInstance.onTabDeactivated();
+        }
         // Detach the currently visible tab container from the shell without
         // destroying it; it remains cached in _tabDomCache for fast restoration.
         while (this.shellElement.firstChild) {

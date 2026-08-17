@@ -35,6 +35,16 @@ class AppBase {
         this.container = null;
     }
 
+    onTabDeactivated() {
+        // Called when the tab is hidden but kept alive in the DOM cache.
+        // Override to suspend observers, animations, or expensive polling.
+    }
+
+    onTabActivated() {
+        // Called when the cached tab DOM is re-attached to the shell.
+        // Override to resume observers, focus, or scroll state.
+    }
+
     getState() {
         return {};
     }

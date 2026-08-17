@@ -40,6 +40,15 @@ class ModelerApp extends AppBase {
     }
 
     render(container) {
+        // When the container is already the cached live DOM, do not rebuild it.
+        // This keeps the SVG viewer, pan/zoom, scroll and running streams alive
+        // across tab switches.
+        if (this.container === container && this.viewer && container.querySelector('#modeler-svg-viewer')) {
+            this._observeResize();
+            this._observeSvgContainerResize();
+            this._updateAssistantToggleVisibility();
+            return;
+        }
         // Any previous viewer is tied to a DOM container that will be replaced;
         // discard the reference so a fresh viewer is created for the new container.
         this.viewer = null;
@@ -419,6 +428,23 @@ class ModelerApp extends AppBase {
             assistantToggle.classList.toggle('hidden', !this.storedName || !!existingSplit);
         }
 
+        // If the live SVG viewer is already attached to the cached container,
+        // just make sure the pane is visible and resume observers.
+        if (this.viewer && this.viewer.svg && viewerContainer && viewerContainer.contains(this.viewer.svg)) {
+            this.viewerState = this.viewer.getState();
+            if (viewer) {
+                viewer.classList.remove('hidden');
+                viewer.style.opacity = '1';
+            }
+            if (editActions) {
+                editActions.classList.remove('hidden');
+                this._updateEditButtonStates();
+            }
+            this._observeSvgContainerResize();
+            this.setTitle(`Modéliseur: ${this.fileName}`);
+            return;
+        }
+
         if (!this.viewer) {
             this.viewer = new SvgViewer(viewerContainer, {
                 onTransform: (state) => { this.viewerState = state; }
@@ -426,7 +452,7 @@ class ModelerApp extends AppBase {
         }
         this.viewer.setSvg(this.svgText, this.mainClassName);
         // New import/open from history/preview: center diagram after it becomes visible.
-        // Returning from another tab: restore the saved pan/zoom.
+        // Returning from another tab with a cached DOM: the viewer stayed alive.
         const finalize = () => {
             this._setLoading(false);
             if (viewer) {
@@ -1098,16 +1124,27 @@ class ModelerApp extends AppBase {
     }
 
     setState(state) {
+        const hadSvg = !!this.svgText;
         this.fileName = state.fileName || '';
         this.storedName = state.storedName || '';
-        this.svgText = state.svgText || '';
+        const incomingSvg = state.svgText || '';
+        const sameSvg = this.svgText === incomingSvg;
+        this.svgText = incomingSvg;
         this.mainClassName = state.mainClassName || '';
         // Only keep the previous pan/zoom if this is the exact same SVG being
         // restored (e.g. tab switch). A new file from history/preview must reset.
-        const sameSvg = this.svgText === (state.svgText || '');
-        this.viewerState = sameSvg ? (state.viewerState || { scale: 1, x: 0, y: 0 }) : { scale: 1, x: 0, y: 0 };
+        this.viewerState = sameSvg ? (state.viewerState || this.viewerState || { scale: 1, x: 0, y: 0 }) : { scale: 1, x: 0, y: 0 };
         this._centerOnNextShow = !sameSvg;
         if (this.container) {
+            if (this.container.querySelector('#modeler-svg-viewer') && this.viewer && this.viewer.svg && sameSvg && hadSvg) {
+                // The live DOM already shows the right SVG with the right state.
+                // Just make sure observers are running and the title is updated.
+                this._observeResize();
+                this._observeSvgContainerResize();
+                this.setTitle(`Modéliseur: ${this.fileName}`);
+                this._updateAssistantToggleVisibility();
+                return;
+            }
             this.render(this.container);
         }
     }
@@ -1191,36 +1228,27 @@ class ModelerApp extends AppBase {
         this._resizeObserver.observe(this.container);
     }
 
+    onTabDeactivated() {
+        // The DOM is being cached, not destroyed. Stop expensive observers but
+        // leave the SVG viewer and its pan/zoom state intact so switching back
+        // feels instant.
+        if (this._resizeObserver) this._resizeObserver.disconnect();
+        if (this._svgResizeObserver) this._svgResizeObserver.disconnect();
+    }
+
     onTabActivated() {
         this.mounted = true;
-        // The DOM was cached while the tab was hidden. The SVG viewer object was
-        // destroyed during unmount, so recreate it for the existing container
-        // and restore the last pan/zoom/scroll state without re-centering.
-        const viewerContainer = this.container?.querySelector('#modeler-svg-viewer');
+        // The DOM was cached while the tab was hidden. The SVG viewer is still
+        // attached, so we only resume observers and make sure the viewer pane
+        // is visible without touching pan/zoom or re-injecting the SVG.
         const viewerPane = this.container?.querySelector('#modeler-viewer');
-        if (viewerContainer && this.svgText) {
-            if (this.viewer) {
-                this.viewer.destroy();
+        if (this.viewer && this.viewer.svg) {
+            if (viewerPane) {
+                viewerPane.classList.remove('hidden');
+                viewerPane.style.opacity = '1';
             }
-            this.viewer = new SvgViewer(viewerContainer, {
-                onTransform: (state) => { this.viewerState = state; }
-            });
-            // Wait a frame so the container has its real size before restoring the SVG
-            // and its saved pan/zoom state.
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    if (!this.viewer) return;
-                    this.viewer.setSvgAndRestore(this.svgText, this.mainClassName, this.viewerState);
-                    if (viewerPane) {
-                        viewerPane.classList.remove('hidden');
-                        viewerPane.style.opacity = '1';
-                    }
-                    this._observeSvgContainerResize();
-                    this._svgResizeObserver?.takeRecords();
-                });
-            });
+            this._observeSvgContainerResize();
         }
-        if (this._resizeObserver) this._resizeObserver.disconnect();
         this._observeResize();
         this._updateAssistantToggleVisibility();
     }

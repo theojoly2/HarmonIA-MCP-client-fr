@@ -102,6 +102,31 @@ class SvgViewer {
     }
 
     /**
+     * Replace the SVG while preserving the current pan/zoom state. Used when
+     * remounting a cached tab so the user view is not reset.
+     */
+    setSvgKeepState(svgText, mainClassName = '') {
+        const previousScale = this.state.scale;
+        const previousX = this.state.x;
+        const previousY = this.state.y;
+        const hadSvg = !!this.svg;
+        this.canvas.innerHTML = svgText
+            .replace(/style="background:#000000;"/g, 'style="background:#ffffff;"')
+            .replace(/background:#000000/g, 'background:#ffffff')
+            .replace(/\u003csvg/, '\u003csvg class="svg-diagram"');
+        this.svg = this.canvas.querySelector('svg.svg-diagram');
+        if (this.svg) this._makeSvgScalable();
+        // If we already had an SVG, restore the exact previous transform so the
+        // user view is preserved. For a brand-new mount we keep the default 1/0/0.
+        if (hadSvg) {
+            this.state.scale = previousScale;
+            this.state.x = previousX;
+            this.state.y = previousY;
+            this.applyTransform();
+        }
+    }
+
+    /**
      * Remove fixed width/height attributes so the SVG renders as a continuous
      * vector surface instead of a scaled bitmap, keeping zoom crisp.
      */
@@ -170,13 +195,15 @@ class SvgViewer {
         try { bounds = this.svg.getBBox(); }
         catch (e) { bounds = { x: 0, y: 0, width: parseFloat(this.svg.getAttribute('width')) || rect.width, height: parseFloat(this.svg.getAttribute('height')) || rect.height }; }
         if (!bounds || !bounds.width || !bounds.height) return;
-        const maxOverflow = 60;
+        const maxOverflow = Math.min(120, Math.max(rect.width, rect.height) * 0.2);
         const scaledWidth = bounds.width * this.state.scale;
         const scaledHeight = bounds.height * this.state.scale;
-        const minScreenLeft = maxOverflow - scaledWidth;
-        const maxScreenLeft = rect.width - maxOverflow;
-        const minScreenTop = maxOverflow - scaledHeight;
-        const maxScreenTop = rect.height - maxOverflow;
+        // Allow the diagram to be panned mostly off-screen; only clamp when it
+        // would be entirely gone, so user-positioned pan/zoom is preserved.
+        const minScreenLeft = Math.min(maxOverflow - scaledWidth, rect.width / 2 - scaledWidth);
+        const maxScreenLeft = rect.width - rect.width / 2;
+        const minScreenTop = Math.min(maxOverflow - scaledHeight, rect.height / 2 - scaledHeight);
+        const maxScreenTop = rect.height - rect.height / 2;
         const currentScreenLeft = this.state.x + bounds.x * this.state.scale;
         const currentScreenTop = this.state.y + bounds.y * this.state.scale;
         const clampedScreenLeft = Math.max(minScreenLeft, Math.min(maxScreenLeft, currentScreenLeft));

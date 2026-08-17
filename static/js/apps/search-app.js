@@ -27,6 +27,15 @@ class SearchApp extends AppBase {
     }
 
     async render(container) {
+        // If the container is the cached live DOM, just resume observers and
+        // focus without rebuilding, so scroll / selection / results stay intact.
+        if (this.container === container && container.querySelector('#search-wrapper-inner')) {
+            this._observeResize();
+            this._updateHomeModeClass();
+            const input = container.querySelector('#search-input');
+            if (input) input.focus();
+            return;
+        }
         this.container = container;
         const showTags = this._firstTagAnimation;
         if (showTags) {
@@ -474,6 +483,21 @@ class SearchApp extends AppBase {
         this._resizeObserver.observe(this.container);
     }
 
+    onTabDeactivated() {
+        // Suspend the resize observer while the tab is cached; the DOM and
+        // scroll state stay intact.
+        if (this._resizeObserver) this._resizeObserver.disconnect();
+    }
+
+    onTabActivated() {
+        this.mounted = true;
+        // Cached DOM is re-attached; just resume the resize observer.
+        this._observeResize();
+        this._updateHomeModeClass();
+        const input = this.container?.querySelector('#search-input');
+        if (input) input.focus();
+    }
+
     unmount() {
         this._stopTimer();
         if (this._resizeObserver) this._resizeObserver.disconnect();
@@ -506,7 +530,16 @@ class SearchApp extends AppBase {
         this.selectedTags = newSelectedTags;
         this.resultsHtml = newResultsHtml;
         this.tagsHtml = newTagsHtml;
-        if (this.container && changed) this.render(this.container);
+        if (!this.container) return;
+        // If the live DOM already shows the right content, don't rebuild it.
+        const liveMatchesState = !changed || (this.container.querySelector('#search-wrapper-inner')
+            && this.container.querySelector('#results-container')?.innerHTML === (this.resultsHtml || ''));
+        if (liveMatchesState) {
+            this._observeResize();
+            this._updateHomeModeClass();
+            return;
+        }
+        this.render(this.container);
     }
 }
 

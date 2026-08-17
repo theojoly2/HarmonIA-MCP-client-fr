@@ -40,6 +40,18 @@ class AssistantApp extends AppBase {
     }
 
     render(container) {
+        // If the container is the cached live DOM, don't rebuild. The SSE events
+        // kept flowing in the background, so the chat is already up-to-date.
+        if (this.container === container && container.querySelector('#assistant-chat')) {
+            this._observeResize();
+            this._applyCentering(true);
+            if (this.messagesEl && this.messagesEl.children.length > 0) {
+                this.chatEl.classList.add('assistant-chat-mode');
+                this.welcomeEl.classList.add('assistant-welcome-top');
+                this.inputArea.classList.add('assistant-input-area-chat');
+            }
+            return;
+        }
         this.container = container;
         this._embedded = this._embedded || !!(this.props.linkedModelerInstanceId || this._linkedModelerInstanceId);
         const embeddedClass = this._embedded ? 'assistant-embedded' : '';
@@ -318,38 +330,40 @@ class AssistantApp extends AppBase {
         if (this._resizeObserver) this._resizeObserver.disconnect();
         this._resizeObserver = null;
         this.mounted = false;
+        // Only abort an active SSE stream when the instance is actually closed,
+        // not when the tab is simply hidden/cached.
+        if (this._eventSource) {
+            this._eventSource.close();
+            this._eventSource = null;
+        }
+    }
+
+    onTabDeactivated() {
+        // The DOM is cached, not destroyed. Stop the resize observer and mark as
+        // not visible, but keep the SSE connection / event buffer alive.
+        this.mounted = false;
+        this._visible = false;
+        if (this._resizeObserver) this._resizeObserver.disconnect();
     }
 
     onTabActivated() {
         this.mounted = true;
-        // The DOM was cached while the tab was hidden, so no rebuild is needed.
-        // Make sure the chat layout stays in chat mode if messages are present.
+        this._visible = true;
+        // The DOM was cached while the tab was hidden and events kept flowing,
+        // so the chat is already up-to-date. Just make sure layout is correct.
         if (this.messagesEl && this.messagesEl.children.length > 0) {
             this.chatEl.classList.add('assistant-chat-mode');
             this.welcomeEl.classList.add('assistant-welcome-top');
             this.inputArea.classList.add('assistant-input-area-chat');
         }
-        // Replay any events that arrived while hidden so the UI catches up.
-        if (this._pendingEvents && this._pendingEvents.length > 0) {
-            const eventsToReplay = this._pendingEvents.slice(this._lastRenderedEventIndex + 1);
-            this._lastRenderedEventIndex = this._pendingEvents.length - 1;
-            for (const ev of eventsToReplay) {
-                this._processEvent(ev, {
-                    typewriter: null,
-                    resetBubble: () => {},
-                    finalizeText: async () => {},
-                    saveHtmlSnapshot: () => {
-                        if (this.messagesEl) {
-                            this.messagesHtml = this.messagesEl.innerHTML;
-                        }
-                    },
-                    placeholderRef: { value: null },
-                });
-            }
-        }
         if (this._resizeObserver) this._resizeObserver.disconnect();
         this._observeResize();
         this._applyCentering(true);
+        if (this.chatEl) {
+            requestAnimationFrame(() => {
+                this.chatEl.scrollTo({ top: this.chatEl.scrollHeight, behavior: 'auto' });
+            });
+        }
     }
 
     _escape(text) {
@@ -1698,9 +1712,9 @@ class AssistantApp extends AppBase {
         };
 
         const liveHandler = async (event) => {
-            if (!this.mounted || !this.messagesEl) {
-                // The user switched away from this tab while the stream was running.
-                // Queue the event for replay when the tab is restored.
+            // The DOM may be cached/visible. If messagesEl exists (it does when
+            // cached because we keep the container), process live. Otherwise queue.
+            if (!this.messagesEl) {
                 this._pendingEvents.push(event);
                 return;
             }
@@ -1715,9 +1729,8 @@ class AssistantApp extends AppBase {
 
             this._processEvent(event, { typewriter, resetBubble, finalizeText, saveHtmlSnapshot, placeholderRef: { value: placeholder } });
 
-            // Re-attach currentBubble to the new DOM after a tab switch. The snapshot
-            // HTML is restored into a fresh messagesEl, so the previous bubble
-            // reference is stale. Find it again by matching the accumulated text.
+            // Re-attach currentBubble if it was disconnected (rare if the DOM was
+            // rebuilt). With cached DOM it always stays connected.
             if (this._currentStreamingText && (!currentBubble || !currentBubble.isConnected)) {
                 const wrappers = Array.from(this.messagesEl.querySelectorAll('[data-role="assistant"][data-active="true"]'));
                 const match = wrappers.find((w) => {
