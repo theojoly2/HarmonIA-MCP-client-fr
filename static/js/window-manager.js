@@ -33,7 +33,17 @@ class WindowManager {
      */
     switchToApp(appId) {
         const existing = AppState.listInstances()
-            .filter((i) => i.appId === appId && (i.mode === 'tab' || i.mode === 'split'))
+            .filter((i) => {
+                if (i.appId !== appId) return false;
+                if (i.mode !== 'tab' && i.mode !== 'split') return false;
+                // The nav Assistant button must always target a standalone
+                // assistant tab, never the assistant pane embedded in a modeler split.
+                if (appId === 'assistant' && i.mode === 'split') {
+                    const rec = AppState.getRecord(i.instanceId);
+                    if (rec?.meta?.origin === 'modeler' || rec?.meta?.linkedModelerInstanceId) return false;
+                }
+                return true;
+            })
             .pop();
         if (existing) {
             this.switchTab(existing.instanceId);
