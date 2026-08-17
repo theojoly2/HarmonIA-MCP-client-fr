@@ -58,7 +58,16 @@ class WindowManager {
         // Tab/split apps are singleton-like: reuse the existing instance.
         if (mode === 'tab' || mode === 'split') {
             const existing = AppState.listInstances()
-                .filter((i) => i.appId === appId && (i.mode === 'tab' || i.mode === 'split'))
+                .filter((i) => {
+                    if (i.appId !== appId || (i.mode !== 'tab' && i.mode !== 'split')) return false;
+                    // The Assistant nav button must never target the modeler-embedded
+                    // assistant pane; it must always open/create a standalone tab.
+                    if (appId === 'assistant') {
+                        const meta = AppState.getRecord(i.instanceId)?.meta || {};
+                        if (meta.origin === 'modeler' || meta.linkedModelerInstanceId) return false;
+                    }
+                    return true;
+                })
                 .pop();
             if (existing) {
                 this.switchTab(existing.instanceId);
