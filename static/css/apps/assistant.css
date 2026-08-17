@@ -973,6 +973,10 @@
     align-items: center;
 }
 
+.assistant-app.assistant-embedded .assistant-messages {
+    padding-bottom: 0;
+}
+
 .assistant-bubble {
     width: 42rem;
     max-width: 100%;

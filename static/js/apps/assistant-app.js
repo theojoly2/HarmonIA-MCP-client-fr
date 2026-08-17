@@ -519,7 +519,7 @@ class AssistantApp extends AppBase {
             // input area so the last message is not hidden behind it.
             const inputHeight = this.inputArea.getBoundingClientRect().height;
             if (this.chatEl && inputHeight) {
-                this.chatEl.style.paddingBottom = `${inputHeight + 16}px`;
+                this.chatEl.style.paddingBottom = `${inputHeight + 8}px`;
             }
             return;
         }
