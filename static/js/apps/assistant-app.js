@@ -364,7 +364,9 @@ class AssistantApp extends AppBase {
         if (this.chatEl) {
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
-                    this.chatEl.scrollTo({ top: this.chatEl.scrollHeight, behavior: 'auto' });
+                    requestAnimationFrame(() => {
+                        this._scrollToBottom(true);
+                    });
                 });
             });
         }
@@ -1550,13 +1552,13 @@ class AssistantApp extends AppBase {
         return '';
     }
 
-    _scrollToBottom() {
+    _scrollToBottom(force = false) {
         const el = this.chatEl;
         if (!el) return;
         const threshold = 80; // px from bottom to consider "at bottom"
         const isNearBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < threshold;
-        if (isNearBottom) {
-            el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+        if (force || isNearBottom) {
+            el.scrollTo({ top: el.scrollHeight, behavior: force ? 'auto' : 'smooth' });
         }
     }
 
