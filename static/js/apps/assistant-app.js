@@ -18,6 +18,9 @@ class AssistantApp extends AppBase {
         super(instanceId, props);
         this.session = props.session || '';
         this.modelName = props.modelName || '';
+        // Context separates the standalone assistant from the modeler assistant so
+        // their conversations never collide.
+        this.context = props.context || 'assistant';
         this.messages = [];
         this.isStreaming = false;
         this.messagesHtml = '';
@@ -241,6 +244,7 @@ class AssistantApp extends AppBase {
         return {
             session: this.session,
             modelName: this.modelName,
+            context: this.context || 'assistant',
             messagesHtml: this.messagesEl ? this.messagesEl.innerHTML : '',
             welcomeTop: this.welcomeEl ? this.welcomeEl.classList.contains('assistant-welcome-top') : false,
             chatMode: this.chatEl ? this.chatEl.classList.contains('assistant-chat-mode') : false,
@@ -255,6 +259,7 @@ class AssistantApp extends AppBase {
         if (!state || !Object.keys(state).length) return;
         if (state.session !== undefined) this.session = state.session;
         if (state.modelName !== undefined) this.modelName = state.modelName;
+        if (state.context !== undefined) this.context = state.context || 'assistant';
         if (state.isStreaming !== undefined) this.isStreaming = state.isStreaming;
         // Only restore the message HTML if we actually have saved HTML. An empty
         // saved state must not wipe out messages that were just loaded from history.
@@ -343,7 +348,8 @@ class AssistantApp extends AppBase {
 
     _newSession() {
         this.session = '';
-        this.modelName = '';
+        // Keep the model name and context: a new conversation inside the modeler
+        // should still be about the current model, and standalone should stay standalone.
         this.messages = [];
         this.messagesEl.innerHTML = '';
         // Prevent the history session from being reloaded when the tab is
@@ -483,7 +489,7 @@ class AssistantApp extends AppBase {
     async _importModel(file) {
         if (!file) return;
         try {
-            const result = await ApiClient.importAssistantModel(file, file.name);
+            const result = await ApiClient.importAssistantModel(file, file.name, this.context);
             if (result?.name) {
                 this.modelName = result.name;
                 this._appendSystemMessage(`Modèle **${this._escape(result.display_name || result.name)}** importé avec succès. Vous pouvez maintenant lui poser des questions.`);
@@ -601,8 +607,8 @@ class AssistantApp extends AppBase {
     }
 
     async loadHistory(session) {
-        console.log('[AssistantApp] loadHistory', session);
-        const data = await ApiClient.getAssistantHistory(session);
+        console.log('[AssistantApp] loadHistory', session, this.context);
+        const data = await ApiClient.getAssistantHistory(session, this.context);
         console.log('[AssistantApp] history data', data);
         if (!data || !Array.isArray(data.messages)) {
             console.warn('[AssistantApp] no messages in history data');
@@ -1700,7 +1706,8 @@ class AssistantApp extends AppBase {
                 text,
                 this.modelName,
                 this.selectedTags || [],
-                liveHandler
+                liveHandler,
+                { context: this.context }
             );
         } catch (err) {
             console.error('Assistant stream error', err);

@@ -635,6 +635,7 @@ class ModelerApp extends AppBase {
         return instances.find((i) =>
             i.appId === 'assistant' &&
             AppState.getRecord(i.instanceId)?.meta?.modelName === this.storedName &&
+            AppState.getRecord(i.instanceId)?.meta?.context === 'modeler' &&
             AppState.getRecord(i.instanceId)?.mode === 'split'
         ) || null;
     }
@@ -671,7 +672,7 @@ class ModelerApp extends AppBase {
         let displayName = this._pendingAssistantDisplayName || '';
         if (!session) {
             try {
-                const data = await ApiClient.findAssistantSessionByModel(this.storedName);
+                const data = await ApiClient.findAssistantSessionByModel(this.storedName, 'modeler');
                 if (data.session) {
                     session = data.session;
                     displayName = '';
@@ -690,6 +691,7 @@ class ModelerApp extends AppBase {
             await window.windowManager.splitPanel(this.instanceId, 'assistant', {
                 modelName: this.storedName,
                 linkedModelerInstanceId: this.instanceId,
+                context: 'modeler',
                 session,
                 display_name: displayName,
                 fromModeler: true,
