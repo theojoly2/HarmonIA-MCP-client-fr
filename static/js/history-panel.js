@@ -93,7 +93,7 @@ class HistoryPanel {
                 // Only sessions created from the modeler are attached to modeler
                 // items. Standalone assistant conversations remain separate.
                 const modelerSessionByModel = new Map();
-                (assistantRes.sessions || []).forEach((s) => {
+                (modelerAssistantRes.sessions || []).forEach((s) => {
                     if (!s.model_name || s.origin !== "modeler") return;
                     const existing = modelerSessionByModel.get(s.model_name);
                     if (!existing || (s.last_opened_at || 0) > (existing.last_opened_at || 0)) {
@@ -138,7 +138,7 @@ class HistoryPanel {
                         display_name: s.display_name || s.preview || s.name,
                         source_format: "conversation",
                         sortKey: Number(s.last_opened_at) || 0,
-                        context: s.context || "assistant",
+                        origin: s.origin || "assistant",
                     }));
             }
             if (modelerAssistantRes && modelerAssistantRes.sessions) {
@@ -152,7 +152,7 @@ class HistoryPanel {
                     display_name: s.display_name || s.preview || s.name,
                     source_format: "conversation modéliseur",
                     sortKey: Number(s.last_opened_at) || 0,
-                    context: s.context || "modeler",
+                    origin: s.origin || "modeler",
                 }));
             }
             this.items = [...models, ...searches, ...conversations, ...modelerConversations].sort((a, b) => b.sortKey - a.sortKey);
@@ -182,7 +182,7 @@ class HistoryPanel {
             li.dataset.itemKind = item.kind;
             if (isSearch) li.dataset.searchId = item.id;
             if (isAssistant || isModelerAssistant) li.dataset.modelName = item.model_name || "";
-            if (isAssistant || isModelerAssistant) li.dataset.context = item.context || (isModelerAssistant ? "modeler" : "assistant");
+            if (isAssistant || isModelerAssistant) li.dataset.origin = item.origin || (isModelerAssistant ? "modeler" : "assistant");
             if (!isSearch && !isAssistant && !isModelerAssistant) {
                 li.dataset.assistantSession = item.assistant_session || "";
                 li.dataset.assistantDisplayName = item.assistant_display_name || "";
@@ -326,7 +326,7 @@ class HistoryPanel {
                 if (isSearch) {
                     await ApiClient.deleteSearch(item.id);
                 } else if (isAssistant) {
-                    const ctx = item.context || "assistant";
+                    const ctx = item.origin || "assistant";
                     await ApiClient.deleteAssistantSession(item.name, ctx);
                     // If this conversation is linked to a model imported through the
                     // assistant, also delete the linked model.
@@ -337,7 +337,7 @@ class HistoryPanel {
                         }).catch((err) => console.error("Delete linked model error", err));
                     }
                 } else if (isModelerAssistant) {
-                    const ctx = item.context || "modeler";
+                    const ctx = item.origin || "modeler";
                     await ApiClient.deleteAssistantSession(item.name, ctx);
                 } else {
                     const encodedName = encodeURIComponent(item.name);
@@ -399,9 +399,9 @@ class HistoryPanel {
             try {
                 let res;
                 if (kind === "assistant" || kind === "modeler_assistant") {
-                    const ctx = item.context || (kind === "modeler_assistant" ? "modeler" : "assistant");
+                    const ctx = item.origin || (kind === "modeler_assistant" ? "modeler" : "assistant");
                     const encodedSession = encodeURIComponent(storedName);
-                    res = await fetch(`api/assistant/sessions/${encodedSession}/rename?context=${encodeURIComponent(ctx)}`, {
+                    res = await fetch(`api/assistant/sessions/${encodedSession}/rename?origin=${encodeURIComponent(ctx)}`, {
                         method: "PATCH",
                         headers: { "Content-Type": "application/json" },
                         credentials: "same-origin",
@@ -416,7 +416,7 @@ class HistoryPanel {
                     AppState.listInstances().forEach((info) => {
                         if (info.appId !== "assistant") return;
                         const inst = AppState.getInstance(info.instanceId);
-                        if (inst && inst.session === storedName && inst.context === ctx) {
+                        if (inst && inst.session === storedName && inst.origin === ctx) {
                             inst.session = newStoredName;
                             inst.props.session = newStoredName;
                             inst.props.fromHistory = true;
@@ -533,12 +533,12 @@ class HistoryPanel {
         }
     }
 
-    async _openAssistant(sessionName, modelName, context = "assistant") {
+    async _openAssistant(sessionName, modelName, origin = "assistant") {
         this.close();
         try {
             // Touch the session on the backend so it moves to the top of the
             // history list even when it is just reopened without a new message.
-            await ApiClient.touchAssistantSession(sessionName, context);
+            await ApiClient.touchAssistantSession(sessionName, origin);
             const existingAssistant = AppState.listInstances().find((i) => i.appId === "assistant");
             if (existingAssistant) {
                 AppState.removeInstance(existingAssistant.instanceId);
@@ -547,7 +547,7 @@ class HistoryPanel {
                 mode: "tab",
                 session: sessionName,
                 modelName: modelName,
-                context: context,
+                origin: origin,
                 fromHistory: true,
             });
             await windowManager._mountTab(assistantInstance.instance);
@@ -610,7 +610,7 @@ class HistoryPanel {
                     return;
                 }
                 if (item.kind === "assistant") {
-                    const ctx = item.context || "assistant";
+                    const ctx = item.origin || "assistant";
                     const sessionKey = `${ctx}__${item.name}`;
                     if (!deletedSessions.has(sessionKey)) {
                         deletedSessions.add(sessionKey);
@@ -628,7 +628,7 @@ class HistoryPanel {
                     return;
                 }
                 if (item.kind === "modeler_assistant") {
-                    const ctx = item.context || "modeler";
+                    const ctx = item.origin || "modeler";
                     const sessionKey = `${ctx}__${item.name}`;
                     if (!deletedSessions.has(sessionKey)) {
                         deletedSessions.add(sessionKey);

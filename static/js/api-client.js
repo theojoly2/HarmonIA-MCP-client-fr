@@ -276,8 +276,8 @@ const ApiClient = (() => {
         }
     }
 
-    async function getAssistantSessions(context) {
-        const qs = context ? `?context=${encodeURIComponent(context)}` : "";
+    async function getAssistantSessions(origin) {
+        const qs = origin ? `?origin=${encodeURIComponent(origin)}` : "";
         const res = await fetch(apiUrl(`assistant/sessions${qs}`), { credentials: "same-origin" });
         if (!res.ok) throw new Error(`Assistant sessions failed: ${res.status}`);
         return res.json();
@@ -291,18 +291,18 @@ const ApiClient = (() => {
         return res.json();
     }
 
-    async function getAssistantHistory(session, context = "assistant") {
+    async function getAssistantHistory(session, origin = "assistant") {
         if (!session) return { messages: [] };
-        const res = await fetch(apiUrl(`assistant/history?session=${encodeURIComponent(session)}&context=${encodeURIComponent(context)}`), {
+        const res = await fetch(apiUrl(`assistant/history?session=${encodeURIComponent(session)}&origin=${encodeURIComponent(origin)}`), {
             credentials: "same-origin",
         });
         if (!res.ok) throw new Error(`Assistant history failed: ${res.status}`);
         return res.json();
     }
 
-    async function deleteAssistantSession(session, context = "assistant") {
+    async function deleteAssistantSession(session, origin = "assistant") {
         if (!session) return { ok: true };
-        const res = await fetch(apiUrl(`assistant/sessions/${encodeURIComponent(session)}?context=${encodeURIComponent(context)}`), {
+        const res = await fetch(apiUrl(`assistant/sessions/${encodeURIComponent(session)}?origin=${encodeURIComponent(origin)}`), {
             method: "DELETE",
             credentials: "same-origin",
         });
@@ -310,9 +310,9 @@ const ApiClient = (() => {
         return res.json();
     }
 
-    async function touchAssistantSession(session, context = "assistant") {
+    async function touchAssistantSession(session, origin = "assistant") {
         if (!session) return { ok: true };
-        const res = await fetch(apiUrl(`assistant/sessions/${encodeURIComponent(session)}/open?context=${encodeURIComponent(context)}`), {
+        const res = await fetch(apiUrl(`assistant/sessions/${encodeURIComponent(session)}/open?origin=${encodeURIComponent(origin)}`), {
             method: "POST",
             credentials: "same-origin",
         });

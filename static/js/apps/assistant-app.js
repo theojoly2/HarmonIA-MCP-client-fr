@@ -381,7 +381,7 @@ class AssistantApp extends AppBase {
 
     _newSession() {
         this.session = '';
-        // Keep the model name and context: a new conversation inside the modeler
+        // Keep the model name and origin: a new conversation inside the modeler
         // should still be about the current model, and standalone should stay standalone.
         this.messages = [];
         this.messagesEl.innerHTML = '';
@@ -640,8 +640,8 @@ class AssistantApp extends AppBase {
     }
 
     async loadHistory(session) {
-        console.log('[AssistantApp] loadHistory', session, this.context);
-        const data = await ApiClient.getAssistantHistory(session, this.context);
+        console.log('[AssistantApp] loadHistory', session, this.origin);
+        const data = await ApiClient.getAssistantHistory(session, this.origin);
         console.log('[AssistantApp] history data', data);
         if (!data || !Array.isArray(data.messages)) {
             console.warn('[AssistantApp] no messages in history data');

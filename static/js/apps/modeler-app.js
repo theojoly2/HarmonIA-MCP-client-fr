@@ -635,7 +635,7 @@ class ModelerApp extends AppBase {
         return instances.find((i) =>
             i.appId === 'assistant' &&
             AppState.getRecord(i.instanceId)?.meta?.modelName === this.storedName &&
-            AppState.getRecord(i.instanceId)?.meta?.context === 'modeler' &&
+            AppState.getRecord(i.instanceId)?.meta?.origin === 'modeler' &&
             AppState.getRecord(i.instanceId)?.mode === 'split'
         ) || null;
     }
