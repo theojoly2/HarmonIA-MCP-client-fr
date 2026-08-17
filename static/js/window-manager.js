@@ -78,6 +78,13 @@ class WindowManager {
 
     _mountFloating(instance, props) {
         AppState.saveInstanceState(instance.instanceId);
+        // Floating windows get a fresh container; clear any stale cached tab DOM
+        // so the instance is rebuilt cleanly if it later returns to tab mode.
+        const cachedContainer = this._tabDomCache.get(instance.instanceId);
+        if (cachedContainer) {
+            cachedContainer.remove();
+            this._tabDomCache.delete(instance.instanceId);
+        }
         const { width = 800, height = 600, offsetX = 0, offsetY = 0 } = props;
         let resizeAnchorSaved = false;
         const floatWin = UiUtils.createFloatingWindow({
@@ -127,6 +134,13 @@ class WindowManager {
 
     _mountSplit(instance, props) {
         AppState.saveInstanceState(instance.instanceId);
+        // Split mode uses a fresh pane; clear any stale cached tab DOM so the
+        // instance is rebuilt cleanly if it later returns to tab mode.
+        const cachedContainer = this._tabDomCache.get(instance.instanceId);
+        if (cachedContainer) {
+            cachedContainer.remove();
+            this._tabDomCache.delete(instance.instanceId);
+        }
         const { targetInstanceId, direction = 'horizontal' } = props;
         let tree = this.splitManager.tree;
         if (!tree) {
@@ -257,6 +271,16 @@ class WindowManager {
             cachedContainer.remove();
             this._tabDomCache.delete(instanceId);
         }
+        // If the closed instance is part of a split tree, collapse the split
+        // around the remaining leaf so the shell is not left empty.
+        if (this.splitManager.tree) {
+            const leaves = this._collectLeaves(this.splitManager.tree);
+            if (leaves.some((l) => l.instanceId === instanceId)) {
+                const remaining = leaves.find((l) => l.instanceId !== instanceId);
+                this.splitManager.setTree(remaining || null);
+                this.splitManager.render();
+            }
+        }
         if (this.shellElement.querySelector(`[data-instance-id="${instanceId}"]`)) {
             this.shellElement.innerHTML = '';
         }
@@ -294,8 +318,22 @@ class WindowManager {
         }
 
         // Otherwise, collapse any existing split and switch to a full tab.
+        // Before destroying the split, save state and cleanly unmount every leaf
+        // so their data (e.g. modeler svgText, chat history) is preserved.
         if (this.splitManager.tree) {
             const leaves = this._collectLeaves(this.splitManager.tree);
+            for (const leaf of leaves) {
+                if (leaf.instanceId === instanceId) continue;
+                const leafInstance = AppState.getInstance(leaf.instanceId);
+                if (leafInstance) {
+                    AppState.saveInstanceState(leaf.instanceId);
+                    if (typeof leafInstance.onTabDeactivated === 'function') {
+                        leafInstance.onTabDeactivated();
+                    } else if (typeof leafInstance.unmount === 'function') {
+                        leafInstance.unmount();
+                    }
+                }
+            }
             const keep = leaves.find(l => l.instanceId === instanceId);
             this.splitManager.setTree(keep || { type: 'pane', instanceId });
             this.splitManager.render();
@@ -403,8 +441,15 @@ class WindowManager {
 
         // Cleanly unmount the target from its current container before re-mounting
         // it inside the split tree. This avoids stale DOM / double-mount issues.
+        // Also clear the cached tab DOM so the target is rebuilt cleanly if it
+        // later returns to tab mode.
         if (typeof targetInstance.unmount === 'function') {
             targetInstance.unmount();
+        }
+        const targetCached = this._tabDomCache.get(targetInstanceId);
+        if (targetCached) {
+            targetCached.remove();
+            this._tabDomCache.delete(targetInstanceId);
         }
         AppState.saveInstanceState(targetInstanceId);
 

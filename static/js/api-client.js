@@ -287,7 +287,10 @@ const ApiClient = (() => {
         const res = await fetch(apiUrl(`assistant/sessions/by-model?model_name=${encodeURIComponent(modelName)}&origin=${encodeURIComponent(origin)}`), {
             credentials: "same-origin",
         });
-        if (!res.ok) return { session: "" };
+        // 404 simply means no prior conversation exists for this model. Do not log
+        // an error; the caller will start a fresh session.
+        if (res.status === 404) return { session: "" };
+        if (!res.ok) throw new Error(`findAssistantSessionByModel failed: ${res.status}`);
         return res.json();
     }
 
