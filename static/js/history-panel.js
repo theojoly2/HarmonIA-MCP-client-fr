@@ -127,18 +127,10 @@ class HistoryPanel {
                 }));
             }
             if (assistantRes && assistantRes.sessions) {
-<<<<<<< HEAD
                 // Show standalone assistant conversations. Modeler-originated
                 // sessions are surfaced through the modeler item, not here.
                 conversations = assistantRes.sessions
                     .filter((s) => s.origin !== "modeler")
-=======
-                // Standalone assistant conversations imported through the
-                // assistant tab. Modeler-linked conversations are listed
-                // separately under the modeler entries.
-                conversations = assistantRes.sessions
-                    .filter((s) => !s.model_name || (modelsData.models || []).some((m) => m.name === s.model_name && m.imported_from_assistant))
->>>>>>> f6b2c3c93cb1b8af013d0423758b3c3e910383e6
                     .map((s) => ({
                         ...s,
                         kind: "assistant",

@@ -61,19 +61,11 @@ const ApiClient = (() => {
         return res.json();
     }
 
-<<<<<<< HEAD
     async function importAssistantModel(file, name, origin = "assistant") {
         const form = new FormData();
         form.append("file", file);
         if (name) form.append("name", name);
         form.append("origin", origin);
-=======
-    async function importAssistantModel(file, name, context = "assistant") {
-        const form = new FormData();
-        form.append("file", file);
-        if (name) form.append("name", name);
-        form.append("context", context);
->>>>>>> f6b2c3c93cb1b8af013d0423758b3c3e910383e6
         const res = await fetch(apiUrl("assistant/import"), {
             method: "POST",
             credentials: "same-origin",
@@ -205,20 +197,12 @@ const ApiClient = (() => {
     }
 
     async function streamAssistant(session, userMessage, modelName, tags, onEvent, options = {}) {
-<<<<<<< HEAD
         const origin = options.origin || "assistant";
-=======
-        const context = options.context || "assistant";
->>>>>>> f6b2c3c93cb1b8af013d0423758b3c3e910383e6
         const res = await fetch(apiUrl("assistant/stream"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "same-origin",
-<<<<<<< HEAD
             body: JSON.stringify({ session, user_message: userMessage, model_name: modelName || "", tags: tags || [], origin }),
-=======
-            body: JSON.stringify({ session, user_message: userMessage, model_name: modelName || "", tags: tags || [], context }),
->>>>>>> f6b2c3c93cb1b8af013d0423758b3c3e910383e6
         });
         if (!res.ok || !res.body) throw new Error(`Assistant stream failed: ${res.status}`);
 
@@ -299,13 +283,8 @@ const ApiClient = (() => {
         return res.json();
     }
 
-<<<<<<< HEAD
     async function findAssistantSessionByModel(modelName, origin = "modeler") {
         const res = await fetch(apiUrl(`assistant/sessions/by-model?model_name=${encodeURIComponent(modelName)}&origin=${encodeURIComponent(origin)}`), {
-=======
-    async function findAssistantSessionByModel(modelName, context = "modeler") {
-        const res = await fetch(apiUrl(`assistant/sessions/by-model?model_name=${encodeURIComponent(modelName)}&context=${encodeURIComponent(context)}`), {
->>>>>>> f6b2c3c93cb1b8af013d0423758b3c3e910383e6
             credentials: "same-origin",
         });
         if (!res.ok) return { session: "" };
