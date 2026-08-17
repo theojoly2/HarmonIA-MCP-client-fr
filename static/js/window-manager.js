@@ -19,6 +19,11 @@ class WindowManager {
         // Cache DOM containers for tab instances so switching tabs does not destroy
         // the rendered app. Each tab keeps its own live DOM tree.
         this._tabDomCache = new Map(); // instanceId -> HTMLElement
+        // Cache for split views. A split has one DOM tree but multiple instanceIds,
+        // so we store the same DOM/tree under each leaf instanceId. When the user
+        // switches back to any leaf, the whole split is restored exactly as it was.
+        this._splitDomCache = new Map(); // instanceId -> HTMLElement
+        this._splitTreeCache = new Map(); // instanceId -> tree
         window.addEventListener('resize', this._viewportHandler);
     }
 
@@ -277,6 +282,16 @@ class WindowManager {
             const leaves = this._collectLeaves(this.splitManager.tree);
             if (leaves.some((l) => l.instanceId === instanceId)) {
                 const remaining = leaves.find((l) => l.instanceId !== instanceId);
+                if (remaining) {
+                    const remainingInstance = AppState.getInstance(remaining.instanceId);
+                    if (remainingInstance) {
+                        AppState.saveInstanceState(remaining.instanceId);
+                        if (typeof remainingInstance.unmount === 'function') {
+                            remainingInstance.unmount();
+                        }
+                    }
+                }
+                this._clearSplitCache(...leaves.map((l) => l.instanceId));
                 this.splitManager.setTree(remaining || null);
                 this.splitManager.render();
             }
@@ -294,14 +309,13 @@ class WindowManager {
         const instance = AppState.getInstance(instanceId);
         if (!instance) return;
         const record = AppState.getRecord(instanceId);
-        if (record) record.mode = 'tab';
 
-        // If the target instance is part of the current split view, just activate
-        // its pane instead of tearing down the split.
+        const activeInstanceId = AppState.getActiveInstance();
+        const activeInstance = activeInstanceId ? AppState.getInstance(activeInstanceId) : null;
+
+        // 1. Target is part of the currently visible split -> just activate its pane.
         if (this.splitManager.containsInstance(instanceId)) {
-            const activeInstanceId = AppState.getActiveInstance();
             if (activeInstanceId !== instanceId) {
-                const activeInstance = AppState.getInstance(activeInstanceId);
                 if (activeInstance && typeof activeInstance.onTabDeactivated === 'function') {
                     activeInstance.onTabDeactivated();
                 }
@@ -317,42 +331,83 @@ class WindowManager {
             return;
         }
 
-        // Otherwise, collapse any existing split and switch to a full tab.
-        // Before destroying the split, save state and cleanly unmount every leaf
-        // so their data (e.g. modeler svgText, chat history) is preserved.
-        if (this.splitManager.tree) {
-            const leaves = this._collectLeaves(this.splitManager.tree);
-            for (const leaf of leaves) {
-                if (leaf.instanceId === instanceId) continue;
-                const leafInstance = AppState.getInstance(leaf.instanceId);
-                if (leafInstance) {
-                    AppState.saveInstanceState(leaf.instanceId);
-                    if (typeof leafInstance.onTabDeactivated === 'function') {
-                        leafInstance.onTabDeactivated();
-                    } else if (typeof leafInstance.unmount === 'function') {
-                        leafInstance.unmount();
+        // 2. Target is in a cached split -> restore the whole split view.
+        if (this._splitDomCache.has(instanceId) && this._splitTreeCache.has(instanceId)) {
+            // Suspend whatever is currently visible before swapping it out.
+            if (activeInstanceId && activeInstanceId !== instanceId) {
+                if (activeInstance && typeof activeInstance.onTabDeactivated === 'function') {
+                    activeInstance.onTabDeactivated();
+                }
+                AppState.saveInstanceState(activeInstanceId);
+                const currentDom = this.shellElement.firstChild;
+                if (activeInstance && currentDom) {
+                    if (this.splitManager.tree) {
+                        // The current view is a split; cache it for all its leaves.
+                        this._cacheCurrentSplit();
+                    } else {
+                        this._tabDomCache.set(activeInstanceId, currentDom);
                     }
                 }
+                while (this.shellElement.firstChild) {
+                    this.shellElement.removeChild(this.shellElement.firstChild);
+                }
             }
-            const keep = leaves.find(l => l.instanceId === instanceId);
-            this.splitManager.setTree(keep || { type: 'pane', instanceId });
-            this.splitManager.render();
+            this.splitManager.unregisterRenderer(instanceId);
+            const splitDom = this._splitDomCache.get(instanceId);
+            const splitTree = this._splitTreeCache.get(instanceId);
+            this.shellElement.appendChild(splitDom);
+            this.splitManager.tree = splitTree;
+            // Activate the requested pane; the other pane is already live and
+            // will resume via the active pane notification if needed.
+            this.splitManager.setActiveLeaf(instanceId);
+            if (typeof instance.onTabActivated === 'function') {
+                instance.onTabActivated();
+            }
+            AppState.setActiveInstance(instanceId);
+            return;
         }
-        // Suspend the currently visible tab before caching its DOM so it can stop
-        // expensive observers / streams without losing live state.
-        const activeInstanceId = AppState.getActiveInstance();
-        const activeInstance = activeInstanceId ? AppState.getInstance(activeInstanceId) : null;
-        if (activeInstance && typeof activeInstance.onTabDeactivated === 'function') {
-            activeInstance.onTabDeactivated();
+
+        // 3. Normal tab switch. If a split is currently visible, cache it first.
+        if (this.splitManager.tree) {
+            this._cacheCurrentSplit();
+            while (this.shellElement.firstChild) {
+                this.shellElement.removeChild(this.shellElement.firstChild);
+            }
+        } else if (activeInstanceId && activeInstanceId !== instanceId) {
+            if (activeInstance && typeof activeInstance.onTabDeactivated === 'function') {
+                activeInstance.onTabDeactivated();
+            }
+            AppState.saveInstanceState(activeInstanceId);
+            const currentDom = this.shellElement.firstChild;
+            if (currentDom) this._tabDomCache.set(activeInstanceId, currentDom);
+            while (this.shellElement.firstChild) {
+                this.shellElement.removeChild(this.shellElement.firstChild);
+            }
         }
-        // Detach the currently visible tab container from the shell without
-        // destroying it; it remains cached in _tabDomCache for fast restoration.
-        while (this.shellElement.firstChild) {
-            this.shellElement.removeChild(this.shellElement.firstChild);
-        }
+
+        if (record) record.mode = 'tab';
         AppState.saveInstanceState(instanceId);
         await this._mountTab(instance);
         AppState.setActiveInstance(instanceId);
+    }
+
+    _cacheCurrentSplit() {
+        if (!this.splitManager.tree) return;
+        const leaves = this._collectLeaves(this.splitManager.tree);
+        const splitDom = this.shellElement.firstChild;
+        if (!splitDom) return;
+        // Deactivate every leaf so observers/streams are suspended while cached.
+        for (const leaf of leaves) {
+            const leafInstance = AppState.getInstance(leaf.instanceId);
+            if (leafInstance && typeof leafInstance.onTabDeactivated === 'function') {
+                leafInstance.onTabDeactivated();
+            }
+            AppState.saveInstanceState(leaf.instanceId);
+        }
+        for (const leaf of leaves) {
+            this._splitDomCache.set(leaf.instanceId, splitDom);
+            this._splitTreeCache.set(leaf.instanceId, this.splitManager.tree);
+        }
     }
 
     /**
@@ -364,6 +419,8 @@ class WindowManager {
         const keepInstance = AppState.getInstance(keepInstanceId);
         const removeRecord = AppState.getRecord(removeInstanceId);
         if (!keepInstance) return;
+        // Clear any cached split state: the split is being closed intentionally.
+        this._clearSplitCache(keepInstanceId, removeInstanceId);
         // Save modeler state before unmounting it from the split.
         AppState.saveInstanceState(keepInstanceId);
         if (typeof keepInstance.unmount === 'function') {
@@ -393,11 +450,23 @@ class WindowManager {
         }
     }
 
+    _clearSplitCache(...instanceIds) {
+        for (const id of instanceIds) {
+            this._splitDomCache.delete(id);
+            this._splitTreeCache.delete(id);
+        }
+    }
+
     async moveToFloat(instanceId, props = {}) {
         const instance = AppState.getInstance(instanceId);
         if (!instance) return;
         const record = AppState.getRecord(instanceId);
         if (record && record.mode === 'split') {
+            // Moving one pane of a split to float destroys the split layout.
+            if (this.splitManager.tree) {
+                const leaves = this._collectLeaves(this.splitManager.tree);
+                this._clearSplitCache(...leaves.map((l) => l.instanceId));
+            }
             this.splitManager.unregisterRenderer(instanceId);
             this.splitManager.removeLeaf(instanceId);
         }
