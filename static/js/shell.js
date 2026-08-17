@@ -152,16 +152,9 @@ class Shell {
         const icon = appClass.iconSvg || '';
         btn.innerHTML = `${icon} <span>${appClass.title}</span>`;
         btn.addEventListener('click', () => {
-            // Reuse an existing tab or split-pane instance of this app if possible,
-            // otherwise create a fresh tab. Floating windows stay independent.
-            const existing = AppState.listInstances()
-                .filter((i) => i.appId === appClass.id && (i.mode === 'tab' || i.mode === 'split'))
-                .pop();
-            if (existing) {
-                this.windowManager.switchTab(existing.instanceId);
-            } else {
-                this.windowManager.open(appClass.id, { mode: 'tab' });
-            }
+            // Delegate instance creation/restoration entirely to the window manager
+            // so the nav buttons never create duplicates or target wrong instances.
+            this.windowManager.switchToApp(appClass.id);
         });
         this.tabBar.appendChild(btn);
         return btn;
