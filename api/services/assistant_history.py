@@ -42,11 +42,13 @@ class AssistantHistory:
         self,
         user: str,
         session: str,
+        origin: str = "assistant",
         system_prompt: Optional[str] = None,
         welcome_prompt: Optional[str] = None,
     ) -> None:
         self.user = user
         self.session = session
+        self.origin = origin or "assistant"
 
         self.display_messages: list[ChatCompletionMessageParam] = []
         self.display_events: list[dict[str, Any]] = []
@@ -314,7 +316,7 @@ class AssistantHistory:
         self.llm_dir.mkdir(parents=True, exist_ok=True)
 
         with open(self.display_fp, "w", encoding="utf-8") as f:
-            json.dump({"display_messages": self.display_messages, "display_events": self.display_events, "display_name": self.display_name}, f, ensure_ascii=False, indent=2)
+            json.dump({"display_messages": self.display_messages, "display_events": self.display_events, "display_name": self.display_name, "origin": self.origin}, f, ensure_ascii=False, indent=2)
 
         with open(self.llm_fp, "w", encoding="utf-8") as f:
             json.dump(
@@ -331,6 +333,7 @@ class AssistantHistory:
                     "display_events": self.display_events,
                     "assistant_model_name": self.assistant_model_name,
                     "display_name": self.display_name,
+                    "origin": self.origin,
                 },
                 f,
                 ensure_ascii=False,
@@ -346,6 +349,7 @@ class AssistantHistory:
                 self.display_messages = data.get("display_messages", [])
                 self.display_events = data.get("display_events", [])
                 self.display_name = data.get("display_name", "")
+                self.origin = data.get("origin", self.origin)
         if self.llm_fp.exists():
             with open(self.llm_fp, "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -361,6 +365,7 @@ class AssistantHistory:
                 self.display_events = data.get("display_events", [])
                 self.assistant_model_name = data.get("assistant_model_name", "")
                 self.display_name = data.get("display_name", "")
+                self.origin = data.get("origin", self.origin)
         if not self.system_messages:
             self._init_prompts(None, None)
 
@@ -392,6 +397,7 @@ class AssistantHistory:
                 self.display_events = data.get("display_events", [])
                 self.assistant_model_name = data.get("assistant_model_name", "")
                 self.display_name = data.get("display_name", "")
+                self.origin = data.get("origin", self.origin)
         if not self.system_messages:
             self._init_prompts(None, None)
 

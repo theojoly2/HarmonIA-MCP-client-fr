@@ -37,6 +37,7 @@ class AssistantStreamRequest(BaseModel):
     user_message: str
     model_name: str = ""
     tags: list[str] = []
+    origin: str = "assistant"
 
 
 class AssistantRenameBody(BaseModel):
@@ -250,6 +251,10 @@ async def assistant_stream_generator(
         yield _event("error", {"message": "Message vide."})
         return
 
+    origin = (request.origin or "assistant").strip().lower()
+    if origin not in {"assistant", "modeler"}:
+        origin = "assistant"
+
     is_new_session = not request.session.strip()
     session_name = request.session.strip() or _slugify_session_name(user_input)
 
@@ -262,11 +267,13 @@ async def assistant_stream_generator(
     history = AssistantHistory(
         user=username,
         session=session_name,
+        origin=origin,
     )
 
     model_name = request.model_name.strip()
     selected_tags = request.tags or []
     # Remember the model attached to this session so we can reopen it later.
+    # Also record the origin so the modeler can find only its own conversations.
     if model_name:
         history.assistant_model_name = model_name
 
@@ -310,7 +317,7 @@ async def assistant_stream_generator(
             ChatCompletionSystemMessageParam(role="session_name", content=session_name),
         )
 
-    yield _event("user", {"content": user_input, "session": session_name, "is_new_session": is_new_session})
+    yield _event("user", {"content": user_input, "session": session_name, "is_new_session": is_new_session, "origin": origin})
 
     # Shared output queue: assistant events, progress updates and heartbeats all go
     # here. A dedicated heartbeat task keeps pushing SSE comment lines so reverse
@@ -761,6 +768,7 @@ async def stream_assistant_response(
 async def import_assistant_model(
     file: UploadFile = File(...),
     name: Optional[str] = Form(None),
+    origin: Optional[str] = Form("assistant"),
     username: str = Depends(require_user),
 ):
     """
@@ -768,6 +776,10 @@ async def import_assistant_model(
     parse the file locally, build the JSON model, add a 'Generated' package for
     XMI/XML, and upload the model to the MCP server so it becomes context for the LLM.
     """
+    session_origin = (origin or "assistant").strip().lower()
+    if session_origin not in {"assistant", "modeler"}:
+        session_origin = "assistant"
+
     try:
         file_bytes = await file.read()
     except Exception as e:
@@ -905,6 +917,7 @@ async def import_assistant_model(
         "name": session_name,
         "display_name": display_name,
         "source_format": kind or "unknown",
+        "origin": session_origin,
     })
 
 
@@ -930,7 +943,10 @@ async def test_stream():
 
 
 @router.get("/sessions")
-async def list_assistant_sessions(username: str = Depends(require_user)):
+async def list_assistant_sessions(
+    origin: Optional[str] = None,
+    username: str = Depends(require_user),
+):
     sessions = []
     for session in AssistantHistory.list_sessions(username):
         h = AssistantHistory(user=username, session=session)
@@ -938,6 +954,15 @@ async def list_assistant_sessions(username: str = Depends(require_user)):
         mtime = 0
         if h.display_fp.exists():
             mtime = int(h.display_fp.stat().st_mtime * 1000)
+
+        session_origin = h.origin or "assistant"
+        # When listing standalone assistant history, hide modeler-originated
+        # sessions that are tied to a model; those are surfaced via the modeler
+        # entry instead.
+        if origin is None and session_origin == "modeler" and h.assistant_model_name:
+            continue
+        if origin and session_origin != origin.strip().lower():
+            continue
 
         # Build a short preview from the first user message in display_messages.
         preview = ""
@@ -952,6 +977,7 @@ async def list_assistant_sessions(username: str = Depends(require_user)):
             "last_opened_at": mtime,
             "preview": preview,
             "model_name": h.assistant_model_name,
+            "origin": session_origin,
         })
     sessions.sort(key=lambda s: s["last_opened_at"], reverse=True)
     return {"sessions": sessions}
@@ -960,14 +986,25 @@ async def list_assistant_sessions(username: str = Depends(require_user)):
 @router.get("/sessions/by-model")
 async def find_assistant_session_by_model(
     model_name: str,
+    origin: str = "modeler",
     username: str = Depends(require_user),
 ):
-    """Return the most recently touched assistant session linked to a model."""
+    """Return the most recently touched assistant session linked to a model.
+
+    The origin parameter lets callers scope the search to the modeler assistant
+    (default) or to the standalone assistant.
+    """
+    target_origin = (origin or "modeler").strip().lower()
+    if target_origin not in {"assistant", "modeler"}:
+        target_origin = "modeler"
+
     best_session = ""
     best_mtime = 0
     for session in AssistantHistory.list_sessions(username):
         h = AssistantHistory(user=username, session=session)
         if h.assistant_model_name != model_name:
+            continue
+        if h.origin != target_origin:
             continue
         mtime = 0
         if h.display_fp.exists():
@@ -977,7 +1014,7 @@ async def find_assistant_session_by_model(
             best_session = session
     if not best_session:
         raise HTTPException(status_code=404, detail="Aucune conversation trouvée pour ce modèle")
-    return {"session": best_session, "model_name": model_name}
+    return {"session": best_session, "model_name": model_name, "origin": target_origin}
 
 
 @router.delete("/sessions/{session}")

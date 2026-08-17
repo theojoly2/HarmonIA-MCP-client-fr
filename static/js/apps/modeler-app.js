@@ -671,7 +671,7 @@ class ModelerApp extends AppBase {
         let displayName = this._pendingAssistantDisplayName || '';
         if (!session) {
             try {
-                const data = await ApiClient.findAssistantSessionByModel(this.storedName);
+                const data = await ApiClient.findAssistantSessionByModel(this.storedName, 'modeler');
                 if (data.session) {
                     session = data.session;
                     displayName = '';
@@ -690,6 +690,7 @@ class ModelerApp extends AppBase {
             await window.windowManager.splitPanel(this.instanceId, 'assistant', {
                 modelName: this.storedName,
                 linkedModelerInstanceId: this.instanceId,
+                origin: 'modeler',
                 session,
                 display_name: displayName,
                 fromModeler: true,

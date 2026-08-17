@@ -16,6 +16,9 @@ class WindowManager {
         this._viewportHandler = () => this._clampAllFloating();
         this._splitResizeObserver = null;
         this._lastShellSize = null;
+        // Cache DOM containers for tab instances so switching tabs does not destroy
+        // the rendered app. Each tab keeps its own live DOM tree.
+        this._tabDomCache = new Map(); // instanceId -> HTMLElement
         window.addEventListener('resize', this._viewportHandler);
     }
 
@@ -37,17 +40,33 @@ class WindowManager {
     }
 
     _mountTab(instance) {
-        AppState.saveInstanceState(instance.instanceId);
+        const instanceId = instance.instanceId;
+        AppState.saveInstanceState(instanceId);
         this.shellElement.innerHTML = '';
-        const container = document.createElement('div');
+
+        // If this tab already has a live DOM cache, reuse it. This preserves the
+        // running stream, scroll position, and partial UI state across tab switches.
+        let container = this._tabDomCache.get(instanceId);
+        if (container) {
+            this.shellElement.appendChild(container);
+            AppState.restoreInstanceState(instanceId);
+            // Notify the app that it is visible again so it can resume UI updates.
+            if (typeof instance.onTabActivated === 'function') {
+                instance.onTabActivated();
+            }
+            return Promise.resolve();
+        }
+
+        container = document.createElement('div');
         container.className = 'app-container h-full w-full';
-        container.dataset.instanceId = instance.instanceId;
+        container.dataset.instanceId = instanceId;
+        this._tabDomCache.set(instanceId, container);
         this.shellElement.appendChild(container);
         return new Promise(async (resolve) => {
             await instance.mount(container);
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
-                    AppState.restoreInstanceState(instance.instanceId);
+                    AppState.restoreInstanceState(instanceId);
                     resolve();
                 });
             });
@@ -229,6 +248,12 @@ class WindowManager {
             floatWin.win.remove();
             this.floatWindows.delete(instanceId);
         }
+        // Remove cached tab DOM for this instance to free memory when explicitly closed.
+        const cachedContainer = this._tabDomCache.get(instanceId);
+        if (cachedContainer) {
+            cachedContainer.remove();
+            this._tabDomCache.delete(instanceId);
+        }
         if (this.shellElement.querySelector(`[data-instance-id="${instanceId}"]`)) {
             this.shellElement.innerHTML = '';
         }
@@ -238,7 +263,7 @@ class WindowManager {
         }
     }
 
-    async switchTab(instanceId) {
+    async     switchTab(instanceId) {
         const instance = AppState.getInstance(instanceId);
         if (!instance) return;
         const record = AppState.getRecord(instanceId);
@@ -253,7 +278,11 @@ class WindowManager {
             this.splitManager.setTree(keep || { type: 'pane', instanceId });
             this.splitManager.render();
         }
-        this.shellElement.innerHTML = '';
+        // Detach the currently visible tab container from the shell without
+        // destroying it; it remains cached in _tabDomCache for fast restoration.
+        while (this.shellElement.firstChild) {
+            this.shellElement.removeChild(this.shellElement.firstChild);
+        }
         AppState.saveInstanceState(instanceId);
         await this._mountTab(instance);
         AppState.setActiveInstance(instanceId);

@@ -61,10 +61,11 @@ const ApiClient = (() => {
         return res.json();
     }
 
-    async function importAssistantModel(file, name) {
-        const formData = new FormData();
-        formData.append("file", file);
-        if (name) formData.append("name", name);
+    async function importAssistantModel(file, name, origin = "assistant") {
+        const form = new FormData();
+        form.append("file", file);
+        if (name) form.append("name", name);
+        form.append("origin", origin);
         const res = await fetch(apiUrl("assistant/import"), {
             method: "POST",
             credentials: "same-origin",
@@ -196,12 +197,13 @@ const ApiClient = (() => {
         return res.body.getReader();
     }
 
-    async function streamAssistant(session, userMessage, modelName, tags, onEvent) {
+    async function streamAssistant(session, userMessage, modelName, tags, onEvent, options = {}) {
+        const origin = options.origin || "assistant";
         const res = await fetch(apiUrl("assistant/stream"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "same-origin",
-            body: JSON.stringify({ session, user_message: userMessage, model_name: modelName || "", tags: tags || [] }),
+            body: JSON.stringify({ session, user_message: userMessage, model_name: modelName || "", tags: tags || [], origin }),
         });
         if (!res.ok || !res.body) throw new Error(`Assistant stream failed: ${res.status}`);
 
@@ -281,8 +283,8 @@ const ApiClient = (() => {
         return res.json();
     }
 
-    async function findAssistantSessionByModel(modelName) {
-        const res = await fetch(apiUrl(`assistant/sessions/by-model?model_name=${encodeURIComponent(modelName)}`), {
+    async function findAssistantSessionByModel(modelName, origin = "modeler") {
+        const res = await fetch(apiUrl(`assistant/sessions/by-model?model_name=${encodeURIComponent(modelName)}&origin=${encodeURIComponent(origin)}`), {
             credentials: "same-origin",
         });
         if (!res.ok) return { session: "" };

@@ -18,6 +18,10 @@ class AssistantApp extends AppBase {
         super(instanceId, props);
         this.session = props.session || '';
         this.modelName = props.modelName || '';
+        // Origin tracks whether this conversation was started from the modeler
+        // or from the standalone assistant. It is saved by the backend so the
+        // modeler can reopen only its own conversations.
+        this.origin = props.origin || 'assistant';
         this.messages = [];
         this.isStreaming = false;
         this.messagesHtml = '';
@@ -241,6 +245,7 @@ class AssistantApp extends AppBase {
         return {
             session: this.session,
             modelName: this.modelName,
+            origin: this.origin || 'assistant',
             messagesHtml: this.messagesEl ? this.messagesEl.innerHTML : '',
             welcomeTop: this.welcomeEl ? this.welcomeEl.classList.contains('assistant-welcome-top') : false,
             chatMode: this.chatEl ? this.chatEl.classList.contains('assistant-chat-mode') : false,
@@ -255,6 +260,7 @@ class AssistantApp extends AppBase {
         if (!state || !Object.keys(state).length) return;
         if (state.session !== undefined) this.session = state.session;
         if (state.modelName !== undefined) this.modelName = state.modelName;
+        if (state.origin !== undefined) this.origin = state.origin || 'assistant';
         if (state.isStreaming !== undefined) this.isStreaming = state.isStreaming;
         // Only restore the message HTML if we actually have saved HTML. An empty
         // saved state must not wipe out messages that were just loaded from history.
@@ -312,6 +318,31 @@ class AssistantApp extends AppBase {
         if (this._resizeObserver) this._resizeObserver.disconnect();
         this._resizeObserver = null;
         this.mounted = false;
+    }
+
+    onTabActivated() {
+        this.mounted = true;
+        // The DOM was cached while the tab was hidden, so no rebuild is needed.
+        // Replay any events that arrived while hidden so the UI catches up.
+        if (this._pendingEvents && this._pendingEvents.length > 0) {
+            const eventsToReplay = this._pendingEvents.slice(this._lastRenderedEventIndex + 1);
+            this._lastRenderedEventIndex = this._pendingEvents.length - 1;
+            for (const ev of eventsToReplay) {
+                this._processEvent(ev, {
+                    typewriter: null,
+                    resetBubble: () => {},
+                    finalizeText: async () => {},
+                    saveHtmlSnapshot: () => {
+                        if (this.messagesEl) {
+                            this.messagesHtml = this.messagesEl.innerHTML;
+                        }
+                    },
+                    placeholderRef: { value: null },
+                });
+            }
+        }
+        if (this._resizeObserver) this._resizeObserver.disconnect();
+        this._observeResize();
     }
 
     _escape(text) {
@@ -483,7 +514,7 @@ class AssistantApp extends AppBase {
     async _importModel(file) {
         if (!file) return;
         try {
-            const result = await ApiClient.importAssistantModel(file, file.name);
+            const result = await ApiClient.importAssistantModel(file, file.name, this.origin);
             if (result?.name) {
                 this.modelName = result.name;
                 this._appendSystemMessage(`Modèle **${this._escape(result.display_name || result.name)}** importé avec succès. Vous pouvez maintenant lui poser des questions.`);
@@ -1700,7 +1731,8 @@ class AssistantApp extends AppBase {
                 text,
                 this.modelName,
                 this.selectedTags || [],
-                liveHandler
+                liveHandler,
+                { origin: this.origin }
             );
         } catch (err) {
             console.error('Assistant stream error', err);
