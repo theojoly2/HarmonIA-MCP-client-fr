@@ -264,10 +264,6 @@ async def assistant_stream_generator(
         from datetime import datetime
         session_name = f"{session_name}__{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
 
-    # Namespace the stored session by context so the standalone assistant and the
-    # modeler assistant never collide.
-    effective_session = f"{context}__{session_name}"
-
     history = AssistantHistory(
         user=username,
         session=session_name,
