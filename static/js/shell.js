@@ -152,7 +152,12 @@ class Shell {
         const icon = appClass.iconSvg || '';
         btn.innerHTML = `${icon} <span>${appClass.title}</span>`;
         btn.addEventListener('click', () => {
-            const existing = AppState.listInstances().find(i => i.appId === appClass.id && i.mode === 'tab');
+            // Always reuse the most recent non-floating instance of this app, or
+            // create a fresh tab if none exists. The mode (tab/split) is the
+            // manager's responsibility, not the shell's.
+            const existing = AppState.listInstances()
+                .filter((i) => i.appId === appClass.id && i.mode !== 'float')
+                .pop();
             if (existing) {
                 this.windowManager.switchTab(existing.instanceId);
             } else {
