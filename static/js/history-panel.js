@@ -75,7 +75,6 @@ class HistoryPanel {
             let models = [];
             let searches = [];
             let conversations = [];
-            let modelerConversations = [];
             let modelsData = { models: [] };
             if (modelsRes.ok) {
                 modelsData = await modelsRes.json();
@@ -141,21 +140,10 @@ class HistoryPanel {
                         origin: s.origin || "assistant",
                     }));
             }
-            if (modelerAssistantRes && modelerAssistantRes.sessions) {
-                // Modeler assistant conversations are attached to their model.
-                // They are shown as assistant sub-entries linked to the modeler
-                // item but sorted independently so they remain visible.
-                modelerConversations = modelerAssistantRes.sessions.map((s) => ({
-                    ...s,
-                    kind: "modeler_assistant",
-                    name: s.name,
-                    display_name: s.display_name || s.preview || s.name,
-                    source_format: "conversation modéliseur",
-                    sortKey: Number(s.last_opened_at) || 0,
-                    origin: s.origin || "modeler",
-                }));
-            }
-            this.items = [...models, ...searches, ...conversations, ...modelerConversations].sort((a, b) => b.sortKey - a.sortKey);
+            // Do NOT list modeler-originated assistant sessions as standalone
+            // history items. They remain accessible only through their linked
+            // modeler item when the user reopens a model.
+            this.items = [...models, ...searches, ...conversations].sort((a, b) => b.sortKey - a.sortKey);
         } catch (err) {
             console.error("History load error", err);
             this.items = [];
