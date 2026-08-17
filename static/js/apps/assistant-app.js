@@ -367,10 +367,25 @@ class AssistantApp extends AppBase {
         this._observeResize();
         this._applyCentering(true);
         // If a chat is present, force-scroll to the bottom so the latest message
-        // is visible after switching back to this tab.
+        // is visible after switching back to this tab. Retry several times because
+        // CSS transitions and layout shifts can reset the scroll position.
         if (this.messagesEl && this.messagesEl.children.length > 0) {
-            this._scrollToBottom(true);
+            this._snapToBottom();
         }
+    }
+
+    _snapToBottom() {
+        const scroll = () => {
+            if (!this.chatEl || !this.messagesEl) return;
+            this.chatEl.scrollTop = this.chatEl.scrollHeight;
+        };
+        scroll();
+        requestAnimationFrame(scroll);
+        requestAnimationFrame(() => requestAnimationFrame(scroll));
+        setTimeout(scroll, 80);
+        setTimeout(scroll, 200);
+        setTimeout(scroll, 400);
+        setTimeout(scroll, 800);
     }
 
     _escape(text) {

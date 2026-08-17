@@ -648,6 +648,9 @@
 #assistant-chat.assistant-chat-mode {
     overflow-y: auto;
     padding-bottom: 7rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
 }
 
 .assistant-welcome {
@@ -979,6 +982,7 @@
 
 .assistant-messages {
     padding-top: 0.5rem;
+    padding-bottom: 7rem;
     font-size: clamp(0.75rem, 1.1vw, 1rem);
     display: flex;
     flex-direction: column;
