@@ -323,6 +323,12 @@ class AssistantApp extends AppBase {
     onTabActivated() {
         this.mounted = true;
         // The DOM was cached while the tab was hidden, so no rebuild is needed.
+        // Make sure the chat layout stays in chat mode if messages are present.
+        if (this.messagesEl && this.messagesEl.children.length > 0) {
+            this.chatEl.classList.add('assistant-chat-mode');
+            this.welcomeEl.classList.add('assistant-welcome-top');
+            this.inputArea.classList.add('assistant-input-area-chat');
+        }
         // Replay any events that arrived while hidden so the UI catches up.
         if (this._pendingEvents && this._pendingEvents.length > 0) {
             const eventsToReplay = this._pendingEvents.slice(this._lastRenderedEventIndex + 1);
@@ -343,6 +349,7 @@ class AssistantApp extends AppBase {
         }
         if (this._resizeObserver) this._resizeObserver.disconnect();
         this._observeResize();
+        this._applyCentering(true);
     }
 
     _escape(text) {
