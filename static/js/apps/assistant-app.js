@@ -358,10 +358,14 @@ class AssistantApp extends AppBase {
         }
         if (this._resizeObserver) this._resizeObserver.disconnect();
         this._observeResize();
+        // Apply layout first, then scroll to the very bottom so returning to the
+        // tab shows the latest messages instead of jumping back to the top.
         this._applyCentering(true);
         if (this.chatEl) {
             requestAnimationFrame(() => {
-                this.chatEl.scrollTo({ top: this.chatEl.scrollHeight, behavior: 'auto' });
+                requestAnimationFrame(() => {
+                    this.chatEl.scrollTo({ top: this.chatEl.scrollHeight, behavior: 'auto' });
+                });
             });
         }
     }
