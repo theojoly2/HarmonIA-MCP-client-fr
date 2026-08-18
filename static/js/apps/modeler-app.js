@@ -720,23 +720,14 @@ class ModelerApp extends AppBase {
     _updateExportMenuState() {
         const exportMenu = this.container?.querySelector('#modeler-export-menu');
         if (!exportMenu) return;
-        const record = AppState.getRecord(this.instanceId);
-        const savedState = record?.savedState || {};
-        const hasXmi = !!(savedState.svgText && this._extractModelJson()?.xmi);
-        const hasTtl = !!(savedState.svgText && (this._extractModelJson()?.ttl_raw || this._extractModelJson()?.ttl));
-
+        // The full model JSON is stored server-side; we cannot know which
+        // formats are available from the client state. Let the backend decide
+        // and report an error if a format is unavailable.
         exportMenu.querySelectorAll('.modeler-export-item').forEach((item) => {
-            const format = item.dataset.format;
-            const enabled = format === 'xmi' ? hasXmi : hasTtl;
-            item.disabled = !enabled;
-            item.classList.toggle('opacity-50', !enabled);
-            item.classList.toggle('cursor-not-allowed', !enabled);
-            item.title = enabled ? '' : `Export ${format.toUpperCase()} indisponible pour ce modèle`;
+            item.disabled = false;
+            item.classList.remove('opacity-50', 'cursor-not-allowed');
+            item.title = '';
         });
-    }
-
-    _extractModelJson() {
-        return AppState.getRecord(this.instanceId)?.savedState || {};
     }
 
     _updateExportToggleVisibility() {
