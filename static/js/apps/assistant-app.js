@@ -218,16 +218,20 @@ class AssistantApp extends AppBase {
         });
 
         // The input area is fixed and positioned with a CSS variable. We need
-        // the container to have its final layout dimensions before measuring.
-        // A single rAF is sometimes too early on first paint; force a reflow
-        // first, then apply centering, and re-apply once more after a short delay
-        // to catch any late layout shifts.
+        // the container and the input wrapper to have their final layout
+        // dimensions before measuring. Force a reflow first, then apply
+        // centering, and re-apply once more after a short delay to catch any
+        // late layout shifts (e.g. font loading, dynamic height of the textarea).
         void container.offsetHeight;
         this._applyCentering(true);
         requestAnimationFrame(() => {
+            void container.offsetHeight;
             this._applyCentering(true);
         });
-        setTimeout(() => this._applyCentering(true), 100);
+        setTimeout(() => {
+            void container.offsetHeight;
+            this._applyCentering(true);
+        }, 100);
 
     }
 
@@ -524,6 +528,9 @@ class AssistantApp extends AppBase {
             // Center the whole title+subtitle+input block vertically in the visible
             // area. The input is positioned together with the title in the middle
             // of the screen; the welcome-input slot provides its sizing reference.
+            // Force a reflow first so the real input area has its final height.
+            void this.inputArea.offsetHeight;
+
             const title = this.welcomeEl.querySelector('.assistant-welcome-title');
             const subtitle = this.welcomeEl.querySelector('.assistant-welcome-subtitle');
             const slot = this.welcomeInputSlot;
@@ -534,16 +541,19 @@ class AssistantApp extends AppBase {
             const titleHeight = titleRect.height;
             const subtitleHeight = subtitleRect.height;
             const subtitleMarginTop = subtitle ? (parseFloat(getComputedStyle(subtitle).marginTop) || 0) : 0;
-            const inputHeight = Math.max(slotRect.height, this.inputArea.getBoundingClientRect().height);
+            // Prefer the real input area height, falling back to the invisible
+            // slot for the very first paint before the input is fully laid out.
+            const realInputHeight = this.inputArea.getBoundingClientRect().height;
+            const inputHeight = realInputHeight > 0 ? realInputHeight : slotRect.height;
             const inputMarginTop = slot ? (parseFloat(getComputedStyle(slot).marginTop) || 0) : 0;
             const contentHeight = titleHeight + subtitleMarginTop + subtitleHeight + inputMarginTop + inputHeight;
             // Use the viewport height as a fallback when the container has not
             // been laid out yet (first paint), so the title starts centered.
             const availableHeight = containerRect.height > 0 ? containerRect.height : window.innerHeight;
             const available = Math.max(availableHeight, contentHeight);
-            // Center the whole block exactly; no upward bias to avoid a gap
-            // between the subtitle and the input area.
-            const offset = Math.max(0, (available - contentHeight) / 2);
+            // Slight upward bias so the block feels optically centered without
+            // leaving too much blank space above the input.
+            const offset = Math.max(0, (available - contentHeight) / 2 - contentHeight * 0.08);
             this.welcomeEl.style.paddingTop = `${offset}px`;
             this.welcomeEl.style.paddingBottom = '0';
 
