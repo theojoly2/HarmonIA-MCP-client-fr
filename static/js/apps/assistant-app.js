@@ -492,19 +492,6 @@ class AssistantApp extends AppBase {
         const welcomeTop = this.welcomeEl.classList.contains('assistant-welcome-top');
         const chatMode = this.chatEl?.classList.contains('assistant-chat-mode');
 
-        // Temporarily disable transitions when snapping (e.g. on load/reset) so
-        // the browser does not animate from an intermediate state.
-        let welcomeWas = '';
-        let inputWas = '';
-        if (skipTransition) {
-            welcomeWas = this.welcomeEl.style.transition;
-            inputWas = this.inputArea.style.transition;
-            this.welcomeEl.style.transition = 'none';
-            this.inputArea.style.transition = 'none';
-            void this.welcomeEl.offsetHeight;
-            void this.inputArea.offsetHeight;
-        }
-
         if (isEmbedded) {
             // Embedded inside the modeler side panel: do not use fixed viewport
             // positioning. The input stays at the bottom of its flex container.
@@ -521,7 +508,10 @@ class AssistantApp extends AppBase {
             if (this.chatEl && inputHeight) {
                 this.chatEl.style.paddingBottom = `${inputHeight + 8}px`;
             }
-        } else if (!welcomeTop) {
+            return;
+        }
+
+        if (!welcomeTop) {
             // Center the whole title+subtitle+input block vertically in the visible area.
             const title = this.welcomeEl.querySelector('.assistant-welcome-title');
             const subtitle = this.welcomeEl.querySelector('.assistant-welcome-subtitle');
@@ -557,13 +547,6 @@ class AssistantApp extends AppBase {
         } else {
             this.welcomeEl.style.paddingTop = '';
             this.welcomeEl.style.paddingBottom = '';
-        }
-
-        if (skipTransition) {
-            void this.welcomeEl.offsetHeight;
-            void this.inputArea.offsetHeight;
-            this.welcomeEl.style.transition = welcomeWas;
-            this.inputArea.style.transition = inputWas;
         }
     }
 
