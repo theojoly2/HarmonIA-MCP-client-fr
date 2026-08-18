@@ -551,7 +551,10 @@ class AssistantApp extends AppBase {
             const inputHeight = Math.max(slotRect.height, this.inputArea.getBoundingClientRect().height);
             const inputMarginTop = parseFloat(getComputedStyle(slot).marginTop) || 0;
             const contentHeight = titleHeight + subtitleMarginTop + subtitleHeight + inputMarginTop + inputHeight;
-            const available = Math.max(containerRect.height, contentHeight);
+            // If the container hasn't been laid out yet, fall back to the visible
+            // viewport area under the container's top.
+            const availableHeight = containerRect.height > 200 ? containerRect.height : Math.max(containerRect.height, window.innerHeight - containerRect.top);
+            const available = Math.max(availableHeight, contentHeight);
             const offset = Math.max(0, (available - contentHeight) / 2 - contentHeight * 0.08);
             this.welcomeEl.style.paddingTop = offset + 'px';
             this.welcomeEl.style.paddingBottom = '0';
@@ -577,8 +580,6 @@ class AssistantApp extends AppBase {
         }
 
         if (skipTransition) {
-            // Save/restore inline transition so the snap is instant and does not
-            // animate from whatever value the browser inherited.
             const welcomeWas = this.welcomeEl.style.transition;
             const inputWas = this.inputArea.style.transition;
             this.welcomeEl.style.transition = 'none';
