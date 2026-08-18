@@ -453,15 +453,14 @@ class AssistantApp extends AppBase {
 
     _switchToChatMode() {
         const hadFocus = document.activeElement === this.inputEl;
-        // First, snap the welcome to its correct centered position WITHOUT
+        // First snap the welcome to its correct centered position WITHOUT
         // animation so the transition starts from the right place.
         this._applyCentering(true);
-        // Then, on the next frame, add the chat-mode classes and re-apply with
-        // transitions enabled so the title slides up and the input slides down.
         requestAnimationFrame(() => {
             this.chatEl.classList.add('assistant-chat-mode');
             this.welcomeEl.classList.add('assistant-welcome-top');
             this.inputArea.classList.add('assistant-input-area-chat');
+            // Now animate both the title up and the input down.
             this._applyCentering(false);
             if (hadFocus) {
                 setTimeout(() => this.inputEl.focus(), 560);
@@ -492,8 +491,8 @@ class AssistantApp extends AppBase {
         const welcomeTop = this.welcomeEl.classList.contains('assistant-welcome-top');
         const chatMode = this.chatEl?.classList.contains('assistant-chat-mode');
 
-        // When skipping the transition we temporarily disable it so the
-        // layout snaps to its final position without animating.
+        // Temporarily disable transitions when snapping (e.g. on load/reset) so
+        // the browser does not animate from an intermediate state.
         let welcomeWas = '';
         let inputWas = '';
         if (skipTransition) {
@@ -501,8 +500,6 @@ class AssistantApp extends AppBase {
             inputWas = this.inputArea.style.transition;
             this.welcomeEl.style.transition = 'none';
             this.inputArea.style.transition = 'none';
-            // Force a reflow so class changes (e.g. removing assistant-welcome-top)
-            // are applied before we measure dimensions below.
             void this.welcomeEl.offsetHeight;
             void this.inputArea.offsetHeight;
         }
@@ -519,14 +516,14 @@ class AssistantApp extends AppBase {
             this.inputArea.style.right = '0';
             this.inputArea.style.top = 'auto';
             this.inputArea.style.width = '100%';
-            // Ensure the chat scroll area leaves room for the absolutely positioned
-            // input area so the last message is not hidden behind it.
             const inputHeight = this.inputArea.getBoundingClientRect().height;
             if (this.chatEl && inputHeight) {
                 this.chatEl.style.paddingBottom = `${inputHeight + 8}px`;
             }
         } else if (!welcomeTop) {
-            // Center the whole title+subtitle+input block vertically in the visible area.
+            // Center the whole title+subtitle+input block vertically in the visible
+            // area. The input is positioned together with the title in the middle
+            // of the screen; the welcome-input slot provides its sizing reference.
             const title = this.welcomeEl.querySelector('.assistant-welcome-title');
             const subtitle = this.welcomeEl.querySelector('.assistant-welcome-subtitle');
             const slot = this.welcomeInputSlot;
@@ -536,22 +533,23 @@ class AssistantApp extends AppBase {
             const containerRect = this.container.getBoundingClientRect();
             const titleHeight = titleRect.height;
             const subtitleHeight = subtitleRect.height;
-            const subtitleMarginTop = parseFloat(getComputedStyle(subtitle).marginTop) || 0;
+            const subtitleMarginTop = subtitle ? (parseFloat(getComputedStyle(subtitle).marginTop) || 0) : 0;
             const inputHeight = Math.max(slotRect.height, this.inputArea.getBoundingClientRect().height);
-            const inputMarginTop = parseFloat(getComputedStyle(slot).marginTop) || 0;
+            const inputMarginTop = slot ? (parseFloat(getComputedStyle(slot).marginTop) || 0) : 0;
             const contentHeight = titleHeight + subtitleMarginTop + subtitleHeight + inputMarginTop + inputHeight;
             // Use the viewport height as a fallback when the container has not
             // been laid out yet (first paint), so the title starts centered.
             const availableHeight = containerRect.height > 0 ? containerRect.height : window.innerHeight;
             const available = Math.max(availableHeight, contentHeight);
-            const offset = Math.max(0, (available - contentHeight) / 2 - contentHeight * 0.08);
-            this.welcomeEl.style.paddingTop = offset + 'px';
+            // Center the whole block exactly; no upward bias to avoid a gap
+            // between the subtitle and the input area.
+            const offset = Math.max(0, (available - contentHeight) / 2);
+            this.welcomeEl.style.paddingTop = `${offset}px`;
             this.welcomeEl.style.paddingBottom = '0';
 
-            // Compute the input top position mathematically from the welcome
-            // padding, title height, subtitle height and margins.
+            // Position the input right below the subtitle, in the center.
             const topY = containerRect.top + offset + titleHeight + subtitleMarginTop + subtitleHeight + inputMarginTop;
-            this.inputArea.style.setProperty('--assistant-input-top', topY + 'px');
+            this.inputArea.style.setProperty('--assistant-input-top', `${topY}px`);
         } else if (chatMode) {
             // In chat mode the title is sticky at the top and the input sits at
             // the bottom of the visible window, preserving its bottom padding.
@@ -559,18 +557,14 @@ class AssistantApp extends AppBase {
             this.welcomeEl.style.paddingBottom = '';
             const inputHeight = this.inputArea.getBoundingClientRect().height;
             const bottomPadding = 0.35 * parseFloat(getComputedStyle(document.documentElement).fontSize || 16);
-            // Position relative to the viewport bottom because the input is fixed.
             const topY = window.innerHeight - inputHeight - bottomPadding;
-            this.inputArea.style.setProperty('--assistant-input-top', topY + 'px');
+            this.inputArea.style.setProperty('--assistant-input-top', `${topY}px`);
         } else {
-            // Fallback: clear explicit padding if neither state is fully active.
             this.welcomeEl.style.paddingTop = '';
             this.welcomeEl.style.paddingBottom = '';
         }
 
         if (skipTransition) {
-            // Force a reflow so the browser applies the new dimensions before
-            // restoring the transition property.
             void this.welcomeEl.offsetHeight;
             void this.inputArea.offsetHeight;
             this.welcomeEl.style.transition = welcomeWas;
