@@ -231,7 +231,10 @@ class AssistantApp extends AppBase {
 
         // The input area is fixed and positioned with a CSS variable so it can
         // slide down in sync with the title when the first message is sent.
-        // Use two rAFs so the initial layout is stable before measuring.
+        // Compute the initial centered layout synchronously before the first
+        // paint so the welcome/input never flash at the wrong position; then
+        // recompute after a couple of frames once fonts/layout have settled.
+        this._applyCentering(true);
         requestAnimationFrame(() => {
             requestAnimationFrame(() => this._applyCentering(true));
         });
@@ -566,9 +569,15 @@ class AssistantApp extends AppBase {
         }
 
         if (skipTransition) {
-            this.welcomeEl.offsetHeight;
-            this.inputArea.offsetHeight;
-            this.welcomeEl.style.transition = was;
+            // Save/restore inline transition so the snap is instant and does not
+            // animate from whatever value the browser inherited.
+            const welcomeWas = this.welcomeEl.style.transition;
+            const inputWas = this.inputArea.style.transition;
+            this.welcomeEl.style.transition = 'none';
+            this.inputArea.style.transition = 'none';
+            void this.welcomeEl.offsetHeight;
+            void this.inputArea.offsetHeight;
+            this.welcomeEl.style.transition = welcomeWas;
             this.inputArea.style.transition = inputWas;
         }
     }
