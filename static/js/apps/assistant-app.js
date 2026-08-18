@@ -580,9 +580,6 @@ class AssistantApp extends AppBase {
                 this.modelName = result.name;
                 this.props.display_name = result.display_name || result.name;
                 this._updateModelPill();
-                this._appendSystemMessage(`Modèle **${this._escape(result.display_name || result.name)}** importé avec succès. Vous pouvez maintenant lui poser des questions.`);
-            } else {
-                this._appendSystemMessage('Le modèle a été importé.');
             }
         } catch (err) {
             console.error('Assistant import model error', err);
