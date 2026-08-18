@@ -44,6 +44,10 @@ class AssistantRenameBody(BaseModel):
     name: str
 
 
+class LinkModelBody(BaseModel):
+    model_name: str
+
+
 class AssistantSessionRequest(BaseModel):
     session: str = "default"
 
@@ -1118,6 +1122,28 @@ async def rename_assistant_session(
         "display_name": new_display_name,
         "origin": target_origin,
     }
+
+
+@router.post("/sessions/{session}/link-model")
+async def link_assistant_session_model(
+    session: str,
+    body: LinkModelBody,
+    origin: str = "modeler",
+    username: str = Depends(require_user),
+):
+    """Update the model name linked to a modeler-originated assistant session."""
+    target_origin = (origin or "modeler").strip().lower()
+    if target_origin not in {"assistant", "modeler"}:
+        target_origin = "modeler"
+
+    history = AssistantHistory(user=username, session=session, origin=target_origin)
+    if not history._session_exists():
+        raise HTTPException(status_code=404, detail="Session inconnue")
+
+    history.assistant_model_name = body.model_name.strip()
+    history.display_name = history.display_name or history.display_fp.stem
+    history.save()
+    return {"ok": True}
 
 
 @router.get("/history")

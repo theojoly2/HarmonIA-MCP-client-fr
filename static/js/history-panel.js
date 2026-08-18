@@ -262,7 +262,7 @@ class HistoryPanel {
                 this._closeMenu();
                 const li = this.listEl.querySelector(`li[data-item-name="${CSS.escape(item.name)}"][data-item-kind="${item.kind}"]`) || anchorBtn.closest(".history-item");
                 const nameEl = li?.querySelector(".history-item-name");
-                if (nameEl) this._startInlineRename(nameEl, item.name, item.display_name || item.name, item.kind);
+                if (nameEl && li) this._startInlineRename(nameEl, item, li);
             });
         }
         if (menu.querySelector(".history-menu-delete")) {
@@ -364,8 +364,11 @@ class HistoryPanel {
         });
     }
 
-    _startInlineRename(nameEl, storedName, displayName, kind = "model") {
+    _startInlineRename(nameEl, item, li) {
         if (nameEl.querySelector("input")) return;
+        const storedName = item.name || "";
+        const displayName = item.display_name || storedName;
+        const kind = item.kind || "model";
         const initialName = displayName || storedName;
         const input = document.createElement("input");
         input.type = "text";
@@ -395,9 +398,16 @@ class HistoryPanel {
                         credentials: "same-origin",
                         body: JSON.stringify({ name: newName }),
                     });
-                    if (!res.ok) throw new Error("rename_failed");
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.detail || `rename_failed_${res.status}`);
+                    }
                     const result = await res.json().catch(() => ({}));
                     const newStoredName = result.name || storedName;
+                    // Update the DOM so subsequent renames use the new stored name.
+                    li.dataset.itemName = newStoredName;
+                    item.name = newStoredName;
+                    item.display_name = newName;
                     // If the renamed assistant conversation is currently open,
                     // update the instance props so the next message goes to the
                     // new session file instead of recreating the old one.
@@ -423,9 +433,31 @@ class HistoryPanel {
                         credentials: "same-origin",
                         body: JSON.stringify({ name: newName }),
                     });
-                    if (!res.ok) throw new Error("rename_failed");
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.detail || `rename_failed_${res.status}`);
+                    }
                     const result = await res.json().catch(() => ({}));
                     const newStoredName = result.name || storedName;
+                    // Update the DOM so subsequent renames use the new stored name.
+                    li.dataset.itemName = newStoredName;
+                    item.name = newStoredName;
+                    item.display_name = newName;
+                    // If the renamed model has a linked modeler assistant session,
+                    // update the assistant's stored model name so the link survives.
+                    const linkedSession = li.dataset.assistantSession;
+                    if (linkedSession) {
+                        try {
+                            await fetch(`api/assistant/sessions/${encodeURIComponent(linkedSession)}/link-model`, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                credentials: "same-origin",
+                                body: JSON.stringify({ model_name: newStoredName }),
+                            });
+                        } catch (err) {
+                            console.error("Update linked model name after rename error", err);
+                        }
+                    }
                     // If the renamed model is currently open in the Modeler, update its
                     // stored name and refresh the SVG so the displayed package/model name
                     // matches the new display name.
@@ -445,7 +477,7 @@ class HistoryPanel {
             } catch (err) {
                 console.error(`Rename ${kind} error`, err);
                 nameEl.textContent = initialName;
-                alert(kind === "assistant" || kind === "modeler_assistant" ? "Impossible de renommer la conversation." : "Impossible de renommer le modèle.");
+                alert(kind === "assistant" || kind === "modeler_assistant" ? "Impossible de renommer la conversation : " + err.message : "Impossible de renommer le modèle : " + err.message);
             }
         };
 
