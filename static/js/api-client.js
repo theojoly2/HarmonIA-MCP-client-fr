@@ -323,6 +323,21 @@ const ApiClient = (() => {
         return res.json();
     }
 
+    async function exportModel(modelName, format = "xmi") {
+        const res = await fetch(
+            apiUrl(`models/${encodeURIComponent(modelName)}/export?format=${encodeURIComponent(format)}`),
+            {
+                method: "GET",
+                credentials: "same-origin",
+            }
+        );
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || `Export failed: ${res.status}`);
+        }
+        return res.blob();
+    }
+
     return {
         postSearch,
         getTags,
@@ -349,6 +364,7 @@ const ApiClient = (() => {
         getAssistantHistory,
         deleteAssistantSession,
         touchAssistantSession,
+        exportModel,
     };
 })();
 

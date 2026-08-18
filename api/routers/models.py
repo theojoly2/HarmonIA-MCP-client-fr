@@ -27,6 +27,11 @@ from api.services.model_store import (
 )
 
 
+def _safe_filename(name: str) -> str:
+    """Remove path separators and control characters from a display name."""
+    return re.sub(r'[^\w\s\-\.]', "_", name).strip() or "model"
+
+
 def _unique_model_name(name: str) -> str:
     """Append a timestamp suffix so duplicate names never overwrite files."""
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
@@ -273,6 +278,58 @@ async def rename(model_name: str, body: RenameBody, username: str = Depends(requ
 async def remove(model_name: str, username: str = Depends(require_user)):
     await delete_model(username, model_name)
     return {"ok": True}
+
+
+@router.get("/{model_name}/export")
+async def export_model(
+    model_name: str,
+    format: str = "xmi",
+    username: str = Depends(require_user),
+):
+    """Export a persisted model as XMI/XML or TTL bytes."""
+    from data_model_utils import build_ttl_bytes, build_xmi_bytes
+
+    model = await get_model(username, model_name)
+    if not model:
+        return Response(status_code=404, content=json.dumps({"detail": "model_not_found"}))
+
+    fmt = (format or "").lower().strip()
+    try:
+        if fmt == "xmi":
+            data = build_xmi_bytes(model)
+            media_type = "application/xml"
+            ext = "xmi"
+        elif fmt == "ttl":
+            data = build_ttl_bytes(model)
+            media_type = "text/turtle"
+            ext = "ttl"
+        else:
+            return Response(
+                status_code=400,
+                content=json.dumps({"detail": "unsupported_format"}),
+            )
+    except Exception as e:
+        print(f"[export_model] {fmt} export failed for {model_name}: {e}", flush=True)
+        return Response(
+            status_code=422,
+            content=json.dumps({"detail": "export_failed", "error": str(e)}),
+        )
+
+    if not data:
+        return Response(
+            status_code=422,
+            content=json.dumps({"detail": "export_empty"}),
+        )
+
+    display = _display_name(model.get("name", model_name))
+    filename = f"{_safe_filename(display)}.{ext}"
+    return Response(
+        content=data,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
 
 
 @router.post("/{model_name}/add-class")

@@ -49,6 +49,7 @@ class ModelerApp extends AppBase {
             this._observeResize();
             this._observeSvgContainerResize();
             this._updateAssistantToggleVisibility();
+            this._updateExportToggleVisibility();
             return;
         }
         // Any previous viewer is tied to a DOM container that will be replaced;
@@ -81,13 +82,24 @@ class ModelerApp extends AppBase {
                     </div>
                 </div>
                 <div id="modeler-viewer" class="hidden flex-1 min-h-0 opacity-0 transition-opacity duration-300 relative">
-                    <button type="button" id="modeler-assistant-toggle" class="hidden absolute top-3 right-3 z-30 w-10 h-10 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-700 hover:text-black hover:bg-gray-50 transition-colors" title="Discuter avec l'assistant sémantique">
-                        <svg class="w-5 h-5 overflow-visible" viewBox="0 0 24 24">
-                            <path class="sparkle-main" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
-                            <path class="sparkle-orbit-path" d="M5.5 2.5L6.34 5.16L9 6L6.34 6.84L5.5 9.5L4.66 6.84L2 6L4.66 5.16L5.5 2.5Z"></path>
-                            <path class="sparkle-orbit-path" d="M19.5 15.5L20.34 18.16L23 19L20.34 19.84L19.5 22.5L18.66 19.84L16 19L18.66 18.16L19.5 15.5Z"></path>
+                    <button type="button" id="modeler-export-toggle" class="hidden absolute top-16 right-3 z-30 w-10 h-10 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-700 hover:text-black hover:bg-gray-50 transition-colors" title="Exporter le modèle">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <path d="M7 10l5 5 5-5"></path>
+                            <path d="M12 15V3"></path>
                         </svg>
                     </button>
+                    <div id="modeler-export-menu" class="hidden absolute top-16 right-14 z-40 w-44 bg-white border border-gray-200 rounded-lg shadow-lg py-1 text-sm">
+                        <button type="button" data-format="xmi" class="modeler-export-item w-full text-left px-4 py-2 hover:bg-gray-50 text-gray-700 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                            Exporter en XMI
+                        </button>
+                        <button type="button" data-format="ttl" class="modeler-export-item w-full text-left px-4 py-2 hover:bg-gray-50 text-gray-700 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                            Exporter en TTL
+                        </button>
+                    </div>
+                    <button type="button" id="modeler-assistant-toggle" class="hidden absolute top-3 right-3 z-30 w-10 h-10 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-700 hover:text-black hover:bg-gray-50 transition-colors" title="Discuter avec l'assistant sémantique">
                     <div id="modeler-loading" class="hidden absolute inset-0 flex items-center justify-center text-gray-500 z-10 bg-white/80 backdrop-blur-sm transition-opacity duration-300">
                         <svg class="animate-spin h-8 w-8 text-gray-400 mr-3" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -126,6 +138,7 @@ class ModelerApp extends AppBase {
         `;
         this._bindEvents();
         this._bindAssistantToggle();
+        this._bindExportToggle();
         if (this.loading) {
             // Loading state (e.g. opened from history): show the compact viewer with spinner immediately,
             // without animating the home panel down from the centered position.
@@ -429,6 +442,7 @@ class ModelerApp extends AppBase {
             const existingSplit = this._findAssistantSplitInstance();
             assistantToggle.classList.toggle('hidden', !this.storedName || !!existingSplit);
         }
+        this._updateExportToggleVisibility();
 
         // If the live SVG viewer is already attached to the cached container,
         // just make sure the pane is visible and resume observers.
@@ -660,6 +674,107 @@ class ModelerApp extends AppBase {
         assistantBtn.addEventListener('click', () => {
             this._toggleAssistantSplit();
         });
+    }
+
+    _bindExportToggle() {
+        const exportBtn = this.container?.querySelector('#modeler-export-toggle');
+        const exportMenu = this.container?.querySelector('#modeler-export-menu');
+        if (!exportBtn || !exportMenu) return;
+
+        exportBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = !exportMenu.classList.contains('hidden');
+            this._closeExportMenu();
+            if (!isOpen) {
+                this._updateExportMenuState();
+                exportMenu.classList.remove('hidden');
+            }
+        });
+
+        exportMenu.querySelectorAll('.modeler-export-item').forEach((item) => {
+            item.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const format = item.dataset.format;
+                if (item.disabled) return;
+                await this._exportModel(format);
+                this._closeExportMenu();
+            });
+        });
+
+        // Track the listener so it is removed when the container is rebuilt.
+        this._closeExportMenuOnClick = () => this._closeExportMenu();
+        document.addEventListener('click', this._closeExportMenuOnClick);
+    }
+
+    _closeExportMenu() {
+        const exportMenu = this.container?.querySelector('#modeler-export-menu');
+        if (exportMenu) exportMenu.classList.add('hidden');
+    }
+
+    _updateExportMenuState() {
+        const exportMenu = this.container?.querySelector('#modeler-export-menu');
+        if (!exportMenu) return;
+        const record = AppState.getRecord(this.instanceId);
+        const savedState = record?.savedState || {};
+        const hasXmi = !!(savedState.svgText && this._extractModelJson()?.xmi);
+        const hasTtl = !!(savedState.svgText && (this._extractModelJson()?.ttl_raw || this._extractModelJson()?.ttl));
+
+        exportMenu.querySelectorAll('.modeler-export-item').forEach((item) => {
+            const format = item.dataset.format;
+            const enabled = format === 'xmi' ? hasXmi : hasTtl;
+            item.disabled = !enabled;
+            item.classList.toggle('opacity-50', !enabled);
+            item.classList.toggle('cursor-not-allowed', !enabled);
+            item.title = enabled ? '' : `Export ${format.toUpperCase()} indisponible pour ce modèle`;
+        });
+    }
+
+    _extractModelJson() {
+        return AppState.getRecord(this.instanceId)?.savedState || {};
+    }
+
+    _updateExportToggleVisibility() {
+        const btn = this.container?.querySelector('#modeler-export-toggle');
+        if (!btn) return;
+        btn.classList.toggle('hidden', !this.svgText);
+    }
+
+    async _exportModel(format) {
+        if (!this.storedName) {
+            this._showExportError('Aucun modèle à exporter.');
+            return;
+        }
+        try {
+            const blob = await ApiClient.exportModel(this.storedName, format);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${this.fileName || 'modele'}.${format}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Export model error', err);
+            this._showExportError(`Échec de l'export ${format.toUpperCase()}.`);
+        }
+    }
+
+    _showExportError(message) {
+        const viewer = this.container?.querySelector('#modeler-viewer');
+        if (!viewer) return;
+        let errorEl = viewer.querySelector('#modeler-export-error');
+        if (!errorEl) {
+            errorEl = document.createElement('div');
+            errorEl.id = 'modeler-export-error';
+            errorEl.className = 'absolute bottom-4 left-1/2 -translate-x-1/2 z-50 bg-red-50 text-red-700 text-sm px-4 py-2 rounded-lg shadow border border-red-100';
+            viewer.appendChild(errorEl);
+        }
+        errorEl.textContent = message;
+        errorEl.classList.remove('hidden');
+        setTimeout(() => {
+            if (errorEl) errorEl.classList.add('hidden');
+        }, 4000);
     }
 
     _prepareLinkedAssistantSession(session, displayName) {
@@ -1151,6 +1266,7 @@ class ModelerApp extends AppBase {
                 this._observeSvgContainerResize();
                 this.setTitle(`Modéliseur: ${this.fileName}`);
                 this._updateAssistantToggleVisibility();
+                this._updateExportToggleVisibility();
                 return;
             }
             this.render(this.container);
@@ -1269,6 +1385,10 @@ class ModelerApp extends AppBase {
         }
         if (this._resizeObserver) this._resizeObserver.disconnect();
         if (this._svgResizeObserver) this._svgResizeObserver.disconnect();
+        if (this._closeExportMenuOnClick) {
+            document.removeEventListener('click', this._closeExportMenuOnClick);
+            this._closeExportMenuOnClick = null;
+        }
         this._resizeObserver = null;
         this._svgResizeObserver = null;
         super.unmount();
