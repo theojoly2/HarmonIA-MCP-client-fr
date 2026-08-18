@@ -436,23 +436,16 @@ class AssistantApp extends AppBase {
         // restored after a switch.
         this.props.session = '';
         this.props.fromHistory = false;
+        // Clear the model pill so the home state is clean.
+        this._clearModelPill();
         this.chatEl.classList.remove('assistant-chat-mode');
         this.welcomeEl.classList.remove('assistant-welcome-top');
         this.inputArea.classList.remove('assistant-input-area-chat');
         this.inputEl.value = '';
         this.inputEl.style.height = 'auto';
-        // Reset the layout without animation to avoid the jarring inverse
-        // transition: the chat is cleared and the welcome/input snap cleanly
-        // back to the centered home position.
-        const welcomeWas = this.welcomeEl.style.transition;
-        const inputWas = this.inputArea.style.transition;
-        this.welcomeEl.style.transition = 'none';
-        this.inputArea.style.transition = 'none';
+        // _applyCentering(true) handles disabling transitions, reflowing,
+        // and restoring them internally.
         this._applyCentering(true);
-        void this.welcomeEl.offsetHeight;
-        void this.inputArea.offsetHeight;
-        this.welcomeEl.style.transition = welcomeWas;
-        this.inputArea.style.transition = inputWas;
     }
 
     _switchToChatMode() {
@@ -492,6 +485,21 @@ class AssistantApp extends AppBase {
         const welcomeTop = this.welcomeEl.classList.contains('assistant-welcome-top');
         const chatMode = this.chatEl?.classList.contains('assistant-chat-mode');
 
+        // When skipping the transition we temporarily disable it so the
+        // layout snaps to its final position without animating.
+        let welcomeWas = '';
+        let inputWas = '';
+        if (skipTransition) {
+            welcomeWas = this.welcomeEl.style.transition;
+            inputWas = this.inputArea.style.transition;
+            this.welcomeEl.style.transition = 'none';
+            this.inputArea.style.transition = 'none';
+            // Force a reflow so class changes (e.g. removing assistant-welcome-top)
+            // are applied before we measure dimensions below.
+            void this.welcomeEl.offsetHeight;
+            void this.inputArea.offsetHeight;
+        }
+
         if (isEmbedded) {
             // Embedded inside the modeler side panel: do not use fixed viewport
             // positioning. The input stays at the bottom of its flex container.
@@ -510,10 +518,7 @@ class AssistantApp extends AppBase {
             if (this.chatEl && inputHeight) {
                 this.chatEl.style.paddingBottom = `${inputHeight + 8}px`;
             }
-            return;
-        }
-
-        if (!welcomeTop) {
+        } else if (!welcomeTop) {
             // Center the whole title+subtitle+input block vertically in the visible area.
             const title = this.welcomeEl.querySelector('.assistant-welcome-title');
             const subtitle = this.welcomeEl.querySelector('.assistant-welcome-subtitle');
@@ -554,9 +559,11 @@ class AssistantApp extends AppBase {
         }
 
         if (skipTransition) {
-            this.welcomeEl.offsetHeight;
-            this.inputArea.offsetHeight;
-            this.welcomeEl.style.transition = was;
+            // Force a reflow so the browser applies the new dimensions before
+            // restoring the transition property.
+            void this.welcomeEl.offsetHeight;
+            void this.inputArea.offsetHeight;
+            this.welcomeEl.style.transition = welcomeWas;
             this.inputArea.style.transition = inputWas;
         }
     }
@@ -595,14 +602,63 @@ class AssistantApp extends AppBase {
             ? rawName.split('__').slice(0, -1).join('__')
             : rawName;
         this.modelPillSlotEl.innerHTML = `
-            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 border border-gray-200 text-xs font-semibold text-gray-700">
+            <div class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-100 border border-gray-200 text-xs font-semibold text-gray-700" id="assistant-model-pill">
                 <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
                 </svg>
-                <span class="truncate max-w-[12rem]" title="${this._escape(displayName)}">${this._escape(displayName)}</span>
+                <span class="truncate max-w-[10rem]" title="${this._escape(displayName)}">${this._escape(displayName)}</span>
+                <button type="button" id="assistant-model-pill-export" class="w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors" title="Exporter le modèle">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <path d="M7 10l5 5 5-5"></path>
+                        <path d="M12 15V3"></path>
+                    </svg>
+                </button>
+                <button type="button" id="assistant-model-pill-close" class="w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors" title="Détacher le modèle">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                        <path d="M18 6L6 18M6 6l12 12"></path>
+                    </svg>
+                </button>
             </div>
         `;
+        const closeBtn = this.modelPillSlotEl.querySelector('#assistant-model-pill-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => this._clearModelPill());
+        }
+        const exportBtn = this.modelPillSlotEl.querySelector('#assistant-model-pill-export');
+        if (exportBtn) {
+            exportBtn.addEventListener('click', () => this._exportModelFromPill());
+        }
+    }
+
+    _clearModelPill() {
+        this.modelName = '';
+        this.props.modelName = '';
+        this.props.display_name = '';
+        if (this.modelPillSlotEl) this.modelPillSlotEl.innerHTML = '';
+    }
+
+    async _exportModelFromPill() {
+        if (!this.modelName) return;
+        try {
+            const blob = await ApiClient.exportModel(this.modelName, 'xmi');
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const rawName = this.props.display_name || this.modelName;
+            const displayName = rawName.includes('__')
+                ? rawName.split('__').slice(0, -1).join('__')
+                : rawName;
+            a.download = `${displayName || 'modele'}.xmi`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Export model from pill error', err);
+            this._appendSystemMessage(`Erreur lors de l'export du modèle : ${this._escape(err.message)}`);
+        }
     }
 
     _buildTagsHtml(tags) {
