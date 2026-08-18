@@ -217,28 +217,12 @@ class AssistantApp extends AppBase {
             }
         });
 
-        // The input area is fixed and positioned with a CSS variable. We need
-        // the container and the input wrapper to have their final layout
-        // dimensions before measuring. Force a reflow first, then apply
-        // centering, and re-apply once more after a short delay to catch any
-        // late layout shifts (e.g. dynamic height of the textarea).
-        void container.offsetHeight;
-        this._applyCentering(true);
+        // The input area is fixed and positioned with a CSS variable so it can
+        // slide down in sync with the title when the first message is sent.
+        // Use two rAFs so the initial layout is stable before measuring.
         requestAnimationFrame(() => {
-            void container.offsetHeight;
-            this._applyCentering(true);
+            requestAnimationFrame(() => this._applyCentering(true));
         });
-        setTimeout(() => {
-            void container.offsetHeight;
-            this._applyCentering(true);
-        }, 150);
-        // Fonts can still be loading at first paint; recompute once they settle.
-        if (document.fonts && document.fonts.ready) {
-            document.fonts.ready.then(() => {
-                void container.offsetHeight;
-                this._applyCentering(true);
-            });
-        }
 
     }
 
@@ -298,19 +282,9 @@ class AssistantApp extends AppBase {
             this.selectedTags = state.selectedTags;
         }
         // Re-apply the welcome centering/positioning once the DOM is rebuilt.
-        void this.container.offsetHeight;
-        this._applyCentering(true);
-        requestAnimationFrame(() => this._applyCentering(true));
-        setTimeout(() => {
-            void this.container.offsetHeight;
-            this._applyCentering(true);
-        }, 150);
-        if (document.fonts && document.fonts.ready) {
-            document.fonts.ready.then(() => {
-                void this.container.offsetHeight;
-                this._applyCentering(true);
-            });
-        }
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => this._applyCentering(true));
+        });
         // For chats (messages present), always scroll to the bottom so the latest
         // message is visible. Restoring the previous scrollTop is confusing when
         // new messages arrived while the tab was hidden.
@@ -340,14 +314,7 @@ class AssistantApp extends AppBase {
             this.welcomeEl.classList.add('assistant-welcome-top');
             this.inputArea.classList.add('assistant-input-area-chat');
         }
-        void this.container.offsetHeight;
         this._applyCentering(true);
-        if (document.fonts && document.fonts.ready) {
-            document.fonts.ready.then(() => {
-                void this.container.offsetHeight;
-                this._applyCentering(true);
-            });
-        }
         this._scrollToBottom(true);
     }
 
@@ -471,20 +438,18 @@ class AssistantApp extends AppBase {
         this.inputArea.classList.remove('assistant-input-area-chat');
         this.inputEl.value = '';
         this.inputEl.style.height = 'auto';
-        // Force a reflow so class removals are applied before measuring.
-        void this.welcomeEl.offsetHeight;
+        // Reset the layout without animation to avoid the jarring inverse
+        // transition: the chat is cleared and the welcome/input snap cleanly
+        // back to the centered home position.
+        const welcomeWas = this.welcomeEl.style.transition;
+        const inputWas = this.inputArea.style.transition;
+        this.welcomeEl.style.transition = 'none';
+        this.inputArea.style.transition = 'none';
         this._applyCentering(true);
-        // Re-apply once more after a short delay to catch late layout shifts.
-        // Use a double rAF + a longer timeout because the subtitle switches from
-        // display:none to display:block and the welcome's padding-top transition
-        // needs time to settle.
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => this._applyCentering(true));
-        });
-        setTimeout(() => {
-            void this.welcomeEl.offsetHeight;
-            this._applyCentering(true);
-        }, 300);
+        void this.welcomeEl.offsetHeight;
+        void this.inputArea.offsetHeight;
+        this.welcomeEl.style.transition = welcomeWas;
+        this.inputArea.style.transition = inputWas;
     }
 
     _switchToChatMode() {
@@ -557,12 +522,7 @@ class AssistantApp extends AppBase {
                 this.chatEl.style.paddingBottom = `${inputHeight + 8}px`;
             }
         } else if (!welcomeTop) {
-            // Center the whole title+subtitle+input block vertically in the visible
-            // area. The input is positioned together with the title in the middle
-            // of the screen; the welcome-input slot provides its sizing reference.
-            // Force a reflow first so the real input area has its final height.
-            void this.inputArea.offsetHeight;
-
+            // Center the whole title+subtitle+input block vertically in the visible area.
             const title = this.welcomeEl.querySelector('.assistant-welcome-title');
             const subtitle = this.welcomeEl.querySelector('.assistant-welcome-subtitle');
             const slot = this.welcomeInputSlot;
@@ -572,26 +532,19 @@ class AssistantApp extends AppBase {
             const containerRect = this.container.getBoundingClientRect();
             const titleHeight = titleRect.height;
             const subtitleHeight = subtitleRect.height;
-            const subtitleMarginTop = subtitle ? (parseFloat(getComputedStyle(subtitle).marginTop) || 0) : 0;
-            // Prefer the real input area height, falling back to the invisible
-            // slot for the very first paint before the input is fully laid out.
-            const realInputHeight = this.inputArea.getBoundingClientRect().height;
-            const inputHeight = realInputHeight > 0 ? realInputHeight : slotRect.height;
-            const inputMarginTop = slot ? (parseFloat(getComputedStyle(slot).marginTop) || 0) : 0;
+            const subtitleMarginTop = parseFloat(getComputedStyle(subtitle).marginTop) || 0;
+            const inputHeight = Math.max(slotRect.height, this.inputArea.getBoundingClientRect().height);
+            const inputMarginTop = parseFloat(getComputedStyle(slot).marginTop) || 0;
             const contentHeight = titleHeight + subtitleMarginTop + subtitleHeight + inputMarginTop + inputHeight;
-            // Use the viewport height as a fallback when the container has not
-            // been laid out yet (first paint), so the title starts centered.
-            const availableHeight = containerRect.height > 0 ? containerRect.height : window.innerHeight;
-            const available = Math.max(availableHeight, contentHeight);
-            // Slight upward bias so the block feels optically centered without
-            // leaving too much blank space above the input.
+            const available = Math.max(containerRect.height, contentHeight);
             const offset = Math.max(0, (available - contentHeight) / 2 - contentHeight * 0.08);
-            this.welcomeEl.style.paddingTop = `${offset}px`;
+            this.welcomeEl.style.paddingTop = offset + 'px';
             this.welcomeEl.style.paddingBottom = '0';
 
-            // Position the input right below the subtitle, in the center.
+            // Compute the input top position mathematically from the welcome
+            // padding, title height, subtitle height and margins.
             const topY = containerRect.top + offset + titleHeight + subtitleMarginTop + subtitleHeight + inputMarginTop;
-            this.inputArea.style.setProperty('--assistant-input-top', `${topY}px`);
+            this.inputArea.style.setProperty('--assistant-input-top', topY + 'px');
         } else if (chatMode) {
             // In chat mode the title is sticky at the top and the input sits at
             // the bottom of the visible window, preserving its bottom padding.
