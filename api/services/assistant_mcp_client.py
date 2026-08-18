@@ -258,11 +258,14 @@ class AssistantMCPClient:
         if not search_terms:
             payload["tool_results"] = {"error": "Missing 'search_terms'"}
             return payload
+        selected_tags = _normalize_list_arg(self.state.get("selected_tags"))
         call_args = {
             "search_terms": _normalize_str_arg(search_terms),
             "limit": _normalize_int_arg(arguments.get("limit"), default=10),
             "return_full_document": _normalize_bool_arg(arguments.get("return_full_document"), default=True),
         }
+        if selected_tags:
+            call_args["tags"] = selected_tags
         payload["tool_arguments"] = call_args
         result = await self._call_tool_raw("retrieve_documents", call_args)
         payload["tool_results"] = self._extract_result(result) or []

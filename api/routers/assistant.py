@@ -291,6 +291,7 @@ async def assistant_stream_generator(
         "user": username,
         "name": model_name or session_name,
         "package": "",
+        "selected_tags": selected_tags,
     }
 
     # Load the uploaded model from the MCP server to inject it into the LLM context.
@@ -575,13 +576,6 @@ async def assistant_stream_generator(
                                 search_rows = await fetch_search(query_terms, selected_tags, limit)
                                 if search_rows == "TIMEOUT":
                                     search_rows = []
-                                # Use the same filtered results both for the UI card and for
-                                # the LLM context. Replace the raw tool_results with the
-                                # filtered rows so the assistant analyses exactly what the
-                                # user sees.
-                                if isinstance(parsed_tool, dict):
-                                    parsed_tool["tool_results"] = search_rows
-                                tool_message = json.dumps(parsed_tool, ensure_ascii=False) if isinstance(parsed_tool, dict) else tool_message
                                 rendered = render_results(search_rows, query=query_terms)
                                 display_payload = {
                                     "type": "search",
