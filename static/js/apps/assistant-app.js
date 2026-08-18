@@ -44,7 +44,7 @@ class AssistantApp extends AppBase {
         // kept flowing in the background, so the chat is already up-to-date.
         if (this.container === container && container.querySelector('#assistant-chat')) {
             this._observeResize();
-            this._snapLayout();
+            this._applyCentering(true);
             if (this.messagesEl && this.messagesEl.children.length > 0) {
                 this.chatEl.classList.add('assistant-chat-mode');
                 this.welcomeEl.classList.add('assistant-welcome-top');
@@ -160,7 +160,21 @@ class AssistantApp extends AppBase {
                 `;
                 this.embeddedIntroEl.classList.remove('hidden');
             }
-            this._updateModelPill();
+            if (this.modelPillSlotEl && this.modelName) {
+                const rawName = this.props.display_name || this.modelName;
+                const displayName = rawName.includes('__')
+                    ? rawName.split('__').slice(0, -1).join('__')
+                    : rawName;
+                this.modelPillSlotEl.innerHTML = `
+                    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 border border-gray-200 text-xs font-semibold text-gray-700">
+                        <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                        </svg>
+                        <span class="truncate max-w-[12rem]" title="${this._escape(displayName)}">${this._escape(displayName)}</span>
+                    </div>
+                `;
+            }
             if (importBtn) {
                 importBtn.style.display = 'none';
             }
@@ -168,8 +182,6 @@ class AssistantApp extends AppBase {
                 this.embeddedModelPillEl.classList.add('hidden');
             }
         }
-
-        this._updateModelPill();
 
         if (window.GlowEffects && typeof window.GlowEffects.scanAndBind === 'function') {
             window.GlowEffects.scanAndBind(container);
@@ -219,27 +231,10 @@ class AssistantApp extends AppBase {
 
         // The input area is fixed and positioned with a CSS variable so it can
         // slide down in sync with the title when the first message is sent.
-        // On first paint the fonts/layout are not final, so hide the welcome
-        // and input until the layout is stable and centered.
-        this.welcomeEl.style.opacity = '0';
-        this.inputArea.style.opacity = '0';
-        let shown = false;
-        const reveal = () => {
-            if (shown) return;
-            shown = true;
-            requestAnimationFrame(() => {
-                this._snapLayout();
-                requestAnimationFrame(() => {
-                    this.welcomeEl.style.opacity = '';
-                    this.inputArea.style.opacity = '';
-                });
-            });
-        };
-        // Wait for fonts; use a timeout as a safety net so the UI is never stuck.
-        if (document.fonts && document.fonts.ready) {
-            document.fonts.ready.then(reveal);
-        }
-        setTimeout(reveal, 250);
+        // Use two rAFs so the initial layout is stable before measuring.
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => this._applyCentering(true));
+        });
 
     }
 
@@ -248,7 +243,7 @@ class AssistantApp extends AppBase {
         this.inputEl.addEventListener('input', () => {
             this.inputEl.style.height = 'auto';
             this.inputEl.style.height = Math.min(this.inputEl.scrollHeight, 160) + 'px';
-            this._snapLayout();
+            this._applyCentering(true);
         });
         this.inputEl.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -300,12 +295,7 @@ class AssistantApp extends AppBase {
         }
         // Re-apply the welcome centering/positioning once the DOM is rebuilt.
         requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                this._snapLayout();
-                if (document.fonts && document.fonts.ready) {
-                    document.fonts.ready.then(() => this._snapLayout());
-                }
-            });
+            requestAnimationFrame(() => this._applyCentering(true));
         });
         // For chats (messages present), always scroll to the bottom so the latest
         // message is visible. Restoring the previous scrollTop is confusing when
@@ -336,10 +326,7 @@ class AssistantApp extends AppBase {
             this.welcomeEl.classList.add('assistant-welcome-top');
             this.inputArea.classList.add('assistant-input-area-chat');
         }
-        this._snapLayout();
-        if (document.fonts && document.fonts.ready) {
-            document.fonts.ready.then(() => this._snapLayout());
-        }
+        this._applyCentering(true);
         this._scrollToBottom(true);
     }
 
@@ -384,7 +371,7 @@ class AssistantApp extends AppBase {
         if (this._resizeObserver) this._resizeObserver.disconnect();
         this._observeResize();
         this._observeMessagesScroll();
-        this._snapLayout();
+        this._applyCentering(true);
         // If a chat is present, force-scroll to the bottom so the latest message
         // is visible after switching back to this tab. Retry several times because
         // CSS transitions and layout shifts can reset the scroll position.
@@ -453,49 +440,45 @@ class AssistantApp extends AppBase {
 
     _newSession() {
         this.session = '';
+        // Keep the model name and origin: a new conversation inside the modeler
+        // should still be about the current model, and standalone should stay standalone.
         this.messages = [];
         this.messagesEl.innerHTML = '';
-        // Reset any residual scroll from a scrollable chat so the welcome
-        // measures from a clean, non-scrolled state.
-        if (this.chatEl) this.chatEl.scrollTop = 0;
+        // Prevent the history session from being reloaded when the tab is
+        // restored after a switch.
         this.props.session = '';
         this.props.fromHistory = false;
-        this._clearModelPill();
         this.chatEl.classList.remove('assistant-chat-mode');
         this.welcomeEl.classList.remove('assistant-welcome-top');
         this.inputArea.classList.remove('assistant-input-area-chat');
         this.inputEl.value = '';
         this.inputEl.style.height = 'auto';
-        // Snap the layout without animating: the chat is cleared and the
-        // welcome/input return directly to the centered home position.
-        // Use several rAFs + a timeout because large tool cards (plan/search)
-        // leave the layout in flux for a few frames after innerHTML is cleared.
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                this._snapLayout();
-                setTimeout(() => this._snapLayout(), 80);
-                if (document.fonts && document.fonts.ready) {
-                    document.fonts.ready.then(() => this._snapLayout());
-                }
-            });
-        });
+        // Reset the layout without animation to avoid the jarring inverse
+        // transition: the chat is cleared and the welcome/input snap cleanly
+        // back to the centered home position.
+        const welcomeWas = this.welcomeEl.style.transition;
+        const inputWas = this.inputArea.style.transition;
+        this.welcomeEl.style.transition = 'none';
+        this.inputArea.style.transition = 'none';
+        this._applyCentering(true);
+        void this.welcomeEl.offsetHeight;
+        void this.inputArea.offsetHeight;
+        this.welcomeEl.style.transition = welcomeWas;
+        this.inputArea.style.transition = inputWas;
     }
 
     _switchToChatMode() {
         const hadFocus = document.activeElement === this.inputEl;
-        // First snap the welcome to its correct centered position WITHOUT
-        // animation so the transition starts from the right place.
-        this._snapLayout();
-        requestAnimationFrame(() => {
-            this.chatEl.classList.add('assistant-chat-mode');
-            this.welcomeEl.classList.add('assistant-welcome-top');
-            this.inputArea.classList.add('assistant-input-area-chat');
-            // Now animate both the title up and the input down.
-            this._applyCentering();
-            if (hadFocus) {
-                setTimeout(() => this.inputEl.focus(), 560);
-            }
-        });
+        this.chatEl.classList.add('assistant-chat-mode');
+        this.welcomeEl.classList.add('assistant-welcome-top');
+        this.inputArea.classList.add('assistant-input-area-chat');
+        // Recalculate positions so the fixed input area animates from its
+        // welcome spot down to the bottom in lockstep with the title.
+        this._applyCentering(false);
+        if (hadFocus) {
+            // Keep focus while animating; re-focus after the slide settles.
+            setTimeout(() => this.inputEl.focus(), 560);
+        }
     }
 
     _measureWelcomeContentHeight() {
@@ -511,7 +494,7 @@ class AssistantApp extends AppBase {
         return Math.max(height, 360);
     }
 
-    _applyCentering() {
+    _applyCentering(skipTransition) {
         if (!this.welcomeEl || !this.container || !this.inputArea) return;
 
         const isEmbedded = this._embedded ||
@@ -533,6 +516,8 @@ class AssistantApp extends AppBase {
             this.inputArea.style.right = '0';
             this.inputArea.style.top = 'auto';
             this.inputArea.style.width = '100%';
+            // Ensure the chat scroll area leaves room for the absolutely positioned
+            // input area so the last message is not hidden behind it.
             const inputHeight = this.inputArea.getBoundingClientRect().height;
             if (this.chatEl && inputHeight) {
                 this.chatEl.style.paddingBottom = `${inputHeight + 8}px`;
@@ -549,41 +534,42 @@ class AssistantApp extends AppBase {
             const subtitleRect = subtitle ? subtitle.getBoundingClientRect() : { top: titleRect.bottom, height: 0 };
             const slotRect = slot ? slot.getBoundingClientRect() : { height: 0 };
             const containerRect = this.container.getBoundingClientRect();
-            // Use the shell parent's height; the .assistant-app container may
-            // not yet have its final height at first paint, whereas the shell
-            // content area is laid out immediately.
-            const shellParent = this.container.parentElement;
-            const parentRect = shellParent ? shellParent.getBoundingClientRect() : containerRect;
             const titleHeight = titleRect.height;
             const subtitleHeight = subtitleRect.height;
             const subtitleMarginTop = parseFloat(getComputedStyle(subtitle).marginTop) || 0;
             const inputHeight = Math.max(slotRect.height, this.inputArea.getBoundingClientRect().height);
             const inputMarginTop = parseFloat(getComputedStyle(slot).marginTop) || 0;
             const contentHeight = titleHeight + subtitleMarginTop + subtitleHeight + inputMarginTop + inputHeight;
-            const available = Math.max(parentRect.height, contentHeight);
+            const available = Math.max(containerRect.height, contentHeight);
             const offset = Math.max(0, (available - contentHeight) / 2 - contentHeight * 0.08);
-            this.welcomeEl.style.paddingTop = `${offset}px`;
+            this.welcomeEl.style.paddingTop = offset + 'px';
             this.welcomeEl.style.paddingBottom = '0';
 
             // Compute the input top position mathematically from the welcome
-            // padding, title height, subtitle height and margins. The input is
-            // absolute inside the container; parentRect.top == containerRect.top
-            // because the container fills the shell parent.
-            const topY = offset + titleHeight + subtitleMarginTop + subtitleHeight + inputMarginTop;
-            this.inputArea.style.setProperty('--assistant-input-top', `${topY}px`);
+            // padding, title height, subtitle height and margins.
+            const topY = containerRect.top + offset + titleHeight + subtitleMarginTop + subtitleHeight + inputMarginTop;
+            this.inputArea.style.setProperty('--assistant-input-top', topY + 'px');
         } else if (chatMode) {
             // In chat mode the title is sticky at the top and the input sits at
-            // the bottom of the container, preserving its bottom padding.
+            // the bottom of the visible window, preserving its bottom padding.
             this.welcomeEl.style.paddingTop = '';
             this.welcomeEl.style.paddingBottom = '';
             const inputHeight = this.inputArea.getBoundingClientRect().height;
             const bottomPadding = 0.35 * parseFloat(getComputedStyle(document.documentElement).fontSize || 16);
-            const containerRect = this.container.getBoundingClientRect();
-            const topY = containerRect.height - inputHeight - bottomPadding;
-            this.inputArea.style.setProperty('--assistant-input-top', `${topY}px`);
+            // Position relative to the viewport bottom because the input is fixed.
+            const topY = window.innerHeight - inputHeight - bottomPadding;
+            this.inputArea.style.setProperty('--assistant-input-top', topY + 'px');
         } else {
+            // Fallback: clear explicit padding if neither state is fully active.
             this.welcomeEl.style.paddingTop = '';
             this.welcomeEl.style.paddingBottom = '';
+        }
+
+        if (skipTransition) {
+            this.welcomeEl.offsetHeight;
+            this.inputArea.offsetHeight;
+            this.welcomeEl.style.transition = was;
+            this.inputArea.style.transition = inputWas;
         }
     }
 
@@ -593,29 +579,9 @@ class AssistantApp extends AppBase {
         this._resizeObserver = new ResizeObserver(() => {
             // Recalculate the input position in both welcome and chat modes so
             // the fixed input area stays correctly placed after a resize.
-            this._snapLayout();
+            this._applyCentering(true);
         });
         this._resizeObserver.observe(this.container);
-    }
-
-    _snapLayout() {
-        // Disable CSS transitions momentarily, recompute the welcome/input
-        // positions, force a reflow so the new values are applied instantly,
-        // then re-enable transitions for subsequent animated state changes.
-        if (!this.welcomeEl || !this.inputArea) return;
-        // Force the chat area non-scrollable during measurement so a transient
-        // scrollbar (from a previously scrollable chat) cannot shrink the
-        // container width and alter title/subtitle heights.
-        const chatWas = this.chatEl ? this.chatEl.style.overflow : '';
-        if (this.chatEl) this.chatEl.style.overflow = 'hidden';
-        this.welcomeEl.classList.add('assistant-welcome-no-transition');
-        this.inputArea.classList.add('assistant-input-area-no-transition');
-        this._applyCentering();
-        void this.welcomeEl.offsetHeight;
-        void this.inputArea.offsetHeight;
-        if (this.chatEl) this.chatEl.style.overflow = chatWas;
-        this.welcomeEl.classList.remove('assistant-welcome-no-transition');
-        this.inputArea.classList.remove('assistant-input-area-no-transition');
     }
 
     async _importModel(file) {
@@ -624,116 +590,15 @@ class AssistantApp extends AppBase {
             const result = await ApiClient.importAssistantModel(file, file.name, this.origin);
             if (result?.name) {
                 this.modelName = result.name;
-                this.props.display_name = result.display_name || result.name;
-                this._updateModelPill();
+                this._appendSystemMessage(`Modèle **${this._escape(result.display_name || result.name)}** importé avec succès. Vous pouvez maintenant lui poser des questions.`);
+            } else {
+                this._appendSystemMessage('Le modèle a été importé.');
             }
         } catch (err) {
             console.error('Assistant import model error', err);
             this._appendSystemMessage(`Erreur lors de l'import du modèle : ${this._escape(err.message)}`);
         }
         if (this.fileInput) this.fileInput.value = '';
-    }
-
-    _updateModelPill() {
-        if (!this.modelPillSlotEl || !this.modelName) return;
-        const rawName = this.props.display_name || this.modelName;
-        const displayName = rawName.includes('__')
-            ? rawName.split('__').slice(0, -1).join('__')
-            : rawName;
-        this.modelPillSlotEl.innerHTML = `
-            <div class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-100 border border-gray-200 text-xs font-semibold text-gray-700" id="assistant-model-pill">
-                <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                </svg>
-                <span class="truncate max-w-[10rem]" title="${this._escape(displayName)}">${this._escape(displayName)}</span>
-                <div class="relative">
-                    <button type="button" id="assistant-model-pill-export" class="w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors" title="Exporter le modèle">
-                        <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                            <path d="M7 10l5 5 5-5"></path>
-                            <path d="M12 15V3"></path>
-                        </svg>
-                    </button>
-                    <div id="assistant-model-pill-export-menu" class="hidden absolute bottom-full right-0 mb-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg py-1 text-xs z-50">
-                        <button type="button" data-format="xmi" class="assistant-pill-export-item w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700">Exporter en XMI</button>
-                        <button type="button" data-format="ttl" class="assistant-pill-export-item w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700">Exporter en TTL</button>
-                    </div>
-                </div>
-                <button type="button" id="assistant-model-pill-close" class="w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors hidden" title="Détacher le modèle">
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-                        <path d="M18 6L6 18M6 6l12 12"></path>
-                    </svg>
-                </button>
-            </div>
-        `;
-        const closeBtn = this.modelPillSlotEl.querySelector('#assistant-model-pill-close');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => this._clearModelPill());
-        }
-        const exportBtn = this.modelPillSlotEl.querySelector('#assistant-model-pill-export');
-        const exportMenu = this.modelPillSlotEl.querySelector('#assistant-model-pill-export-menu');
-        if (exportBtn && exportMenu) {
-            exportBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const isOpen = !exportMenu.classList.contains('hidden');
-                this._closePillExportMenu();
-                if (!isOpen) exportMenu.classList.remove('hidden');
-            });
-            exportMenu.querySelectorAll('.assistant-pill-export-item').forEach((item) => {
-                item.addEventListener('click', async (e) => {
-                    e.stopPropagation();
-                    const format = item.dataset.format;
-                    await this._exportModelFromPill(format);
-                    this._closePillExportMenu();
-                });
-            });
-            // Close the export menu when clicking anywhere outside it.
-            this._pillExportCloseHandler = (e) => {
-                if (!exportMenu.contains(e.target) && e.target !== exportBtn && !exportBtn.contains(e.target)) {
-                    this._closePillExportMenu();
-                }
-            };
-            setTimeout(() => document.addEventListener('click', this._pillExportCloseHandler), 0);
-        }
-    }
-
-    _closePillExportMenu() {
-        const exportMenu = this.modelPillSlotEl?.querySelector('#assistant-model-pill-export-menu');
-        if (exportMenu) exportMenu.classList.add('hidden');
-    }
-
-    _clearModelPill() {
-        if (this._pillExportCloseHandler) {
-            document.removeEventListener('click', this._pillExportCloseHandler);
-            this._pillExportCloseHandler = null;
-        }
-        this.modelName = '';
-        this.props.modelName = '';
-        this.props.display_name = '';
-        if (this.modelPillSlotEl) this.modelPillSlotEl.innerHTML = '';
-    }
-
-    async _exportModelFromPill(format) {
-        if (!this.modelName) return;
-        try {
-            const blob = await ApiClient.exportModel(this.modelName, format);
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            const rawName = this.props.display_name || this.modelName;
-            const displayName = rawName.includes('__')
-                ? rawName.split('__').slice(0, -1).join('__')
-                : rawName;
-            a.download = `${displayName || 'modele'}.${format}`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        } catch (err) {
-            console.error('Export model from pill error', err);
-            this._appendSystemMessage(`Erreur lors de l'export du modèle : ${this._escape(err.message)}`);
-        }
     }
 
     _buildTagsHtml(tags) {
