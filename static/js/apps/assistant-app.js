@@ -217,12 +217,17 @@ class AssistantApp extends AppBase {
             }
         });
 
-        // The input area is fixed and positioned with a CSS variable so it can
-        // slide down in sync with the title when the first message is sent.
-        // Use two rAFs so the initial layout is stable before measuring.
+        // The input area is fixed and positioned with a CSS variable. We need
+        // the container to have its final layout dimensions before measuring.
+        // A single rAF is sometimes too early on first paint; force a reflow
+        // first, then apply centering, and re-apply once more after a short delay
+        // to catch any late layout shifts.
+        void container.offsetHeight;
+        this._applyCentering(true);
         requestAnimationFrame(() => {
-            requestAnimationFrame(() => this._applyCentering(true));
+            this._applyCentering(true);
         });
+        setTimeout(() => this._applyCentering(true), 100);
 
     }
 
@@ -282,9 +287,10 @@ class AssistantApp extends AppBase {
             this.selectedTags = state.selectedTags;
         }
         // Re-apply the welcome centering/positioning once the DOM is rebuilt.
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => this._applyCentering(true));
-        });
+        void this.container.offsetHeight;
+        this._applyCentering(true);
+        requestAnimationFrame(() => this._applyCentering(true));
+        setTimeout(() => this._applyCentering(true), 100);
         // For chats (messages present), always scroll to the bottom so the latest
         // message is visible. Restoring the previous scrollTop is confusing when
         // new messages arrived while the tab was hidden.
@@ -428,24 +434,21 @@ class AssistantApp extends AppBase {
 
     _newSession() {
         this.session = '';
-        // Keep the model name and origin: a new conversation inside the modeler
-        // should still be about the current model, and standalone should stay standalone.
         this.messages = [];
         this.messagesEl.innerHTML = '';
-        // Prevent the history session from being reloaded when the tab is
-        // restored after a switch.
         this.props.session = '';
         this.props.fromHistory = false;
-        // Clear the model pill so the home state is clean.
         this._clearModelPill();
         this.chatEl.classList.remove('assistant-chat-mode');
         this.welcomeEl.classList.remove('assistant-welcome-top');
         this.inputArea.classList.remove('assistant-input-area-chat');
         this.inputEl.value = '';
         this.inputEl.style.height = 'auto';
-        // _applyCentering(true) handles disabling transitions, reflowing,
-        // and restoring them internally.
+        // Force a reflow so class removals are applied before measuring.
+        void this.welcomeEl.offsetHeight;
         this._applyCentering(true);
+        // Re-apply once more after a short delay to catch late layout shifts.
+        setTimeout(() => this._applyCentering(true), 50);
     }
 
     _switchToChatMode() {
@@ -539,6 +542,11 @@ class AssistantApp extends AppBase {
             // padding, title height, subtitle height and margins.
             const topY = containerRect.top + offset + titleHeight + subtitleMarginTop + subtitleHeight + inputMarginTop;
             this.inputArea.style.setProperty('--assistant-input-top', topY + 'px');
+            // If the container has no height yet (first paint), fall back to
+            // the viewport height so the input is at least visible.
+            if (containerRect.height === 0) {
+                this.inputArea.style.setProperty('--assistant-input-top', (window.innerHeight - inputHeight) / 2 + 'px');
+            }
         } else if (chatMode) {
             // In chat mode the title is sticky at the top and the input sits at
             // the bottom of the visible window, preserving its bottom padding.
