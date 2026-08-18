@@ -677,6 +677,16 @@
     z-index: 20;
 }
 
+/* Utility class used by JS during initial load/reset to snap the welcome
+   layout to its final position without animating from an intermediate state. */
+.assistant-welcome-no-transition {
+    transition: none !important;
+}
+
+.assistant-input-area.assistant-input-area-no-transition {
+    transition: none !important;
+}
+
 .assistant-welcome-title {
     margin: 0;
     font-size: clamp(1rem, 2vw, 1.5rem);

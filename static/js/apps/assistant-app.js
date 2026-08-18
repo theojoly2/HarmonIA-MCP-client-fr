@@ -44,7 +44,7 @@ class AssistantApp extends AppBase {
         // kept flowing in the background, so the chat is already up-to-date.
         if (this.container === container && container.querySelector('#assistant-chat')) {
             this._observeResize();
-            this._applyCentering(true);
+            this._snapLayout();
             if (this.messagesEl && this.messagesEl.children.length > 0) {
                 this.chatEl.classList.add('assistant-chat-mode');
                 this.welcomeEl.classList.add('assistant-welcome-top');
@@ -219,9 +219,11 @@ class AssistantApp extends AppBase {
 
         // The input area is fixed and positioned with a CSS variable so it can
         // slide down in sync with the title when the first message is sent.
-        // Use two rAFs so the initial layout is stable before measuring.
+        // Use two rAFs so the initial layout is stable before measuring, and
+        // disable transitions temporarily so the first paint snaps directly to
+        // the centered position instead of animating from an intermediate state.
         requestAnimationFrame(() => {
-            requestAnimationFrame(() => this._applyCentering(true));
+            requestAnimationFrame(() => this._snapLayout());
         });
 
     }
@@ -231,7 +233,7 @@ class AssistantApp extends AppBase {
         this.inputEl.addEventListener('input', () => {
             this.inputEl.style.height = 'auto';
             this.inputEl.style.height = Math.min(this.inputEl.scrollHeight, 160) + 'px';
-            this._applyCentering(true);
+            this._snapLayout();
         });
         this.inputEl.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -283,7 +285,7 @@ class AssistantApp extends AppBase {
         }
         // Re-apply the welcome centering/positioning once the DOM is rebuilt.
         requestAnimationFrame(() => {
-            requestAnimationFrame(() => this._applyCentering(true));
+            requestAnimationFrame(() => this._snapLayout());
         });
         // For chats (messages present), always scroll to the bottom so the latest
         // message is visible. Restoring the previous scrollTop is confusing when
@@ -314,7 +316,7 @@ class AssistantApp extends AppBase {
             this.welcomeEl.classList.add('assistant-welcome-top');
             this.inputArea.classList.add('assistant-input-area-chat');
         }
-        this._applyCentering(true);
+        this._snapLayout();
         this._scrollToBottom(true);
     }
 
@@ -359,7 +361,7 @@ class AssistantApp extends AppBase {
         if (this._resizeObserver) this._resizeObserver.disconnect();
         this._observeResize();
         this._observeMessagesScroll();
-        this._applyCentering(true);
+        this._snapLayout();
         // If a chat is present, force-scroll to the bottom so the latest message
         // is visible after switching back to this tab. Retry several times because
         // CSS transitions and layout shifts can reset the scroll position.
@@ -438,31 +440,22 @@ class AssistantApp extends AppBase {
         this.inputArea.classList.remove('assistant-input-area-chat');
         this.inputEl.value = '';
         this.inputEl.style.height = 'auto';
-        // Reset the layout without animation to avoid the jarring inverse
-        // transition: the chat is cleared and the welcome/input snap cleanly
-        // back to the centered home position.
-        const welcomeWas = this.welcomeEl.style.transition;
-        const inputWas = this.inputArea.style.transition;
-        this.welcomeEl.style.transition = 'none';
-        this.inputArea.style.transition = 'none';
-        this._applyCentering(true);
-        void this.welcomeEl.offsetHeight;
-        void this.inputArea.offsetHeight;
-        this.welcomeEl.style.transition = welcomeWas;
-        this.inputArea.style.transition = inputWas;
+        // Snap the layout without animating: the chat is cleared and the
+        // welcome/input return directly to the centered home position.
+        requestAnimationFrame(() => this._snapLayout());
     }
 
     _switchToChatMode() {
         const hadFocus = document.activeElement === this.inputEl;
         // First snap the welcome to its correct centered position WITHOUT
         // animation so the transition starts from the right place.
-        this._applyCentering(true);
+        this._snapLayout();
         requestAnimationFrame(() => {
             this.chatEl.classList.add('assistant-chat-mode');
             this.welcomeEl.classList.add('assistant-welcome-top');
             this.inputArea.classList.add('assistant-input-area-chat');
             // Now animate both the title up and the input down.
-            this._applyCentering(false);
+            this._applyCentering();
             if (hadFocus) {
                 setTimeout(() => this.inputEl.focus(), 560);
             }
@@ -482,7 +475,7 @@ class AssistantApp extends AppBase {
         return Math.max(height, 360);
     }
 
-    _applyCentering(skipTransition) {
+    _applyCentering() {
         if (!this.welcomeEl || !this.container || !this.inputArea) return;
 
         const isEmbedded = this._embedded ||
@@ -556,9 +549,23 @@ class AssistantApp extends AppBase {
         this._resizeObserver = new ResizeObserver(() => {
             // Recalculate the input position in both welcome and chat modes so
             // the fixed input area stays correctly placed after a resize.
-            this._applyCentering(true);
+            this._snapLayout();
         });
         this._resizeObserver.observe(this.container);
+    }
+
+    _snapLayout() {
+        // Disable CSS transitions momentarily, recompute the welcome/input
+        // positions, force a reflow so the new values are applied instantly,
+        // then re-enable transitions for subsequent animated state changes.
+        if (!this.welcomeEl || !this.inputArea) return;
+        this.welcomeEl.classList.add('assistant-welcome-no-transition');
+        this.inputArea.classList.add('assistant-input-area-no-transition');
+        this._applyCentering();
+        void this.welcomeEl.offsetHeight;
+        void this.inputArea.offsetHeight;
+        this.welcomeEl.classList.remove('assistant-welcome-no-transition');
+        this.inputArea.classList.remove('assistant-input-area-no-transition');
     }
 
     async _importModel(file) {
