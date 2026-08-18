@@ -456,9 +456,10 @@ class AssistantApp extends AppBase {
         this.chatEl.classList.add('assistant-chat-mode');
         this.welcomeEl.classList.add('assistant-welcome-top');
         this.inputArea.classList.add('assistant-input-area-chat');
-        this._applyCentering(true);
+        // Let the transitions animate the title up and the input down.
+        this._applyCentering(false);
         if (hadFocus) {
-            this.inputEl.focus();
+            setTimeout(() => this.inputEl.focus(), 560);
         }
     }
 
