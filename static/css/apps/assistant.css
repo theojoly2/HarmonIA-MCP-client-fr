@@ -658,7 +658,7 @@
     padding-top: 0;
     padding-bottom: 0;
     flex-shrink: 0;
-    transition: padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.45s ease;
+    transition: none;
     opacity: 1;
     position: relative;
     z-index: 25;
@@ -744,7 +744,7 @@
     z-index: 30;
     will-change: top;
     transform: translateY(0);
-    transition: top 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease;
+    transition: none;
 }
 
 .assistant-app.assistant-embedded .assistant-input-area,

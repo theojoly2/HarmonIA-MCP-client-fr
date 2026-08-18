@@ -453,12 +453,9 @@ class AssistantApp extends AppBase {
         this.chatEl.classList.add('assistant-chat-mode');
         this.welcomeEl.classList.add('assistant-welcome-top');
         this.inputArea.classList.add('assistant-input-area-chat');
-        // Recalculate positions so the fixed input area animates from its
-        // welcome spot down to the bottom in lockstep with the title.
-        this._applyCentering(false);
+        this._applyCentering(true);
         if (hadFocus) {
-            // Keep focus while animating; re-focus after the slide settles.
-            setTimeout(() => this.inputEl.focus(), 560);
+            this.inputEl.focus();
         }
     }
 
