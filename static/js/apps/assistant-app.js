@@ -219,19 +219,27 @@ class AssistantApp extends AppBase {
 
         // The input area is fixed and positioned with a CSS variable so it can
         // slide down in sync with the title when the first message is sent.
-        // Use two rAFs so the initial layout is stable before measuring, and
-        // disable transitions temporarily so the first paint snaps directly to
-        // the centered position instead of animating from an intermediate state.
-        requestAnimationFrame(() => {
+        // On first paint the fonts/layout are not final, so hide the welcome
+        // and input until the layout is stable and centered.
+        this.welcomeEl.style.opacity = '0';
+        this.inputArea.style.opacity = '0';
+        let shown = false;
+        const reveal = () => {
+            if (shown) return;
+            shown = true;
             requestAnimationFrame(() => {
                 this._snapLayout();
-                // Fonts and final layout may still settle after the first paint;
-                // re-snap once they do so the cached DOM matches this final value.
-                if (document.fonts && document.fonts.ready) {
-                    document.fonts.ready.then(() => this._snapLayout());
-                }
+                requestAnimationFrame(() => {
+                    this.welcomeEl.style.opacity = '';
+                    this.inputArea.style.opacity = '';
+                });
             });
-        });
+        };
+        // Wait for fonts; use a timeout as a safety net so the UI is never stuck.
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(reveal);
+        }
+        setTimeout(reveal, 250);
 
     }
 
