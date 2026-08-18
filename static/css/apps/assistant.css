@@ -740,7 +740,7 @@
 }
 
 .assistant-input-area {
-    position: fixed !important;
+    position: absolute !important;
     top: var(--assistant-input-top, 50%);
     left: 0;
     right: 0;

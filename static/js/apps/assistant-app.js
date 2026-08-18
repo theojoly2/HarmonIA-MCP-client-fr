@@ -549,29 +549,37 @@ class AssistantApp extends AppBase {
             const subtitleRect = subtitle ? subtitle.getBoundingClientRect() : { top: titleRect.bottom, height: 0 };
             const slotRect = slot ? slot.getBoundingClientRect() : { height: 0 };
             const containerRect = this.container.getBoundingClientRect();
+            // Use the shell parent's height; the .assistant-app container may
+            // not yet have its final height at first paint, whereas the shell
+            // content area is laid out immediately.
+            const shellParent = this.container.parentElement;
+            const parentRect = shellParent ? shellParent.getBoundingClientRect() : containerRect;
             const titleHeight = titleRect.height;
             const subtitleHeight = subtitleRect.height;
             const subtitleMarginTop = parseFloat(getComputedStyle(subtitle).marginTop) || 0;
             const inputHeight = Math.max(slotRect.height, this.inputArea.getBoundingClientRect().height);
             const inputMarginTop = parseFloat(getComputedStyle(slot).marginTop) || 0;
             const contentHeight = titleHeight + subtitleMarginTop + subtitleHeight + inputMarginTop + inputHeight;
-            const available = Math.max(containerRect.height, contentHeight);
+            const available = Math.max(parentRect.height, contentHeight);
             const offset = Math.max(0, (available - contentHeight) / 2 - contentHeight * 0.08);
             this.welcomeEl.style.paddingTop = `${offset}px`;
             this.welcomeEl.style.paddingBottom = '0';
 
             // Compute the input top position mathematically from the welcome
-            // padding, title height, subtitle height and margins.
-            const topY = containerRect.top + offset + titleHeight + subtitleMarginTop + subtitleHeight + inputMarginTop;
+            // padding, title height, subtitle height and margins. The input is
+            // absolute inside the container; parentRect.top == containerRect.top
+            // because the container fills the shell parent.
+            const topY = offset + titleHeight + subtitleMarginTop + subtitleHeight + inputMarginTop;
             this.inputArea.style.setProperty('--assistant-input-top', `${topY}px`);
         } else if (chatMode) {
             // In chat mode the title is sticky at the top and the input sits at
-            // the bottom of the visible window, preserving its bottom padding.
+            // the bottom of the container, preserving its bottom padding.
             this.welcomeEl.style.paddingTop = '';
             this.welcomeEl.style.paddingBottom = '';
             const inputHeight = this.inputArea.getBoundingClientRect().height;
             const bottomPadding = 0.35 * parseFloat(getComputedStyle(document.documentElement).fontSize || 16);
-            const topY = window.innerHeight - inputHeight - bottomPadding;
+            const containerRect = this.container.getBoundingClientRect();
+            const topY = containerRect.height - inputHeight - bottomPadding;
             this.inputArea.style.setProperty('--assistant-input-top', `${topY}px`);
         } else {
             this.welcomeEl.style.paddingTop = '';
