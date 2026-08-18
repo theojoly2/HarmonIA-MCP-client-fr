@@ -527,10 +527,16 @@ class AssistantApp extends AppBase {
 
         if (!welcomeTop) {
             // Center the whole title+subtitle+input block vertically in the visible area.
-            // Force the shell layout to settle before measuring; on first paint
-            // the container may not yet have its final h-full height.
-            const shellParent = this.container.parentElement;
-            if (shellParent) void shellParent.offsetHeight;
+            // Force every ancestor up to #app-shell to reflow so the container's
+            // h-full height is resolved before we measure it (first paint fix).
+            let ancestor = this.container;
+            let guard = 0;
+            while (ancestor && guard < 10) {
+                void ancestor.offsetHeight;
+                if (ancestor.id === 'app-shell') break;
+                ancestor = ancestor.parentElement;
+                guard++;
+            }
 
             const title = this.welcomeEl.querySelector('.assistant-welcome-title');
             const subtitle = this.welcomeEl.querySelector('.assistant-welcome-subtitle');
@@ -545,11 +551,7 @@ class AssistantApp extends AppBase {
             const inputHeight = Math.max(slotRect.height, this.inputArea.getBoundingClientRect().height);
             const inputMarginTop = parseFloat(getComputedStyle(slot).marginTop) || 0;
             const contentHeight = titleHeight + subtitleMarginTop + subtitleHeight + inputMarginTop + inputHeight;
-            // Use the available visible height under the container's top. This
-            // is robust even when the container's own height is still 0 because
-            // the parent shell has not finished laying out.
-            const visibleHeight = Math.max(containerRect.height, window.innerHeight - containerRect.top);
-            const available = Math.max(visibleHeight, contentHeight);
+            const available = Math.max(containerRect.height, contentHeight);
             const offset = Math.max(0, (available - contentHeight) / 2 - contentHeight * 0.08);
             this.welcomeEl.style.paddingTop = offset + 'px';
             this.welcomeEl.style.paddingBottom = '0';
