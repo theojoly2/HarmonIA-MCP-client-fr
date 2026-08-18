@@ -231,10 +231,7 @@ class AssistantApp extends AppBase {
 
         // The input area is fixed and positioned with a CSS variable so it can
         // slide down in sync with the title when the first message is sent.
-        // Compute the initial centered layout synchronously before the first
-        // paint so the welcome/input never flash at the wrong position; then
-        // recompute after a couple of frames once fonts/layout have settled.
-        this._applyCentering(true);
+        // Use two rAFs so the initial layout is stable before measuring.
         requestAnimationFrame(() => {
             requestAnimationFrame(() => this._applyCentering(true));
         });
