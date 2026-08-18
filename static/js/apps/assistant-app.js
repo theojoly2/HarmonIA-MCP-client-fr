@@ -447,6 +447,9 @@ class AssistantApp extends AppBase {
         this.session = '';
         this.messages = [];
         this.messagesEl.innerHTML = '';
+        // Reset any residual scroll from a scrollable chat so the welcome
+        // measures from a clean, non-scrolled state.
+        if (this.chatEl) this.chatEl.scrollTop = 0;
         this.props.session = '';
         this.props.fromHistory = false;
         this._clearModelPill();
@@ -457,7 +460,17 @@ class AssistantApp extends AppBase {
         this.inputEl.style.height = 'auto';
         // Snap the layout without animating: the chat is cleared and the
         // welcome/input return directly to the centered home position.
-        requestAnimationFrame(() => this._snapLayout());
+        // Use several rAFs + a timeout because large tool cards (plan/search)
+        // leave the layout in flux for a few frames after innerHTML is cleared.
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                this._snapLayout();
+                setTimeout(() => this._snapLayout(), 80);
+                if (document.fonts && document.fonts.ready) {
+                    document.fonts.ready.then(() => this._snapLayout());
+                }
+            });
+        });
     }
 
     _switchToChatMode() {
@@ -574,11 +587,17 @@ class AssistantApp extends AppBase {
         // positions, force a reflow so the new values are applied instantly,
         // then re-enable transitions for subsequent animated state changes.
         if (!this.welcomeEl || !this.inputArea) return;
+        // Force the chat area non-scrollable during measurement so a transient
+        // scrollbar (from a previously scrollable chat) cannot shrink the
+        // container width and alter title/subtitle heights.
+        const chatWas = this.chatEl ? this.chatEl.style.overflow : '';
+        if (this.chatEl) this.chatEl.style.overflow = 'hidden';
         this.welcomeEl.classList.add('assistant-welcome-no-transition');
         this.inputArea.classList.add('assistant-input-area-no-transition');
         this._applyCentering();
         void this.welcomeEl.offsetHeight;
         void this.inputArea.offsetHeight;
+        if (this.chatEl) this.chatEl.style.overflow = chatWas;
         this.welcomeEl.classList.remove('assistant-welcome-no-transition');
         this.inputArea.classList.remove('assistant-input-area-no-transition');
     }
