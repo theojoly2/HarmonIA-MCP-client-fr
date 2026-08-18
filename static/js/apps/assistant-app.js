@@ -221,7 +221,7 @@ class AssistantApp extends AppBase {
         // the container and the input wrapper to have their final layout
         // dimensions before measuring. Force a reflow first, then apply
         // centering, and re-apply once more after a short delay to catch any
-        // late layout shifts (e.g. font loading, dynamic height of the textarea).
+        // late layout shifts (e.g. dynamic height of the textarea).
         void container.offsetHeight;
         this._applyCentering(true);
         requestAnimationFrame(() => {
@@ -231,7 +231,14 @@ class AssistantApp extends AppBase {
         setTimeout(() => {
             void container.offsetHeight;
             this._applyCentering(true);
-        }, 100);
+        }, 150);
+        // Fonts can still be loading at first paint; recompute once they settle.
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(() => {
+                void container.offsetHeight;
+                this._applyCentering(true);
+            });
+        }
 
     }
 
@@ -294,7 +301,16 @@ class AssistantApp extends AppBase {
         void this.container.offsetHeight;
         this._applyCentering(true);
         requestAnimationFrame(() => this._applyCentering(true));
-        setTimeout(() => this._applyCentering(true), 100);
+        setTimeout(() => {
+            void this.container.offsetHeight;
+            this._applyCentering(true);
+        }, 150);
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(() => {
+                void this.container.offsetHeight;
+                this._applyCentering(true);
+            });
+        }
         // For chats (messages present), always scroll to the bottom so the latest
         // message is visible. Restoring the previous scrollTop is confusing when
         // new messages arrived while the tab was hidden.
@@ -324,7 +340,14 @@ class AssistantApp extends AppBase {
             this.welcomeEl.classList.add('assistant-welcome-top');
             this.inputArea.classList.add('assistant-input-area-chat');
         }
+        void this.container.offsetHeight;
         this._applyCentering(true);
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(() => {
+                void this.container.offsetHeight;
+                this._applyCentering(true);
+            });
+        }
         this._scrollToBottom(true);
     }
 
@@ -452,7 +475,16 @@ class AssistantApp extends AppBase {
         void this.welcomeEl.offsetHeight;
         this._applyCentering(true);
         // Re-apply once more after a short delay to catch late layout shifts.
-        setTimeout(() => this._applyCentering(true), 50);
+        // Use a double rAF + a longer timeout because the subtitle switches from
+        // display:none to display:block and the welcome's padding-top transition
+        // needs time to settle.
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => this._applyCentering(true));
+        });
+        setTimeout(() => {
+            void this.welcomeEl.offsetHeight;
+            this._applyCentering(true);
+        }, 300);
     }
 
     _switchToChatMode() {
