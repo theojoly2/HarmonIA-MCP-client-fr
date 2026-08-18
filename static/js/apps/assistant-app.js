@@ -453,14 +453,20 @@ class AssistantApp extends AppBase {
 
     _switchToChatMode() {
         const hadFocus = document.activeElement === this.inputEl;
-        this.chatEl.classList.add('assistant-chat-mode');
-        this.welcomeEl.classList.add('assistant-welcome-top');
-        this.inputArea.classList.add('assistant-input-area-chat');
-        // Let the transitions animate the title up and the input down.
-        this._applyCentering(false);
-        if (hadFocus) {
-            setTimeout(() => this.inputEl.focus(), 560);
-        }
+        // First, snap the welcome to its correct centered position WITHOUT
+        // animation so the transition starts from the right place.
+        this._applyCentering(true);
+        // Then, on the next frame, add the chat-mode classes and re-apply with
+        // transitions enabled so the title slides up and the input slides down.
+        requestAnimationFrame(() => {
+            this.chatEl.classList.add('assistant-chat-mode');
+            this.welcomeEl.classList.add('assistant-welcome-top');
+            this.inputArea.classList.add('assistant-input-area-chat');
+            this._applyCentering(false);
+            if (hadFocus) {
+                setTimeout(() => this.inputEl.focus(), 560);
+            }
+        });
     }
 
     _measureWelcomeContentHeight() {
@@ -534,7 +540,10 @@ class AssistantApp extends AppBase {
             const inputHeight = Math.max(slotRect.height, this.inputArea.getBoundingClientRect().height);
             const inputMarginTop = parseFloat(getComputedStyle(slot).marginTop) || 0;
             const contentHeight = titleHeight + subtitleMarginTop + subtitleHeight + inputMarginTop + inputHeight;
-            const available = Math.max(containerRect.height, contentHeight);
+            // Use the viewport height as a fallback when the container has not
+            // been laid out yet (first paint), so the title starts centered.
+            const availableHeight = containerRect.height > 0 ? containerRect.height : window.innerHeight;
+            const available = Math.max(availableHeight, contentHeight);
             const offset = Math.max(0, (available - contentHeight) / 2 - contentHeight * 0.08);
             this.welcomeEl.style.paddingTop = offset + 'px';
             this.welcomeEl.style.paddingBottom = '0';
@@ -543,11 +552,6 @@ class AssistantApp extends AppBase {
             // padding, title height, subtitle height and margins.
             const topY = containerRect.top + offset + titleHeight + subtitleMarginTop + subtitleHeight + inputMarginTop;
             this.inputArea.style.setProperty('--assistant-input-top', topY + 'px');
-            // If the container has no height yet (first paint), fall back to
-            // the viewport height so the input is at least visible.
-            if (containerRect.height === 0) {
-                this.inputArea.style.setProperty('--assistant-input-top', (window.innerHeight - inputHeight) / 2 + 'px');
-            }
         } else if (chatMode) {
             // In chat mode the title is sticky at the top and the input sits at
             // the bottom of the visible window, preserving its bottom padding.
