@@ -531,11 +531,14 @@ class AssistantApp extends AppBase {
             return;
         }
 
-        // The input area is the only element with a vertical transition in
-        // welcome mode. We disable it inline when snapping so measurements don't
-        // read mid-animation values, then restore it.
+        // Welcome padding and input top are both transitioned. Disable them
+        // inline when snapping so measurements don't read mid-animation values.
+        const welcomeWas = this.welcomeEl.style.transition;
         const inputWas = this.inputArea.style.transition;
-        if (skipTransition) this.inputArea.style.transition = 'none';
+        if (skipTransition) {
+            this.welcomeEl.style.transition = 'none';
+            this.inputArea.style.transition = 'none';
+        }
 
         if (!welcomeTop) {
             // Reset any leftover chat scroll so the welcome is measured from the
@@ -584,8 +587,11 @@ class AssistantApp extends AppBase {
         }
 
         if (skipTransition) {
+            void this.welcomeEl.offsetHeight;
             void this.inputArea.offsetHeight;
+            this.welcomeEl.style.transition = welcomeWas;
             this.inputArea.style.transition = inputWas;
+            void this.welcomeEl.offsetHeight;
             void this.inputArea.offsetHeight;
         }
     }
