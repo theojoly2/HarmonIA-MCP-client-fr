@@ -464,11 +464,24 @@ class AssistantApp extends AppBase {
 
     _switchToChatMode() {
         const hadFocus = document.activeElement === this.inputEl;
+        // Snap the welcome/input to their final home positions without animating
+        // so the transition starts from the exact same place the user sees.
+        this.welcomeEl.style.transition = 'none';
+        this.inputArea.style.transition = 'none';
+        this._applyCentering(true);
+        void this.welcomeEl.offsetHeight;
+        void this.inputArea.offsetHeight;
+
         this.chatEl.classList.add('assistant-chat-mode');
         this.welcomeEl.classList.add('assistant-welcome-top');
         this.inputArea.classList.add('assistant-input-area-chat');
-        // Recalculate positions so the fixed input area animates from its
-        // welcome spot down to the bottom in lockstep with the title.
+
+        // Re-enable CSS transitions, then compute the chat-mode positions so the
+        // slide from home to chat is animated from the correct starting point.
+        this.welcomeEl.style.transition = '';
+        this.inputArea.style.transition = '';
+        void this.welcomeEl.offsetHeight;
+        void this.inputArea.offsetHeight;
         this._applyCentering(false);
         if (hadFocus) {
             // Keep focus while animating; re-focus after the slide settles.
