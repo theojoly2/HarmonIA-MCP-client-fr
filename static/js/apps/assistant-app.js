@@ -219,10 +219,18 @@ class AssistantApp extends AppBase {
 
         // The input area is fixed and positioned with a CSS variable so it can
         // slide down in sync with the title when the first message is sent.
-        // Use two rAFs so the initial layout is stable before measuring.
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => this._applyCentering(true));
-        });
+        // Wait for fonts and two layout frames so the initial centering is
+        // computed from stable dimensions instead of mid-transition values.
+        const initialCenter = () => {
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => this._applyCentering(true));
+            });
+        };
+        if (document.fonts && typeof document.fonts.ready === 'object') {
+            document.fonts.ready.then(initialCenter).catch(initialCenter);
+        } else {
+            initialCenter();
+        }
 
     }
 
@@ -438,15 +446,7 @@ class AssistantApp extends AppBase {
         this.inputArea.classList.remove('assistant-input-area-chat');
         this.inputEl.value = '';
         this.inputEl.style.height = 'auto';
-        const welcomeWas = this.welcomeEl.style.transition;
-        const inputWas = this.inputArea.style.transition;
-        this.welcomeEl.style.transition = 'none';
-        this.inputArea.style.transition = 'none';
         this._applyCentering(true);
-        void this.welcomeEl.offsetHeight;
-        void this.inputArea.offsetHeight;
-        this.welcomeEl.style.transition = welcomeWas;
-        this.inputArea.style.transition = inputWas;
     }
 
     _switchToChatMode() {
@@ -454,6 +454,12 @@ class AssistantApp extends AppBase {
         this.chatEl.classList.add('assistant-chat-mode');
         this.welcomeEl.classList.add('assistant-welcome-top');
         this.inputArea.classList.add('assistant-input-area-chat');
+        // Re-enable CSS transitions before recalculating so the slide from
+        // the centered home position to the chat position is animated.
+        this.welcomeEl.style.transition = '';
+        this.inputArea.style.transition = '';
+        void this.welcomeEl.offsetHeight;
+        void this.inputArea.offsetHeight;
         // Recalculate positions so the fixed input area animates from its
         // welcome spot down to the bottom in lockstep with the title.
         this._applyCentering(false);
@@ -485,6 +491,14 @@ class AssistantApp extends AppBase {
             this.container.closest('#modeler-assistant-panel') !== null;
         const welcomeTop = this.welcomeEl.classList.contains('assistant-welcome-top');
         const chatMode = this.chatEl?.classList.contains('assistant-chat-mode');
+
+        // When not in chat mode yet, disable vertical transitions on the
+        // welcome block and the input area so the initial centering is applied
+        // instantly and does not read mid-animation geometry.
+        if (!welcomeTop && !chatMode) {
+            this.welcomeEl.style.transition = 'none';
+            this.inputArea.style.transition = 'none';
+        }
 
         if (isEmbedded) {
             // Embedded inside the modeler side panel: do not use fixed viewport
@@ -562,14 +576,18 @@ class AssistantApp extends AppBase {
         }
 
         if (skipTransition) {
-            const welcomeWas = this.welcomeEl.style.transition;
-            const inputWas = this.inputArea.style.transition;
-            this.welcomeEl.style.transition = 'none';
-            this.inputArea.style.transition = 'none';
+            // Force a reflow so the new padding/top values are applied instantly.
             void this.welcomeEl.offsetHeight;
             void this.inputArea.offsetHeight;
-            this.welcomeEl.style.transition = welcomeWas;
-            this.inputArea.style.transition = inputWas;
+            // Only re-enable CSS transitions once the view is transitioning to
+            // chat mode. In home mode the welcome block must stay transitionless
+            // so it does not drift if _applyCentering is called again.
+            if (welcomeTop || chatMode) {
+                this.welcomeEl.style.transition = '';
+                this.inputArea.style.transition = '';
+                void this.welcomeEl.offsetHeight;
+                void this.inputArea.offsetHeight;
+            }
         }
     }
 
