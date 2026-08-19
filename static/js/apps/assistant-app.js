@@ -482,7 +482,9 @@ class AssistantApp extends AppBase {
         this.inputArea.style.transition = '';
         void this.welcomeEl.offsetHeight;
         void this.inputArea.offsetHeight;
+        console.log('[Assistant switch] before chat applyCentering, input top var:', getComputedStyle(this.inputArea).getPropertyValue('--assistant-input-top'), 'welcome padding:', this.welcomeEl.style.paddingTop);
         this._applyCentering(false);
+        console.log('[Assistant switch] after chat applyCentering, input top var:', getComputedStyle(this.inputArea).getPropertyValue('--assistant-input-top'));
         if (hadFocus) {
             // Keep focus while animating; re-focus after the slide settles.
             setTimeout(() => this.inputEl.focus(), 560);
@@ -579,6 +581,21 @@ class AssistantApp extends AppBase {
             // viewport-relative top as the origin for the fixed element.
             const topY = offset + titleHeight + subtitleMarginTop + subtitleHeight + subtitleMarginBottom + inputMarginTop;
             this.inputArea.style.setProperty('--assistant-input-top', `${topY}px`);
+
+            console.log('[Assistant home]', {
+                caller: skipTransition ? 'snap' : 'animate',
+                viewportHeight,
+                titleHeight,
+                subtitleHeight,
+                inputHeight,
+                contentHeight,
+                offset,
+                topY,
+                paddingTop: this.welcomeEl.style.paddingTop,
+                inputTopVar: getComputedStyle(this.inputArea).getPropertyValue('--assistant-input-top'),
+                inputRectTop: inputRect.top,
+                containerTop: containerRect.top,
+            });
         } else if (chatMode) {
             // In chat mode the title is sticky at the top and the input sits at
             // the bottom of the visible window, preserving its bottom padding.
