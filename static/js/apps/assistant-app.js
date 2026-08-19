@@ -674,7 +674,7 @@ class AssistantApp extends AppBase {
                             <path d="M12 15V3"></path>
                         </svg>
                     </button>
-                    <div class="assistant-model-pill-export-menu hidden absolute bottom-full right-0 mb-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg py-1 text-xs z-50">
+                    <div class="assistant-model-pill-export-menu hidden absolute bottom-full right-0 mb-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg py-1 text-xs z-[100]">
                         <button type="button" data-format="xmi" class="assistant-pill-export-item w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700">Exporter en XMI</button>
                         <button type="button" data-format="ttl" class="assistant-pill-export-item w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700">Exporter en TTL</button>
                     </div>

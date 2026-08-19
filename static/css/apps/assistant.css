@@ -889,7 +889,7 @@
     flex-wrap: nowrap;
     gap: 0.35rem;
     max-width: 28rem;
-    overflow: hidden;
+    overflow: visible;
 }
 
 #assistant-model-pill-slot .assistant-model-pill {
