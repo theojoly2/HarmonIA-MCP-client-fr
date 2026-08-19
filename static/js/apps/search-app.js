@@ -23,6 +23,7 @@ class SearchApp extends AppBase {
         this._skipNextTransition = false;
         this._firstTagAnimation = true;
         this._introAnimating = false;
+        this._introAnimationDone = false;
         this._skipHistorySave = !!props.fromHistory;
     }
 
@@ -37,11 +38,9 @@ class SearchApp extends AppBase {
             return;
         }
         this.container = container;
-        // The tag intro animation runs once per browser session. We track this
-        // in sessionStorage so tab switches and state restores don't re-trigger
-        // the landing animation.
-        const introPlayed = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('searchIntroPlayed') === '1';
-        const showTags = this._firstTagAnimation && !introPlayed;
+        // The tag intro animation runs only once per instance. After that,
+        // switching back to the tab should restore the already-revealed tags.
+        const showTags = !this._introAnimationDone && this._firstTagAnimation;
         if (showTags) {
             this._firstTagAnimation = false;
             this._introAnimating = true;
@@ -49,13 +48,7 @@ class SearchApp extends AppBase {
             this._layoutReady = false;
             // Start loading tags in parallel; the reveal fires as soon as both tags and layout are ready.
             this._loadTags().then(() => this._checkRevealReady());
-        } else if (!this.tagsHtml) {
-            // When the intro has already played, load tags directly without staging an animation.
-            this._loadTags().then(() => this._injectTagsHtml());
         }
-        // If the intro already played once, never stage the tags again: they
-        // should be visible immediately without animation classes.
-        const tagsStagedClass = showTags ? 'tags-staged' : '';
         // Hide tags initially so only the title/search bar affect the first centering.
         // Start with the wrapper invisible to avoid a flash at the top before centering is applied.
         container.innerHTML = `
@@ -77,7 +70,7 @@ class SearchApp extends AppBase {
                                 <span class="btn-label">Chercher</span>
                             </button>
                         </div>
-                        <div id="tags-container" class="mt-5 flex flex-wrap gap-2 justify-center ${tagsStagedClass}">
+                        <div id="tags-container" class="mt-5 flex flex-wrap gap-2 justify-center ${showTags ? 'tags-staged' : ''}">
                             ${showTags ? '' : (this.tagsHtml || '<span class="text-gray-500 font-medium text-sm">Aucune source disponible.</span>')}
                         </div>
                     </form>
@@ -299,21 +292,9 @@ class SearchApp extends AppBase {
                 el.style.animationDelay = (i * 0.18) + 's';
             });
         }
-        // Mark the intro animation as played for this browser session so it
-        // doesn't run again on tab switch.
-        if (typeof sessionStorage !== 'undefined') {
-            sessionStorage.setItem('searchIntroPlayed', '1');
-        }
-        // Once the landing animation has run, remove the animation classes from
-        // the live DOM so switching back to this tab does not re-trigger CSS
-        // animations on cached tags. Wait for the animation to finish first.
-        const labels = tagsContainer.querySelectorAll('.tag-land');
-        setTimeout(() => {
-            labels.forEach((el) => {
-                el.classList.remove('tag-land');
-                el.style.animationDelay = '';
-            });
-        }, 1100);
+        // Mark the intro animation as finished so it does not run again when
+        // the user switches back to this tab.
+        this._introAnimationDone = true;
         // Re-enable resize observer after the intro animation finishes.
         setTimeout(() => {
             this._introAnimating = false;
