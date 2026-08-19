@@ -664,22 +664,22 @@ class AssistantApp extends AppBase {
         this.modelPillSlotEl.innerHTML = this.modelNames.map((name) => {
             const displayName = this._displayNameForModel(name);
             return `
-            <div class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-100 border border-gray-200 text-xs font-semibold text-gray-700 assistant-model-pill" data-model-name="${this._escape(name)}">
-                <span class="truncate max-w-[5rem]" title="${this._escape(displayName)}">${this._escape(displayName)}</span>
-                <div class="relative">
-                    <button type="button" class="assistant-model-pill-export w-4 h-4 flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors" title="Exporter le modèle">
+            <div class="inline-flex items-center gap-1 px-1.5 py-1 rounded-full bg-gray-100 border border-gray-200 text-xs font-semibold text-gray-700 assistant-model-pill" data-model-name="${this._escape(name)}">
+                <span class="truncate max-w-[5rem] leading-none" title="${this._escape(displayName)}">${this._escape(displayName)}</span>
+                <div class="relative inline-flex items-center">
+                    <button type="button" class="assistant-model-pill-export w-4 h-4 inline-flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors leading-none" title="Exporter le modèle">
                         <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                             <path d="M7 10l5 5 5-5"></path>
                             <path d="M12 15V3"></path>
                         </svg>
                     </button>
-                    <div class="assistant-model-pill-export-menu hidden absolute bottom-full right-0 mb-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg py-1 text-xs z-[100]">
+                    <div class="assistant-model-pill-export-menu hidden absolute bottom-full right-0 mb-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg py-1 text-xs z-[100] flex flex-col">
                         <button type="button" data-format="xmi" class="assistant-pill-export-item w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700">Exporter en XMI</button>
                         <button type="button" data-format="ttl" class="assistant-pill-export-item w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700">Exporter en TTL</button>
                     </div>
                 </div>
-                <button type="button" class="assistant-model-pill-close w-4 h-4 flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors" title="Détacher le modèle">
+                <button type="button" class="assistant-model-pill-close w-4 h-4 inline-flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors leading-none" title="Détacher le modèle">
                     <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                         <path d="M18 6L6 18M6 6l12 12"></path>
                     </svg>

@@ -898,7 +898,7 @@
     flex-shrink: 1;
     min-width: 0;
     padding: 0.35rem 0.45rem;
-    gap: 0.35rem;
+    gap: 0.25rem;
     font-size: 0.7rem;
     line-height: 1;
     border-radius: 9999px;
@@ -908,6 +908,7 @@
     width: 0.75rem;
     height: 0.75rem;
     flex-shrink: 0;
+    display: block;
 }
 
 #assistant-model-pill-slot .assistant-model-pill span {
@@ -918,18 +919,21 @@
     white-space: nowrap;
     flex-shrink: 1;
     min-width: 0;
+    line-height: 1;
 }
 
 #assistant-model-pill-slot .assistant-model-pill button {
     width: 1rem;
     height: 1rem;
-    margin-left: 0.1rem;
+    margin: 0;
+    padding: 0;
     flex-shrink: 0;
 }
 
 #assistant-model-pill-slot .assistant-model-pill button svg {
     width: 0.65rem;
     height: 0.65rem;
+    display: block;
 }
 
 .assistant-sources-header {
