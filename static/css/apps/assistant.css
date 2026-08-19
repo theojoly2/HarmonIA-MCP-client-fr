@@ -892,8 +892,13 @@
     overflow: visible;
 }
 
+#assistant-model-pill-slot .assistant-model-pill {
+    gap: 0.25rem;
+    padding-right: 0.4rem;
+}
+
 #assistant-model-pill-slot .assistant-model-pill span {
-    max-width: 8rem;
+    max-width: 5rem;
 }
 
 .assistant-sources-header {
