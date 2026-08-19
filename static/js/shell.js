@@ -152,12 +152,9 @@ class Shell {
         const icon = appClass.iconSvg || '';
         btn.innerHTML = `${icon} <span>${appClass.title}</span>`;
         btn.addEventListener('click', () => {
-            const existing = AppState.listInstances().find(i => i.appId === appClass.id && i.mode === 'tab');
-            if (existing) {
-                this.windowManager.switchTab(existing.instanceId);
-            } else {
-                this.windowManager.open(appClass.id, { mode: 'tab' });
-            }
+            // Delegate instance creation/restoration entirely to the window manager
+            // so the nav buttons never create duplicates or target wrong instances.
+            this.windowManager.switchToApp(appClass.id);
         });
         this.tabBar.appendChild(btn);
         return btn;

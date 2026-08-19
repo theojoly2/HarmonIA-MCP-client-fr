@@ -66,19 +66,54 @@ class HistoryPanel {
             return;
         }
         try {
-            const [modelsRes, searchesRes] = await Promise.all([
+            const [modelsRes, searchesRes, assistantRes, modelerAssistantRes] = await Promise.all([
                 fetch("api/models", { credentials: "same-origin" }),
                 fetch("api/searches", { credentials: "same-origin" }),
+                ApiClient.getAssistantSessions("assistant"),
+                ApiClient.getAssistantSessions("modeler"),
             ]);
             let models = [];
             let searches = [];
+            let conversations = [];
+            let modelsData = { models: [] };
             if (modelsRes.ok) {
-                const data = await modelsRes.json();
-                models = (data.models || []).map((m) => ({
-                    ...m,
-                    kind: "model",
-                    sortKey: Number(m.last_opened_at) || 0,
-                }));
+                modelsData = await modelsRes.json();
+                // Build a map from model name to modeler assistant session so modeler items
+                // know which conversation to reopen when the user opens the chat split.
+                const assistantSessionByModel = new Map();
+                (modelerAssistantRes.sessions || []).forEach((s) => {
+                    if (!s.model_name) return;
+                    // Keep the most recently touched session for each model.
+                    const existing = assistantSessionByModel.get(s.model_name);
+                    if (!existing || (s.last_opened_at || 0) > (existing.last_opened_at || 0)) {
+                        assistantSessionByModel.set(s.model_name, s);
+                    }
+                });
+                // Only sessions created from the modeler are attached to modeler
+                // items. Standalone assistant conversations remain separate.
+                const modelerSessionByModel = new Map();
+                (modelerAssistantRes.sessions || []).forEach((s) => {
+                    if (!s.model_name || s.origin !== "modeler") return;
+                    const existing = modelerSessionByModel.get(s.model_name);
+                    if (!existing || (s.last_opened_at || 0) > (existing.last_opened_at || 0)) {
+                        modelerSessionByModel.set(s.model_name, s);
+                    }
+                });
+                models = (modelsData.models || [])
+                    .filter((m) => {
+                        if (m.imported_from_assistant) return false;
+                        return true;
+                    })
+                    .map((m) => {
+                        const linked = modelerSessionByModel.get(m.name);
+                        return {
+                            ...m,
+                            kind: "model",
+                            sortKey: Number(m.last_opened_at) || 0,
+                            assistant_session: linked?.name || "",
+                            assistant_display_name: linked?.display_name || "",
+                        };
+                    });
             }
             if (searchesRes.ok) {
                 const data = await searchesRes.json();
@@ -90,7 +125,25 @@ class HistoryPanel {
                     sortKey: Number(s.last_opened_at) || 0,
                 }));
             }
-            this.items = [...models, ...searches].sort((a, b) => b.sortKey - a.sortKey);
+            if (assistantRes && assistantRes.sessions) {
+                // Show standalone assistant conversations. Modeler-originated
+                // sessions are surfaced through the modeler item, not here.
+                conversations = assistantRes.sessions
+                    .filter((s) => s.origin !== "modeler")
+                    .map((s) => ({
+                        ...s,
+                        kind: "assistant",
+                        name: s.name,
+                        display_name: s.display_name || s.preview || s.name,
+                        source_format: "conversation",
+                        sortKey: Number(s.last_opened_at) || 0,
+                        origin: s.origin || "assistant",
+                    }));
+            }
+            // Do NOT list modeler-originated assistant sessions as standalone
+            // history items. They remain accessible only through their linked
+            // modeler item when the user reopens a model.
+            this.items = [...models, ...searches, ...conversations].sort((a, b) => b.sortKey - a.sortKey);
         } catch (err) {
             console.error("History load error", err);
             this.items = [];
@@ -107,6 +160,8 @@ class HistoryPanel {
         this.emptyEl.classList.add("hidden");
         this.items.forEach((item) => {
             const isSearch = item.kind === "search";
+            const isAssistant = item.kind === "assistant";
+            const isModelerAssistant = item.kind === "modeler_assistant";
             const storedName = item.name || "";
             const displayName = item.display_name || storedName;
             const li = document.createElement("li");
@@ -114,12 +169,19 @@ class HistoryPanel {
             li.dataset.itemName = storedName;
             li.dataset.itemKind = item.kind;
             if (isSearch) li.dataset.searchId = item.id;
+            if (isAssistant || isModelerAssistant) li.dataset.modelName = item.model_name || "";
+            if (isAssistant || isModelerAssistant) li.dataset.origin = item.origin || (isModelerAssistant ? "modeler" : "assistant");
+            if (!isSearch && !isAssistant && !isModelerAssistant) {
+                li.dataset.assistantSession = item.assistant_session || "";
+                li.dataset.assistantDisplayName = item.assistant_display_name || "";
+            }
             li.innerHTML = `
                 <div class="history-item-icon">
-                    ${isSearch ? this._searchIcon() : this._modelerIcon()}
+                    ${isSearch ? this._searchIcon() : (isAssistant || isModelerAssistant) ? this._assistantIcon() : this._modelerIcon()}
                 </div>
                 <div class="history-item-info">
                     <span class="history-item-name">${this._escape(displayName)}</span>
+                    ${isModelerAssistant ? '<span class="history-item-subtitle text-xs text-gray-400">Modéliseur</span>' : ''}
                 </div>
                 <button type="button" class="history-action history-action-more" title="Actions" aria-haspopup="true">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -130,6 +192,8 @@ class HistoryPanel {
             li.addEventListener("click", (e) => {
                 if (e.target.closest(".history-action-more, .history-menu")) return;
                 if (isSearch) this._runSearch(storedName, (item.tags || "").split(",").filter(Boolean), item.id);
+                else if (isAssistant) this._openAssistant(storedName, item.model_name || "", "assistant");
+                else if (isModelerAssistant) this._openAssistant(storedName, item.model_name || "", "modeler");
                 else this._openModel(storedName);
             });
             const moreBtn = li.querySelector(".history-action-more");
@@ -145,6 +209,10 @@ class HistoryPanel {
         return `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
         </svg>`;
+    }
+
+    _assistantIcon() {
+        return AssistantApp.iconSvg;
     }
 
     _modelerIcon() {
@@ -166,6 +234,8 @@ class HistoryPanel {
         // Remove any existing menu
         this._closeMenu();
         const isSearch = item.kind === "search";
+        const isAssistant = item.kind === "assistant";
+        const isModelerAssistant = item.kind === "modeler_assistant";
         const menu = document.createElement("div");
         menu.className = "history-menu";
         menu.innerHTML = isSearch
@@ -175,24 +245,32 @@ class HistoryPanel {
                 <button type="button" class="history-menu-item history-menu-delete">Supprimer</button>
             `;
         const rect = anchorBtn.getBoundingClientRect();
-        menu.style.top = `${rect.bottom + 4}px`;
-        menu.style.right = `${document.body.clientWidth - rect.right}px`;
         document.body.appendChild(menu);
+        const menuHeight = menu.offsetHeight;
+        const gap = 4;
+        // Open upwards when the menu would overflow the viewport bottom.
+        const top = (rect.bottom + menuHeight + gap > window.innerHeight)
+            ? rect.top - menuHeight - gap
+            : rect.bottom + gap;
+        menu.style.top = `${top}px`;
+        menu.style.right = `${document.body.clientWidth - rect.right}px`;
         this._activeMenu = menu;
 
         if (!isSearch) {
             menu.querySelector(".history-menu-rename").addEventListener("click", (e) => {
                 e.stopPropagation();
                 this._closeMenu();
-                const li = this.listEl.querySelector(`li[data-item-name="${CSS.escape(item.name)}"][data-item-kind="model"]`) || anchorBtn.closest(".history-item");
+                const li = this.listEl.querySelector(`li[data-item-name="${CSS.escape(item.name)}"][data-item-kind="${item.kind}"]`) || anchorBtn.closest(".history-item");
                 const nameEl = li?.querySelector(".history-item-name");
-                if (nameEl) this._startInlineRename(nameEl, item.name, item.display_name || item.name);
+                if (nameEl && li) this._startInlineRename(nameEl, item, li);
             });
         }
-        menu.querySelector(".history-menu-delete").addEventListener("click", (e) => {
-            e.stopPropagation();
-            this._showDeleteConfirm(menu, item);
-        });
+        if (menu.querySelector(".history-menu-delete")) {
+            menu.querySelector(".history-menu-delete").addEventListener("click", (e) => {
+                e.stopPropagation();
+                this._showDeleteConfirm(menu, item);
+            });
+        }
 
         // Close on next click anywhere
         requestAnimationFrame(() => {
@@ -214,9 +292,18 @@ class HistoryPanel {
 
     _showDeleteConfirm(menu, item) {
         const isSearch = item.kind === "search";
-        const label = isSearch ? "recherche" : "modèle";
+        const isAssistant = item.kind === "assistant";
+        const isModelerAssistant = item.kind === "modeler_assistant";
+        const label = isSearch
+            ? "cette recherche"
+            : isAssistant
+            ? "cette conversation"
+            : isModelerAssistant
+            ? "cette conversation modéliseur"
+            : "ce modèle";
+        const currentTop = parseFloat(menu.style.top) || 0;
         menu.innerHTML = `
-            <div class="history-menu-text">Supprimer cette ${label} ?</div>
+            <div class="history-menu-text">Supprimer ${label} ?</div>
             <button type="button" class="history-menu-item history-menu-cancel">Annuler</button>
             <button type="button" class="history-menu-item history-menu-confirm-delete">Supprimer</button>
         `;
@@ -226,6 +313,20 @@ class HistoryPanel {
             try {
                 if (isSearch) {
                     await ApiClient.deleteSearch(item.id);
+                } else if (isAssistant) {
+                    const ctx = item.origin || "assistant";
+                    await ApiClient.deleteAssistantSession(item.name, ctx);
+                    // If this conversation is linked to a model imported through the
+                    // assistant, also delete the linked model.
+                    if (item.model_name && (modelsData.models || []).some((m) => m.name === item.model_name && m.imported_from_assistant)) {
+                        await fetch(`api/models/${encodeURIComponent(item.model_name)}`, {
+                            method: "DELETE",
+                            credentials: "same-origin",
+                        }).catch((err) => console.error("Delete linked model error", err));
+                    }
+                } else if (isModelerAssistant) {
+                    const ctx = item.origin || "modeler";
+                    await ApiClient.deleteAssistantSession(item.name, ctx);
                 } else {
                     const encodedName = encodeURIComponent(item.name);
                     const res = await fetch(`api/models/${encodedName}`, {
@@ -233,22 +334,42 @@ class HistoryPanel {
                         credentials: "same-origin",
                     });
                     if (!res.ok) throw new Error("delete_failed");
+                    // If this model has a linked modeler assistant session, also delete it.
+                    if (item.assistant_session) {
+                        await ApiClient.deleteAssistantSession(item.assistant_session, "modeler").catch((err) =>
+                            console.error("Delete linked assistant error", err)
+                        );
+                    }
                 }
                 await this.load();
             } catch (err) {
                 console.error("Delete history item error", err);
-                alert(`Impossible de supprimer ${isSearch ? "la recherche" : "le modèle"}.`);
+                alert(`Impossible de supprimer ${isSearch ? "la recherche" : isAssistant ? "la conversation" : isModelerAssistant ? "la conversation modéliseur" : "le modèle"}.`);
             }
         });
         menu.querySelector(".history-menu-cancel").addEventListener("click", (e) => {
             e.stopPropagation();
             this._closeMenu();
         });
+
+        // The delete confirmation may be taller than the original menu; recheck
+        // viewport overflow and flip upwards if needed.
+        requestAnimationFrame(() => {
+            const menuHeight = menu.offsetHeight;
+            const bottom = currentTop + menuHeight;
+            const gap = 4;
+            if (bottom > window.innerHeight) {
+                menu.style.top = `${Math.max(gap, currentTop - (bottom - window.innerHeight))}px`;
+            }
+        });
     }
 
-    _startInlineRename(nameEl, modelName, displayName) {
+    _startInlineRename(nameEl, item, li) {
         if (nameEl.querySelector("input")) return;
-        const initialName = displayName || modelName;
+        const storedName = item.name || "";
+        const displayName = item.display_name || storedName;
+        const kind = item.kind || "model";
+        const initialName = displayName || storedName;
         const input = document.createElement("input");
         input.type = "text";
         input.value = initialName;
@@ -267,35 +388,96 @@ class HistoryPanel {
             }
             nameEl.textContent = newName;
             try {
-                const encodedName = encodeURIComponent(modelName);
-                const res = await fetch(`api/models/${encodedName}/rename`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    credentials: "same-origin",
-                    body: JSON.stringify({ name: newName }),
-                });
-                if (!res.ok) throw new Error("rename_failed");
-                const result = await res.json().catch(() => ({}));
-                const newStoredName = result.name || modelName;
-                // If the renamed model is currently open in the Modeler, update its
-                // stored name and refresh the SVG so the displayed package/model name
-                // matches the new display name.
-                AppState.listInstances().forEach((info) => {
-                    if (info.appId !== "modeler") return;
-                    const inst = AppState.getInstance(info.instanceId);
-                    if (inst && inst.updateModelName && (inst.storedName === modelName || inst.fileName === initialName)) {
-                        inst.updateModelName(newStoredName, newName);
-                        if (inst._reloadSvgFromServer) {
-                            inst._reloadSvgFromServer().catch((err) => console.error("Refresh SVG after rename error", err));
+                let res;
+                if (kind === "assistant" || kind === "modeler_assistant") {
+                    const ctx = item.origin || (kind === "modeler_assistant" ? "modeler" : "assistant");
+                    const encodedSession = encodeURIComponent(storedName);
+                    res = await fetch(`api/assistant/sessions/${encodedSession}/rename?origin=${encodeURIComponent(ctx)}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "same-origin",
+                        body: JSON.stringify({ name: newName }),
+                    });
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.detail || `rename_failed_${res.status}`);
+                    }
+                    const result = await res.json().catch(() => ({}));
+                    const newStoredName = result.name || storedName;
+                    // Update the DOM so subsequent renames use the new stored name.
+                    li.dataset.itemName = newStoredName;
+                    item.name = newStoredName;
+                    item.display_name = newName;
+                    // If the renamed assistant conversation is currently open,
+                    // update the instance props so the next message goes to the
+                    // new session file instead of recreating the old one.
+                    AppState.listInstances().forEach((info) => {
+                        if (info.appId !== "assistant") return;
+                        const inst = AppState.getInstance(info.instanceId);
+                        if (inst && inst.session === storedName && inst.origin === ctx) {
+                            inst.session = newStoredName;
+                            inst.props.session = newStoredName;
+                            inst.props.fromHistory = true;
+                            inst.props.display_name = newName;
+                            // Update the displayed title in the tab if it changed.
+                            if (inst.setTitle) {
+                                inst.setTitle(`Assistant: ${newName}`);
+                            }
+                        }
+                    });
+                } else {
+                    const encodedName = encodeURIComponent(storedName);
+                    res = await fetch(`api/models/${encodedName}/rename`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "same-origin",
+                        body: JSON.stringify({ name: newName }),
+                    });
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.detail || `rename_failed_${res.status}`);
+                    }
+                    const result = await res.json().catch(() => ({}));
+                    const newStoredName = result.name || storedName;
+                    // Update the DOM so subsequent renames use the new stored name.
+                    li.dataset.itemName = newStoredName;
+                    item.name = newStoredName;
+                    item.display_name = newName;
+                    // If the renamed model has a linked modeler assistant session,
+                    // update the assistant's stored model name so the link survives.
+                    const linkedSession = li.dataset.assistantSession;
+                    if (linkedSession) {
+                        try {
+                            await fetch(`api/assistant/sessions/${encodeURIComponent(linkedSession)}/link-model`, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                credentials: "same-origin",
+                                body: JSON.stringify({ model_name: newStoredName }),
+                            });
+                        } catch (err) {
+                            console.error("Update linked model name after rename error", err);
                         }
                     }
-                });
+                    // If the renamed model is currently open in the Modeler, update its
+                    // stored name and refresh the SVG so the displayed package/model name
+                    // matches the new display name.
+                    AppState.listInstances().forEach((info) => {
+                        if (info.appId !== "modeler") return;
+                        const inst = AppState.getInstance(info.instanceId);
+                        if (inst && inst.updateModelName && (inst.storedName === storedName || inst.fileName === initialName)) {
+                            inst.updateModelName(newStoredName, newName);
+                            if (inst._reloadSvgFromServer) {
+                                inst._reloadSvgFromServer().catch((err) => console.error("Refresh SVG after rename error", err));
+                            }
+                        }
+                    });
+                }
                 // Keep displayed text; refresh list silently in background to sync ordering
                 this.load();
             } catch (err) {
-                console.error("Rename model error", err);
+                console.error(`Rename ${kind} error`, err);
                 nameEl.textContent = initialName;
-                alert("Impossible de renommer le modèle.");
+                alert(kind === "assistant" || kind === "modeler_assistant" ? "Impossible de renommer la conversation : " + err.message : "Impossible de renommer le modèle : " + err.message);
             }
         };
 
@@ -344,10 +526,56 @@ class HistoryPanel {
                 await modelerInstance.instance.loadSvg(svgText, displayName, (svgText.match(match) || ["", ""])[1], modelName);
             }
 
+            // If this model has a linked modeler assistant conversation, prepare the
+            // modeler so its assistant split reopens that session instead of
+            // creating a blank one.
+            const li = this.listEl.querySelector(`li[data-item-name="${CSS.escape(modelName)}"][data-item-kind="model"]`);
+            const linkedSession = li?.dataset.assistantSession;
+            const linkedDisplayName = li?.dataset.assistantDisplayName;
+            if (linkedSession && modelerInstance.instance._prepareLinkedAssistantSession) {
+                modelerInstance.instance._prepareLinkedAssistantSession(linkedSession, linkedDisplayName);
+            }
+
+            // Also update the modeler assistant sub-entry mtime so it stays in
+            // sync with the model item in the history panel.
+            if (linkedSession) {
+                try {
+                    await ApiClient.touchAssistantSession(linkedSession, "modeler");
+                } catch (err) {
+                    console.error("Touch modeler assistant session error", err);
+                }
+            }
+
             await this.load();
         } catch (err) {
             console.error("Open model error", err);
             alert("Impossible d'ouvrir le modèle : " + (err.message || err));
+        }
+    }
+
+    async _openAssistant(sessionName, modelName, origin = "assistant") {
+        this.close();
+        try {
+            // Touch the session on the backend so it moves to the top of the
+            // history list even when it is just reopened without a new message.
+            await ApiClient.touchAssistantSession(sessionName, origin);
+            const existingAssistant = AppState.listInstances().find((i) => i.appId === "assistant");
+            if (existingAssistant) {
+                AppState.removeInstance(existingAssistant.instanceId);
+            }
+            const assistantInstance = AppState.createInstance("assistant", {
+                mode: "tab",
+                session: sessionName,
+                modelName: modelName,
+                origin: origin,
+                fromHistory: true,
+            });
+            await windowManager._mountTab(assistantInstance.instance);
+            AppState.setActiveInstance(assistantInstance.instanceId);
+            await this.load();
+        } catch (err) {
+            console.error("Open assistant conversation error", err);
+            alert("Impossible d'ouvrir la conversation : " + (err.message || err));
         }
     }
 
@@ -367,6 +595,10 @@ class HistoryPanel {
                 inst.query = query;
                 inst.selectedTags = tags;
                 inst._skipHistorySave = true;
+                // Update the visible input so the user sees the restored query
+                // instead of whatever was previously typed in the search box.
+                const input = inst.container?.querySelector('#search-input');
+                if (input) input.value = query;
                 if (existingSearch.mode === "tab") {
                     await windowManager.switchTab(existingSearch.instanceId);
                 } else if (existingSearch.mode === "float") {
@@ -386,22 +618,69 @@ class HistoryPanel {
     async _deleteAll() {
         const confirmed = await this._showConfirmDialog(
             "Supprimer tout l'historique",
-            "Cette action supprimera définitivement tous vos modèles et toutes vos recherches. Cette action est irréversible."
+            "Cette action supprimera définitivement tous vos modèles, toutes vos recherches et toutes vos conversations. Cette action est irréversible."
         );
         if (!confirmed) return;
         try {
-            await Promise.all(
-                this.items.map((item) => {
-                    if (item.kind === "search") {
-                        return ApiClient.deleteSearch(item.id);
+            // Track which models/sessions are already deleted by their linked
+            // counterpart so we don't try to delete the same file twice.
+            const deletedModels = new Set();
+            const deletedSessions = new Set();
+            const deletions = [];
+
+            this.items.forEach((item) => {
+                if (item.kind === "search") {
+                    deletions.push(ApiClient.deleteSearch(item.id));
+                    return;
+                }
+                if (item.kind === "assistant") {
+                    const ctx = item.origin || "assistant";
+                    const sessionKey = `${ctx}__${item.name}`;
+                    if (!deletedSessions.has(sessionKey)) {
+                        deletedSessions.add(sessionKey);
+                        deletions.push(ApiClient.deleteAssistantSession(item.name, ctx));
                     }
-                    const encodedName = encodeURIComponent(item.name);
-                    return fetch(`api/models/${encodedName}`, {
-                        method: "DELETE",
-                        credentials: "same-origin",
-                    });
-                })
-            );
+                    if (item.model_name && !deletedModels.has(item.model_name)) {
+                        deletedModels.add(item.model_name);
+                        deletions.push(
+                            fetch(`api/models/${encodeURIComponent(item.model_name)}`, {
+                                method: "DELETE",
+                                credentials: "same-origin",
+                            }).catch((err) => console.error("Delete all linked model error", err))
+                        );
+                    }
+                    return;
+                }
+                if (item.kind === "modeler_assistant") {
+                    const ctx = item.origin || "modeler";
+                    const sessionKey = `${ctx}__${item.name}`;
+                    if (!deletedSessions.has(sessionKey)) {
+                        deletedSessions.add(sessionKey);
+                        deletions.push(ApiClient.deleteAssistantSession(item.name, ctx));
+                    }
+                    return;
+                }
+                // modeler item
+                if (!deletedModels.has(item.name)) {
+                    deletedModels.add(item.name);
+                    deletions.push(
+                        fetch(`api/models/${encodeURIComponent(item.name)}`, {
+                            method: "DELETE",
+                            credentials: "same-origin",
+                        })
+                    );
+                }
+                if (item.assistant_session && !deletedSessions.has(`modeler__${item.assistant_session}`)) {
+                    deletedSessions.add(`modeler__${item.assistant_session}`);
+                    deletions.push(
+                        ApiClient.deleteAssistantSession(item.assistant_session, "modeler").catch((err) =>
+                            console.error("Delete all linked session error", err)
+                        )
+                    );
+                }
+            });
+
+            await Promise.all(deletions);
             await this.load();
         } catch (err) {
             console.error("Delete all error", err);

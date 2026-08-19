@@ -61,6 +61,23 @@ const ApiClient = (() => {
         return res.json();
     }
 
+    async function importAssistantModel(file, name, origin = "assistant") {
+        const form = new FormData();
+        form.append("file", file);
+        if (name) form.append("name", name);
+        form.append("origin", origin);
+        const res = await fetch(apiUrl("assistant/import"), {
+            method: "POST",
+            credentials: "same-origin",
+            body: form,
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || `Assistant model import failed: ${res.status}`);
+        }
+        return res.json();
+    }
+
     async function getModelSvg(name) {
         const res = await fetch(apiUrl(`models/${encodeURIComponent(name)}/open`), {
             method: "POST",
@@ -179,6 +196,148 @@ const ApiClient = (() => {
         return res.body.getReader();
     }
 
+    async function streamAssistant(session, userMessage, modelName, tags, onEvent, options = {}) {
+        const origin = options.origin || "assistant";
+        const res = await fetch(apiUrl("assistant/stream"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ session, user_message: userMessage, model_name: modelName || "", tags: tags || [], origin }),
+        });
+        if (!res.ok || !res.body) throw new Error(`Assistant stream failed: ${res.status}`);
+
+        // Read SSE events one at a time and force the browser to paint after each
+        // event, so every assistant loop / tool card / text update is rendered
+        // before the next event is consumed.
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+
+        // Force a real browser paint. requestAnimationFrame alone is not enough when
+        // events arrive in a burst; the style->macro-task->paint sequence guarantees
+        // the DOM changes are visible before we continue reading the stream.
+        const forcePaint = () =>
+            new Promise((resolve) => {
+                requestAnimationFrame(() => {
+                    setTimeout(() => {
+                        requestAnimationFrame(resolve);
+                    }, 0);
+                });
+            });
+
+        const handleLine = async (line) => {
+            const ev = JSON.parse(line);
+            try {
+                await onEvent(ev);
+            } catch (err) {
+                console.error("Assistant event handler error", err, ev);
+            }
+            // Make structural events visible immediately. For text we let the
+            // typewriter handle the pace, but for every milestone event we force a
+            // layout + paint so the user sees the tool card / status before the
+            // next chunk arrives.
+            if (ev.kind === "loop_done" || ev.kind === "assistant_done" || ev.kind === "tool_result" || ev.kind === "tool_start" || ev.kind === "assistant_tool_calls") {
+                await forcePaint();
+            } else {
+                await new Promise((resolve) => requestAnimationFrame(resolve));
+            }
+        };
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const rawLines = buffer.split("\n");
+            buffer = rawLines.pop() || "";
+
+            for (let i = 0; i < rawLines.length; i++) {
+                const rawLine = rawLines[i];
+                const line = rawLine.replace(/^data:\s*/, "").trim();
+                if (!line) continue;
+                // SSE comments start with ":" and are used as heartbeats to force
+                // reverse proxies to flush their buffers. The client ignores them.
+                if (line.startsWith("event:") || line.startsWith("id:")) continue;
+                if (line.startsWith(":")) continue;
+                try {
+                    await handleLine(line);
+                } catch (err) {
+                    console.error("Assistant event parse/handler error", err, line);
+                }
+            }
+        }
+
+        const tail = buffer.replace(/^data:\s*/, "").trim();
+        if (tail) {
+            try {
+                await handleLine(tail);
+            } catch (err) {
+                console.error("Assistant trailing event parse/handler error", err, tail);
+            }
+        }
+    }
+
+    async function getAssistantSessions(origin) {
+        const qs = origin ? `?origin=${encodeURIComponent(origin)}` : "";
+        const res = await fetch(apiUrl(`assistant/sessions${qs}`), { credentials: "same-origin" });
+        if (!res.ok) throw new Error(`Assistant sessions failed: ${res.status}`);
+        return res.json();
+    }
+
+    async function findAssistantSessionByModel(modelName, origin = "modeler") {
+        const res = await fetch(apiUrl(`assistant/sessions/by-model?model_name=${encodeURIComponent(modelName)}&origin=${encodeURIComponent(origin)}`), {
+            credentials: "same-origin",
+        });
+        // 404 simply means no prior conversation exists for this model. Do not log
+        // an error; the caller will start a fresh session.
+        if (res.status === 404) return { session: "" };
+        if (!res.ok) throw new Error(`findAssistantSessionByModel failed: ${res.status}`);
+        return res.json();
+    }
+
+    async function getAssistantHistory(session, origin = "assistant") {
+        if (!session) return { messages: [] };
+        const res = await fetch(apiUrl(`assistant/history?session=${encodeURIComponent(session)}&origin=${encodeURIComponent(origin)}`), {
+            credentials: "same-origin",
+        });
+        if (!res.ok) throw new Error(`Assistant history failed: ${res.status}`);
+        return res.json();
+    }
+
+    async function deleteAssistantSession(session, origin = "assistant") {
+        if (!session) return { ok: true };
+        const res = await fetch(apiUrl(`assistant/sessions/${encodeURIComponent(session)}?origin=${encodeURIComponent(origin)}`), {
+            method: "DELETE",
+            credentials: "same-origin",
+        });
+        if (!res.ok) throw new Error(`Assistant session delete failed: ${res.status}`);
+        return res.json();
+    }
+
+    async function touchAssistantSession(session, origin = "assistant") {
+        if (!session) return { ok: true };
+        const res = await fetch(apiUrl(`assistant/sessions/${encodeURIComponent(session)}/open?origin=${encodeURIComponent(origin)}`), {
+            method: "POST",
+            credentials: "same-origin",
+        });
+        if (!res.ok) throw new Error(`Assistant session touch failed: ${res.status}`);
+        return res.json();
+    }
+
+    async function exportModel(modelName, format = "xmi") {
+        const res = await fetch(
+            apiUrl(`models/${encodeURIComponent(modelName)}/export?format=${encodeURIComponent(format)}`),
+            {
+                method: "GET",
+                credentials: "same-origin",
+            }
+        );
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || `Export failed: ${res.status}`);
+        }
+        return res.blob();
+    }
+
     return {
         postSearch,
         getTags,
@@ -186,6 +345,7 @@ const ApiClient = (() => {
         getDocumentVisualizeUrl,
         importModéliseurFile,
         importAndSaveModel,
+        importAssistantModel,
         getModelSvg,
         createEmptyModel,
         getModels,
@@ -198,6 +358,13 @@ const ApiClient = (() => {
         register,
         logout,
         streamChat,
+        streamAssistant,
+        getAssistantSessions,
+        findAssistantSessionByModel,
+        getAssistantHistory,
+        deleteAssistantSession,
+        touchAssistantSession,
+        exportModel,
     };
 })();
 

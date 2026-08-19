@@ -27,11 +27,6 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
     transition: border-color 0.2s, background-color 0.2s, --glow-size 0.25s ease;
 }
 .nav-tab:hover { border-color: #d1d5db; }
-.nav-tab.active {
-    background: #111827;
-    color: #ffffff;
-    border-color: #111827;
-}
 
 /* === Floating windows === */
 .floating-window {

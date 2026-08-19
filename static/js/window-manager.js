@@ -1,6 +1,13 @@
 /**
  * WindowManager
  * Gère les apps dans trois modes : tab (plein écran shell), float (fenêtre flottante), split (panneau).
+ *
+ * Conception du cache :
+ * - Une seule vue est visible à la fois dans this.shellElement.
+ * - Quand on la quitte, son DOM est détaché et stocké dans _viewCache[instanceId].
+ * - Pour un split, les deux feuilles pointent vers la MÊME entrée de cache.
+ * - La source de vérité de "qui est visible" est le DOM (dataset.instanceId), pas
+ *   AppState.activeInstanceId, qui peut être en retard.
  */
 
 class WindowManager {
@@ -14,13 +21,72 @@ class WindowManager {
         this.activeFloat = null;
         this.options = options;
         this._viewportHandler = () => this._clampAllFloating();
+        this._splitResizeObserver = null;
+        this._lastShellSize = null;
+        this._viewCache = new Map(); // instanceId -> { dom, mode, splitTree?, activeInstanceId? }
         window.addEventListener('resize', this._viewportHandler);
     }
 
+    /**
+     * Public entry point for the shell nav buttons. Ensures one tab/split
+     * instance per appId and switches/restores it.
+     */
+    switchToApp(appId) {
+        const existing = AppState.listInstances()
+            .filter((i) => {
+                if (i.appId !== appId) return false;
+                if (i.mode !== 'tab' && i.mode !== 'split') return false;
+                // The nav Assistant button must always target a standalone
+                // assistant tab, never the assistant pane embedded in a modeler split.
+                if (appId === 'assistant') {
+                    const rec = AppState.getRecord(i.instanceId);
+                    const meta = rec?.meta || {};
+                    if (meta.origin === 'modeler' || meta.linkedModelerInstanceId) return false;
+                }
+                return true;
+            })
+            .pop();
+        if (existing) {
+            this.switchTab(existing.instanceId);
+        } else {
+            this.open(appId, { mode: 'tab' });
+        }
+    }
+
     open(appId, props = {}) {
+        const mode = props.mode || 'tab';
+        // Tab/split apps are singleton-like: reuse the existing instance.
+        if (mode === 'tab' || mode === 'split') {
+            const existing = AppState.listInstances()
+                .filter((i) => {
+                    if (i.appId !== appId || (i.mode !== 'tab' && i.mode !== 'split')) return false;
+                    // The Assistant nav button must never target the modeler-embedded
+                    // assistant pane; it must always open/create a standalone tab.
+                    if (appId === 'assistant') {
+                        const meta = AppState.getRecord(i.instanceId)?.meta || {};
+                        if (meta.origin === 'modeler' || meta.linkedModelerInstanceId) return false;
+                    }
+                    return true;
+                })
+                .pop();
+            if (existing) {
+                this.switchTab(existing.instanceId);
+                return existing.instanceId;
+            }
+        }
+
+        // Cache whatever is currently visible before replacing it with a new tab.
+        if (mode === 'tab') {
+            const visibleId = this._getVisibleInstanceId();
+            if (visibleId) {
+                this._cacheView(visibleId);
+            }
+        }
+
         const AppClass = AppState.getRecord ? null : null; // not used directly
         const { instanceId, instance } = AppState.createInstance(appId, props);
-        const mode = props.mode || 'tab';
+        const record = AppState.getRecord(instanceId);
+        if (record) record.mode = mode;
         instance.setTitle(instance.getTitle());
 
         if (mode === 'tab') {
@@ -34,18 +100,246 @@ class WindowManager {
         return instanceId;
     }
 
-    _mountTab(instance) {
-        AppState.saveInstanceState(instance.instanceId);
+    /**
+     * Return the instanceId whose DOM is currently in the shell.
+     * For a split, returns the active pane (or the first pane if none is active).
+     */
+    _getVisibleInstanceId() {
+        if (this.splitManager.tree) {
+            const activePane = this.shellElement.querySelector('.split-pane.split-pane-active');
+            if (activePane) return activePane.dataset.instanceId || null;
+            const firstPane = this.shellElement.querySelector('.split-pane');
+            if (firstPane) return firstPane.dataset.instanceId || null;
+        }
+        const container = this.shellElement.querySelector('.app-container');
+        return container?.dataset.instanceId || AppState.getActiveInstance();
+    }
+
+    async switchTab(instanceId) {
+        const instance = AppState.getInstance(instanceId);
+        if (!instance) return;
+
+        const visibleId = this._getVisibleInstanceId();
+
+        // Already visible and target is the visible one -> nothing to do.
+        if (visibleId === instanceId) {
+            return;
+        }
+
+        // Suspend the currently visible view.
+        if (visibleId) {
+            this._cacheView(visibleId);
+        }
+
+        // Restore a cached view for the target.
+        const cached = this._viewCache.get(instanceId);
+        if (cached?.dom) {
+            this._restoreCachedView(instanceId, cached, instance);
+            return;
+        }
+
+        // If the target is actually a split leaf, rebuild the split tree from
+        // any leaf's cached tree record. We do NOT downgrade it to a tab.
+        const record = AppState.getRecord(instanceId);
+        if (record && record.mode === 'split') {
+            await this._restoreSplitLeaf(instanceId);
+            return;
+        }
+
+        // Fresh mount as a tab.
+        if (record) record.mode = 'tab';
         this.shellElement.innerHTML = '';
+        this.splitManager.setTree(null);
+        AppState.saveInstanceState(instanceId);
+        await this._mountTab(instance);
+        AppState.setActiveInstance(instanceId);
+    }
+
+    /**
+     * Rebuild the split tree around `instanceId` when its cached DOM has been
+     * discarded (e.g. after a tab/split was converted back to tab by a previous
+     * bug, or when SplitManager lost its tree). Only used as a fallback.
+     */
+    async _restoreSplitLeaf(instanceId) {
+        let splitTree = null;
+        // Try to recover the tree from any leaf instance's saved meta state.
+        AppState.listInstances().forEach((i) => {
+            if (splitTree) return;
+            const rec = AppState.getRecord(i.instanceId);
+            const st = rec?.savedState?.splitTree;
+            if (st && this._collectLeaves(st).some((l) => l.instanceId === instanceId)) {
+                splitTree = st;
+            }
+        });
+        if (!splitTree) {
+            const record = AppState.getRecord(instanceId);
+            if (record?.savedState?.splitTree) {
+                splitTree = record.savedState.splitTree;
+            }
+        }
+        // Reconstruct a two-pane split from the modeler record when possible.
+        if (!splitTree) {
+            const record = AppState.getRecord(instanceId);
+            const assistantId = record?.savedState?.assistantInstanceId;
+            const ratios = record?.savedState?.lastSplitRatios;
+            if (assistantId && AppState.getInstance(assistantId)) {
+                splitTree = {
+                    type: 'split',
+                    direction: 'horizontal',
+                    children: [
+                        { type: 'pane', instanceId },
+                        { type: 'pane', instanceId: assistantId },
+                    ],
+                    ratios: ratios || [70, 30],
+                };
+            }
+        }
+
+        const leaves = [];
+        if (splitTree) {
+            this._collectLeaves(splitTree, leaves);
+        }
+        if (leaves.length === 0) {
+            // Fallback: single pane with the target instance.
+            splitTree = { type: 'pane', instanceId };
+            leaves.push({ type: 'pane', instanceId });
+        }
+
+        this.splitManager.setTree(null);
+        this._clearShell();
+        this.splitManager.setTree(splitTree);
+
+        const mounted = new Set();
+        leaves.forEach((leaf) => {
+            const inst = AppState.getInstance(leaf.instanceId);
+            if (!inst) return;
+            this.splitManager.unregisterRenderer(leaf.instanceId);
+            this.splitManager.registerRenderer(leaf.instanceId, async (pane) => {
+                if (mounted.has(leaf.instanceId)) return;
+                mounted.add(leaf.instanceId);
+                pane.innerHTML = '';
+                await inst.mount(pane);
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => AppState.restoreInstanceState(leaf.instanceId));
+                });
+            });
+        });
+        this.splitManager.setActiveLeaf(instanceId);
+        this.splitManager.render();
+        AppState.setActiveInstance(instanceId);
+    }
+
+    /**
+     * Detach the visible DOM for instanceId and store it in _viewCache.
+     * Defensive: only cache if the DOM actually belongs to instanceId.
+     */
+    _cacheView(instanceId) {
+        const record = AppState.getRecord(instanceId);
+        const instance = AppState.getInstance(instanceId);
+        if (!record) return;
+
+        // Split view: cache the whole split under every leaf.
+        if (this.splitManager.tree) {
+            const leaves = this._collectLeaves(this.splitManager.tree);
+            const dom = this.shellElement.firstChild;
+            if (!dom || !dom.querySelector('.split-pane')) return;
+            // Verify the target instance is part of the current split tree.
+            if (!leaves.some((l) => l.instanceId === instanceId)) return;
+
+            leaves.forEach((leaf) => {
+                const leafInstance = AppState.getInstance(leaf.instanceId);
+                if (leafInstance && typeof leafInstance.onTabDeactivated === 'function') {
+                    leafInstance.onTabDeactivated();
+                }
+                AppState.saveInstanceState(leaf.instanceId);
+            });
+            const entry = {
+                dom,
+                mode: 'split',
+                splitTree: this.splitManager.tree,
+                activeInstanceId: instanceId,
+            };
+            leaves.forEach((leaf) => this._viewCache.set(leaf.instanceId, entry));
+            this.splitManager.tree = null;
+            this._clearShell();
+            return;
+        }
+
+        // Simple tab view.
+        if (instance && typeof instance.onTabDeactivated === 'function') {
+            instance.onTabDeactivated();
+        }
+        AppState.saveInstanceState(instanceId);
+        const dom = this.shellElement.querySelector(`[data-instance-id="${instanceId}"]`);
+        if (dom) {
+            this._viewCache.set(instanceId, { dom, mode: record.mode || 'tab' });
+        }
+        this._clearShell();
+    }
+
+    _restoreCachedView(instanceId, cached, instance) {
+        this._viewCache.delete(instanceId);
+        this._clearShell();
+
+        if (cached.mode === 'split' && cached.splitTree) {
+            // Remove the shared cache entry for all split leaves.
+            this._collectLeaves(cached.splitTree).forEach((leaf) => {
+                if (leaf.instanceId !== instanceId) this._viewCache.delete(leaf.instanceId);
+            });
+            this.shellElement.appendChild(cached.dom);
+            this.splitManager.tree = cached.splitTree;
+            this.splitManager.setActiveLeaf(instanceId);
+        } else {
+            this.splitManager.setTree(null);
+            this.shellElement.appendChild(cached.dom);
+        }
+
+        if (typeof instance.onTabActivated === 'function') {
+            instance.onTabActivated();
+        } else {
+            AppState.restoreInstanceState(instanceId);
+        }
+        AppState.setActiveInstance(instanceId);
+    }
+
+    _clearShell() {
+        while (this.shellElement.firstChild) {
+            this.shellElement.removeChild(this.shellElement.firstChild);
+        }
+    }
+
+    _mountTab(instance) {
+        const instanceId = instance.instanceId;
+        AppState.saveInstanceState(instanceId);
+        this._clearShell();
+        this.splitManager.setTree(null);
+
+        const cached = this._viewCache.get(instanceId);
+        if (cached && cached.mode === 'tab') {
+            this.shellElement.appendChild(cached.dom);
+            this._viewCache.delete(instanceId);
+            if (typeof instance.onTabActivated === 'function') {
+                instance.onTabActivated();
+            } else {
+                AppState.restoreInstanceState(instanceId);
+            }
+            return Promise.resolve();
+        }
+
         const container = document.createElement('div');
         container.className = 'app-container h-full w-full';
-        container.dataset.instanceId = instance.instanceId;
+        container.dataset.instanceId = instanceId;
         this.shellElement.appendChild(container);
         return new Promise(async (resolve) => {
             await instance.mount(container);
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
-                    AppState.restoreInstanceState(instance.instanceId);
+                    AppState.restoreInstanceState(instanceId);
+                    // Give apps with fixed/absolute home layouts one last chance
+                    // to center now that the DOM is fully attached to the shell.
+                    if (typeof instance._scheduleCentering === 'function') {
+                        instance._scheduleCentering(true);
+                    }
                     resolve();
                 });
             });
@@ -54,6 +348,7 @@ class WindowManager {
 
     _mountFloating(instance, props) {
         AppState.saveInstanceState(instance.instanceId);
+        this._removeViewCache(instance.instanceId);
         const { width = 800, height = 600, offsetX = 0, offsetY = 0 } = props;
         let resizeAnchorSaved = false;
         const floatWin = UiUtils.createFloatingWindow({
@@ -85,7 +380,6 @@ class WindowManager {
         this.floatingRoot.appendChild(floatWin.win);
         const body = floatWin.body;
         body.dataset.instanceId = instance.instanceId;
-        // Position and force layout so the body has its final size before mounting the app.
         UiUtils.centerWindow(floatWin.win, offsetX, offsetY);
         void floatWin.win.offsetHeight;
         return new Promise(async (resolve) => {
@@ -103,6 +397,7 @@ class WindowManager {
 
     _mountSplit(instance, props) {
         AppState.saveInstanceState(instance.instanceId);
+        this._removeViewCache(instance.instanceId);
         const { targetInstanceId, direction = 'horizontal' } = props;
         let tree = this.splitManager.tree;
         if (!tree) {
@@ -112,10 +407,46 @@ class WindowManager {
             AppState.restoreInstanceState(instance.instanceId);
             return Promise.resolve();
         }
+
+        const targetIsCurrentTab = targetInstanceId &&
+            this.shellElement.querySelector(`[data-instance-id="${targetInstanceId}"]`);
+        if (targetInstanceId && targetIsCurrentTab) {
+            AppState.saveInstanceState(targetInstanceId);
+            AppState.saveInstanceState(instance.instanceId);
+            this._clearShell();
+            this.splitManager.unregisterRenderer(targetInstanceId);
+            this.splitManager.unregisterRenderer(instance.instanceId);
+            tree = {
+                type: 'split',
+                direction: 'horizontal',
+                children: [
+                    { type: 'pane', instanceId: targetInstanceId },
+                    { type: 'pane', instanceId: instance.instanceId },
+                ],
+                ratios: [55, 45],
+            };
+            this.splitManager.setTree(tree);
+            this.splitManager.registerRenderer(targetInstanceId, async (pane) => {
+                const targetInstance = AppState.getInstance(targetInstanceId);
+                if (!targetInstance) return;
+                await targetInstance.mount(pane);
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => AppState.restoreInstanceState(targetInstanceId));
+                });
+            });
+            this.splitManager.registerRenderer(instance.instanceId, async (pane) => {
+                await instance.mount(pane);
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => AppState.restoreInstanceState(instance.instanceId));
+                });
+            });
+            this.splitManager.render();
+            return Promise.resolve();
+        }
+
         if (targetInstanceId) {
             this.splitManager.splitLeaf(targetInstanceId, direction, { type: 'pane', instanceId: instance.instanceId });
         } else {
-            // split active or first leaf
             const leaves = this._collectLeaves(tree);
             const target = leaves.find(l => l.instanceId === AppState.getActiveInstance()) || leaves[0];
             if (target) {
@@ -181,8 +512,26 @@ class WindowManager {
             floatWin.win.remove();
             this.floatWindows.delete(instanceId);
         }
+        this._removeViewCache(instanceId);
+        if (this.splitManager.tree) {
+            const leaves = this._collectLeaves(this.splitManager.tree);
+            if (leaves.some((l) => l.instanceId === instanceId)) {
+                const remaining = leaves.find((l) => l.instanceId !== instanceId);
+                if (remaining) {
+                    const remainingInstance = AppState.getInstance(remaining.instanceId);
+                    if (remainingInstance) {
+                        AppState.saveInstanceState(remaining.instanceId);
+                        if (typeof remainingInstance.unmount === 'function') {
+                            remainingInstance.unmount();
+                        }
+                    }
+                }
+                this.splitManager.setTree(remaining || null);
+                this.splitManager.render();
+            }
+        }
         if (this.shellElement.querySelector(`[data-instance-id="${instanceId}"]`)) {
-            this.shellElement.innerHTML = '';
+            this._clearShell();
         }
         AppState.removeInstance(instanceId);
         if (this.floatWindows.size === 0) {
@@ -190,15 +539,53 @@ class WindowManager {
         }
     }
 
-    async switchTab(instanceId) {
-        const instance = AppState.getInstance(instanceId);
-        if (!instance) return;
-        const record = AppState.getRecord(instanceId);
-        if (record) record.mode = 'tab';
-        this.shellElement.innerHTML = '';
-        AppState.saveInstanceState(instanceId);
-        await this._mountTab(instance);
-        AppState.setActiveInstance(instanceId);
+    _removeViewCache(instanceId) {
+        const cached = this._viewCache.get(instanceId);
+        if (cached && cached.mode === 'split' && cached.splitTree) {
+            this._collectLeaves(cached.splitTree).forEach((leaf) => {
+                this._viewCache.delete(leaf.instanceId);
+            });
+            return;
+        }
+        this._viewCache.delete(instanceId);
+    }
+
+    /**
+     * Collapse a split so only `keepInstanceId` remains, then remove
+     * `removeInstanceId` and remount `keepInstanceId` as a full tab.
+     * Use this when closing a split panel without leaving an empty shell.
+     */
+    async collapseSplitTo(keepInstanceId, removeInstanceId) {
+        const keepInstance = AppState.getInstance(keepInstanceId);
+        const removeRecord = AppState.getRecord(removeInstanceId);
+        if (!keepInstance) return;
+        this._removeViewCache(keepInstanceId);
+        this._removeViewCache(removeInstanceId);
+        AppState.saveInstanceState(keepInstanceId);
+        if (typeof keepInstance.unmount === 'function') {
+            keepInstance.unmount();
+        }
+        if (removeRecord && removeRecord.mode === 'split') {
+            this.splitManager.unregisterRenderer(removeInstanceId);
+            this.splitManager.removeLeaf(removeInstanceId);
+        }
+        this.splitManager.unregisterRenderer(keepInstanceId);
+        this.splitManager.setTree({ type: 'pane', instanceId: keepInstanceId });
+        this._clearShell();
+
+        AppState.restoreInstanceState(keepInstanceId);
+
+        const container = document.createElement('div');
+        container.className = 'app-container h-full w-full';
+        container.dataset.instanceId = keepInstanceId;
+        this.shellElement.appendChild(container);
+        await keepInstance.mount(container);
+        AppState.setActiveInstance(keepInstanceId);
+
+        this.splitManager.unregisterRenderer(removeInstanceId);
+        if (removeRecord && removeRecord.mode === 'split') {
+            AppState.removeInstance(removeInstanceId);
+        }
     }
 
     async moveToFloat(instanceId, props = {}) {
@@ -206,11 +593,15 @@ class WindowManager {
         if (!instance) return;
         const record = AppState.getRecord(instanceId);
         if (record && record.mode === 'split') {
+            if (this.splitManager.tree) {
+                const leaves = this._collectLeaves(this.splitManager.tree);
+                leaves.forEach((leaf) => this._removeViewCache(leaf.instanceId));
+            }
             this.splitManager.unregisterRenderer(instanceId);
             this.splitManager.removeLeaf(instanceId);
         }
         if (this.shellElement.querySelector(`[data-instance-id="${instanceId}"]`)) {
-            this.shellElement.innerHTML = '';
+            this._clearShell();
         }
         record.mode = 'float';
         await this._mountFloating(instance, props);
@@ -228,14 +619,108 @@ class WindowManager {
             }
         }
         if (this.shellElement.querySelector(`[data-instance-id="${instanceId}"]`)) {
-            this.shellElement.innerHTML = '';
+            this._clearShell();
         }
+        this._removeViewCache(instanceId);
         record.mode = 'split';
         await this._mountSplit(instance, props);
     }
 
     renderSplit() {
         this.splitManager.render();
+    }
+
+    /**
+     * Open a panel split next to a specific instance.
+     * Guarantees both panes are rendered, even when starting from a full-screen tab.
+     */
+    async splitPanel(targetInstanceId, appId, props = {}, options = {}) {
+        const targetRecord = AppState.getRecord(targetInstanceId);
+        const targetInstance = AppState.getInstance(targetInstanceId);
+        if (!targetInstance || !targetRecord) throw new Error('Target instance not found');
+
+        if (typeof targetInstance.unmount === 'function') {
+            targetInstance.unmount();
+        }
+        this._removeViewCache(targetInstanceId);
+        AppState.saveInstanceState(targetInstanceId);
+
+        const { instanceId, instance } = AppState.createInstance(appId, {
+            ...props,
+            mode: 'split',
+        });
+        const newRecord = AppState.getRecord(instanceId);
+        if (newRecord) newRecord.mode = 'split';
+        targetRecord.mode = 'split';
+        targetInstance._assistantInstanceId = instanceId;
+        targetInstance._lastSplitRatios = options.ratio || [50, 50];
+        AppState.saveInstanceState(instanceId);
+
+        this.splitManager.unregisterRenderer(targetInstanceId);
+        this.splitManager.unregisterRenderer(instanceId);
+        this._clearShell();
+
+        const ratio = options.ratio || [50, 50];
+        this.splitManager.setTree({
+            type: 'split',
+            direction: 'horizontal',
+            children: [
+                { type: 'pane', instanceId: targetInstanceId },
+                { type: 'pane', instanceId },
+            ],
+            ratios: ratio,
+        });
+
+        let mountedTarget = false;
+        this.splitManager.registerRenderer(targetInstanceId, async (pane) => {
+            if (mountedTarget) return;
+            mountedTarget = true;
+            pane.innerHTML = '';
+            await targetInstance.mount(pane);
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => AppState.restoreInstanceState(targetInstanceId));
+            });
+        });
+
+        let mountedAssistant = false;
+        this.splitManager.registerRenderer(instanceId, async (pane) => {
+            if (mountedAssistant) return;
+            mountedAssistant = true;
+            pane.innerHTML = '';
+            await instance.mount(pane);
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => AppState.restoreInstanceState(instanceId));
+            });
+        });
+
+        this.splitManager.render();
+
+        if (this._splitResizeObserver) this._splitResizeObserver.disconnect();
+        this._splitResizeObserver = new ResizeObserver((entries) => {
+            const modeler = AppState.getInstance(targetInstanceId);
+            if (!modeler) return;
+            const entry = entries[0];
+            if (!entry) return;
+            const cr = entry.contentRect;
+            if (!this._lastShellSize) {
+                this._lastShellSize = { width: cr.width, height: cr.height };
+                return;
+            }
+            const prev = this._lastShellSize;
+            const dx = (cr.width - prev.width) / 2;
+            const dy = (cr.height - prev.height) / 2;
+            this._lastShellSize = { width: cr.width, height: cr.height };
+            if (modeler.viewer && modeler.svgText) {
+                modeler.viewer.state.x += dx;
+                modeler.viewer.state.y += dy;
+                modeler.viewer.applyTransform();
+            }
+        });
+        this._lastShellSize = null;
+        this._splitResizeObserver.observe(this.shellElement);
+
+        AppState.setActiveInstance(instanceId);
+        return instanceId;
     }
 }
 

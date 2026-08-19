@@ -1,0 +1,1047 @@
+/* === AssistantApp styles (inspired by floating ChatApp) === */
+
+.assistant-app {
+    background: #ffffff;
+}
+
+.assistant-toolbar {
+    background: #ffffff;
+}
+
+.assistant-model-input {
+    background: #ffffff;
+    color: #111827;
+}
+
+.assistant-model-input:focus {
+    border-color: #111827;
+}
+
+.assistant-btn-secondary {
+    background: #ffffff;
+    color: #374151;
+}
+
+.assistant-btn-secondary:hover {
+    background: #f3f4f6;
+}
+
+.assistant-send-btn {
+    position: relative;
+    overflow: hidden;
+    background-image: radial-gradient(circle var(--glow-size, 0px) at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255,255,255,0.5) 0%, transparent 100%);
+    transition: --glow-size 0.3s ease;
+}
+
+.assistant-tool-result {
+    max-width: 100%;
+}
+
+.assistant-tool-result pre {
+    background: #f3f4f6;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.85em;
+    max-height: 16rem;
+    overflow-y: auto;
+}
+
+.assistant-tool-result summary {
+    list-style-position: outside;
+    padding-left: 0.25rem;
+}
+
+/* Ensure user messages anchor correctly when scrolling */
+.user-msg-anchor {
+    scroll-margin-top: 2px;
+}
+
+/* Global max-width container shared by bubbles, cards, and input */
+.assistant-bubble,
+.assistant-tool-card,
+.assistant-plan-card,
+.assistant-search-card,
+.assistant-tool-calls {
+    width: 42rem;
+    max-width: 100%;
+}
+
+.assistant-bubble {
+    display: flex;
+    flex-direction: column;
+}
+
+.assistant-bubble-user {
+    align-items: flex-end;
+}
+
+.assistant-bubble-assistant {
+    align-items: flex-start;
+}
+
+.assistant-bubble-user > .assistant-bubble-content {
+    max-width: 80%;
+}
+
+.assistant-bubble-assistant > .assistant-bubble-content {
+    width: 100%;
+}
+
+/* === Tool calls summary === */
+.assistant-tool-calls {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    padding: 0.75rem 1rem;
+    width: 42rem;
+    max-width: 100%;
+    margin: 0.75rem 0;
+}
+
+.assistant-tool-calls-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+    margin-bottom: 0.5rem;
+}
+
+.assistant-tool-calls-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.assistant-tool-call-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: 9999px;
+    background: #e5e7eb;
+    color: #374151;
+    font-size: 0.875rem;
+    font-weight: 600;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+/* === Individual tool card === */
+.assistant-tool-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    width: 42rem;
+    max-width: 100%;
+    margin: 0.75rem 0;
+    transition: border-color 0.2s;
+}
+
+.assistant-tool-card.tool-running {
+    border-color: #93c5fd;
+}
+
+.assistant-tool-card.tool-done {
+    border-color: #86efac;
+}
+
+/* === Progress card (metadata/validator/reuse/style checks) === */
+.assistant-progress-card {
+    background: #ffffff;
+    border: 1px solid #fdba74;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    width: 42rem;
+    max-width: 100%;
+    margin: 0.75rem 0;
+    box-shadow: 0 4px 6px -1px rgba(234, 88, 12, 0.08);
+}
+
+.assistant-progress-card.assistant-progress-done {
+    border-color: #86efac;
+    box-shadow: 0 4px 6px -1px rgba(22, 101, 52, 0.08);
+}
+
+.assistant-progress-card.assistant-progress-done .assistant-progress-header {
+    background: #f0fdf4;
+    border-bottom-color: #bbf7d0;
+    color: #166534;
+}
+
+.assistant-progress-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: #fff7ed;
+    border-bottom: 1px solid #ffedd5;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #c2410c;
+}
+
+.assistant-progress-header svg {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+}
+
+.assistant-progress-body {
+    padding: 0.75rem 1rem;
+}
+
+.assistant-progress-footer {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    color: #9a3412;
+}
+
+.assistant-progress-card.assistant-progress-done .assistant-progress-footer {
+    color: #166534;
+}
+
+.assistant-progress-label {
+    font-weight: 700;
+}
+
+.assistant-progress-message {
+    color: #c2410c;
+    font-size: 0.8rem;
+}
+
+.assistant-progress-card.assistant-progress-done .assistant-progress-message {
+    color: #16a34a;
+}
+
+.assistant-progress-sparkle {
+    width: 1.25rem;
+    height: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #f97316;
+    flex-shrink: 0;
+}
+
+.assistant-progress-sparkle svg {
+    width: 100%;
+    height: 100%;
+}
+
+.assistant-progress-card.assistant-progress-done .assistant-progress-sparkle {
+    color: #22c55e;
+}
+
+.assistant-progress-bar-bg {
+    width: 100%;
+    height: 0.5rem;
+    background: #fed7aa;
+    border-radius: 9999px;
+    overflow: hidden;
+}
+
+.assistant-progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #fb923c 0%, #f97316 50%, #fb923c 100%);
+    background-size: 200% 100%;
+    border-radius: 9999px;
+    transition: width 0.6s ease;
+    animation: assistant-progress-shimmer 3s infinite linear;
+}
+
+@keyframes assistant-progress-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.assistant-progress-card.assistant-progress-done .assistant-progress-bar-bg {
+    background: #bbf7d0;
+}
+
+.assistant-progress-card.assistant-progress-done .assistant-progress-bar-fill {
+    background: #22c55e;
+    animation: none;
+}
+    padding: 0.75rem 1rem;
+}
+
+.assistant-progress-bar-bg {
+    width: 100%;
+    height: 0.5rem;
+    background: #fed7aa;
+    border-radius: 9999px;
+    overflow: hidden;
+}
+
+.assistant-progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #fb923c 0%, #f97316 50%, #fb923c 100%);
+    background-size: 200% 100%;
+    border-radius: 9999px;
+    transition: width 0.6s ease;
+    animation: assistant-progress-shimmer 3s infinite linear;
+}
+
+@keyframes assistant-progress-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.assistant-progress-card.assistant-progress-done .assistant-progress-bar-bg {
+    background: #bbf7d0;
+}
+
+.assistant-progress-card.assistant-progress-done .assistant-progress-bar-fill {
+    background: #22c55e;
+}
+
+.assistant-progress-message {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    color: #9a3412;
+}
+
+.assistant-progress-card.assistant-progress-done .assistant-progress-message {
+    color: #166534;
+}
+
+.assistant-tool-card-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.75rem 1rem;
+    background: #f9fafb;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.assistant-tool-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+.assistant-tool-args {
+    font-size: 0.75rem;
+    color: #6b7280;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.assistant-tool-card-body {
+    padding: 0.75rem 1rem;
+}
+
+.assistant-tool-section + .assistant-tool-section {
+    margin-top: 0.75rem;
+}
+
+.assistant-tool-section-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #9ca3af;
+    margin-bottom: 0.35rem;
+}
+
+.assistant-tool-card-body pre {
+    background: #f3f4f6;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.8rem;
+    max-height: 16rem;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    margin: 0;
+}
+
+/* === Plan card === */
+.assistant-plan-card {
+    background: #ffffff;
+    border: 1px solid #93c5fd;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    width: 42rem;
+    max-width: 100%;
+    margin: 0.75rem 0;
+    box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.08);
+}
+
+.assistant-plan-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: #eff6ff;
+    border-bottom: 1px solid #dbeafe;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #1d4ed8;
+}
+
+.assistant-plan-body {
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+    color: #1f2937;
+}
+
+.assistant-plan-steps {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    counter-reset: plan-step;
+}
+
+.assistant-plan-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.assistant-plan-step:last-child {
+    border-bottom: none;
+}
+
+.assistant-plan-step-number {
+    flex-shrink: 0;
+    width: 1.35rem;
+    height: 1.35rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #2563eb;
+    color: #ffffff;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.assistant-plan-step-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    flex: 1;
+}
+
+.assistant-plan-step-text {
+    color: #1f2937;
+    line-height: 1.5;
+}
+
+.assistant-plan-tool-badge {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    padding: 0.2rem 0.55rem;
+    border-radius: 9999px;
+    background: #dbeafe;
+    color: #1d4ed8;
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.assistant-plan-uses-tool {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    font-size: 0.75rem;
+    color: #6b7280;
+    font-style: italic;
+}
+
+.assistant-plan-notes {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #e5e7eb;
+    color: #6b7280;
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+/* === Search card inside assistant chat === */
+.assistant-search-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 1rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+    overflow: hidden;
+    width: 42rem;
+    max-width: 100%;
+    margin: 0.75rem 0;
+}
+
+.assistant-search-card .assistant-search-results {
+    padding: 1rem;
+}
+
+.assistant-search-card .assistant-search-results .result-item {
+    padding: 1rem 0;
+}
+
+.assistant-search-card .assistant-search-results .result-item h3 {
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.assistant-search-card .assistant-search-results .result-item .markdown-body {
+    font-size: 0.9rem;
+}
+
+.assistant-search-card .assistant-search-results .result-item .markdown-body p,
+.assistant-search-card .assistant-search-results .result-item .markdown-body li,
+.assistant-search-card .assistant-search-results .result-item .markdown-body strong,
+.assistant-search-card .assistant-search-results .result-item .markdown-body em {
+    font-size: 0.9rem;
+}
+
+.assistant-search-card .assistant-search-results .result-item .flex {
+    font-size: 0.75rem;
+}
+
+.assistant-search-card #results-header {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.assistant-search-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #f3f4f6;
+    background: #fafafa;
+}
+
+.assistant-search-header svg {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+}
+
+.assistant-search-query {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #111827;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.assistant-search-loading {
+    padding: 2rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.assistant-search-spinner {
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid #e5e7eb;
+    border-top-color: #2563eb;
+    border-radius: 9999px;
+    animation: assistant-spin 1s linear infinite;
+}
+
+@keyframes assistant-spin {
+    to { transform: rotate(360deg); }
+}
+
+.assistant-search-results {
+    max-height: 32rem;
+    overflow-y: auto;
+    padding: 0;
+}
+
+/* SVG model card */
+.assistant-svg-card {
+    background: #ffffff;
+    border: 1px solid #a78bfa;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    width: 42rem;
+    max-width: 100%;
+    margin: 0.75rem 0;
+    box-shadow: 0 4px 6px -1px rgba(91, 33, 182, 0.08);
+}
+
+.assistant-svg-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #c4b5fd;
+    background: #f3f0ff;
+}
+
+.assistant-svg-header svg {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+    color: #5b21b8;
+}
+
+.assistant-svg-header span {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #5b21b8;
+}
+
+.assistant-svg-body {
+    padding: 0;
+    background: #ffffff;
+    overflow: hidden;
+    min-height: 18rem;
+    max-height: 32rem;
+    position: relative;
+    isolation: isolate;
+    z-index: 1;
+}
+
+.assistant-svg-body .svg-viewer {
+    width: 100%;
+    height: 100%;
+    min-height: 18rem;
+    max-height: 32rem;
+    background: #ffffff;
+    border-radius: 0 0 0.5rem 0.5rem;
+}
+
+.assistant-svg-body .svg-controls {
+    z-index: 2;
+}
+
+/* Title / reset button */
+.assistant-title-reset {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+    display: inline-block;
+}
+
+/* Chat scroll area */
+#assistant-chat {
+    padding-left: calc((100% - 42rem) / 2);
+    padding-right: calc((100% - 42rem) / 2);
+    overflow: hidden;
+}
+
+#assistant-chat.assistant-chat-mode {
+    overflow-y: auto;
+}
+
+.assistant-welcome {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    min-height: 100%;
+    padding-top: 0;
+    padding-bottom: 0;
+    flex-shrink: 0;
+    transition: padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.45s ease;
+    opacity: 1;
+    position: relative;
+    z-index: 25;
+}
+
+.assistant-welcome-top {
+    justify-content: flex-start;
+    padding-top: 0.35rem !important;
+    padding-bottom: 0 !important;
+    min-height: auto !important;
+    opacity: 1;
+    position: sticky;
+    top: 0;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(4px);
+    z-index: 20;
+}
+
+.assistant-welcome-title {
+    margin: 0;
+    font-size: clamp(1rem, 2vw, 1.5rem);
+    line-height: 1.4;
+}
+
+.assistant-welcome-subtitle {
+    margin: 0.75rem 0 0;
+    font-size: clamp(0.85rem, 1.1vw, 1rem);
+    color: #6b7280;
+    text-align: center;
+    max-width: 32rem;
+    line-height: 1.5;
+    padding: 0 1rem;
+}
+
+.assistant-welcome-top .assistant-welcome-subtitle {
+    display: none;
+}
+
+.assistant-welcome-input {
+    /* The real input area is position:fixed and positioned separately so it can
+       slide down in sync with the title. This slot is kept only as a sizing
+       reference and is otherwise invisible. */
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    margin-top: 1.25rem;
+    opacity: 0;
+    pointer-events: none;
+    height: 0;
+    overflow: hidden;
+}
+
+.assistant-welcome-top .assistant-welcome-input {
+    margin-top: 0;
+}
+
+.assistant-title-glow {
+    display: inline-block;
+    background-color: #111827;
+    background-image: radial-gradient(circle var(--glow-size, 0px) at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255,255,255,0.85) 0%, rgba(255,255,255,0) 100%);
+    background-repeat: no-repeat;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    transition: --glow-size 0.3s ease;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.assistant-input-area {
+    position: fixed !important;
+    top: var(--assistant-input-top, 50%);
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-width: none;
+    padding: 0 0 0.35rem !important;
+    background: transparent;
+    border-top: none;
+    display: flex;
+    justify-content: center;
+    z-index: 30;
+    will-change: top;
+    transform: translateY(0);
+    transition: top 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease;
+}
+
+.assistant-app.assistant-embedded .assistant-input-area,
+.assistant-app.assistant-embedded #assistant-input-area {
+    position: absolute !important;
+    top: auto !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    padding: 0.5rem 0.75rem 0.75rem !important;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(4px);
+    justify-content: center;
+    z-index: 30;
+    transition: none;
+}
+
+.assistant-app.assistant-embedded .assistant-input-area .assistant-input-wrapper,
+.assistant-app.assistant-embedded #assistant-input-area .assistant-input-wrapper {
+    max-width: 100%;
+}
+
+.assistant-input-area-chat {
+    /* In chat mode the JS sets --assistant-input-top so the input sits on the
+       bottom with its existing padding preserved. */
+}
+
+.assistant-send-btn:disabled,
+.assistant-send-btn-disabled {
+    background-color: #9ca3af !important;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.assistant-sources-menu {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    right: 0;
+    min-width: 14rem;
+    max-width: 18rem;
+    max-height: 18rem;
+    overflow-y: auto;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+    padding: 0.5rem;
+    z-index: 50;
+}
+
+.assistant-sources-menu.hidden {
+    display: none;
+}
+
+/* Embedded assistant inside the modeler side panel */
+.assistant-app.assistant-embedded {
+    border-radius: 0;
+}
+
+.assistant-app.assistant-embedded #assistant-chat,
+.assistant-app.assistant-embedded #assistant-chat.assistant-chat-mode {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    /* Padding-bottom is set dynamically by JS to match the real input-area height. */
+    padding-bottom: 0;
+}
+
+.assistant-app.assistant-embedded .assistant-welcome {
+    display: none !important;
+}
+
+.assistant-app.assistant-embedded .assistant-embedded-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0.5rem 0.5rem 0;
+    flex-shrink: 0;
+    z-index: 35;
+}
+
+.assistant-app.assistant-embedded .assistant-embedded-intro {
+    padding: 0.75rem 0.75rem 0;
+}
+
+.assistant-app.assistant-embedded .assistant-embedded-intro .assistant-bubble {
+    width: 42rem;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.assistant-app.assistant-embedded .assistant-embedded-intro .assistant-bubble-content {
+    font-size: 1rem;
+}
+
+.assistant-app.assistant-embedded .assistant-bubble,
+.assistant-app.assistant-embedded .assistant-tool-card,
+.assistant-app.assistant-embedded .assistant-plan-card,
+.assistant-app.assistant-embedded .assistant-search-card,
+.assistant-app.assistant-embedded .assistant-tool-calls {
+    width: 42rem;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.assistant-app.assistant-embedded .assistant-input-area.assistant-embedded,
+.assistant-app.assistant-embedded #assistant-input-area {
+    position: absolute;
+    top: auto !important;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 0.5rem 0.75rem 0.75rem !important;
+    background: transparent;
+    z-index: 30;
+}
+
+.assistant-app.assistant-embedded .assistant-input-area.assistant-embedded .assistant-input-wrapper,
+.assistant-app.assistant-embedded #assistant-input-area .assistant-input-wrapper {
+    max-width: 100%;
+    background: #ffffff;
+}
+
+.assistant-app.assistant-embedded .assistant-input-area.assistant-embedded .assistant-input-wrapper,
+.assistant-app.assistant-embedded #assistant-input-area .assistant-input-wrapper,
+.assistant-app.assistant-embedded .assistant-input-area.assistant-embedded,
+.assistant-app.assistant-embedded #assistant-input-area {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+.assistant-app.assistant-embedded #assistant-model-pill-slot .inline-flex {
+    border: 1px solid #e5e7eb;
+    background: #f9fafb;
+}
+
+.assistant-sources-header {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+    padding: 0.35rem 0.5rem 0.5rem;
+    border-bottom: 1px solid #f3f4f6;
+    margin-bottom: 0.25rem;
+}
+
+.assistant-sources-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.assistant-tag-label .icon-checked {
+    display: none;
+}
+
+.assistant-tag-label .icon-unchecked {
+    display: inline-block;
+}
+
+.assistant-tag-label input:checked + span .icon-checked {
+    display: inline-block;
+}
+
+.assistant-tag-label input:checked + span .icon-unchecked {
+    display: none;
+}
+
+.assistant-input-wrapper {
+    width: 42rem;
+    max-width: calc(100% - 2rem);
+    margin: 0 auto;
+    padding: 0;
+    transform: translateX(-1px);
+    transition: width 0.7s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.7s cubic-bezier(0.4, 0, 0.2, 1), padding 0.7s cubic-bezier(0.4, 0, 0.2, 1), transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.assistant-input-box-chat .assistant-input-wrapper {
+    width: 42rem;
+    max-width: calc(100% - 2rem);
+    padding: 0;
+    transform: translateX(-1px);
+}
+
+.assistant-input-wrapper form {
+    margin: 0;
+}
+
+.assistant-input-wrapper textarea {
+    min-height: 1.35rem;
+    field-sizing: content;
+    font-size: clamp(0.75rem, 1.1vw, 1rem);
+    padding: 0.65rem clamp(3rem, 6.5vw, 5rem) 0.45rem clamp(0.75rem, 1.5vw, 1.25rem);
+    margin: 0;
+    border-radius: 0.65rem;
+}
+
+.assistant-input-wrapper textarea::-webkit-scrollbar {
+    width: 6px;
+}
+
+.assistant-input-wrapper textarea::-webkit-scrollbar-thumb {
+    background-color: #d1d5db;
+    border-radius: 9999px;
+}
+
+.assistant-app {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.assistant-app .assistant-input-area {
+    position: fixed;
+}
+
+.assistant-messages {
+    padding-top: 0.5rem;
+    padding-bottom: 6.25rem;
+    font-size: clamp(0.75rem, 1.1vw, 1rem);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.assistant-app.assistant-embedded .assistant-messages {
+    padding-bottom: 0;
+}
+
+.assistant-bubble {
+    width: 42rem;
+    max-width: 100%;
+    margin-bottom: 1.25rem;
+}
+
+.assistant-bubble-assistant {
+    align-self: flex-start;
+}
+
+.assistant-bubble-user {
+    align-self: flex-end;
+}
+
+.assistant-bubble-content {
+    color: #1f2937;
+    line-height: 1.6;
+    font-size: clamp(0.75rem, 1.1vw, 1rem);
+}
+
+.assistant-bubble-user .assistant-bubble-content {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    color: #111827;
+    padding: 0.75rem 1rem;
+    border-radius: 1.25rem;
+    display: inline-block;
+}
+
+.assistant-messages .markdown-body {
+    font-size: clamp(0.75rem, 1.1vw, 1rem);
+}
+
+.assistant-messages .markdown-body h1,
+.assistant-messages .markdown-body h2,
+.assistant-messages .markdown-body h3 {
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.assistant-messages .markdown-body p,
+.assistant-messages .markdown-body li {
+    font-size: clamp(0.75rem, 1.1vw, 1rem);
+}
+
+.assistant-messages .markdown-body code {
+    font-size: 0.9em;
+}
+
+.assistant-search-results .result-item {
+    padding: 1.5rem 1rem;
+    border-bottom: 1px solid #e5e7eb;
+    opacity: 0;
+    transform: translateY(12px);
+    animation: assistant-result-fade 0.45s ease forwards;
+}
+
+.assistant-search-results .result-item:last-child {
+    border-bottom: none;
+}
+
+.results-visible .result-item {
+    /* triggered by class on container */
+}
+
+@keyframes assistant-result-fade {
+    to { opacity: 1; transform: translateY(0); }
+}

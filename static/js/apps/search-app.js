@@ -23,12 +23,24 @@ class SearchApp extends AppBase {
         this._skipNextTransition = false;
         this._firstTagAnimation = true;
         this._introAnimating = false;
+        this._introAnimationDone = false;
         this._skipHistorySave = !!props.fromHistory;
     }
 
     async render(container) {
+        // If the container is the cached live DOM, just resume observers and
+        // focus without rebuilding, so scroll / selection / results stay intact.
+        if (this.container === container && container.querySelector('#search-wrapper-inner')) {
+            this._observeResize();
+            this._updateHomeModeClass();
+            const input = container.querySelector('#search-input');
+            if (input) input.focus();
+            return;
+        }
         this.container = container;
-        const showTags = this._firstTagAnimation;
+        // The tag intro animation runs only once per instance. After that,
+        // switching back to the tab should restore the already-revealed tags.
+        const showTags = !this._introAnimationDone && this._firstTagAnimation;
         if (showTags) {
             this._firstTagAnimation = false;
             this._introAnimating = true;
@@ -280,6 +292,9 @@ class SearchApp extends AppBase {
                 el.style.animationDelay = (i * 0.18) + 's';
             });
         }
+        // Mark the intro animation as finished so it does not run again when
+        // the user switches back to this tab.
+        this._introAnimationDone = true;
         // Re-enable resize observer after the intro animation finishes.
         setTimeout(() => {
             this._introAnimating = false;
@@ -292,6 +307,7 @@ class SearchApp extends AppBase {
         this._setLoading(true);
         this._startTimer();
         this._setLoading(true);
+        this._updateHomeModeClass();
         this._applyCentering();
         // Clear previous results immediately so stale content is not shown during loading.
         const resultsContainer = this.container.querySelector('#results-container');
@@ -474,6 +490,21 @@ class SearchApp extends AppBase {
         this._resizeObserver.observe(this.container);
     }
 
+    onTabDeactivated() {
+        // Suspend the resize observer while the tab is cached; the DOM and
+        // scroll state stay intact.
+        if (this._resizeObserver) this._resizeObserver.disconnect();
+    }
+
+    onTabActivated() {
+        this.mounted = true;
+        // Cached DOM is re-attached; just resume the resize observer.
+        this._observeResize();
+        this._updateHomeModeClass();
+        const input = this.container?.querySelector('#search-input');
+        if (input) input.focus();
+    }
+
     unmount() {
         this._stopTimer();
         if (this._resizeObserver) this._resizeObserver.disconnect();
@@ -506,7 +537,16 @@ class SearchApp extends AppBase {
         this.selectedTags = newSelectedTags;
         this.resultsHtml = newResultsHtml;
         this.tagsHtml = newTagsHtml;
-        if (this.container && changed) this.render(this.container);
+        if (!this.container) return;
+        // If the live DOM already shows the right content, don't rebuild it.
+        const liveMatchesState = !changed || (this.container.querySelector('#search-wrapper-inner')
+            && this.container.querySelector('#results-container')?.innerHTML === (this.resultsHtml || ''));
+        if (liveMatchesState) {
+            this._observeResize();
+            this._updateHomeModeClass();
+            return;
+        }
+        this.render(this.container);
     }
 }
 

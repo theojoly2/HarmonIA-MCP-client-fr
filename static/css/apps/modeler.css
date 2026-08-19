@@ -8,6 +8,18 @@
 }
 .modeler-home.hidden { display: none; }
 
+/* When animating back from viewer to centered home, the viewer is already
+ * fading out; hide it immediately so the home panel does not try to share
+ * vertical space with an empty diagram pane. */
+.modeler-app.returning-home #modeler-viewer {
+    display: none !important;
+}
+.modeler-app.returning-home #modeler-home {
+    flex: 1 1 auto;
+    justify-content: center;
+}
+
+/* Home panel in viewer mode (compact top bar). */
 .modeler-top {
     justify-content: flex-start;
     padding-top: 0;
@@ -27,9 +39,10 @@
 .modeler-loading-layout #modeler-import-container {
     display: none !important;
 }
-.modeler-loading-layout #modeler-viewer {
-    flex: 1 1 0%;
-    display: flex;
+
+/* Ensure the import UI is never hidden by a stale inline style after returning home. */
+#modeler-import-container:not(.modeler-import-hidden) {
+    display: flex !important;
     flex-direction: column;
 }
 

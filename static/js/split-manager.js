@@ -163,6 +163,28 @@ class SplitManager {
     unregisterRenderer(instanceId) {
         this.renderers.delete(instanceId);
     }
+
+    containsInstance(instanceId) {
+        if (!this.tree) return false;
+        return this._collectLeaves(this.tree).some((l) => l.instanceId === instanceId);
+    }
+
+    _collectLeaves(node, out = []) {
+        if (!node) return out;
+        if (node.type === 'pane') {
+            if (node.instanceId) out.push(node);
+            return out;
+        }
+        (node.children || []).forEach((c) => this._collectLeaves(c, out));
+        return out;
+    }
+
+    setActiveLeaf(instanceId) {
+        if (!this.rootElement) return;
+        this.rootElement.querySelectorAll('.split-pane').forEach((pane) => {
+            pane.classList.toggle('split-pane-active', pane.dataset.instanceId === instanceId);
+        });
+    }
 }
 
 function childrenRatios(children) {

@@ -18,6 +18,8 @@ class ModelerApp extends AppBase {
         this.svgText = props.svgText || '';
         this.mainClassName = props.mainClassName || '';
         this.loading = props.loading || false;
+        this._assistantInstanceId = props.assistantInstanceId || '';
+        this._lastSplitRatios = props.lastSplitRatios || [70, 30];
         // New imports/opened models should always start centered/scaled to fit.
         this.viewerState = { scale: 1, x: 0, y: 0 };
         this.viewer = null;
@@ -25,6 +27,8 @@ class ModelerApp extends AppBase {
         this._homeTimeout = null;
         this._loadingTimeout = null;
         this._resizeObserver = null;
+        this._svgResizeObserver = null;
+        this._lastSvgContainerSize = null;
         this._skipNextTransition = false;
     }
 
@@ -38,6 +42,16 @@ class ModelerApp extends AppBase {
     }
 
     render(container) {
+        // When the container is already the cached live DOM, do not rebuild it.
+        // This keeps the SVG viewer, pan/zoom, scroll and running streams alive
+        // across tab switches.
+        if (this.container === container && this.viewer && container.querySelector('#modeler-svg-viewer')) {
+            this._observeResize();
+            this._observeSvgContainerResize();
+            this._updateAssistantToggleVisibility();
+            this._updateExportToggleVisibility();
+            return;
+        }
         // Any previous viewer is tied to a DOM container that will be replaced;
         // discard the reference so a fresh viewer is created for the new container.
         this.viewer = null;
@@ -68,7 +82,30 @@ class ModelerApp extends AppBase {
                     </div>
                 </div>
                 <div id="modeler-viewer" class="hidden flex-1 min-h-0 opacity-0 transition-opacity duration-300 relative">
-                    <div id="modeler-svg-viewer" class="h-full w-full"></div>
+                    <button type="button" id="modeler-export-toggle" class="hidden absolute top-16 right-3 z-30 w-10 h-10 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-700 hover:text-black hover:bg-gray-50 transition-colors" title="Exporter le modèle">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <path d="M7 10l5 5 5-5"></path>
+                            <path d="M12 15V3"></path>
+                        </svg>
+                    </button>
+                    <div id="modeler-export-menu" class="hidden absolute top-16 right-14 z-40 w-44 bg-white border border-gray-200 rounded-lg shadow-lg py-1 text-sm">
+                        <button type="button" data-format="xmi" class="modeler-export-item w-full text-left px-4 py-2 hover:bg-gray-50 text-gray-700 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                            Exporter en XMI
+                        </button>
+                        <button type="button" data-format="ttl" class="modeler-export-item w-full text-left px-4 py-2 hover:bg-gray-50 text-gray-700 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                            Exporter en TTL
+                        </button>
+                    </div>
+                    <button type="button" id="modeler-assistant-toggle" class="hidden absolute top-3 right-3 z-30 w-10 h-10 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-700 hover:text-black hover:bg-gray-50 transition-colors" title="Discuter avec l'assistant sémantique">
+                        <svg class="w-5 h-5 overflow-visible" viewBox="0 0 24 24">
+                            <path class="sparkle-main" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
+                            <path class="sparkle-orbit-path" d="M5.5 2.5L6.34 5.16L9 6L6.34 6.84L5.5 9.5L4.66 6.84L2 6L4.66 5.16L5.5 2.5Z"></path>
+                            <path class="sparkle-orbit-path" d="M19.5 15.5L20.34 18.16L23 19L20.34 19.84L19.5 22.5L18.66 19.84L16 19L18.66 18.16L19.5 15.5Z"></path>
+                        </svg>
+                    </button>
                     <div id="modeler-loading" class="hidden absolute inset-0 flex items-center justify-center text-gray-500 z-10 bg-white/80 backdrop-blur-sm transition-opacity duration-300">
                         <svg class="animate-spin h-8 w-8 text-gray-400 mr-3" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -76,6 +113,7 @@ class ModelerApp extends AppBase {
                         </svg>
                         <span class="text-sm font-medium">Génération de la modélisation...</span>
                     </div>
+                    <div id="modeler-svg-viewer" class="h-full w-full"></div>
                     <div id="modeler-edit-actions" class="hidden absolute right-3 z-20 flex flex-col gap-3" style="top: calc(50% - (2.75rem + 0.75rem)); transform: translateY(-50%);">
                         <button type="button" id="modeler-add-class" class="modeler-edit-btn" title="Ajouter une classe">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
@@ -92,20 +130,21 @@ class ModelerApp extends AppBase {
                             </svg>
                             <span class="modeler-edit-label">Attribut</span>
                         </button>
-                        <button type="button" id="modeler-add-connector" class="modeler-edit-btn" title="Ajouter une relation">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-                                <rect x="3" y="8" width="7" height="8" rx="2"></rect>
-                                <rect x="14" y="8" width="7" height="8" rx="2"></rect>
-                                <path d="M10 12h4"></path>
-                                <path d="M17 8v-2M17 18v-2M7 8V6M7 18v-2" opacity="0.5"></path>
-                            </svg>
-                            <span class="modeler-edit-label">Relation</span>
-                        </button>
-                    </div>
+                    <button type="button" id="modeler-add-connector" class="modeler-edit-btn" title="Ajouter une relation">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                            <rect x="3" y="8" width="7" height="8" rx="2"></rect>
+                            <rect x="14" y="8" width="7" height="8" rx="2"></rect>
+                            <path d="M10 12h4"></path>
+                            <path d="M17 8v-2M17 18v-2M7 8V6M7 18v-2" opacity="0.5"></path>
+                        </svg>
+                        <span class="modeler-edit-label">Relation</span>
+                    </button>
                 </div>
             </div>
         `;
         this._bindEvents();
+        this._bindAssistantToggle();
+        this._bindExportToggle();
         if (this.loading) {
             // Loading state (e.g. opened from history): show the compact viewer with spinner immediately,
             // without animating the home panel down from the centered position.
@@ -195,7 +234,17 @@ class ModelerApp extends AppBase {
         const titleBtn = this.container.querySelector('#modeler-home .interactive-title');
 
         if (titleBtn) {
-            titleBtn.addEventListener('click', () => this._showModéliseurHome());
+            titleBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (this._returningHome) return;
+                this._returningHome = true;
+                try {
+                    await this._showModéliseurHome();
+                } finally {
+                    this._returningHome = false;
+                }
+            });
         }
 
         if (newEmptyBtn) {
@@ -393,7 +442,31 @@ class ModelerApp extends AppBase {
         const viewer = this.container.querySelector('#modeler-viewer');
         const app = this.container.querySelector('.modeler-app');
         const editActions = this.container.querySelector('#modeler-edit-actions');
+        const assistantToggle = this.container.querySelector('#modeler-assistant-toggle');
         if (app) app.classList.remove('modeler-loading-layout');
+        if (assistantToggle) {
+            const existingSplit = this._findAssistantSplitInstance();
+            assistantToggle.classList.toggle('hidden', !this.storedName || !!existingSplit);
+        }
+        this._updateExportToggleVisibility();
+
+        // If the live SVG viewer is already attached to the cached container,
+        // just make sure the pane is visible and resume observers.
+        if (this.viewer && this.viewer.svg && viewerContainer && viewerContainer.contains(this.viewer.svg)) {
+            this.viewerState = this.viewer.getState();
+            if (viewer) {
+                viewer.classList.remove('hidden');
+                viewer.style.opacity = '1';
+            }
+            if (editActions) {
+                editActions.classList.remove('hidden');
+                this._updateEditButtonStates();
+            }
+            this._setLoading(false);
+            this._observeSvgContainerResize();
+            this.setTitle(`Modéliseur: ${this.fileName}`);
+            return;
+        }
 
         if (!this.viewer) {
             this.viewer = new SvgViewer(viewerContainer, {
@@ -402,7 +475,7 @@ class ModelerApp extends AppBase {
         }
         this.viewer.setSvg(this.svgText, this.mainClassName);
         // New import/open from history/preview: center diagram after it becomes visible.
-        // Returning from another tab: restore the saved pan/zoom.
+        // Returning from another tab with a cached DOM: the viewer stayed alive.
         const finalize = () => {
             this._setLoading(false);
             if (viewer) {
@@ -426,91 +499,111 @@ class ModelerApp extends AppBase {
                 });
             });
         } else {
+            // When the viewer is remounted into a different container size
+            // (e.g. opening the assistant split), restore the saved pan/zoom state.
+            // Do NOT auto-center; the saved state is the user's chosen view.
             this.viewer.restoreState(this.viewerState);
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    if (this.viewer && this.svgText) {
+                        this.viewer.applyTransform();
+                    }
+                });
+            });
             finalize();
+        }
+        this._observeSvgContainerResize();
+    }
+
+    _observeSvgContainerResize() {
+        const viewerContainer = this.container?.querySelector('#modeler-svg-viewer');
+        if (!viewerContainer || typeof ResizeObserver === 'undefined') return;
+        if (this._svgResizeObserver) this._svgResizeObserver.disconnect();
+        this._svgResizeObserver = new ResizeObserver((entries) => {
+            if (!this.viewer || !this.svgText || this._centerOnNextShow) return;
+            const entry = entries[0];
+            if (!entry) return;
+            const cr = entry.contentRect;
+            // Ignore the first event so the initial mount/restore state is not shifted.
+            if (!this._lastSvgContainerSize) {
+                this._lastSvgContainerSize = { width: cr.width, height: cr.height };
+                return;
+            }
+            // Only nudge the pan when the container size actually changed by a
+            // non-trivial amount (e.g. dragging the split resizer). Tiny changes
+            // from tab visibility switches should not accumulate.
+            const prev = this._lastSvgContainerSize;
+            const dw = cr.width - prev.width;
+            const dh = cr.height - prev.height;
+            if (Math.abs(dw) < 2 && Math.abs(dh) < 2) {
+                this._lastSvgContainerSize = { width: cr.width, height: cr.height };
+                return;
+            }
+            const dx = dw / 2;
+            const dy = dh / 2;
+            this.viewer.state.x += dx;
+            this.viewer.state.y += dy;
+            this.viewer.applyTransform();
+            this._lastSvgContainerSize = { width: cr.width, height: cr.height };
+        });
+        this._lastSvgContainerSize = null;
+        this._svgResizeObserver.observe(viewerContainer);
+    }
+
+    _centerSvgInPane() {
+        if (this.viewer && this.svgText) {
+            this.viewer.centerDiagram(this.mainClassName);
         }
     }
 
-    _showModéliseurHome() {
-        const home = this.container.querySelector('#modeler-home');
-        const importContainer = this.container.querySelector('#modeler-import-container');
-        const viewer = this.container.querySelector('#modeler-viewer');
-        const app = this.container.querySelector('.modeler-app');
-
-        if (app) app.classList.remove('modeler-loading-layout');
-
-        if (!home || !viewer || viewer.classList.contains('hidden')) {
-            this._finalizeHomeAndCenter(true);
-            return;
+    async _showModéliseurHome() {
+        // Cancel any in-flight animation.
+        if (this._homeTimeout) {
+            clearTimeout(this._homeTimeout);
+            this._homeTimeout = null;
         }
 
-        // Compute final centered offset for the home view.
-        const contentHeight = this._measureHomeContentHeight(home);
-        const available = Math.max(this.container.clientHeight, contentHeight);
-        const finalOffset = Math.max(0, (available - contentHeight) / 2);
+        // Reset model state first so the next render knows we are in home mode.
+        this.svgText = '';
+        this.fileName = '';
+        this.mainClassName = '';
+        this.loading = false;
+        this.viewerState = { scale: 1, x: 0, y: 0 };
+        if (this.viewer) {
+            this.viewer.destroy();
+            this.viewer = null;
+        }
 
-        // Stage the import container hidden so it can fade in later.
+        const existing = this._findAssistantSplitInstance();
+        if (existing) {
+            await window.windowManager?.collapseSplitTo(this.instanceId, existing.instanceId);
+            // collapseSplitTo remounts the modeler in a fresh tab container.
+            const liveContainer = document.querySelector(`.app-container[data-instance-id="${this.instanceId}"]`);
+            if (liveContainer) this.container = liveContainer;
+        }
+
+        this._finalizeHomeAndCenter(true);
+        this.setTitle(this.constructor.title);
+
+        // The import container may still carry inline styles or a hidden class
+        // from the previous loading/viewer state. Force it visible.
+        const importContainer = this.container?.querySelector('#modeler-import-container');
+        const dropZone = this.container?.querySelector('#modeler-drop-zone');
         if (importContainer) {
             importContainer.classList.remove('modeler-import-hidden');
             importContainer.style.display = '';
-            importContainer.style.transition = 'none';
-            importContainer.style.opacity = '0';
-            importContainer.style.transform = 'translateY(-16px)';
+            importContainer.style.opacity = '1';
+            importContainer.style.transform = 'translateY(0)';
+            importContainer.style.transition = '';
         }
+        if (dropZone) dropZone.style.display = '';
 
-        // Remove compact class and reset padding so we can animate from the current viewer layout.
-        home.classList.remove('modeler-top');
-
-        // Start the title/diagram descent using paddingTop in the normal flex flow.
-        home.style.transition = 'none';
-        home.style.paddingTop = '0px';
-        void home.offsetHeight;
-
-        requestAnimationFrame(() => {
-            home.style.transition = 'padding-top 0.7s cubic-bezier(0.4, 0, 0.2, 1)';
-            home.style.paddingTop = finalOffset + 'px';
-
-            // Fade out the diagram viewer as it follows the title downward naturally.
-            viewer.style.transition = 'opacity 0.7s ease';
-            viewer.style.opacity = '0';
-        });
-
-        // Fade in the import container so it is fully visible when the title reaches center.
-        if (importContainer) {
-            const dropZone = importContainer.querySelector('#modeler-drop-zone');
-            setTimeout(() => {
-                if (dropZone) {
-                    dropZone.style.display = '';
-                }
-                void importContainer.offsetHeight;
-                importContainer.style.transition = 'opacity 0.55s ease, transform 0.55s cubic-bezier(0.16, 1, 0.3, 1)';
-                requestAnimationFrame(() => {
-                    importContainer.style.opacity = '1';
-                    importContainer.style.transform = 'translateY(0)';
-                });
-            }, 250);
+        // Re-bind events because collapseSplitTo created a fresh DOM.
+        if (existing) {
+            this._bindEvents();
+            this._bindAssistantToggle();
+            this._observeResize();
         }
-
-        // When the fade-out completes, clean up state and lock the home layout.
-        this._homeTimeout = setTimeout(() => {
-            this._homeTimeout = null;
-            this.svgText = '';
-            this.fileName = '';
-            this.mainClassName = '';
-            this.loading = false;
-            this.viewerState = { scale: 1, x: 0, y: 0 };
-            if (this.viewer) {
-                this.viewer.destroy();
-                this.viewer = null;
-            }
-            this._updateHomeVisibility(true);
-            this.setTitle(this.constructor.title);
-            if (importContainer) {
-                importContainer.style.display = '';
-            }
-            const dropZone = this.container.querySelector('#modeler-drop-zone');
-            if (dropZone) dropZone.style.display = '';
-        }, 700);
     }
 
     _finalizeHomeAndCenter(skipTransition) {
@@ -579,6 +672,184 @@ class ModelerApp extends AppBase {
         if (addAttrBtn) addAttrBtn.addEventListener('click', () => this._showAddAttributeDialog());
         if (addConnectorBtn) addConnectorBtn.addEventListener('click', () => this._showAddConnectorDialog());
         this._updateEditButtonStates();
+    }
+
+    _bindAssistantToggle() {
+        const assistantBtn = this.container?.querySelector('#modeler-assistant-toggle');
+        if (!assistantBtn) return;
+        assistantBtn.addEventListener('click', () => {
+            this._toggleAssistantSplit();
+        });
+    }
+
+    _bindExportToggle() {
+        const exportBtn = this.container?.querySelector('#modeler-export-toggle');
+        const exportMenu = this.container?.querySelector('#modeler-export-menu');
+        if (!exportBtn || !exportMenu) return;
+
+        exportBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = !exportMenu.classList.contains('hidden');
+            this._closeExportMenu();
+            if (!isOpen) {
+                this._updateExportMenuState();
+                exportMenu.classList.remove('hidden');
+            }
+        });
+
+        exportMenu.querySelectorAll('.modeler-export-item').forEach((item) => {
+            item.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const format = item.dataset.format;
+                if (item.disabled) return;
+                await this._exportModel(format);
+                this._closeExportMenu();
+            });
+        });
+
+        // Track the listener so it is removed when the container is rebuilt.
+        this._closeExportMenuOnClick = () => this._closeExportMenu();
+        document.addEventListener('click', this._closeExportMenuOnClick);
+    }
+
+    _closeExportMenu() {
+        const exportMenu = this.container?.querySelector('#modeler-export-menu');
+        if (exportMenu) exportMenu.classList.add('hidden');
+    }
+
+    _updateExportMenuState() {
+        const exportMenu = this.container?.querySelector('#modeler-export-menu');
+        if (!exportMenu) return;
+        // The full model JSON is stored server-side; we cannot know which
+        // formats are available from the client state. Let the backend decide
+        // and report an error if a format is unavailable.
+        exportMenu.querySelectorAll('.modeler-export-item').forEach((item) => {
+            item.disabled = false;
+            item.classList.remove('opacity-50', 'cursor-not-allowed');
+            item.title = '';
+        });
+    }
+
+    _updateExportToggleVisibility() {
+        const btn = this.container?.querySelector('#modeler-export-toggle');
+        if (!btn) return;
+        btn.classList.toggle('hidden', !this.svgText);
+    }
+
+    async _exportModel(format) {
+        if (!this.storedName) {
+            this._showExportError('Aucun modèle à exporter.');
+            return;
+        }
+        try {
+            const blob = await ApiClient.exportModel(this.storedName, format);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${this.fileName || 'modele'}.${format}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Export model error', err);
+            this._showExportError(`Échec de l'export ${format.toUpperCase()}.`);
+        }
+    }
+
+    _showExportError(message) {
+        const viewer = this.container?.querySelector('#modeler-viewer');
+        if (!viewer) return;
+        let errorEl = viewer.querySelector('#modeler-export-error');
+        if (!errorEl) {
+            errorEl = document.createElement('div');
+            errorEl.id = 'modeler-export-error';
+            errorEl.className = 'absolute bottom-4 left-1/2 -translate-x-1/2 z-50 bg-red-50 text-red-700 text-sm px-4 py-2 rounded-lg shadow border border-red-100';
+            viewer.appendChild(errorEl);
+        }
+        errorEl.textContent = message;
+        errorEl.classList.remove('hidden');
+        setTimeout(() => {
+            if (errorEl) errorEl.classList.add('hidden');
+        }, 4000);
+    }
+
+    _prepareLinkedAssistantSession(session, displayName) {
+        this._pendingAssistantSession = session || '';
+        this._pendingAssistantDisplayName = displayName || '';
+    }
+
+    _findAssistantSplitInstance() {
+        if (!this.storedName) return null;
+        const instances = AppState.listInstances();
+        return instances.find((i) =>
+            i.appId === 'assistant' &&
+            AppState.getRecord(i.instanceId)?.meta?.modelName === this.storedName &&
+            AppState.getRecord(i.instanceId)?.meta?.origin === 'modeler' &&
+            AppState.getRecord(i.instanceId)?.mode === 'split'
+        ) || null;
+    }
+
+    _updateAssistantToggleVisibility() {
+        const btn = this.container?.querySelector('#modeler-assistant-toggle');
+        if (!btn || !this.storedName) return;
+        const existing = this._findAssistantSplitInstance();
+        btn.classList.toggle('hidden', !!existing);
+    }
+
+    _closeAssistantSplit() {
+        const existing = this._findAssistantSplitInstance();
+        if (!existing || !window.windowManager) return;
+        // Collapse the split around the modeler pane, then remove the assistant
+        // instance. The helper explicitly remounts the modeler in a fresh tab
+        // container so its DOM reference stays valid.
+        window.windowManager.collapseSplitTo(this.instanceId, existing.instanceId);
+        this._updateAssistantToggleVisibility();
+    }
+
+    async _toggleAssistantSplit() {
+        if (!this.storedName || !window.windowManager) return;
+        const existing = this._findAssistantSplitInstance();
+        if (existing) {
+            this._closeAssistantSplit();
+            return;
+        }
+        // Open: create the assistant in a real split panel next to the modeler.
+        // If a session was prepared from the history panel, reopen that
+        // conversation; otherwise ask the backend for the most recent session
+        // linked to this model, or start a fresh one.
+        let session = this._pendingAssistantSession || '';
+        let displayName = this._pendingAssistantDisplayName || '';
+        if (!session) {
+            try {
+                const data = await ApiClient.findAssistantSessionByModel(this.storedName, 'modeler');
+                if (data.session) {
+                    session = data.session;
+                    displayName = '';
+                }
+            } catch (err) {
+                console.warn('No existing assistant session for model', this.storedName, err);
+            }
+        }
+        this._pendingAssistantSession = '';
+        this._pendingAssistantDisplayName = '';
+
+        // Ignore rapid repeated clicks until the split is fully created.
+        if (this._openingAssistant) return;
+        this._openingAssistant = true;
+        try {
+            await window.windowManager.splitPanel(this.instanceId, 'assistant', {
+                modelName: this.storedName,
+                linkedModelerInstanceId: this.instanceId,
+                origin: 'modeler',
+                session,
+                display_name: displayName,
+                fromModeler: true,
+            }, { ratio: [70, 30] });
+            this._updateAssistantToggleVisibility();
+        } finally {
+            this._openingAssistant = false;
+        }
     }
 
     _updateEditButtonStates() {
@@ -832,6 +1103,8 @@ class ModelerApp extends AppBase {
         this._updateEditButtonStates();
     }
 
+
+
     _showFloatingDialog(title, fields, onSubmit, onOpen) {
         // Close any existing edit dialog first (only one floating edit window at a time).
         ModelerApp._closeOpenEditDialogs();
@@ -962,20 +1235,37 @@ class ModelerApp extends AppBase {
             svgText: this.svgText,
             mainClassName: this.mainClassName,
             viewerState: this.viewer ? this.viewer.getState() : this.viewerState,
+            assistantInstanceId: this._assistantInstanceId || '',
+            lastSplitRatios: this._lastSplitRatios || [70, 30],
         };
     }
 
     setState(state) {
+        const hadSvg = !!this.svgText;
         this.fileName = state.fileName || '';
         this.storedName = state.storedName || '';
-        this.svgText = state.svgText || '';
+        const incomingSvg = state.svgText || '';
+        const sameSvg = this.svgText === incomingSvg;
+        this.svgText = incomingSvg;
         this.mainClassName = state.mainClassName || '';
+        this._assistantInstanceId = state.assistantInstanceId || this._assistantInstanceId || '';
+        this._lastSplitRatios = state.lastSplitRatios || this._lastSplitRatios || [70, 30];
         // Only keep the previous pan/zoom if this is the exact same SVG being
         // restored (e.g. tab switch). A new file from history/preview must reset.
-        const sameSvg = this.svgText === (state.svgText || '');
-        this.viewerState = sameSvg ? (state.viewerState || { scale: 1, x: 0, y: 0 }) : { scale: 1, x: 0, y: 0 };
+        this.viewerState = sameSvg ? (state.viewerState || this.viewerState || { scale: 1, x: 0, y: 0 }) : { scale: 1, x: 0, y: 0 };
         this._centerOnNextShow = !sameSvg;
         if (this.container) {
+            if (this.container.querySelector('#modeler-svg-viewer') && this.viewer && this.viewer.svg && sameSvg && hadSvg) {
+                // The live DOM already shows the right SVG with the right state.
+                // Just make sure observers are running, hide any stale loader and update the title.
+                this._setLoading(false);
+                this._observeResize();
+                this._observeSvgContainerResize();
+                this.setTitle(`Modéliseur: ${this.fileName}`);
+                this._updateAssistantToggleVisibility();
+                this._updateExportToggleVisibility();
+                return;
+            }
             this.render(this.container);
         }
     }
@@ -1021,6 +1311,7 @@ class ModelerApp extends AppBase {
             home.classList.add('modeler-top');
             home.style.paddingTop = '0px';
             importContainer.classList.add('modeler-import-hidden');
+            importContainer.style.display = '';
             viewer.classList.remove('hidden');
             viewer.style.opacity = '1';
             viewer.style.transition = '';
@@ -1039,6 +1330,10 @@ class ModelerApp extends AppBase {
                 home.style.transition = was;
             }
             importContainer.classList.remove('modeler-import-hidden');
+            importContainer.style.display = '';
+            importContainer.style.opacity = '1';
+            importContainer.style.transform = 'translateY(0)';
+            importContainer.style.transition = '';
             viewer.classList.add('hidden');
             viewer.style.opacity = '0';
             viewer.style.transition = '';
@@ -1054,6 +1349,31 @@ class ModelerApp extends AppBase {
         this._resizeObserver.observe(this.container);
     }
 
+    onTabDeactivated() {
+        // The DOM is being cached, not destroyed. Stop expensive observers but
+        // leave the SVG viewer and its pan/zoom state intact so switching back
+        // feels instant.
+        if (this._resizeObserver) this._resizeObserver.disconnect();
+        if (this._svgResizeObserver) this._svgResizeObserver.disconnect();
+    }
+
+    onTabActivated() {
+        this.mounted = true;
+        // The DOM was cached while the tab was hidden. The SVG viewer is still
+        // attached, so we only resume observers and make sure the viewer pane
+        // is visible without touching pan/zoom or re-injecting the SVG.
+        const viewerPane = this.container?.querySelector('#modeler-viewer');
+        if (this.viewer && this.viewer.svg) {
+            if (viewerPane) {
+                viewerPane.classList.remove('hidden');
+                viewerPane.style.opacity = '1';
+            }
+            this._observeSvgContainerResize();
+        }
+        this._observeResize();
+        this._updateAssistantToggleVisibility();
+    }
+
     unmount() {
         if (this.viewer) {
             this.viewerState = this.viewer.getState();
@@ -1061,7 +1381,13 @@ class ModelerApp extends AppBase {
             this.viewer = null;
         }
         if (this._resizeObserver) this._resizeObserver.disconnect();
+        if (this._svgResizeObserver) this._svgResizeObserver.disconnect();
+        if (this._closeExportMenuOnClick) {
+            document.removeEventListener('click', this._closeExportMenuOnClick);
+            this._closeExportMenuOnClick = null;
+        }
         this._resizeObserver = null;
+        this._svgResizeObserver = null;
         super.unmount();
     }
 }

@@ -140,10 +140,12 @@ env.bak/
 venv.bak/
 
 # dirs
-**/data/
+**/data/users.db
+**/data/assistant_histories
+**/data/.session_secret
+**/data/sample_roh.ttl
 **/documents/
 
-data/
 documents/
 
 # PlantUML auto-downloaded native binaries
