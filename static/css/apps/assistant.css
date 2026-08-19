@@ -965,6 +965,24 @@
     background: #9ca3af;
 }
 
+.assistant-model-pill .assistant-model-pill-export-menu {
+    width: auto;
+    min-width: 8rem;
+    max-width: 90vw;
+}
+
+.assistant-pill-export-item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    text-align: left;
+    white-space: nowrap;
+    padding: 0.65rem 1rem;
+    font-size: 0.8rem;
+    line-height: 1.25;
+    box-sizing: border-box;
+}
+
 .assistant-sources-header {
     font-size: 0.75rem;
     font-weight: 700;

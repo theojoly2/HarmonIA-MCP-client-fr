@@ -674,9 +674,9 @@ class AssistantApp extends AppBase {
                             <path d="M12 15V3"></path>
                         </svg>
                     </button>
-                    <div class="assistant-model-pill-export-menu hidden absolute bottom-full right-0 mb-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg py-1 text-xs z-[100] flex flex-col">
-                        <button type="button" data-format="xmi" class="assistant-pill-export-item w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700">Exporter en XMI</button>
-                        <button type="button" data-format="ttl" class="assistant-pill-export-item w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700">Exporter en TTL</button>
+                    <div class="assistant-model-pill-export-menu hidden absolute bottom-full right-0 mb-1 min-w-[8rem] w-auto bg-white border border-gray-200 rounded-lg shadow-lg py-1 text-xs z-[100] flex flex-col">
+                        <button type="button" data-format="xmi" class="assistant-pill-export-item w-full text-left px-3 py-2 hover:bg-gray-200 text-gray-700">Exporter en XMI</button>
+                        <button type="button" data-format="ttl" class="assistant-pill-export-item w-full text-left px-3 py-2 hover:bg-gray-200 text-gray-700">Exporter en TTL</button>
                     </div>
                 </div>
                 <button type="button" class="assistant-model-pill-close w-4 h-4 inline-flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors leading-none" title="Détacher le modèle">
