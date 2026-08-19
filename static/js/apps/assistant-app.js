@@ -447,19 +447,24 @@ class AssistantApp extends AppBase {
                     const entry = entries[0];
                     this._sentinelVisible = entry.isIntersecting;
                 },
-                { root: this.chatEl, threshold: 0 }
+                { root: this.chatEl, threshold: 0, rootMargin: '0px 0px 80px 0px' }
             );
             this._bottomSentinelObserver.observe(this._bottomSentinel);
         }
 
+        let scrollRaf = null;
         this._messagesObserver = new MutationObserver(() => {
             if (!this.chatEl) return;
             if (!this._bottomSentinel.parentNode && this.messagesEl.lastElementChild) {
                 this.messagesEl.appendChild(this._bottomSentinel);
             }
-            if (this._sentinelVisible) {
+            if (!this._sentinelVisible) return;
+            if (scrollRaf) return;
+            scrollRaf = requestAnimationFrame(() => {
+                scrollRaf = null;
+                if (!this.chatEl || !this._sentinelVisible) return;
                 this.chatEl.scrollTo({ top: this.chatEl.scrollHeight, behavior: 'auto' });
-            }
+            });
         });
         this._messagesObserver.observe(this.messagesEl, { childList: true, subtree: true });
     }
