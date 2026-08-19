@@ -838,7 +838,7 @@
 }
 
 .assistant-app.assistant-embedded .assistant-embedded-intro .assistant-bubble-content {
-    font-size: 1rem;
+    font-size: clamp(0.75rem, 1.1vw, 1rem);
 }
 
 .assistant-app.assistant-embedded .assistant-bubble,
