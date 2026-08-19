@@ -839,11 +839,16 @@
 
 .assistant-app.assistant-embedded .assistant-embedded-intro .assistant-bubble-content {
     font-size: clamp(0.75rem, 1.1vw, 1rem);
+    padding: 0;
+    margin: 0;
 }
 
-.assistant-app.assistant-embedded .assistant-embedded-intro .assistant-bubble-content p,
-.assistant-app.assistant-embedded .assistant-embedded-intro .assistant-bubble-content li {
-    margin: 0;
+.assistant-app.assistant-embedded .assistant-embedded-intro .assistant-bubble-content > *:first-child {
+    margin-top: 0;
+}
+
+.assistant-app.assistant-embedded .assistant-embedded-intro .assistant-bubble-content > *:last-child {
+    margin-bottom: 0;
 }
 
 .assistant-app.assistant-embedded .assistant-bubble,
