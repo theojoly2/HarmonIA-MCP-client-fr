@@ -483,6 +483,10 @@ class AssistantApp extends AppBase {
         void this.welcomeEl.offsetHeight;
         void this.inputArea.offsetHeight;
         console.log('[Assistant switch] before chat applyCentering, input top var:', getComputedStyle(this.inputArea).getPropertyValue('--assistant-input-top'), 'welcome padding:', this.welcomeEl.style.paddingTop);
+        // Measure the actual slot position while still in home layout so we can
+        // compare it with the computed topY used for the transition origin.
+        const slotBefore = this.welcomeInputSlot ? this.welcomeInputSlot.getBoundingClientRect() : { top: 0 };
+        console.log('[Assistant switch] slot top before chat:', slotBefore.top);
         this._applyCentering(false);
         console.log('[Assistant switch] after chat applyCentering, input top var:', getComputedStyle(this.inputArea).getPropertyValue('--assistant-input-top'));
         if (hadFocus) {
@@ -569,11 +573,11 @@ class AssistantApp extends AppBase {
             const inputHeight = inputRect.height;
             const inputMarginTop = parseFloat(getComputedStyle(slot).marginTop) || 0;
             const contentHeight = titleHeight + subtitleMarginTop + subtitleHeight + subtitleMarginBottom + inputMarginTop + inputHeight;
-            // Center the content block inside the visible app container, just like
-            // SearchApp and ModelerApp do. Fall back to the viewport only if the
-            // container has not been laid out yet.
-            const containerHeight = containerRect.height;
-            const available = containerHeight > 200 ? Math.max(containerHeight, contentHeight) : Math.max(window.visualViewport ? window.visualViewport.height : window.innerHeight, contentHeight);
+            // Center the content block inside the visible viewport so the
+            // perceived center is consistent across first load, tab switch and
+            // reset, regardless of the container's transient layout state.
+            const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+            const available = Math.max(viewportHeight, contentHeight);
             const offset = Math.max(0, (available - contentHeight) / 2);
 
             // First apply the padding so the slot has its final position in the
@@ -584,6 +588,19 @@ class AssistantApp extends AppBase {
             const slotRect = slot ? slot.getBoundingClientRect() : { top: 0 };
             const topY = slotRect.top;
             this.inputArea.style.setProperty('--assistant-input-top', `${topY}px`);
+
+            console.log('[Assistant centering]', {
+                source: 'home',
+                viewportHeight,
+                containerHeight: containerRect.height,
+                containerTop: containerRect.top,
+                available,
+                contentHeight,
+                offset,
+                topY,
+                slotTop: slotRect.top,
+                paddingTop: this.welcomeEl.style.paddingTop,
+            });
         } else if (chatMode) {
             // In chat mode the title is sticky at the top and the input sits at
             // the bottom of the visible window, preserving its bottom padding.
