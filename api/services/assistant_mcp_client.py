@@ -414,9 +414,18 @@ class AssistantMCPClient:
             else:
                 observations.append({"value": item})
 
+        context_models = self.state.get("allowed_model_names") or []
+        if context_models:
+            observations.insert(0, {
+                "type": "attached_models",
+                "model_names": context_models,
+                "count": len(context_models),
+                "note": "These models are already loaded in the assistant context. Do not plan retrieval to find them; when mutating, specify the target model_name if several are attached.",
+            })
+
         call_args = {
             "user": _normalize_str_arg(self.state.get("user"), default=""),
-            "name": _normalize_str_arg(self.state.get("name"), default=""),
+            "context_models": context_models,
             "user_question": _normalize_str_arg(user_question),
             "allowed_executor_tools": sorted(EXPOSED_TOOLS),
             "observations": observations,
