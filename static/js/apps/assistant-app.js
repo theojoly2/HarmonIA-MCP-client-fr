@@ -315,11 +315,20 @@ class AssistantApp extends AppBase {
 
     _scheduleCentering(skipTransition, delayMs = 0) {
         const run = () => {
-            requestAnimationFrame(() => {
+            // Wait for web fonts to be rendered so title/subtitle heights are
+            // stable before measuring, then wait two layout frames.
+            const center = () => {
                 requestAnimationFrame(() => {
-                    this._applyCentering(skipTransition);
+                    requestAnimationFrame(() => {
+                        this._applyCentering(skipTransition);
+                    });
                 });
-            });
+            };
+            if (document.fonts && typeof document.fonts.ready === 'object') {
+                document.fonts.ready.then(center).catch(center);
+            } else {
+                center();
+            }
         };
         if (delayMs > 0) {
             setTimeout(run, delayMs);
@@ -536,8 +545,8 @@ class AssistantApp extends AppBase {
             const slot = this.welcomeInputSlot;
             const titleRect = title ? title.getBoundingClientRect() : { top: 0, height: 0 };
             const subtitleRect = subtitle ? subtitle.getBoundingClientRect() : { top: titleRect.bottom, height: 0 };
-            const slotRect = slot ? slot.getBoundingClientRect() : { top: 0, height: 0 };
             const inputRect = this.inputArea.getBoundingClientRect();
+            const containerRect = this.container.getBoundingClientRect();
             const titleHeight = titleRect.height;
             const subtitleHeight = subtitleRect.height;
             const subtitleMarginTop = parseFloat(getComputedStyle(subtitle).marginTop) || 0;
@@ -550,10 +559,12 @@ class AssistantApp extends AppBase {
             const offset = Math.max(0, (available - contentHeight) / 2);
             this.welcomeEl.style.paddingTop = `${offset}px`;
             this.welcomeEl.style.paddingBottom = '0';
+            void this.welcomeEl.offsetHeight;
 
-            // Position the fixed input exactly where the invisible slot would be
-            // in the normal document flow.
-            const topY = slotRect.top - inputMarginTop;
+            // Compute the fixed input top position mathematically from the
+            // welcome padding and the content heights. Use the container's
+            // viewport-relative top as the origin for the fixed element.
+            const topY = offset + titleHeight + subtitleMarginTop + subtitleHeight + subtitleMarginBottom + inputMarginTop;
             this.inputArea.style.setProperty('--assistant-input-top', `${topY}px`);
         } else if (chatMode) {
             // In chat mode the title is sticky at the top and the input sits at
