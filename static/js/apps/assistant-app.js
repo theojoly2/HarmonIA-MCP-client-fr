@@ -538,44 +538,14 @@ class AssistantApp extends AppBase {
         if (skipTransition) this.inputArea.style.transition = 'none';
 
         if (!welcomeTop) {
-            // Center the whole title+subtitle+input block vertically in the visible area.
-            // Force every ancestor up to #app-shell to reflow so the container's
-            // h-full height is resolved before we measure it (first paint fix).
-            let ancestor = this.container;
-            let guard = 0;
-            while (ancestor && guard < 10) {
-                void ancestor.offsetHeight;
-                if (ancestor.id === 'app-shell') break;
-                ancestor = ancestor.parentElement;
-                guard++;
-            }
-
-            const title = this.welcomeEl.querySelector('.assistant-welcome-title');
-            const subtitle = this.welcomeEl.querySelector('.assistant-welcome-subtitle');
+            // Let CSS flex center the welcome content (justify-content: center).
+            // Only position the fixed input area so it sits right below the
+            // invisible slot in the normal document flow.
+            this.welcomeEl.style.paddingTop = '';
+            this.welcomeEl.style.paddingBottom = '';
             const slot = this.welcomeInputSlot;
-            const titleRect = title ? title.getBoundingClientRect() : { top: 0, height: 0 };
-            const subtitleRect = subtitle ? subtitle.getBoundingClientRect() : { top: titleRect.bottom, height: 0 };
-            const inputRect = this.inputArea.getBoundingClientRect();
-            const containerRect = this.container.getBoundingClientRect();
-            const titleHeight = titleRect.height;
-            const subtitleHeight = subtitleRect.height;
-            const subtitleMarginTop = parseFloat(getComputedStyle(subtitle).marginTop) || 0;
-            const subtitleMarginBottom = parseFloat(getComputedStyle(subtitle).marginBottom) || 0;
-            const inputHeight = inputRect.height;
-            const inputMarginTop = parseFloat(getComputedStyle(slot).marginTop) || 0;
-            const contentHeight = titleHeight + subtitleMarginTop + subtitleHeight + subtitleMarginBottom + inputMarginTop + inputHeight;
-            // Center the content block inside the visible app container. This is
-            // the same reference frame used by SearchApp and ModelerApp.
-            const containerHeight = containerRect.height;
-            const available = containerHeight > 200 ? Math.max(containerHeight, contentHeight) : Math.max(window.visualViewport ? window.visualViewport.height : window.innerHeight, contentHeight);
-            const offset = Math.max(0, (available - contentHeight) / 2);
-            this.welcomeEl.style.paddingTop = `${offset}px`;
-            this.welcomeEl.style.paddingBottom = '0';
-
-            // The input area is fixed, so its top origin is the viewport. Add the
-            // container's viewport offset to the computed flow position.
-            const topY = containerRect.top + offset + titleHeight + subtitleMarginTop + subtitleHeight + subtitleMarginBottom + inputMarginTop;
-            this.inputArea.style.setProperty('--assistant-input-top', `${topY}px`);
+            const slotRect = slot ? slot.getBoundingClientRect() : { top: 0 };
+            this.inputArea.style.setProperty('--assistant-input-top', `${slotRect.top}px`);
         } else if (chatMode) {
             // In chat mode the title is sticky at the top and the input sits at
             // the bottom of the visible window, preserving its bottom padding.
