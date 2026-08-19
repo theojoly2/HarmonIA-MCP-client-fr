@@ -884,7 +884,7 @@
 }
 
 .assistant-app.assistant-embedded #assistant-model-pill-slot .assistant-model-pill span {
-    max-width: 10rem;
+    max-width: 8rem;
 }
 
 /* === Model pills in the input toolbar === */
