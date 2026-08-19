@@ -307,6 +307,7 @@ class SearchApp extends AppBase {
         this._setLoading(true);
         this._startTimer();
         this._setLoading(true);
+        this._updateHomeModeClass();
         this._applyCentering();
         // Clear previous results immediately so stale content is not shown during loading.
         const resultsContainer = this.container.querySelector('#results-container');
