@@ -538,16 +538,34 @@ class AssistantApp extends AppBase {
         if (skipTransition) this.inputArea.style.transition = 'none';
 
         if (!welcomeTop) {
-            // Let CSS flex center the welcome content (justify-content: center).
-            // Only position the fixed input area so it sits right below the
-            // invisible slot in the normal document flow.
-            this.welcomeEl.style.paddingTop = '';
-            this.welcomeEl.style.paddingBottom = '';
             // Reset any leftover chat scroll so the welcome is measured from the
             // top of the scroll area, not from a previously scrolled position.
             if (this.chatEl) this.chatEl.scrollTop = 0;
-            void this.welcomeEl.offsetHeight;
+
+            const title = this.welcomeEl.querySelector('.assistant-welcome-title');
+            const subtitle = this.welcomeEl.querySelector('.assistant-welcome-subtitle');
             const slot = this.welcomeInputSlot;
+            const titleRect = title ? title.getBoundingClientRect() : { top: 0, height: 0 };
+            const subtitleRect = subtitle ? subtitle.getBoundingClientRect() : { top: titleRect.bottom, height: 0 };
+            const inputRect = this.inputArea.getBoundingClientRect();
+            const containerRect = this.container.getBoundingClientRect();
+            const titleHeight = titleRect.height;
+            const subtitleHeight = subtitleRect.height;
+            const subtitleMarginTop = parseFloat(getComputedStyle(subtitle).marginTop) || 0;
+            const subtitleMarginBottom = parseFloat(getComputedStyle(subtitle).marginBottom) || 0;
+            const inputHeight = inputRect.height;
+            const inputMarginTop = parseFloat(getComputedStyle(slot).marginTop) || 0;
+            const contentHeight = titleHeight + subtitleMarginTop + subtitleHeight + subtitleMarginBottom + inputMarginTop + inputHeight;
+            // Center the title+subtitle+input block inside the visible app container.
+            const containerHeight = containerRect.height;
+            const available = containerHeight > 200 ? Math.max(containerHeight, contentHeight) : Math.max(window.visualViewport ? window.visualViewport.height : window.innerHeight, contentHeight);
+            const offset = Math.max(0, (available - contentHeight) / 2);
+            this.welcomeEl.style.paddingTop = `${offset}px`;
+            this.welcomeEl.style.paddingBottom = '0';
+            void this.welcomeEl.offsetHeight;
+
+            // Position the fixed input exactly where the invisible slot sits
+            // after the welcome padding has been applied.
             const slotRect = slot ? slot.getBoundingClientRect() : { top: 0 };
             this.inputArea.style.setProperty('--assistant-input-top', `${slotRect.top}px`);
         } else if (chatMode) {
