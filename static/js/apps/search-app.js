@@ -306,12 +306,14 @@ class SearchApp extends AppBase {
         }
         // Once the landing animation has run, remove the animation classes from
         // the live DOM so switching back to this tab does not re-trigger CSS
-        // animations on cached tags.
+        // animations on cached tags. Wait for the animation to finish first.
         const labels = tagsContainer.querySelectorAll('.tag-land');
-        labels.forEach((el) => {
-            el.classList.remove('tag-land');
-            el.style.animationDelay = '';
-        });
+        setTimeout(() => {
+            labels.forEach((el) => {
+                el.classList.remove('tag-land');
+                el.style.animationDelay = '';
+            });
+        }, 1100);
         // Re-enable resize observer after the intro animation finishes.
         setTimeout(() => {
             this._introAnimating = false;
