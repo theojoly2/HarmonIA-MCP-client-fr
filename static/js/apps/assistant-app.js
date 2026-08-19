@@ -426,9 +426,40 @@ class AssistantApp extends AppBase {
     _observeMessagesScroll() {
         if (!this.messagesEl || typeof MutationObserver === 'undefined') return;
         if (this._messagesObserver) this._messagesObserver.disconnect();
+        if (this._bottomSentinelObserver) {
+            this._bottomSentinelObserver.disconnect();
+            this._bottomSentinelObserver = null;
+        }
+
+        // Use an invisible sentinel at the bottom of the messages list to know
+        // whether the user is currently at the bottom. This is far more robust
+        // than distance math because it survives abrupt height changes caused by
+        // markdown re-renders or line breaks.
+        this._bottomSentinel = document.createElement('div');
+        this._bottomSentinel.style.cssText = 'height:1px; flex-shrink:0; pointer-events:none;';
+        if (this.messagesEl.lastElementChild) {
+            this.messagesEl.appendChild(this._bottomSentinel);
+        }
+
+        if (typeof IntersectionObserver !== 'undefined' && this.chatEl) {
+            this._bottomSentinelObserver = new IntersectionObserver(
+                (entries) => {
+                    const entry = entries[0];
+                    this._sentinelVisible = entry.isIntersecting;
+                },
+                { root: this.chatEl, threshold: 0 }
+            );
+            this._bottomSentinelObserver.observe(this._bottomSentinel);
+        }
+
         this._messagesObserver = new MutationObserver(() => {
             if (!this.chatEl) return;
-            this._scrollToBottom(false);
+            if (!this._bottomSentinel.parentNode && this.messagesEl.lastElementChild) {
+                this.messagesEl.appendChild(this._bottomSentinel);
+            }
+            if (this._sentinelVisible) {
+                this.chatEl.scrollTo({ top: this.chatEl.scrollHeight, behavior: 'auto' });
+            }
         });
         this._messagesObserver.observe(this.messagesEl, { childList: true, subtree: true });
     }
@@ -1777,18 +1808,14 @@ class AssistantApp extends AppBase {
     _scrollToBottom(force = false) {
         const el = this.chatEl;
         if (!el) return;
-        const threshold = 38; // px from bottom to consider "at bottom"
-        const isNearBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < threshold;
-        if (force || isNearBottom) {
+        // If the bottom sentinel is visible, the user is at the bottom.
+        if (force || this._sentinelVisible) {
             el.scrollTo({ top: el.scrollHeight, behavior: force ? 'auto' : 'smooth' });
         }
     }
 
     _isNearBottom() {
-        const el = this.chatEl;
-        if (!el) return true;
-        const threshold = 38;
-        return (el.scrollHeight - el.scrollTop - el.clientHeight) < threshold;
+        return !!this._sentinelVisible;
     }
 
     async _send(text) {
