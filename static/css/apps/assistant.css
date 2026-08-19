@@ -897,9 +897,9 @@
     align-items: center;
     flex-shrink: 1;
     min-width: 0;
-    padding: 0.45rem 0.6rem;
-    gap: 0.45rem;
-    font-size: 0.85rem;
+    padding: 0.4rem 0.55rem;
+    gap: 0.4rem;
+    font-size: 0.78rem;
     line-height: 1;
     border-radius: 9999px;
 }
@@ -939,7 +939,7 @@
 /* Export menu inside a pill */
 .assistant-model-pill .assistant-model-pill-export-menu {
     width: max-content;
-    min-width: 8rem;
+    min-width: 9rem;
     white-space: nowrap;
 }
 
@@ -948,9 +948,21 @@
     width: 100%;
     text-align: left;
     white-space: nowrap;
-    padding: 0.5rem 0.75rem;
+    padding: 0.65rem 1rem;
     font-size: 0.8rem;
     line-height: 1.25;
+}
+
+.assistant-pill-export-item:hover {
+    background: #e5e7eb;
+}
+
+#assistant-model-pill-slot .assistant-model-pill button:hover {
+    background: #d1d5db;
+}
+
+#assistant-model-pill-slot .assistant-model-pill button:active {
+    background: #9ca3af;
 }
 
 .assistant-sources-header {
