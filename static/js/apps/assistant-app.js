@@ -44,7 +44,7 @@ class AssistantApp extends AppBase {
         // kept flowing in the background, so the chat is already up-to-date.
         if (this.container === container && container.querySelector('#assistant-chat')) {
             this._observeResize();
-            this._applyCentering(true);
+            this._scheduleCentering(true);
             if (this.messagesEl && this.messagesEl.children.length > 0) {
                 this.chatEl.classList.add('assistant-chat-mode');
                 this.welcomeEl.classList.add('assistant-welcome-top');
@@ -533,27 +533,27 @@ class AssistantApp extends AppBase {
 
             const title = this.welcomeEl.querySelector('.assistant-welcome-title');
             const subtitle = this.welcomeEl.querySelector('.assistant-welcome-subtitle');
+            const slot = this.welcomeInputSlot;
             const titleRect = title ? title.getBoundingClientRect() : { top: 0, height: 0 };
             const subtitleRect = subtitle ? subtitle.getBoundingClientRect() : { top: titleRect.bottom, height: 0 };
+            const slotRect = slot ? slot.getBoundingClientRect() : { top: 0, height: 0 };
             const inputRect = this.inputArea.getBoundingClientRect();
             const titleHeight = titleRect.height;
             const subtitleHeight = subtitleRect.height;
             const subtitleMarginTop = parseFloat(getComputedStyle(subtitle).marginTop) || 0;
             const subtitleMarginBottom = parseFloat(getComputedStyle(subtitle).marginBottom) || 0;
             const inputHeight = inputRect.height;
-            const inputMarginTop = parseFloat(getComputedStyle(this.welcomeInputSlot).marginTop) || 0;
-
-            // Center visually around the title + subtitle only; place the fixed
-            // input right below that block with its own top margin. This matches
-            // the natural layout perceived by users (SearchApp / ModelerApp).
-            const headerHeight = titleHeight + subtitleMarginTop + subtitleHeight + subtitleMarginBottom;
+            const inputMarginTop = parseFloat(getComputedStyle(slot).marginTop) || 0;
+            const contentHeight = titleHeight + subtitleMarginTop + subtitleHeight + subtitleMarginBottom + inputMarginTop + inputHeight;
             const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-            const available = Math.max(viewportHeight, headerHeight + inputMarginTop + inputHeight);
-            const headerOffset = Math.max(0, (available - headerHeight) / 2);
-            this.welcomeEl.style.paddingTop = `${headerOffset}px`;
+            const available = Math.max(viewportHeight, contentHeight);
+            const offset = Math.max(0, (available - contentHeight) / 2);
+            this.welcomeEl.style.paddingTop = `${offset}px`;
             this.welcomeEl.style.paddingBottom = '0';
 
-            const topY = headerOffset + headerHeight + inputMarginTop;
+            // Position the fixed input exactly where the invisible slot would be
+            // in the normal document flow.
+            const topY = slotRect.top - inputMarginTop;
             this.inputArea.style.setProperty('--assistant-input-top', `${topY}px`);
         } else if (chatMode) {
             // In chat mode the title is sticky at the top and the input sits at
@@ -586,7 +586,7 @@ class AssistantApp extends AppBase {
         this._resizeObserver = new ResizeObserver(() => {
             // Recalculate the input position in both welcome and chat modes so
             // the fixed input area stays correctly placed after a resize.
-            this._applyCentering(true);
+            this._scheduleCentering(true);
         });
         this._resizeObserver.observe(this.container);
     }
