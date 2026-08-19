@@ -83,7 +83,7 @@ class SplitManager {
             // - the right/bottom pane ratio is (100 - ratio)
             // - keeping it >= minRatioAfter means ratio <= (100 - minRatioAfter)
             const minAfter = node.minRatioAfter != null ? node.minRatioAfter : 10;
-            ratio = Math.max(10, Math.min(100 - minAfter, ratio));
+            ratio = Math.max(30, Math.min(100 - minAfter, ratio));
             node.ratios = node.ratios || childrenRatios(node.children || []);
             node.ratios[index] = ratio;
             node.ratios[index + 1] = 100 - ratio;
