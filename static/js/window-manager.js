@@ -335,6 +335,11 @@ class WindowManager {
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
                     AppState.restoreInstanceState(instanceId);
+                    // Give apps with fixed/absolute home layouts one last chance
+                    // to center now that the DOM is fully attached to the shell.
+                    if (typeof instance._scheduleCentering === 'function') {
+                        instance._scheduleCentering(true);
+                    }
                     resolve();
                 });
             });

@@ -217,21 +217,6 @@ class AssistantApp extends AppBase {
             }
         });
 
-        // The input area is fixed and positioned with a CSS variable so it can
-        // slide down in sync with the title when the first message is sent.
-        // Wait for fonts and two layout frames so the initial centering is
-        // computed from stable dimensions instead of mid-transition values.
-        const initialCenter = () => {
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => this._applyCentering(true));
-            });
-        };
-        if (document.fonts && typeof document.fonts.ready === 'object') {
-            document.fonts.ready.then(initialCenter).catch(initialCenter);
-        } else {
-            initialCenter();
-        }
-
     }
 
     _bindInputEvents() {
@@ -290,9 +275,7 @@ class AssistantApp extends AppBase {
             this.selectedTags = state.selectedTags;
         }
         // Re-apply the welcome centering/positioning once the DOM is rebuilt.
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => this._applyCentering(true));
-        });
+        this._scheduleCentering(true);
         // For chats (messages present), always scroll to the bottom so the latest
         // message is visible. Restoring the previous scrollTop is confusing when
         // new messages arrived while the tab was hidden.
@@ -322,14 +305,27 @@ class AssistantApp extends AppBase {
             this.welcomeEl.classList.add('assistant-welcome-top');
             this.inputArea.classList.add('assistant-input-area-chat');
         }
-        // Let the chat-mode class changes settle before measuring the final
-        // welcome/input positions, following the same pattern as _newSession.
-        requestAnimationFrame(() => {
+        // Centering is deferred until the DOM is fully attached to the shell
+        // and the browser has resolved all ancestor heights. _applyCentering is
+        // called here instead of in render() because render() may run before the
+        // container has its final size.
+        this._scheduleCentering(true);
+        this._scrollToBottom(true);
+    }
+
+    _scheduleCentering(skipTransition, delayMs = 0) {
+        const run = () => {
             requestAnimationFrame(() => {
-                this._applyCentering(true);
-                this._scrollToBottom(true);
+                requestAnimationFrame(() => {
+                    this._applyCentering(skipTransition);
+                });
             });
-        });
+        };
+        if (delayMs > 0) {
+            setTimeout(run, delayMs);
+        } else {
+            run();
+        }
     }
 
     unmount() {
@@ -373,19 +369,13 @@ class AssistantApp extends AppBase {
         if (this._resizeObserver) this._resizeObserver.disconnect();
         this._observeResize();
         this._observeMessagesScroll();
-        // Give the cached DOM one frame to settle after re-attachment before
-        // measuring positions, matching the pattern used elsewhere.
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                this._applyCentering(true);
-                // If a chat is present, force-scroll to the bottom so the latest message
-                // is visible after switching back to this tab. Retry several times because
-                // CSS transitions and layout shifts can reset the scroll position.
-                if (this.messagesEl && this.messagesEl.children.length > 0) {
-                    this._snapToBottom();
-                }
-            });
-        });
+        this._scheduleCentering(true);
+        // If a chat is present, force-scroll to the bottom so the latest message
+        // is visible after switching back to this tab. Retry several times because
+        // CSS transitions and layout shifts can reset the scroll position.
+        if (this.messagesEl && this.messagesEl.children.length > 0) {
+            this._snapToBottom();
+        }
     }
 
     _snapToBottom() {
@@ -460,9 +450,7 @@ class AssistantApp extends AppBase {
         this.inputEl.style.height = 'auto';
         // Wait for the browser to settle back into the home layout before
         // measuring and centering, just like SearchApp/ModelerApp do.
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => this._applyCentering(true));
-        });
+        this._scheduleCentering(true);
     }
 
     _switchToChatMode() {
