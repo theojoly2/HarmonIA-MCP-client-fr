@@ -50,6 +50,9 @@ class SearchApp extends AppBase {
             // Start loading tags in parallel; the reveal fires as soon as both tags and layout are ready.
             this._loadTags().then(() => this._checkRevealReady());
         }
+        // If the intro already played once, never stage the tags again: they
+        // should be visible immediately without animation classes.
+        const tagsStagedClass = showTags ? 'tags-staged' : '';
         // Hide tags initially so only the title/search bar affect the first centering.
         // Start with the wrapper invisible to avoid a flash at the top before centering is applied.
         container.innerHTML = `
@@ -71,7 +74,7 @@ class SearchApp extends AppBase {
                                 <span class="btn-label">Chercher</span>
                             </button>
                         </div>
-                        <div id="tags-container" class="mt-5 flex flex-wrap gap-2 justify-center ${showTags ? 'tags-staged' : ''}">
+                        <div id="tags-container" class="mt-5 flex flex-wrap gap-2 justify-center ${tagsStagedClass}">
                             ${showTags ? '' : (this.tagsHtml || '<span class="text-gray-500 font-medium text-sm">Aucune source disponible.</span>')}
                         </div>
                     </form>
@@ -298,6 +301,14 @@ class SearchApp extends AppBase {
         if (typeof sessionStorage !== 'undefined') {
             sessionStorage.setItem('searchIntroPlayed', '1');
         }
+        // Once the landing animation has run, remove the animation classes from
+        // the live DOM so switching back to this tab does not re-trigger CSS
+        // animations on cached tags.
+        const labels = tagsContainer.querySelectorAll('.tag-land');
+        labels.forEach((el) => {
+            el.classList.remove('tag-land');
+            el.style.animationDelay = '';
+        });
         // Re-enable resize observer after the intro animation finishes.
         setTimeout(() => {
             this._introAnimating = false;
