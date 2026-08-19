@@ -23,6 +23,7 @@ class SearchApp extends AppBase {
         this._skipNextTransition = false;
         this._firstTagAnimation = true;
         this._introAnimating = false;
+        this._introAnimationDone = false;
         this._skipHistorySave = !!props.fromHistory;
     }
 
@@ -37,7 +38,9 @@ class SearchApp extends AppBase {
             return;
         }
         this.container = container;
-        const showTags = this._firstTagAnimation;
+        // The tag intro animation runs only once per instance. After that,
+        // switching back to the tab should restore the already-revealed tags.
+        const showTags = !this._introAnimationDone && this._firstTagAnimation;
         if (showTags) {
             this._firstTagAnimation = false;
             this._introAnimating = true;
@@ -289,6 +292,9 @@ class SearchApp extends AppBase {
                 el.style.animationDelay = (i * 0.18) + 's';
             });
         }
+        // Mark the intro animation as finished so it does not run again when
+        // the user switches back to this tab.
+        this._introAnimationDone = true;
         // Re-enable resize observer after the intro animation finishes.
         setTimeout(() => {
             this._introAnimating = false;
