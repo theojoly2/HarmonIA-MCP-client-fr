@@ -1837,9 +1837,9 @@ class AssistantApp extends AppBase {
         // mostly up-to-date without freezing the UI. Tokens are appended as raw text
         // between two re-renders, which prevents the duplication seen when mixing
         // plain-text DOM nodes with full HTML replacement.
-        const STRUCTURE_RE = /[ \n\r\t.,;:!?*`_#\-+=~\[\](){}|'"\\/<>.]/;
-        const MIN_REPARSE_MS = 60;
-        const MAX_PLAIN_MS = 300;
+        const STRUCTURE_RE = /[\W]/;
+        const MIN_REPARSE_MS = 20;
+        const MAX_PLAIN_MS = 80;
         let lastReparsedAt = 0;
         let pendingPlain = '';
         let lastPlainAt = 0;
