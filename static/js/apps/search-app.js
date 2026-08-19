@@ -517,6 +517,7 @@ class SearchApp extends AppBase {
             selectedTags: this.selectedTags,
             resultsHtml: this.resultsHtml,
             tagsHtml: this.tagsHtml,
+            introAnimationDone: this._introAnimationDone,
         };
     }
 
@@ -536,6 +537,10 @@ class SearchApp extends AppBase {
         this.selectedTags = newSelectedTags;
         this.resultsHtml = newResultsHtml;
         this.tagsHtml = newTagsHtml;
+        // Persist the intro-animation flag across tab switches.
+        if (state.introAnimationDone !== undefined) {
+            this._introAnimationDone = !!state.introAnimationDone;
+        }
         if (!this.container) return;
         // If the live DOM already shows the right content, don't rebuild it.
         const liveMatchesState = !changed || (this.container.querySelector('#search-wrapper-inner')
