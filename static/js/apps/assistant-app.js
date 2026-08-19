@@ -543,8 +543,19 @@ class AssistantApp extends AppBase {
             // invisible slot in the normal document flow.
             this.welcomeEl.style.paddingTop = '';
             this.welcomeEl.style.paddingBottom = '';
+            void this.welcomeEl.offsetHeight;
             const slot = this.welcomeInputSlot;
             const slotRect = slot ? slot.getBoundingClientRect() : { top: 0 };
+            const containerRect = this.container.getBoundingClientRect();
+            console.log('[Assistant home position]', {
+                slotTop: slotRect.top,
+                slotHeight: slotRect.height,
+                welcomeHeight: this.welcomeEl.getBoundingClientRect().height,
+                welcomeOffsetHeight: this.welcomeEl.offsetHeight,
+                containerTop: containerRect.top,
+                containerHeight: containerRect.height,
+                inputTopVar: getComputedStyle(this.inputArea).getPropertyValue('--assistant-input-top'),
+            });
             this.inputArea.style.setProperty('--assistant-input-top', `${slotRect.top}px`);
         } else if (chatMode) {
             // In chat mode the title is sticky at the top and the input sits at
