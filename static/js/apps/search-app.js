@@ -42,6 +42,10 @@ class SearchApp extends AppBase {
         // the landing animation.
         const introPlayed = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('searchIntroPlayed') === '1';
         const showTags = this._firstTagAnimation && !introPlayed;
+        // Always load tags if we don't have them yet, even when the animation is skipped.
+        if (!this.tagsHtml) {
+            this._loadTags().then(() => this._injectTagsHtml());
+        }
         if (showTags) {
             this._firstTagAnimation = false;
             this._introAnimating = true;
