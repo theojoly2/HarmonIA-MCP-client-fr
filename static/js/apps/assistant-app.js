@@ -1777,7 +1777,7 @@ class AssistantApp extends AppBase {
     _scrollToBottom(force = false) {
         const el = this.chatEl;
         if (!el) return;
-        const threshold = 80; // px from bottom to consider "at bottom"
+        const threshold = 24; // px from bottom to consider "at bottom"
         const isNearBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < threshold;
         if (force || isNearBottom) {
             el.scrollTo({ top: el.scrollHeight, behavior: force ? 'auto' : 'smooth' });
@@ -1787,7 +1787,7 @@ class AssistantApp extends AppBase {
     _isNearBottom() {
         const el = this.chatEl;
         if (!el) return true;
-        const threshold = 80;
+        const threshold = 24;
         return (el.scrollHeight - el.scrollTop - el.clientHeight) < threshold;
     }
 
