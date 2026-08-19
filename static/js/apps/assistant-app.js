@@ -322,8 +322,14 @@ class AssistantApp extends AppBase {
             this.welcomeEl.classList.add('assistant-welcome-top');
             this.inputArea.classList.add('assistant-input-area-chat');
         }
-        this._applyCentering(true);
-        this._scrollToBottom(true);
+        // Let the chat-mode class changes settle before measuring the final
+        // welcome/input positions, following the same pattern as _newSession.
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                this._applyCentering(true);
+                this._scrollToBottom(true);
+            });
+        });
     }
 
     unmount() {
@@ -367,13 +373,19 @@ class AssistantApp extends AppBase {
         if (this._resizeObserver) this._resizeObserver.disconnect();
         this._observeResize();
         this._observeMessagesScroll();
-        this._applyCentering(true);
-        // If a chat is present, force-scroll to the bottom so the latest message
-        // is visible after switching back to this tab. Retry several times because
-        // CSS transitions and layout shifts can reset the scroll position.
-        if (this.messagesEl && this.messagesEl.children.length > 0) {
-            this._snapToBottom();
-        }
+        // Give the cached DOM one frame to settle after re-attachment before
+        // measuring positions, matching the pattern used elsewhere.
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                this._applyCentering(true);
+                // If a chat is present, force-scroll to the bottom so the latest message
+                // is visible after switching back to this tab. Retry several times because
+                // CSS transitions and layout shifts can reset the scroll position.
+                if (this.messagesEl && this.messagesEl.children.length > 0) {
+                    this._snapToBottom();
+                }
+            });
+        });
     }
 
     _snapToBottom() {
@@ -446,7 +458,11 @@ class AssistantApp extends AppBase {
         this.inputArea.classList.remove('assistant-input-area-chat');
         this.inputEl.value = '';
         this.inputEl.style.height = 'auto';
-        this._applyCentering(true);
+        // Wait for the browser to settle back into the home layout before
+        // measuring and centering, just like SearchApp/ModelerApp do.
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => this._applyCentering(true));
+        });
     }
 
     _switchToChatMode() {
@@ -454,12 +470,6 @@ class AssistantApp extends AppBase {
         this.chatEl.classList.add('assistant-chat-mode');
         this.welcomeEl.classList.add('assistant-welcome-top');
         this.inputArea.classList.add('assistant-input-area-chat');
-        // Re-enable CSS transitions before recalculating so the slide from
-        // the centered home position to the chat position is animated.
-        this.welcomeEl.style.transition = '';
-        this.inputArea.style.transition = '';
-        void this.welcomeEl.offsetHeight;
-        void this.inputArea.offsetHeight;
         // Recalculate positions so the fixed input area animates from its
         // welcome spot down to the bottom in lockstep with the title.
         this._applyCentering(false);
@@ -492,14 +502,6 @@ class AssistantApp extends AppBase {
         const welcomeTop = this.welcomeEl.classList.contains('assistant-welcome-top');
         const chatMode = this.chatEl?.classList.contains('assistant-chat-mode');
 
-        // When not in chat mode yet, disable vertical transitions on the
-        // welcome block and the input area so the initial centering is applied
-        // instantly and does not read mid-animation geometry.
-        if (!welcomeTop && !chatMode) {
-            this.welcomeEl.style.transition = 'none';
-            this.inputArea.style.transition = 'none';
-        }
-
         if (isEmbedded) {
             // Embedded inside the modeler side panel: do not use fixed viewport
             // positioning. The input stays at the bottom of its flex container.
@@ -512,8 +514,6 @@ class AssistantApp extends AppBase {
             this.inputArea.style.right = '0';
             this.inputArea.style.top = 'auto';
             this.inputArea.style.width = '100%';
-            // Ensure the chat scroll area leaves room for the absolutely positioned
-            // input area so the last message is not hidden behind it.
             const inputHeight = this.inputArea.getBoundingClientRect().height;
             if (this.chatEl && inputHeight) {
                 this.chatEl.style.paddingBottom = `${inputHeight + 8}px`;
@@ -521,8 +521,16 @@ class AssistantApp extends AppBase {
             return;
         }
 
+        // Same pattern as SearchApp/ModelerApp: disable the animated property
+        // inline before measuring, then restore after the value is applied.
+        const welcomeWas = this.welcomeEl.style.transition;
+        const inputWas = this.inputArea.style.transition;
+        if (skipTransition) {
+            this.welcomeEl.style.transition = 'none';
+            this.inputArea.style.transition = 'none';
+        }
+
         if (!welcomeTop) {
-            // Center the whole title+subtitle+input block vertically in the visible area.
             // Force every ancestor up to #app-shell to reflow so the container's
             // h-full height is resolved before we measure it (first paint fix).
             let ancestor = this.container;
@@ -534,60 +542,43 @@ class AssistantApp extends AppBase {
                 guard++;
             }
 
-            const title = this.welcomeEl.querySelector('.assistant-welcome-title');
-            const subtitle = this.welcomeEl.querySelector('.assistant-welcome-subtitle');
-            const slot = this.welcomeInputSlot;
-            const titleRect = title ? title.getBoundingClientRect() : { top: 0, height: 0 };
-            const subtitleRect = subtitle ? subtitle.getBoundingClientRect() : { top: titleRect.bottom, height: 0 };
-            const slotRect = slot ? slot.getBoundingClientRect() : { height: 0 };
-            const containerRect = this.container.getBoundingClientRect();
-            const titleHeight = titleRect.height;
-            const subtitleHeight = subtitleRect.height;
-            const subtitleMarginTop = parseFloat(getComputedStyle(subtitle).marginTop) || 0;
-            const inputHeight = Math.max(slotRect.height, this.inputArea.getBoundingClientRect().height);
-            const inputMarginTop = parseFloat(getComputedStyle(slot).marginTop) || 0;
-            const contentHeight = titleHeight + subtitleMarginTop + subtitleHeight + inputMarginTop + inputHeight;
-            // If the container hasn't been laid out yet, fall back to the visible
-            // viewport area under the container's top.
-            const availableHeight = containerRect.height > 200 ? containerRect.height : Math.max(containerRect.height, window.innerHeight - containerRect.top);
-            const available = Math.max(availableHeight, contentHeight);
-            const offset = Math.max(0, (available - contentHeight) / 2 - contentHeight * 0.08);
-            this.welcomeEl.style.paddingTop = offset + 'px';
+            // Reset the fixed input position so we don't measure stale chat-mode
+            // geometry when returning to the welcome screen.
+            this.inputArea.style.setProperty('--assistant-input-top', '50%');
+            this.inputArea.style.top = '50%';
+            void this.inputArea.offsetHeight;
+
+            const contentHeight = this._measureWelcomeContentHeight();
+            const available = Math.max(this.container.clientHeight, contentHeight);
+            const offset = Math.max(0, (available - contentHeight) / 2);
+            this.welcomeEl.style.paddingTop = `${offset}px`;
             this.welcomeEl.style.paddingBottom = '0';
 
-            // Compute the input top position mathematically from the welcome
-            // padding, title height, subtitle height and margins.
-            const topY = containerRect.top + offset + titleHeight + subtitleMarginTop + subtitleHeight + inputMarginTop;
-            this.inputArea.style.setProperty('--assistant-input-top', topY + 'px');
+            // Position the fixed input right below the welcome content block.
+            const containerRect = this.container.getBoundingClientRect();
+            const topY = containerRect.top + offset + contentHeight;
+            this.inputArea.style.setProperty('--assistant-input-top', `${topY}px`);
+            this.inputArea.style.top = '';
         } else if (chatMode) {
-            // In chat mode the title is sticky at the top and the input sits at
-            // the bottom of the visible window, preserving its bottom padding.
             this.welcomeEl.style.paddingTop = '';
             this.welcomeEl.style.paddingBottom = '';
             const inputHeight = this.inputArea.getBoundingClientRect().height;
             const bottomPadding = 0.35 * parseFloat(getComputedStyle(document.documentElement).fontSize || 16);
-            // Position relative to the viewport bottom because the input is fixed.
             const topY = window.innerHeight - inputHeight - bottomPadding;
-            this.inputArea.style.setProperty('--assistant-input-top', topY + 'px');
+            this.inputArea.style.setProperty('--assistant-input-top', `${topY}px`);
+            this.inputArea.style.top = '';
         } else {
-            // Fallback: clear explicit padding if neither state is fully active.
             this.welcomeEl.style.paddingTop = '';
             this.welcomeEl.style.paddingBottom = '';
         }
 
         if (skipTransition) {
-            // Force a reflow so the new padding/top values are applied instantly.
             void this.welcomeEl.offsetHeight;
             void this.inputArea.offsetHeight;
-            // Only re-enable CSS transitions once the view is transitioning to
-            // chat mode. In home mode the welcome block must stay transitionless
-            // so it does not drift if _applyCentering is called again.
-            if (welcomeTop || chatMode) {
-                this.welcomeEl.style.transition = '';
-                this.inputArea.style.transition = '';
-                void this.welcomeEl.offsetHeight;
-                void this.inputArea.offsetHeight;
-            }
+            this.welcomeEl.style.transition = welcomeWas;
+            this.inputArea.style.transition = inputWas;
+            void this.welcomeEl.offsetHeight;
+            void this.inputArea.offsetHeight;
         }
     }
 
