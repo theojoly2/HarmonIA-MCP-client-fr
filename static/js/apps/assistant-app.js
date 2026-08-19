@@ -17,7 +17,10 @@ class AssistantApp extends AppBase {
     constructor(instanceId, props = {}) {
         super(instanceId, props);
         this.session = props.session || '';
-        this.modelName = props.modelName || '';
+        // Up to 3 models can be attached to the assistant context. For backward
+        // compatibility a single string may arrive from older sessions.
+        this.modelNames = this._normalizeModelNames(props.modelNames ?? props.modelName);
+        this.modelNamesConfig = { max: 3 };
         // Origin tracks whether this conversation was started from the modeler
         // or from the standalone assistant. It is saved by the backend so the
         // modeler can reopen only its own conversations.
@@ -160,16 +163,17 @@ class AssistantApp extends AppBase {
                 `;
                 this.embeddedIntroEl.classList.remove('hidden');
             }
-            this._updateModelPill();
-            if (importBtn) {
-                importBtn.style.display = 'none';
+                this._updateModelPill();
+                if (importBtn) {
+                    importBtn.style.display = 'none';
+                }
+                if (this.embeddedModelPillEl) {
+                    this.embeddedModelPillEl.classList.add('hidden');
+                }
             }
-            if (this.embeddedModelPillEl) {
-                this.embeddedModelPillEl.classList.add('hidden');
-            }
-        }
 
-        this._updateModelPill();
+            this._updateImportButtonState(importBtn);
+            this._updateModelPill();
 
         if (window.GlowEffects && typeof window.GlowEffects.scanAndBind === 'function') {
             window.GlowEffects.scanAndBind(container);
@@ -178,6 +182,8 @@ class AssistantApp extends AppBase {
         container.querySelector('#assistant-reset').addEventListener('click', () => {
             this._newSession();
         });
+
+        this._updateImportButtonState(importBtn);
 
         if (importBtn && !this._embedded) {
             importBtn.addEventListener('click', () => {
@@ -196,8 +202,11 @@ class AssistantApp extends AppBase {
         }
 
         this.fileInput.addEventListener('change', (e) => {
-            const file = e.target.files?.[0];
-            if (file) this._importModel(file);
+            const files = Array.from(e.target.files || []);
+            const remaining = Math.max(0, this.modelNamesConfig.max - (this.modelNames?.length || 0));
+            const toImport = files.slice(0, remaining);
+            for (const file of toImport) this._importModel(file);
+            if (this.fileInput) this.fileInput.value = '';
         });
 
         this.sourcesBtn.addEventListener('click', () => this._toggleSourcesMenu());
@@ -237,7 +246,7 @@ class AssistantApp extends AppBase {
     getState() {
         return {
             session: this.session,
-            modelName: this.modelName,
+            modelNames: this.modelNames,
             origin: this.origin || 'assistant',
             messagesHtml: this.messagesEl ? this.messagesEl.innerHTML : '',
             welcomeTop: this.welcomeEl ? this.welcomeEl.classList.contains('assistant-welcome-top') : false,
@@ -254,7 +263,7 @@ class AssistantApp extends AppBase {
     setState(state) {
         if (!state || !Object.keys(state).length) return;
         if (state.session !== undefined) this.session = state.session;
-        if (state.modelName !== undefined) this.modelName = state.modelName;
+        if (state.modelNames !== undefined) this.modelNames = this._normalizeModelNames(state.modelNames);
         if (state.origin !== undefined) this.origin = state.origin || 'assistant';
         if (state.isStreaming !== undefined) this.isStreaming = state.isStreaming;
         // Only restore the message HTML if we actually have saved HTML. An empty
@@ -451,7 +460,7 @@ class AssistantApp extends AppBase {
         this.messagesEl.innerHTML = '';
         this.props.session = '';
         this.props.fromHistory = false;
-        this._clearModelPill();
+        this._clearModelPills();
         this.chatEl.classList.remove('assistant-chat-mode');
         this.welcomeEl.classList.remove('assistant-welcome-top');
         this.inputArea.classList.remove('assistant-input-area-chat');
@@ -607,115 +616,149 @@ class AssistantApp extends AppBase {
         this._resizeObserver.observe(this.container);
     }
 
+    _normalizeModelNames(value) {
+        if (Array.isArray(value)) return value.filter(Boolean);
+        if (typeof value === 'string' && value.trim()) return [value.trim()];
+        return [];
+    }
+
+    _displayNameForModel(name) {
+        const raw = this.props.displayNames?.[name] || name;
+        return raw.includes('__') ? raw.split('__').slice(0, -1).join('__') : raw;
+    }
+
+    _updateImportButtonState(importBtn) {
+        if (!importBtn || this._embedded) return;
+        const atMax = (this.modelNames?.length || 0) >= this.modelNamesConfig.max;
+        importBtn.disabled = atMax;
+        importBtn.style.opacity = atMax ? '0.4' : '';
+        importBtn.title = atMax
+            ? `Limite de ${this.modelNamesConfig.max} modèles atteinte`
+            : 'Importer un modèle';
+    }
+
     async _importModel(file) {
-        if (!file) return;
+        if (!file || (this.modelNames?.length || 0) >= this.modelNamesConfig.max) return;
         try {
             const result = await ApiClient.importAssistantModel(file, file.name, this.origin);
             if (result?.name) {
-                this.modelName = result.name;
-                this.props.display_name = result.display_name || result.name;
+                const names = this.modelNames.slice();
+                if (!names.includes(result.name)) names.push(result.name);
+                this.modelNames = names.slice(0, this.modelNamesConfig.max);
+                this.props.displayNames = this.props.displayNames || {};
+                this.props.displayNames[result.name] = result.display_name || result.name;
+                this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
                 this._updateModelPill();
             }
         } catch (err) {
             console.error('Assistant import model error', err);
             this._appendSystemMessage(`Erreur lors de l'import du modèle : ${this._escape(err.message)}`);
         }
-        if (this.fileInput) this.fileInput.value = '';
     }
 
     _updateModelPill() {
-        if (!this.modelPillSlotEl || !this.modelName) return;
-        const rawName = this.props.display_name || this.modelName;
-        const displayName = rawName.includes('__')
-            ? rawName.split('__').slice(0, -1).join('__')
-            : rawName;
-        this.modelPillSlotEl.innerHTML = `
-            <div class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-100 border border-gray-200 text-xs font-semibold text-gray-700" id="assistant-model-pill">
+        if (!this.modelPillSlotEl || !this.modelNames?.length) {
+            if (this.modelPillSlotEl) this.modelPillSlotEl.innerHTML = '';
+            return;
+        }
+        this.modelPillSlotEl.innerHTML = this.modelNames.map((name) => {
+            const displayName = this._displayNameForModel(name);
+            return `
+            <div class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-100 border border-gray-200 text-xs font-semibold text-gray-700 assistant-model-pill" data-model-name="${this._escape(name)}">
                 <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
                 </svg>
                 <span class="truncate max-w-[10rem]" title="${this._escape(displayName)}">${this._escape(displayName)}</span>
                 <div class="relative">
-                    <button type="button" id="assistant-model-pill-export" class="w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors" title="Exporter le modèle">
+                    <button type="button" class="assistant-model-pill-export w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors" title="Exporter le modèle">
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                             <path d="M7 10l5 5 5-5"></path>
                             <path d="M12 15V3"></path>
                         </svg>
                     </button>
-                    <div id="assistant-model-pill-export-menu" class="hidden absolute bottom-full right-0 mb-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg py-1 text-xs z-50">
+                    <div class="assistant-model-pill-export-menu hidden absolute bottom-full right-0 mb-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg py-1 text-xs z-50">
                         <button type="button" data-format="xmi" class="assistant-pill-export-item w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700">Exporter en XMI</button>
                         <button type="button" data-format="ttl" class="assistant-pill-export-item w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700">Exporter en TTL</button>
                     </div>
                 </div>
-                <button type="button" id="assistant-model-pill-close" class="w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors hidden" title="Détacher le modèle">
+                <button type="button" class="assistant-model-pill-close w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors" title="Détacher le modèle">
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                         <path d="M18 6L6 18M6 6l12 12"></path>
                     </svg>
                 </button>
             </div>
-        `;
-        const closeBtn = this.modelPillSlotEl.querySelector('#assistant-model-pill-close');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => this._clearModelPill());
-        }
-        const exportBtn = this.modelPillSlotEl.querySelector('#assistant-model-pill-export');
-        const exportMenu = this.modelPillSlotEl.querySelector('#assistant-model-pill-export-menu');
-        if (exportBtn && exportMenu) {
-            exportBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const isOpen = !exportMenu.classList.contains('hidden');
-                this._closePillExportMenu();
-                if (!isOpen) exportMenu.classList.remove('hidden');
-            });
-            exportMenu.querySelectorAll('.assistant-pill-export-item').forEach((item) => {
-                item.addEventListener('click', async (e) => {
+            `;
+        }).join('');
+
+        this.modelPillSlotEl.querySelectorAll('.assistant-model-pill').forEach((pill) => {
+            const name = pill.dataset.modelName;
+            const closeBtn = pill.querySelector('.assistant-model-pill-close');
+            const exportBtn = pill.querySelector('.assistant-model-pill-export');
+            const exportMenu = pill.querySelector('.assistant-model-pill-export-menu');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => this._removeModelPill(name));
+            }
+            if (exportBtn && exportMenu) {
+                exportBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    const format = item.dataset.format;
-                    await this._exportModelFromPill(format);
-                    this._closePillExportMenu();
+                    this._closePillExportMenus();
+                    exportMenu.classList.remove('hidden');
                 });
+                exportMenu.querySelectorAll('.assistant-pill-export-item').forEach((item) => {
+                    item.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        await this._exportModelFromPill(item.dataset.format, name);
+                        this._closePillExportMenus();
+                    });
+                });
+            }
+        });
+
+        this._pillExportCloseHandler = (e) => {
+            const menus = this.modelPillSlotEl?.querySelectorAll('.assistant-model-pill-export-menu');
+            let inside = false;
+            menus?.forEach((menu) => {
+                const pill = menu.closest('.assistant-model-pill');
+                const exportBtn = pill?.querySelector('.assistant-model-pill-export');
+                if (menu.contains(e.target) || exportBtn === e.target || exportBtn?.contains(e.target)) inside = true;
             });
-            this._pillExportCloseHandler = (e) => {
-                if (!exportMenu.contains(e.target) && e.target !== exportBtn && !exportBtn.contains(e.target)) {
-                    this._closePillExportMenu();
-                }
-            };
-            setTimeout(() => document.addEventListener('click', this._pillExportCloseHandler), 0);
-        }
+            if (!inside) this._closePillExportMenus();
+        };
+        setTimeout(() => document.addEventListener('click', this._pillExportCloseHandler), 0);
     }
 
-    _closePillExportMenu() {
-        const exportMenu = this.modelPillSlotEl?.querySelector('#assistant-model-pill-export-menu');
-        if (exportMenu) exportMenu.classList.add('hidden');
+    _closePillExportMenus() {
+        this.modelPillSlotEl?.querySelectorAll('.assistant-model-pill-export-menu').forEach((m) => m.classList.add('hidden'));
     }
 
-    _clearModelPill() {
+    _removeModelPill(name) {
+        this.modelNames = (this.modelNames || []).filter((n) => n !== name);
+        if (this.props.displayNames) delete this.props.displayNames[name];
+        this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
+        this._updateModelPill();
+    }
+
+    _clearModelPills() {
         if (this._pillExportCloseHandler) {
             document.removeEventListener('click', this._pillExportCloseHandler);
             this._pillExportCloseHandler = null;
         }
-        this.modelName = '';
-        this.props.modelName = '';
-        this.props.display_name = '';
+        this.modelNames = [];
+        this.props.displayNames = {};
         if (this.modelPillSlotEl) this.modelPillSlotEl.innerHTML = '';
-        const importBtn = this.container?.querySelector('#assistant-import-model');
-        if (importBtn && !this._embedded) importBtn.style.display = '';
+        this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
     }
 
-    async _exportModelFromPill(format) {
-        if (!this.modelName) return;
+    async _exportModelFromPill(format, name) {
+        if (!name) return;
         try {
-            const blob = await ApiClient.exportModel(this.modelName, format);
+            const blob = await ApiClient.exportModel(name, format);
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            const rawName = this.props.display_name || this.modelName;
-            const displayName = rawName.includes('__')
-                ? rawName.split('__').slice(0, -1).join('__')
-                : rawName;
-            a.download = `${displayName || 'modele'}.${format}`;
+            a.download = `${this._displayNameForModel(name) || 'modele'}.${format}`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -844,7 +887,8 @@ class AssistantApp extends AppBase {
         }
 
         this.session = session;
-        this.modelName = data.model_name || this.modelName || '';
+        const loadedNames = this._normalizeModelNames(data.model_names ?? data.model_name);
+        if (loadedNames.length) this.modelNames = loadedNames;
         // Persist the display name on the instance props so tab title survives
         // across remounts and renames from the history panel.
         if (data.display_name) {
@@ -980,7 +1024,7 @@ class AssistantApp extends AppBase {
                 return;
             }
             if (kind === 'model_svg') {
-                this._updateCurrentSvgCard(event.svg, event.model_name || 'Visualisation du modèle');
+                this._updateCurrentSvgCard(event.svg, event.model_name || event.label || 'Visualisation du modèle');
                 return;
             }
             if (kind === 'loop_done') {
@@ -1926,7 +1970,7 @@ class AssistantApp extends AppBase {
             await ApiClient.streamAssistant(
                 sessionToSend,
                 text,
-                this.modelName,
+                this.modelNames,
                 this.selectedTags || [],
                 liveHandler,
                 { origin: this.origin }
@@ -2075,13 +2119,14 @@ class AssistantApp extends AppBase {
             // When the assistant is embedded next to the modeler, the visualization
             // lives in the modeler's main canvas instead.
             const linked = this._linkedModelerInstanceId || this.props.linkedModelerInstanceId;
-            if (linked && this.modelName) {
+            if (linked && this.modelNames?.length) {
                 const modeler = AppState.getInstance(linked);
                 if (modeler && typeof modeler._reloadSvgFromServer === 'function') {
                     modeler._reloadSvgFromServer();
                 }
             } else {
-                this._updateCurrentSvgCard(event.svg, event.label || 'Visualisation du modèle');
+                const label = event.model_name || event.label || 'Visualisation du modèle';
+                this._updateCurrentSvgCard(event.svg, label);
             }
             saveHtmlSnapshot();
             return;

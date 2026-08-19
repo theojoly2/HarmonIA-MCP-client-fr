@@ -172,21 +172,48 @@ class AssistantMCPClient:
     async def tools(self) -> list[ChatCompletionToolParam]:
         assert self.client is not None, "MCP client not initialized"
         tools = await self.client.list_tools()
+        allowed_model_names = self.state.get("allowed_model_names") or []
         exposed: list[ChatCompletionToolParam] = []
         for t in tools:
             exposed_name = _TOOL_ALIASES.get(t.name, t.name)
-            if exposed_name in EXPOSED_TOOLS:
-                exposed.append(
-                    ChatCompletionToolParam(
-                        type="function",
-                        function=FunctionDefinition(
-                            name=exposed_name,
-                            description=t.description or "",
-                            parameters=t.inputSchema,
-                        ),
-                    )
+            if exposed_name not in EXPOSED_TOOLS:
+                continue
+            schema: dict[str, Any] = dict(t.inputSchema) if t.inputSchema else {}
+            if exposed_name in {"add_class", "add_attribute", "add_connector"}:
+                schema = self._ensure_model_name_schema(schema, allowed_model_names)
+            exposed.append(
+                ChatCompletionToolParam(
+                    type="function",
+                    function=FunctionDefinition(
+                        name=exposed_name,
+                        description=t.description or "",
+                        parameters=schema,
+                    ),
                 )
+            )
         return exposed
+
+    @staticmethod
+    def _ensure_model_name_schema(schema: dict[str, Any], allowed_model_names: list[str]) -> dict[str, Any]:
+        """Inject a required model_name parameter into mutation tool schemas."""
+        schema = dict(schema)
+        properties: dict[str, Any] = dict(schema.get("properties") or {})
+        if "model_name" not in properties:
+            description = "Nom du modèle cible"
+            if allowed_model_names:
+                description += f". Valeurs autorisées : {', '.join(allowed_model_names)}"
+            properties["model_name"] = {
+                "type": "string",
+                "description": description,
+            }
+            if allowed_model_names:
+                properties["model_name"]["enum"] = allowed_model_names
+        schema["properties"] = properties
+        required: list[str] = list(schema.get("required") or [])
+        if "model_name" not in required:
+            required.append("model_name")
+        schema["required"] = required
+        return schema
 
     async def call_tool(
         self,
@@ -273,6 +300,13 @@ class AssistantMCPClient:
 
     async def _add_class(self, payload: dict[str, Any]) -> dict[str, Any]:
         arguments = payload.get("tool_arguments") or {}
+        allowed = self.state.get("allowed_model_names") or []
+        target_name = _normalize_str_arg(arguments.get("model_name"), default="")
+        if not target_name:
+            target_name = _normalize_str_arg(self.state.get("name"), default="")
+        if allowed and target_name not in allowed:
+            payload["tool_results"] = {"error": f"model_name '{target_name}' not in allowed models: {allowed}"}
+            return payload
         required = {"title", "definition", "usage_note"}
         missing = [arg for arg in required if not arguments.get(arg)]
         if missing:
@@ -280,7 +314,7 @@ class AssistantMCPClient:
             return payload
         call_args = {
             "user": _normalize_str_arg(self.state.get("user"), default=""),
-            "name": _normalize_str_arg(self.state.get("name"), default=""),
+            "name": target_name,
             "package": _normalize_str_arg(self.state.get("package", ""), default=""),
             "uri": _normalize_str_arg(arguments.get("uri"), default=""),
             "title": _normalize_str_arg(arguments["title"]),
@@ -294,6 +328,13 @@ class AssistantMCPClient:
 
     async def _add_attribute(self, payload: dict[str, Any]) -> dict[str, Any]:
         arguments = payload.get("tool_arguments") or {}
+        allowed = self.state.get("allowed_model_names") or []
+        target_name = _normalize_str_arg(arguments.get("model_name"), default="")
+        if not target_name:
+            target_name = _normalize_str_arg(self.state.get("name"), default="")
+        if allowed and target_name not in allowed:
+            payload["tool_results"] = {"error": f"model_name '{target_name}' not in allowed models: {allowed}"}
+            return payload
         required = {"class_name", "attr_label", "attr_definition", "attr_uri"}
         missing = [arg for arg in required if not arguments.get(arg)]
         if missing:
@@ -301,7 +342,7 @@ class AssistantMCPClient:
             return payload
         call_args = {
             "user": _normalize_str_arg(self.state.get("user"), default=""),
-            "name": _normalize_str_arg(self.state.get("name"), default=""),
+            "name": target_name,
             "class_name": _normalize_str_arg(arguments["class_name"]),
             "attr_label": _normalize_str_arg(arguments["attr_label"]),
             "attr_definition": _normalize_str_arg(arguments["attr_definition"]),
@@ -318,6 +359,13 @@ class AssistantMCPClient:
 
     async def _add_connector(self, payload: dict[str, Any]) -> dict[str, Any]:
         arguments = payload.get("tool_arguments") or {}
+        allowed = self.state.get("allowed_model_names") or []
+        target_name = _normalize_str_arg(arguments.get("model_name"), default="")
+        if not target_name:
+            target_name = _normalize_str_arg(self.state.get("name"), default="")
+        if allowed and target_name not in allowed:
+            payload["tool_results"] = {"error": f"model_name '{target_name}' not in allowed models: {allowed}"}
+            return payload
         required = {"source_name", "target_name", "rel_label", "rel_definition", "rel_uri"}
         missing = [arg for arg in required if not arguments.get(arg)]
         if missing:
@@ -325,7 +373,7 @@ class AssistantMCPClient:
             return payload
         call_args = {
             "user": _normalize_str_arg(self.state.get("user"), default=""),
-            "name": _normalize_str_arg(self.state.get("name"), default=""),
+            "name": target_name,
             "source_name": _normalize_str_arg(arguments["source_name"]),
             "target_name": _normalize_str_arg(arguments["target_name"]),
             "rel_label": _normalize_str_arg(arguments["rel_label"]),
@@ -465,11 +513,17 @@ class AssistantMCPClient:
         `model_svg` SSE event that the front-end renders as the live model card.
         """
         arguments = payload.get("tool_arguments") or {}
+        allowed = self.state.get("allowed_model_names") or []
+        target_name = _normalize_str_arg(arguments.get("model_name", ""), default="")
+        if not target_name and allowed:
+            target_name = allowed[0]
+        elif not target_name:
+            target_name = _normalize_str_arg(self.state.get("name"), default="")
         payload["tool_arguments"] = {
-            "model_name": _normalize_str_arg(arguments.get("model_name", self.state.get("name")), default=""),
+            "model_name": target_name,
             "reason": _normalize_str_arg(arguments.get("reason", ""), default=""),
         }
-        payload["tool_results"] = {"ok": True, "display": True}
+        payload["tool_results"] = {"ok": True, "display": True, "model_name": target_name}
         return payload
 
     # ------------------------------------------------------------------

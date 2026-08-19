@@ -62,6 +62,7 @@ class AssistantHistory:
         self.retained_retrieve_documents: list[dict[str, Any]] = []
         self.last_tool_observations_compact: list[dict[str, Any]] = []
         self.assistant_model_name: str = ""
+        self.assistant_model_names: list[str] = []
         self.display_name: str = ""
 
         self.display_dir = BASE_DIR / user
@@ -332,6 +333,7 @@ class AssistantHistory:
                     "last_tool_observations_compact": self.last_tool_observations_compact,
                     "display_events": self.display_events,
                     "assistant_model_name": self.assistant_model_name,
+                    "assistant_model_names": self.assistant_model_names,
                     "display_name": self.display_name,
                     "origin": self.origin,
                 },
@@ -364,6 +366,7 @@ class AssistantHistory:
                 self.last_tool_observations_compact = data.get("last_tool_observations_compact", [])
                 self.display_events = data.get("display_events", [])
                 self.assistant_model_name = data.get("assistant_model_name", "")
+                self.assistant_model_names = data.get("assistant_model_names", []) or ([] if not self.assistant_model_name else [self.assistant_model_name])
                 self.display_name = data.get("display_name", "")
                 self.origin = data.get("origin", self.origin)
         if not self.system_messages:
@@ -396,6 +399,7 @@ class AssistantHistory:
                 self.last_tool_observations_compact = data.get("last_tool_observations_compact", [])
                 self.display_events = data.get("display_events", [])
                 self.assistant_model_name = data.get("assistant_model_name", "")
+                self.assistant_model_names = data.get("assistant_model_names", []) or ([] if not self.assistant_model_name else [self.assistant_model_name])
                 self.display_name = data.get("display_name", "")
                 self.origin = data.get("origin", self.origin)
         if not self.system_messages:

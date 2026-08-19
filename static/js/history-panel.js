@@ -169,8 +169,11 @@ class HistoryPanel {
             li.dataset.itemName = storedName;
             li.dataset.itemKind = item.kind;
             if (isSearch) li.dataset.searchId = item.id;
-            if (isAssistant || isModelerAssistant) li.dataset.modelName = item.model_name || "";
-            if (isAssistant || isModelerAssistant) li.dataset.origin = item.origin || (isModelerAssistant ? "modeler" : "assistant");
+            if (isAssistant || isModelerAssistant) {
+                li.dataset.modelName = item.model_name || "";
+                li.dataset.modelNames = Array.isArray(item.model_names) ? item.model_names.join(",") : "";
+                li.dataset.origin = item.origin || (isModelerAssistant ? "modeler" : "assistant");
+            }
             if (!isSearch && !isAssistant && !isModelerAssistant) {
                 li.dataset.assistantSession = item.assistant_session || "";
                 li.dataset.assistantDisplayName = item.assistant_display_name || "";
@@ -192,8 +195,8 @@ class HistoryPanel {
             li.addEventListener("click", (e) => {
                 if (e.target.closest(".history-action-more, .history-menu")) return;
                 if (isSearch) this._runSearch(storedName, (item.tags || "").split(",").filter(Boolean), item.id);
-                else if (isAssistant) this._openAssistant(storedName, item.model_name || "", "assistant");
-                else if (isModelerAssistant) this._openAssistant(storedName, item.model_name || "", "modeler");
+                else if (isAssistant) this._openAssistant(storedName, item.model_names || (item.model_name ? [item.model_name] : []), "assistant");
+                else if (isModelerAssistant) this._openAssistant(storedName, item.model_names || (item.model_name ? [item.model_name] : []), "modeler");
                 else this._openModel(storedName);
             });
             const moreBtn = li.querySelector(".history-action-more");
@@ -553,9 +556,10 @@ class HistoryPanel {
         }
     }
 
-    async _openAssistant(sessionName, modelName, origin = "assistant") {
+    async _openAssistant(sessionName, modelNames, origin = "assistant") {
         this.close();
         try {
+            const names = Array.isArray(modelNames) ? modelNames : (modelNames ? [modelNames] : []);
             // Touch the session on the backend so it moves to the top of the
             // history list even when it is just reopened without a new message.
             await ApiClient.touchAssistantSession(sessionName, origin);
@@ -566,7 +570,8 @@ class HistoryPanel {
             const assistantInstance = AppState.createInstance("assistant", {
                 mode: "tab",
                 session: sessionName,
-                modelName: modelName,
+                modelNames: names,
+                modelName: names[0] || "",
                 origin: origin,
                 fromHistory: true,
             });
