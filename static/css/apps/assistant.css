@@ -883,6 +883,10 @@
     background: #f9fafb;
 }
 
+.assistant-app.assistant-embedded #assistant-model-pill-slot .assistant-model-pill span {
+    max-width: 10rem;
+}
+
 /* === Model pills in the input toolbar === */
 #assistant-model-pill-slot {
     display: flex;
