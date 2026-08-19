@@ -155,9 +155,14 @@ class AssistantApp extends AppBase {
         if (this._embedded) {
             if (this.embeddedIntroEl) {
                 this.embeddedIntroEl.innerHTML = `
-                    <div class="assistant-bubble assistant-bubble-assistant mb-4">
+                    <div class="assistant-bubble assistant-bubble-assistant mb-6">
                         <div class="assistant-bubble-content markdown-body">
                             Je peux vous aider à explorer ou modifier le modèle affiché dans le canvas. Posez-moi une question ou demandez une modification.
+                        </div>
+                        <div class="ai-avatar-row flex items-center gap-2">
+                            <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic" data-hidden="false">
+                                ${this._sparkleSvg()}
+                            </div>
                         </div>
                     </div>
                 `;
