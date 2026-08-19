@@ -569,33 +569,21 @@ class AssistantApp extends AppBase {
             const inputHeight = inputRect.height;
             const inputMarginTop = parseFloat(getComputedStyle(slot).marginTop) || 0;
             const contentHeight = titleHeight + subtitleMarginTop + subtitleHeight + subtitleMarginBottom + inputMarginTop + inputHeight;
-            const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-            const available = Math.max(viewportHeight, contentHeight);
+            // Center the content block inside the visible app container, just like
+            // SearchApp and ModelerApp do. Fall back to the viewport only if the
+            // container has not been laid out yet.
+            const containerHeight = containerRect.height;
+            const available = containerHeight > 200 ? Math.max(containerHeight, contentHeight) : Math.max(window.visualViewport ? window.visualViewport.height : window.innerHeight, contentHeight);
             const offset = Math.max(0, (available - contentHeight) / 2);
+
+            // First apply the padding so the slot has its final position in the
+            // document flow, then read that position to place the fixed input.
             this.welcomeEl.style.paddingTop = `${offset}px`;
             this.welcomeEl.style.paddingBottom = '0';
             void this.welcomeEl.offsetHeight;
-
-            // Compute the fixed input top position mathematically from the
-            // welcome padding and the content heights. Use the container's
-            // viewport-relative top as the origin for the fixed element.
-            const topY = offset + titleHeight + subtitleMarginTop + subtitleHeight + subtitleMarginBottom + inputMarginTop;
+            const slotRect = slot ? slot.getBoundingClientRect() : { top: 0 };
+            const topY = slotRect.top;
             this.inputArea.style.setProperty('--assistant-input-top', `${topY}px`);
-
-            console.log('[Assistant home]', {
-                caller: skipTransition ? 'snap' : 'animate',
-                viewportHeight,
-                titleHeight,
-                subtitleHeight,
-                inputHeight,
-                contentHeight,
-                offset,
-                topY,
-                paddingTop: this.welcomeEl.style.paddingTop,
-                inputTopVar: getComputedStyle(this.inputArea).getPropertyValue('--assistant-input-top'),
-                inputRectTop: inputRect.top,
-                containerTop: containerRect.top,
-            });
         } else if (chatMode) {
             // In chat mode the title is sticky at the top and the input sits at
             // the bottom of the visible window, preserving its bottom padding.
