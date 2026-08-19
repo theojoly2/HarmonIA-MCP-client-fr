@@ -595,6 +595,10 @@ class HistoryPanel {
                 inst.query = query;
                 inst.selectedTags = tags;
                 inst._skipHistorySave = true;
+                // Update the visible input so the user sees the restored query
+                // instead of whatever was previously typed in the search box.
+                const input = inst.container?.querySelector('#search-input');
+                if (input) input.value = query;
                 if (existingSearch.mode === "tab") {
                     await windowManager.switchTab(existingSearch.instanceId);
                 } else if (existingSearch.mode === "float") {
