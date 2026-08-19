@@ -531,6 +531,7 @@ class AssistantApp extends AppBase {
         }
 
         if (!welcomeTop) {
+            // Center the whole title+subtitle+input block vertically in the visible area.
             // Force every ancestor up to #app-shell to reflow so the container's
             // h-full height is resolved before we measure it (first paint fix).
             let ancestor = this.container;
@@ -542,32 +543,39 @@ class AssistantApp extends AppBase {
                 guard++;
             }
 
-            // Reset the fixed input position so we don't measure stale chat-mode
-            // geometry when returning to the welcome screen.
-            this.inputArea.style.setProperty('--assistant-input-top', '50%');
-            this.inputArea.style.top = '50%';
-            void this.inputArea.offsetHeight;
-
-            const contentHeight = this._measureWelcomeContentHeight();
-            const available = Math.max(this.container.clientHeight, contentHeight);
+            const title = this.welcomeEl.querySelector('.assistant-welcome-title');
+            const subtitle = this.welcomeEl.querySelector('.assistant-welcome-subtitle');
+            const titleRect = title ? title.getBoundingClientRect() : { top: 0, height: 0 };
+            const subtitleRect = subtitle ? subtitle.getBoundingClientRect() : { top: titleRect.bottom, height: 0 };
+            const inputRect = this.inputArea.getBoundingClientRect();
+            const containerRect = this.container.getBoundingClientRect();
+            const titleHeight = titleRect.height;
+            const subtitleHeight = subtitleRect.height;
+            const subtitleMarginTop = parseFloat(getComputedStyle(subtitle).marginTop) || 0;
+            const subtitleMarginBottom = parseFloat(getComputedStyle(subtitle).marginBottom) || 0;
+            const inputHeight = inputRect.height;
+            const inputMarginTop = parseFloat(getComputedStyle(this.welcomeInputSlot).marginTop) || 0;
+            const contentHeight = titleHeight + subtitleMarginTop + subtitleHeight + subtitleMarginBottom + inputMarginTop + inputHeight;
+            const availableHeight = containerRect.height > 200 ? containerRect.height : Math.max(containerRect.height, window.innerHeight - containerRect.top);
+            const available = Math.max(availableHeight, contentHeight);
             const offset = Math.max(0, (available - contentHeight) / 2);
             this.welcomeEl.style.paddingTop = `${offset}px`;
             this.welcomeEl.style.paddingBottom = '0';
 
             // Position the fixed input right below the welcome content block.
-            const containerRect = this.container.getBoundingClientRect();
-            const topY = containerRect.top + offset + contentHeight;
+            const topY = containerRect.top + offset + titleHeight + subtitleMarginTop + subtitleHeight + subtitleMarginBottom + inputMarginTop;
             this.inputArea.style.setProperty('--assistant-input-top', `${topY}px`);
-            this.inputArea.style.top = '';
         } else if (chatMode) {
+            // In chat mode the title is sticky at the top and the input sits at
+            // the bottom of the visible window, preserving its bottom padding.
             this.welcomeEl.style.paddingTop = '';
             this.welcomeEl.style.paddingBottom = '';
             const inputHeight = this.inputArea.getBoundingClientRect().height;
             const bottomPadding = 0.35 * parseFloat(getComputedStyle(document.documentElement).fontSize || 16);
             const topY = window.innerHeight - inputHeight - bottomPadding;
             this.inputArea.style.setProperty('--assistant-input-top', `${topY}px`);
-            this.inputArea.style.top = '';
         } else {
+            // Fallback: clear explicit padding if neither state is fully active.
             this.welcomeEl.style.paddingTop = '';
             this.welcomeEl.style.paddingBottom = '';
         }
