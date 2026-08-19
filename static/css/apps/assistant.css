@@ -888,7 +888,7 @@
     display: flex;
     flex-wrap: nowrap;
     gap: 0.35rem;
-    max-width: 14rem;
+    max-width: 28rem;
     overflow: hidden;
 }
 
@@ -912,7 +912,7 @@
 
 #assistant-model-pill-slot .assistant-model-pill span {
     display: inline-block;
-    max-width: 6rem;
+    max-width: 12rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
