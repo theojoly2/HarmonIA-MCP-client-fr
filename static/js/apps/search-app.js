@@ -42,7 +42,10 @@ class SearchApp extends AppBase {
         // switching back to the tab should restore the already-revealed tags.
         const showTags = !this._introAnimationDone && this._firstTagAnimation;
         if (showTags) {
+            // Mark the intro as consumed immediately so that a tab switch before
+            // the animation/reveal finishes does not re-trigger it later.
             this._firstTagAnimation = false;
+            this._introAnimationDone = true;
             this._introAnimating = true;
             this._tagsReady = false;
             this._layoutReady = false;
@@ -292,9 +295,6 @@ class SearchApp extends AppBase {
                 el.style.animationDelay = (i * 0.18) + 's';
             });
         }
-        // Mark the intro animation as finished so it does not run again when
-        // the user switches back to this tab.
-        this._introAnimationDone = true;
         // Re-enable resize observer after the intro animation finishes.
         setTimeout(() => {
             this._introAnimating = false;
