@@ -567,11 +567,11 @@ class AssistantApp extends AppBase {
             const inputHeight = inputRect.height;
             const inputMarginTop = parseFloat(getComputedStyle(slot).marginTop) || 0;
             const contentHeight = titleHeight + subtitleMarginTop + subtitleHeight + subtitleMarginBottom + inputMarginTop + inputHeight;
-            // Center the content block inside the visible viewport. Using the
-            // viewport guarantees the same perceived center on first load, tab
-            // switch and reset even if the container is still settling.
-            const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-            const available = Math.max(viewportHeight, contentHeight);
+            // Center the content block inside the visible app container. This is
+            // the same reference frame used by SearchApp and ModelerApp and gives
+            // a consistent perceived center on first load, tab switch and reset.
+            const containerHeight = containerRect.height;
+            const available = containerHeight > 200 ? Math.max(containerHeight, contentHeight) : Math.max(window.visualViewport ? window.visualViewport.height : window.innerHeight, contentHeight);
             const offset = Math.max(0, (available - contentHeight) / 2);
             this.welcomeEl.style.paddingTop = `${offset}px`;
             this.welcomeEl.style.paddingBottom = '0';
