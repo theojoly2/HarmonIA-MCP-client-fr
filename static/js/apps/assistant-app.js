@@ -1815,7 +1815,10 @@ class AssistantApp extends AppBase {
     }
 
     _isNearBottom() {
-        return !!this._sentinelVisible;
+        const el = this.chatEl;
+        if (!el) return true;
+        const threshold = 56;
+        return (el.scrollHeight - el.scrollTop - el.clientHeight) < threshold;
     }
 
     async _send(text) {
