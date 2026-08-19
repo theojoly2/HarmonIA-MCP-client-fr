@@ -888,8 +888,12 @@
     display: flex;
     flex-wrap: nowrap;
     gap: 0.5rem;
-    max-width: 28rem;
+    max-width: 22rem;
     overflow: visible;
+}
+
+#assistant-model-pill-slot .assistant-model-pill span {
+    max-width: 8rem;
 }
 
 .assistant-sources-header {
