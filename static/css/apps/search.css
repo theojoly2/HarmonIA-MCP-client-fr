@@ -1,6 +1,7 @@
 /* === SearchApp styles === */
 .search-app { background: #ffffff; scrollbar-gutter: stable both-edges; }
 .search-app.home-mode { overflow: hidden; }
+.search-app:not(.home-mode) { overflow-y: auto; }
 #search-wrapper-inner {
     margin: 0 auto;
     min-height: 100%;
