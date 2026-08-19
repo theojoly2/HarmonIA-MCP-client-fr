@@ -23,7 +23,6 @@ class SearchApp extends AppBase {
         this._skipNextTransition = false;
         this._firstTagAnimation = true;
         this._introAnimating = false;
-        this._introAnimationDone = false;
         this._skipHistorySave = !!props.fromHistory;
     }
 
@@ -38,14 +37,13 @@ class SearchApp extends AppBase {
             return;
         }
         this.container = container;
-        // The tag intro animation runs only once per instance. After that,
-        // switching back to the tab should restore the already-revealed tags.
-        const showTags = !this._introAnimationDone && this._firstTagAnimation;
+        // The tag intro animation runs once per browser session. We track this
+        // in sessionStorage so tab switches and state restores don't re-trigger
+        // the landing animation.
+        const introPlayed = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('searchIntroPlayed') === '1';
+        const showTags = this._firstTagAnimation && !introPlayed;
         if (showTags) {
-            // Mark the intro as consumed immediately so that a tab switch before
-            // the animation/reveal finishes does not re-trigger it later.
             this._firstTagAnimation = false;
-            this._introAnimationDone = true;
             this._introAnimating = true;
             this._tagsReady = false;
             this._layoutReady = false;
@@ -295,6 +293,11 @@ class SearchApp extends AppBase {
                 el.style.animationDelay = (i * 0.18) + 's';
             });
         }
+        // Mark the intro animation as played for this browser session so it
+        // doesn't run again on tab switch.
+        if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.setItem('searchIntroPlayed', '1');
+        }
         // Re-enable resize observer after the intro animation finishes.
         setTimeout(() => {
             this._introAnimating = false;
@@ -517,7 +520,6 @@ class SearchApp extends AppBase {
             selectedTags: this.selectedTags,
             resultsHtml: this.resultsHtml,
             tagsHtml: this.tagsHtml,
-            introAnimationDone: this._introAnimationDone,
         };
     }
 
@@ -537,10 +539,6 @@ class SearchApp extends AppBase {
         this.selectedTags = newSelectedTags;
         this.resultsHtml = newResultsHtml;
         this.tagsHtml = newTagsHtml;
-        // Persist the intro-animation flag across tab switches.
-        if (state.introAnimationDone !== undefined) {
-            this._introAnimationDone = !!state.introAnimationDone;
-        }
         if (!this.container) return;
         // If the live DOM already shows the right content, don't rebuild it.
         const liveMatchesState = !changed || (this.container.querySelector('#search-wrapper-inner')
