@@ -531,14 +531,11 @@ class AssistantApp extends AppBase {
             return;
         }
 
-        // Same pattern as SearchApp/ModelerApp: disable the animated property
-        // inline before measuring, then restore after the value is applied.
-        const welcomeWas = this.welcomeEl.style.transition;
+        // The input area is the only element with a vertical transition in
+        // welcome mode. We disable it inline when snapping so measurements don't
+        // read mid-animation values, then restore it.
         const inputWas = this.inputArea.style.transition;
-        if (skipTransition) {
-            this.welcomeEl.style.transition = 'none';
-            this.inputArea.style.transition = 'none';
-        }
+        if (skipTransition) this.inputArea.style.transition = 'none';
 
         if (!welcomeTop) {
             // Center the whole title+subtitle+input block vertically in the visible area.
@@ -568,17 +565,15 @@ class AssistantApp extends AppBase {
             const inputMarginTop = parseFloat(getComputedStyle(slot).marginTop) || 0;
             const contentHeight = titleHeight + subtitleMarginTop + subtitleHeight + subtitleMarginBottom + inputMarginTop + inputHeight;
             // Center the content block inside the visible app container. This is
-            // the same reference frame used by SearchApp and ModelerApp and gives
-            // a consistent perceived center on first load, tab switch and reset.
+            // the same reference frame used by SearchApp and ModelerApp.
             const containerHeight = containerRect.height;
             const available = containerHeight > 200 ? Math.max(containerHeight, contentHeight) : Math.max(window.visualViewport ? window.visualViewport.height : window.innerHeight, contentHeight);
             const offset = Math.max(0, (available - contentHeight) / 2);
             this.welcomeEl.style.paddingTop = `${offset}px`;
             this.welcomeEl.style.paddingBottom = '0';
 
-            // The input area is fixed, so its top origin is the viewport. Compute
-            // the position from the container's viewport offset, the welcome
-            // padding and the measured content heights.
+            // The input area is fixed, so its top origin is the viewport. Add the
+            // container's viewport offset to the computed flow position.
             const topY = containerRect.top + offset + titleHeight + subtitleMarginTop + subtitleHeight + subtitleMarginBottom + inputMarginTop;
             this.inputArea.style.setProperty('--assistant-input-top', `${topY}px`);
         } else if (chatMode) {
@@ -597,11 +592,8 @@ class AssistantApp extends AppBase {
         }
 
         if (skipTransition) {
-            void this.welcomeEl.offsetHeight;
             void this.inputArea.offsetHeight;
-            this.welcomeEl.style.transition = welcomeWas;
             this.inputArea.style.transition = inputWas;
-            void this.welcomeEl.offsetHeight;
             void this.inputArea.offsetHeight;
         }
     }
