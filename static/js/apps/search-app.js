@@ -242,7 +242,7 @@ class SearchApp extends AppBase {
             } else if (action === 'chat') {
                 EventBus.emit('open-chat', { documentId, name });
             } else if (action === 'add-to-assistant') {
-                this._toggleAssistantModel(documentId, filename, extension);
+                this._toggleAssistantModel(docId, filename, extension);
             }
         });
 
@@ -577,22 +577,22 @@ class SearchApp extends AppBase {
         this.render(this.container);
     }
 
-    _toggleAssistantModel(documentId, filename, extension) {
-        if (!documentId || !filename) return;
-        const existingIndex = this.selectedAssistantModels.findIndex(m => m.documentId === documentId);
+    _toggleAssistantModel(docId, filename, extension) {
+        if (!docId || !filename) return;
+        const existingIndex = this.selectedAssistantModels.findIndex(m => m.docId === docId);
         if (existingIndex >= 0) {
             this.selectedAssistantModels.splice(existingIndex, 1);
         } else {
             if (this.selectedAssistantModels.length >= this.maxAssistantModels) return;
-            this.selectedAssistantModels.push({ documentId, filename, extension });
+            this.selectedAssistantModels.push({ docId, filename, extension });
         }
         this._renderAssistantModelBar();
         this._updateAddModelButtons();
         this._saveState();
     }
 
-    _removeAssistantModel(documentId) {
-        this.selectedAssistantModels = this.selectedAssistantModels.filter(m => m.documentId !== documentId);
+    _removeAssistantModel(docId) {
+        this.selectedAssistantModels = this.selectedAssistantModels.filter(m => m.docId !== docId);
         this._renderAssistantModelBar();
         this._updateAddModelButtons();
         this._saveState();
@@ -638,8 +638,8 @@ class SearchApp extends AppBase {
         if (!this.container) return;
         const atMax = this.selectedAssistantModels.length >= this.maxAssistantModels;
         this.container.querySelectorAll('[data-action="add-to-assistant"]').forEach(btn => {
-            const documentId = btn.dataset.documentId;
-            const selected = this.selectedAssistantModels.some(m => m.documentId === documentId);
+            const docId = btn.dataset.docId;
+            const selected = this.selectedAssistantModels.some(m => m.docId === docId);
             btn.disabled = atMax && !selected;
             btn.classList.toggle('search-add-model-selected', selected);
             btn.style.opacity = (atMax && !selected) ? '0.4' : '';
@@ -657,7 +657,7 @@ class SearchApp extends AppBase {
         const imported = [];
         for (const item of this.selectedAssistantModels) {
             try {
-                const result = await ApiClient.importDocumentAsAssistantModel(item.documentId, 'assistant');
+                const result = await ApiClient.importDocumentAsAssistantModel(item.docId, 'assistant');
                 if (result?.name) {
                     imported.push({ name: result.name, display_name: result.display_name || item.filename });
                 }

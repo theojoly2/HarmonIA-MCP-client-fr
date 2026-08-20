@@ -104,7 +104,7 @@ def render_results(results_data: list, query: str = "") -> dict:
             is_pdf = ext == ".pdf"
             importable_extensions = {".xml", ".xmi", ".ttl", ".json", ".jsonld", ".sql", ".txt", ".html", ".htm", ".csv"}
             can_add_to_assistant = ext in importable_extensions
-            add_button = f"""<button data-action="add-to-assistant" data-document-id="{document_id}" data-filename="{filename}" data-extension="{ext}" class="magic-btn search-add-model-btn flex items-center justify-center p-1.5 rounded-full bg-gray-100 hover:bg-white text-gray-500 hover:text-black focus:outline-none transition-colors" title="Ajouter au contexte de l'Assistant">
+            add_button = f"""<button data-action="add-to-assistant" data-doc-id="{chunk0_id}" data-filename="{filename}" data-extension="{ext}" class="magic-btn search-add-model-btn flex items-center justify-center p-1.5 rounded-full bg-gray-100 hover:bg-white text-gray-500 hover:text-black focus:outline-none transition-colors" title="Ajouter au contexte de l'Assistant">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
                         </button>""" if can_add_to_assistant else ""
             preview_button = "" if is_pdf else f"""<button data-action="preview" data-doc-id="{chunk0_id}" data-document-id="{document_id}" data-name="{safe_filename}" class="magic-btn flex items-center justify-center p-1.5 rounded-full bg-gray-100 hover:bg-white text-gray-500 hover:text-black focus:outline-none transition-colors" title="Aperçu rapide">

@@ -78,12 +78,12 @@ const ApiClient = (() => {
         return res.json();
     }
 
-    async function importDocumentAsAssistantModel(documentId, origin = "assistant") {
+    async function importDocumentAsAssistantModel(docId, origin = "assistant") {
         const res = await fetch(apiUrl("assistant/import-from-document"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "same-origin",
-            body: JSON.stringify({ document_id: documentId, origin }),
+            body: JSON.stringify({ doc_id: docId, origin }),
         });
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));

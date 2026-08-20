@@ -54,7 +54,7 @@ class AssistantSessionRequest(BaseModel):
 
 
 class ImportFromDocumentRequest(BaseModel):
-    document_id: str
+    doc_id: str
     origin: str = "assistant"
 
 
@@ -966,7 +966,7 @@ async def import_assistant_model_from_document(
     if session_origin not in {"assistant", "modeler"}:
         session_origin = "assistant"
 
-    file_data = await fetch_document_file(request.document_id)
+    file_data = await fetch_document_file(request.doc_id)
     if not file_data.get("success"):
         raise HTTPException(status_code=404, detail=file_data.get("error", "Document introuvable"))
 
