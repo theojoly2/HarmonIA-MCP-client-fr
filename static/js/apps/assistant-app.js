@@ -2005,112 +2005,83 @@ class AssistantApp extends AppBase {
             }
         }, 1200);
 
-        let currentBubble = null;
-        let currentText = this._currentStreamingText || '';
-        this._currentStreamingText = currentText;
+        // ChatApp-style streaming: accumulate the full response, then display it
+        // character-by-character with live markdown reparsing.
+        let fullResponse = '';
+        let displayedText = '';
+        let streamBuffer = '';
+        let currentBubbleContent = null;
+        let typewriterInterval = null;
+
+        const startTypewriter = () => {
+            if (typewriterInterval) return;
+            typewriterInterval = setInterval(() => {
+                if (streamBuffer.length === 0) return;
+                const chunkSize = Math.min(1 + Math.floor(Math.random() * 4), streamBuffer.length);
+                displayedText += streamBuffer.slice(0, chunkSize);
+                streamBuffer = streamBuffer.slice(chunkSize);
+                if (currentBubbleContent) {
+                    currentBubbleContent.innerHTML = this._markdown(displayedText, false);
+                }
+                this._adjustChatPadding();
+                this._throttledScrollToBottom();
+            }, 20);
+        };
+
+        const stopTypewriter = () => {
+            if (typewriterInterval) {
+                clearInterval(typewriterInterval);
+                typewriterInterval = null;
+            }
+        };
+
+        const flushTypewriter = () => {
+            stopTypewriter();
+            if (streamBuffer.length > 0) {
+                displayedText += streamBuffer;
+                streamBuffer = '';
+            }
+            if (currentBubbleContent) {
+                currentBubbleContent.innerHTML = this._markdown(displayedText, false);
+            }
+        };
+
+        const resetTypewriter = () => {
+            stopTypewriter();
+            displayedText = '';
+            streamBuffer = '';
+            currentBubbleContent = null;
+        };
+
+        const appendToStreamBuffer = (text) => {
+            streamBuffer += text;
+        };
+
+        const ensureAssistantTextBubble = () => {
+            if (currentBubbleContent) return currentBubbleContent;
+            this._removeThinkingPlaceholder();
+            this._closeAssistantBubble();
+            const wrapper = document.createElement('div');
+            wrapper.className = 'assistant-bubble assistant-bubble-assistant mb-6';
+            wrapper.dataset.role = 'assistant';
+            wrapper.dataset.active = 'true';
+            wrapper.innerHTML = `
+                <div class="assistant-bubble-content markdown-body"></div>
+                <div class="ai-avatar-row flex items-center gap-2">
+                    <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic" data-hidden="false">
+                        ${this._sparkleSvg()}
+                    </div>
+                </div>
+            `;
+            this.messagesEl.appendChild(wrapper);
+            this._scrollToBottom(true);
+            currentBubbleContent = wrapper.querySelector('.assistant-bubble-content');
+            return currentBubbleContent;
+        };
 
         // Abort controller lets the client survive long waits and prevents duplicate streams.
         this._streamAbortController?.abort();
         this._streamAbortController = new AbortController();
-
-        // Streaming markdown renderer: tokens appear as they arrive from the LLM,
-        // but the markdown is re-rendered only when safe (no unclosed markdown
-        // markers) and at "structure breakpoints" so the visible formatting stays
-        // mostly up-to-date without freezing the UI. Tokens are appended as raw text
-        // between two re-renders, which prevents the duplication seen when mixing
-        // plain-text DOM nodes with full HTML replacement.
-        const STRUCTURE_RE = /[\W]/;
-        const MIN_REPARSE_MS = 20;
-        const MAX_PLAIN_MS = 80;
-        let lastReparsedAt = 0;
-        let pendingPlain = '';
-        let lastPlainAt = 0;
-
-        const hasUnclosedMarkdown = (txt) => {
-            // Count backticks: odd means an inline code span is open.
-            const backticks = (txt.match(/`/g) || []).length;
-            if (backticks % 2 !== 0) return true;
-            // Count double-asterisks (bold). Odd count means an opener/closer is pending.
-            const doubleStars = (txt.match(/\*\*/g) || []).length;
-            if (doubleStars % 2 !== 0) return true;
-            // Single underscores/asterisks used as emphasis markers. Approximation: if the
-            // total count of unescaped emphasis markers is odd, an emphasis span is open.
-            const emphasis = (txt.match(/(^|[^\\])[_*](?=[^\s]|$)/g) || []).length;
-            if (emphasis % 2 !== 0) return true;
-            return false;
-        };
-
-        const updateCurrentText = (chunk) => {
-            currentText += chunk;
-            this._currentStreamingText = currentText;
-        };
-
-        const typewriter = this._createTypewriter((chunk) => {
-            updateCurrentText(chunk);
-
-            if (!currentBubble) {
-                this._removeThinkingPlaceholder();
-                this._closeAssistantBubble();
-                currentBubble = this._ensureAssistantBubble();
-                currentBubble.innerHTML = '';
-                lastReparsedAt = performance.now();
-                lastPlainAt = lastReparsedAt;
-            }
-
-            const now = performance.now();
-            const safeToRender = !hasUnclosedMarkdown(currentText);
-            const tooLongPlain = (now - lastPlainAt > MAX_PLAIN_MS) && (now - lastReparsedAt > MIN_REPARSE_MS);
-            const shouldReparse = safeToRender && tooLongPlain && (now - lastReparsedAt > MIN_REPARSE_MS);
-
-            if (shouldReparse) {
-                currentBubble.innerHTML = this._markdown(currentText, false);
-                lastReparsedAt = now;
-                lastPlainAt = now;
-                this._throttledReflow();
-                this._adjustChatPadding();
-                this._throttledScrollToBottom();
-            } else {
-                // Character-by-character fast path: append the incoming chunk as
-                // plain text so the typewriter effect is visible, then reparse the
-                // markdown at safe breakpoints.
-                const tail = currentBubble.lastChild;
-                if (tail && tail.nodeType === Node.TEXT_NODE) {
-                    tail.textContent += chunk;
-                } else {
-                    currentBubble.appendChild(document.createTextNode(chunk));
-                }
-                lastPlainAt = now;
-                this._throttledReflow();
-                this._adjustChatPadding();
-                this._throttledScrollToBottom();
-            }
-        });
-
-        const finalizeText = async () => {
-            typewriter.flush();
-            if (currentBubble) {
-                // Yield to the browser so the progress-done transition / last chunks
-                // are painted before the final markdown parse.
-                await new Promise((resolve) => requestAnimationFrame(resolve));
-                currentBubble.innerHTML = this._markdown(currentText, false);
-                this._forceReflow();
-                this._resetChatPadding();
-            }
-        };
-
-        const resetBubble = () => {
-            typewriter.flush();
-            if (currentBubble) {
-                // Convert the streaming view into the final markdown render before
-                // closing this bubble so the next bubble starts clean and formatted.
-                currentBubble.innerHTML = this._markdown(currentText, false);
-            }
-            pendingPlain = '';
-            currentBubble = null;
-            currentText = '';
-            this._currentStreamingText = '';
-            this._closeAssistantBubble();
-        };
 
         const saveHtmlSnapshot = () => {
             if (this.messagesEl) {
@@ -2131,26 +2102,10 @@ class AssistantApp extends AppBase {
             const eventsToReplay = this._pendingEvents.slice(this._lastRenderedEventIndex + 1);
             this._lastRenderedEventIndex = this._pendingEvents.length - 1;
             for (const ev of eventsToReplay) {
-                this._processEvent(ev, { typewriter, resetBubble, finalizeText, saveHtmlSnapshot, placeholderRef: { value: placeholder } });
+                this._processEvent(ev, { startTypewriter, stopTypewriter, flushTypewriter, resetTypewriter, ensureAssistantTextBubble, appendToStreamBuffer, saveHtmlSnapshot, placeholderRef: { value: placeholder } });
             }
 
-            this._processEvent(event, { typewriter, resetBubble, finalizeText, saveHtmlSnapshot, placeholderRef: { value: placeholder } });
-
-            // Re-attach currentBubble if it was disconnected (rare if the DOM was
-            // rebuilt). With cached DOM it always stays connected.
-            if (this._currentStreamingText && (!currentBubble || !currentBubble.isConnected)) {
-                const wrappers = Array.from(this.messagesEl.querySelectorAll('[data-role="assistant"][data-active="true"]'));
-                const match = wrappers.find((w) => {
-                    const content = w.querySelector('.assistant-bubble-content');
-                    if (!content) return false;
-                    const text = content.textContent || '';
-                    return this._currentStreamingText.startsWith(text.trimStart().slice(0, 60)) ||
-                           text.trimStart().startsWith(this._currentStreamingText.slice(0, 60));
-                });
-                if (match) {
-                    currentBubble = match.querySelector('.assistant-bubble-content');
-                }
-            }
+            this._processEvent(event, { startTypewriter, stopTypewriter, flushTypewriter, resetTypewriter, ensureAssistantTextBubble, appendToStreamBuffer, saveHtmlSnapshot, placeholderRef: { value: placeholder } });
         };
 
         try {
@@ -2169,13 +2124,15 @@ class AssistantApp extends AppBase {
             bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(err.message)}</em>`;
         } finally {
             clearInterval(loadingInterval);
-            typewriter.stop();
+            stopTypewriter();
+            flushTypewriter();
             this.isStreaming = false;
             this._setSendEnabled(true);
             this._closeAssistantBubble();
+            this._resetChatPadding();
 
-            if (currentText) {
-                this.messages.push({ role: 'assistant', content: currentText });
+            if (displayedText) {
+                this.messages.push({ role: 'assistant', content: displayedText });
             }
 
             this._removeThinkingPlaceholder();
@@ -2186,7 +2143,7 @@ class AssistantApp extends AppBase {
         }
     }
 
-    _processEvent(event, { typewriter, resetBubble, finalizeText, saveHtmlSnapshot, placeholderRef }) {
+    _processEvent(event, { startTypewriter, stopTypewriter, flushTypewriter, resetTypewriter, ensureAssistantTextBubble, appendToStreamBuffer, saveHtmlSnapshot, placeholderRef }) {
         if (this._streamAliveTimeout) {
             clearTimeout(this._streamAliveTimeout);
             this._streamAliveTimeout = null;
@@ -2216,8 +2173,12 @@ class AssistantApp extends AppBase {
         }
 
         if (event.kind === 'assistant_text') {
-            if (typewriter) {
-                typewriter.append(event.content || '');
+            if (appendToStreamBuffer) {
+                // ChatApp-style live typewriter: append to the buffer and let the
+                // interval display characters one-by-one with live markdown parsing.
+                appendToStreamBuffer(event.content || '');
+                ensureAssistantTextBubble();
+                startTypewriter();
             } else {
                 // Fallback during background replay (no live typewriter available).
                 const bubble = this._ensureAssistantBubble();
@@ -2231,7 +2192,10 @@ class AssistantApp extends AppBase {
         }
 
         if (event.kind === 'assistant_tool_calls') {
-            resetBubble();
+            stopTypewriter?.();
+            flushTypewriter?.();
+            resetTypewriter?.();
+            this._closeAssistantBubble();
             // Hide the verbose tool-call list; only progress cards (and the
             // plan card) give the user feedback now.
             this.messages.push({ role: 'assistant_tool_calls', tool_calls: event.tool_calls });
@@ -2240,7 +2204,10 @@ class AssistantApp extends AppBase {
         }
 
         if (event.kind === 'tool_start') {
-            resetBubble();
+            stopTypewriter?.();
+            flushTypewriter?.();
+            resetTypewriter?.();
+            this._closeAssistantBubble();
             // Hide the sparkle on any previous assistant bubble as soon as a new
             // tool starts, so it does not stay under an intermediate message.
             this._hideAllSparkles();
@@ -2262,7 +2229,10 @@ class AssistantApp extends AppBase {
         }
 
         if (event.kind === 'progress_start') {
-            resetBubble();
+            stopTypewriter?.();
+            flushTypewriter?.();
+            resetTypewriter?.();
+            this._closeAssistantBubble();
             this._hideAllSparkles();
             this._appendProgressCard(event.card_id, event.tool_name);
             saveHtmlSnapshot();
@@ -2283,7 +2253,10 @@ class AssistantApp extends AppBase {
         }
 
         if (event.kind === 'tool_result') {
-            resetBubble();
+            stopTypewriter?.();
+            flushTypewriter?.();
+            resetTypewriter?.();
+            this._closeAssistantBubble();
             if (event.name === 'plan_workflow_with_tools') {
                 this._renderPlan(event.result);
             } else if (event.name === 'retrieve_documents') {
@@ -2296,7 +2269,10 @@ class AssistantApp extends AppBase {
         }
 
         if (event.kind === 'loop_done') {
-            resetBubble();
+            stopTypewriter?.();
+            flushTypewriter?.();
+            resetTypewriter?.();
+            this._closeAssistantBubble();
             saveHtmlSnapshot();
             return;
         }
@@ -2320,24 +2296,21 @@ class AssistantApp extends AppBase {
         }
 
         if (event.kind === 'assistant_done') {
-            resetBubble();
+            stopTypewriter?.();
+            flushTypewriter?.();
+            resetTypewriter?.();
+            this._closeAssistantBubble();
             // Remove any lingering thinking placeholder before rendering the final answer.
             this._removeThinkingPlaceholder();
-            // If the backend only sent the final message inside assistant_done
-            // (no preceding assistant_text chunks), render it now.
-            if (event.content && !this._currentStreamingText && !currentBubble) {
-                const bubble = this._ensureAssistantBubble();
-                bubble.innerHTML = this._markdown(event.content, false);
-                this._currentStreamingText = event.content;
-                this._forceReflow();
-            }
-            this._closeAssistantBubble();
             saveHtmlSnapshot();
             return;
         }
 
         if (event.kind === 'error') {
-            resetBubble();
+            stopTypewriter?.();
+            flushTypewriter?.();
+            resetTypewriter?.();
+            this._closeAssistantBubble();
             const bubble = this._ensureAssistantBubble();
             bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(event.message || '')}</em>`;
             saveHtmlSnapshot();
