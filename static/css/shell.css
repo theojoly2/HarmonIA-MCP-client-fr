@@ -572,9 +572,10 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
     height: 1.25rem;
     flex-shrink: 0;
     visibility: visible;
+    opacity: 1;
     transition: visibility 0.2s ease, opacity 0.2s ease;
 }
-.history-panel-spinner.hidden {
+.history-panel-spinner.history-panel-spinner-hidden {
     visibility: hidden;
     opacity: 0;
     pointer-events: none;
