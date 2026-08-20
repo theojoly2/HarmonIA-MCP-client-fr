@@ -760,6 +760,8 @@ class ModelerApp extends AppBase {
             this._showExportError('Aucun modèle à exporter.');
             return;
         }
+        const exportBtn = this.container?.querySelector('#modeler-export-toggle');
+        this._setExportLoading(true);
         try {
             const blob = await ApiClient.exportModel(this.storedName, format);
             const url = URL.createObjectURL(blob);
@@ -773,6 +775,28 @@ class ModelerApp extends AppBase {
         } catch (err) {
             console.error('Export model error', err);
             this._showExportError(`Échec de l'export ${format.toUpperCase()}.`);
+        } finally {
+            this._setExportLoading(false);
+        }
+    }
+
+    _setExportLoading(isLoading) {
+        const exportBtn = this.container?.querySelector('#modeler-export-toggle');
+        if (!exportBtn) return;
+        if (isLoading) {
+            exportBtn.disabled = true;
+            exportBtn.dataset.originalHtml = exportBtn.innerHTML;
+            exportBtn.innerHTML = `
+                <svg class="animate-spin w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>`;
+        } else {
+            exportBtn.disabled = false;
+            if (exportBtn.dataset.originalHtml) {
+                exportBtn.innerHTML = exportBtn.dataset.originalHtml;
+                delete exportBtn.dataset.originalHtml;
+            }
         }
     }
 

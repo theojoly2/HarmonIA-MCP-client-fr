@@ -828,7 +828,7 @@ class AssistantApp extends AppBase {
                 exportMenu.querySelectorAll('.assistant-pill-export-item').forEach((item) => {
                     item.addEventListener('click', async (e) => {
                         e.stopPropagation();
-                        await this._exportModelFromPill(item.dataset.format, name);
+                        await this._exportModelFromPill(item.dataset.format, name, item);
                         this._closePillExportMenus();
                     });
                 });
@@ -872,8 +872,10 @@ class AssistantApp extends AppBase {
         this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
     }
 
-    async _exportModelFromPill(format, name) {
+    async _exportModelFromPill(format, name, itemEl) {
         if (!name) return;
+        const originalText = itemEl?.textContent || '';
+        this._setPillExportItemLoading(itemEl, true);
         try {
             const blob = await ApiClient.exportModel(name, format);
             const url = URL.createObjectURL(blob);
@@ -887,6 +889,28 @@ class AssistantApp extends AppBase {
         } catch (err) {
             console.error('Export model from pill error', err);
             this._appendSystemMessage(`Erreur lors de l'export du modèle : ${this._escape(err.message)}`);
+        } finally {
+            this._setPillExportItemLoading(itemEl, false, originalText);
+        }
+    }
+
+    _setPillExportItemLoading(itemEl, isLoading, originalText = '') {
+        if (!itemEl) return;
+        if (isLoading) {
+            itemEl.disabled = true;
+            itemEl.dataset.originalText = itemEl.textContent;
+            itemEl.innerHTML = `
+                <span class="inline-flex items-center gap-1.5">
+                    <svg class="animate-spin w-3.5 h-3.5 text-gray-500" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Export...</span>
+                </span>`;
+        } else {
+            itemEl.disabled = false;
+            itemEl.textContent = originalText || itemEl.dataset.originalText || 'Exporter';
+            delete itemEl.dataset.originalText;
         }
     }
 
