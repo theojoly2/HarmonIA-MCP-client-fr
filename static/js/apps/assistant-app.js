@@ -1306,14 +1306,8 @@ class AssistantApp extends AppBase {
     }
 
     _adjustChatPadding() {
-        if (!this.chatEl || !this.inputArea) return;
-        const lastBubble = this.messagesEl?.lastElementChild;
-        if (!lastBubble) return;
-        const visibleBlockHeight = lastBubble.offsetTop + lastBubble.offsetHeight;
-        const remaining = Math.max(0, this.chatEl.clientHeight - visibleBlockHeight + this.chatEl.scrollTop - 20);
-        if (remaining > 0) {
-            this.chatEl.style.paddingBottom = `${remaining}px`;
-        }
+        // Disabled: dynamic padding during streaming was causing erratic scroll
+        // jumps and blank space below the last message.
     }
 
     _resetChatPadding() {
@@ -2040,7 +2034,6 @@ class AssistantApp extends AppBase {
                 </div>
             `;
             this.messagesEl.appendChild(wrapper);
-            this._scrollToBottom(true);
             currentBubbleContent = wrapper.querySelector('.assistant-bubble-content');
             return currentBubbleContent;
         };
