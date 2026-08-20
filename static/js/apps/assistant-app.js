@@ -1248,7 +1248,17 @@ class AssistantApp extends AppBase {
         div.className = 'assistant-bubble assistant-bubble-user mb-6 user-msg-anchor';
         div.innerHTML = `<div class="assistant-bubble-content">${this._escape(text)}</div>`;
         this.messagesEl.appendChild(div);
-        this._scrollToBottom();
+        // Scroll the user message into view (like the floating chat), then re-enable
+        // auto-stick so the streaming answer continues to scroll the chat down.
+        if (this.chatEl) {
+            this._stickToBottom = false;
+            requestAnimationFrame(() => {
+                div.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                // Re-enable stick-to-bottom once the smooth scroll finishes, so the
+                // assistant response keeps pulling the view down.
+                setTimeout(() => { this._stickToBottom = true; }, 350);
+            });
+        }
         return div;
     }
 
@@ -1326,6 +1336,21 @@ class AssistantApp extends AppBase {
             this._scrollRaf = null;
             this._scrollToBottom();
         });
+    }
+
+    _adjustChatPadding() {
+        if (!this.chatEl || !this.inputArea) return;
+        const lastBubble = this.messagesEl?.lastElementChild;
+        if (!lastBubble) return;
+        const visibleBlockHeight = lastBubble.offsetTop + lastBubble.offsetHeight;
+        const remaining = Math.max(0, this.chatEl.clientHeight - visibleBlockHeight + this.chatEl.scrollTop - 20);
+        if (remaining > 0) {
+            this.chatEl.style.paddingBottom = `${remaining}px`;
+        }
+    }
+
+    _resetChatPadding() {
+        if (this.chatEl) this.chatEl.style.paddingBottom = '';
     }
 
     _hideAllSparkles() {
@@ -2022,7 +2047,6 @@ class AssistantApp extends AppBase {
 
         const typewriter = this._createTypewriter((chunk) => {
             updateCurrentText(chunk);
-            pendingPlain += chunk;
 
             if (!currentBubble) {
                 this._removeThinkingPlaceholder();
@@ -2034,33 +2058,30 @@ class AssistantApp extends AppBase {
             }
 
             const now = performance.now();
-            const lastChar = chunk.slice(-1);
-            const isBreakpoint = STRUCTURE_RE.test(lastChar);
-            const tooLongPlain = (now - lastPlainAt > MAX_PLAIN_MS) && (now - lastReparsedAt > MIN_REPARSE_MS);
             const safeToRender = !hasUnclosedMarkdown(currentText);
-            const shouldReparse = (isBreakpoint || tooLongPlain) && safeToRender && (now - lastReparsedAt > MIN_REPARSE_MS);
+            const tooLongPlain = (now - lastPlainAt > MAX_PLAIN_MS) && (now - lastReparsedAt > MIN_REPARSE_MS);
+            const shouldReparse = safeToRender && tooLongPlain && (now - lastReparsedAt > MIN_REPARSE_MS);
 
             if (shouldReparse) {
                 currentBubble.innerHTML = this._markdown(currentText, false);
-                pendingPlain = '';
                 lastReparsedAt = now;
                 lastPlainAt = now;
                 this._throttledReflow();
+                this._adjustChatPadding();
                 this._throttledScrollToBottom();
-            } else if (currentBubble) {
-                // Fast path: append raw text to the live DOM without re-parsing
-                // markdown. We insert pendingPlain if any to keep the DOM minimal.
-                if (pendingPlain) {
-                    const tail = currentBubble.lastChild;
-                    if (tail && tail.nodeType === Node.TEXT_NODE) {
-                        tail.textContent += pendingPlain;
-                    } else {
-                        currentBubble.appendChild(document.createTextNode(pendingPlain));
-                    }
-                    pendingPlain = '';
-                    lastPlainAt = now;
+            } else {
+                // Character-by-character fast path: append the incoming chunk as
+                // plain text so the typewriter effect is visible, then reparse the
+                // markdown at safe breakpoints.
+                const tail = currentBubble.lastChild;
+                if (tail && tail.nodeType === Node.TEXT_NODE) {
+                    tail.textContent += chunk;
+                } else {
+                    currentBubble.appendChild(document.createTextNode(chunk));
                 }
+                lastPlainAt = now;
                 this._throttledReflow();
+                this._adjustChatPadding();
                 this._throttledScrollToBottom();
             }
         });
@@ -2073,6 +2094,7 @@ class AssistantApp extends AppBase {
                 await new Promise((resolve) => requestAnimationFrame(resolve));
                 currentBubble.innerHTML = this._markdown(currentText, false);
                 this._forceReflow();
+                this._resetChatPadding();
             }
         };
 
@@ -2324,39 +2346,35 @@ class AssistantApp extends AppBase {
     }
 
     _createTypewriter(onChunk, options = {}) {
-        // By default, render each append() as a whole token/word. This matches how
-        // the backend streams LLM tokens and avoids the artificial "character by
-        // character" feel. Very long tokens are still split at spaces to keep the
-        // UI responsive.
-        const maxTokenLength = options.maxTokenLength || 80;
+        // Character-by-character typewriter effect, matching the floating chat
+        // window. The chunk size varies slightly for a natural feel.
+        const charInterval = options.charInterval || 20;
 
         let buffer = '';
-        let rafId = null;
+        let timerId = null;
         let running = false;
 
         const emitNext = () => {
             if (buffer === '') return;
-            // Prefer emitting whole words/tokens. If a token is too long, split on
-            // spaces; if there are no spaces, take the whole chunk.
-            let chunk = buffer;
-            if (chunk.length > maxTokenLength) {
-                const cut = chunk.lastIndexOf(' ', maxTokenLength);
-                const splitAt = cut > 0 ? cut : maxTokenLength;
-                chunk = chunk.slice(0, splitAt);
-            }
-            buffer = buffer.slice(chunk.length);
+            // Emit 1 to 4 characters per tick with a small random variation.
+            const chunkSize = Math.min(1 + Math.floor(Math.random() * 4), buffer.length);
+            const chunk = buffer.slice(0, chunkSize);
+            buffer = buffer.slice(chunkSize);
             if (chunk) onChunk(chunk);
+            return chunkSize;
         };
 
         const schedule = () => {
-            if (running || rafId) return;
+            if (running || timerId) return;
             running = true;
-            rafId = requestAnimationFrame(() => {
-                emitNext();
-                rafId = null;
+            timerId = setTimeout(() => {
+                timerId = null;
                 running = false;
-                if (buffer !== '') schedule();
-            });
+                if (buffer !== '') {
+                    emitNext();
+                    if (buffer !== '') schedule();
+                }
+            }, charInterval);
         };
 
         return {
@@ -2365,9 +2383,9 @@ class AssistantApp extends AppBase {
                 schedule();
             },
             flush: () => {
-                if (rafId) {
-                    cancelAnimationFrame(rafId);
-                    rafId = null;
+                if (timerId) {
+                    clearTimeout(timerId);
+                    timerId = null;
                 }
                 running = false;
                 while (buffer !== '') {
@@ -2375,9 +2393,9 @@ class AssistantApp extends AppBase {
                 }
             },
             stop: () => {
-                if (rafId) {
-                    cancelAnimationFrame(rafId);
-                    rafId = null;
+                if (timerId) {
+                    clearTimeout(timerId);
+                    timerId = null;
                 }
                 running = false;
                 buffer = '';
