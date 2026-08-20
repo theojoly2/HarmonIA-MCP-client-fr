@@ -721,8 +721,7 @@ class ModelerApp extends AppBase {
                 e.stopPropagation();
                 const format = item.dataset.format;
                 if (item.disabled) return;
-                await this._exportModel(format);
-                this._closeExportMenu();
+                await this._exportModel(format, item);
             });
         });
 
@@ -755,13 +754,13 @@ class ModelerApp extends AppBase {
         btn.classList.toggle('hidden', !this.svgText);
     }
 
-    async _exportModel(format) {
+    async _exportModel(format, itemEl) {
         if (!this.storedName) {
             this._showExportError('Aucun modèle à exporter.');
             return;
         }
-        const exportBtn = this.container?.querySelector('#modeler-export-toggle');
-        this._setExportLoading(true);
+        const originalText = itemEl?.textContent?.trim() || '';
+        this._setExportItemLoading(itemEl, true);
         try {
             const blob = await ApiClient.exportModel(this.storedName, format);
             const url = URL.createObjectURL(blob);
@@ -772,31 +771,31 @@ class ModelerApp extends AppBase {
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
+            this._closeExportMenu();
         } catch (err) {
             console.error('Export model error', err);
+            this._setExportItemLoading(itemEl, false, originalText);
             this._showExportError(`Échec de l'export ${format.toUpperCase()}.`);
-        } finally {
-            this._setExportLoading(false);
         }
     }
 
-    _setExportLoading(isLoading) {
-        const exportBtn = this.container?.querySelector('#modeler-export-toggle');
-        if (!exportBtn) return;
+    _setExportItemLoading(itemEl, isLoading, originalText = '') {
+        if (!itemEl) return;
         if (isLoading) {
-            exportBtn.disabled = true;
-            exportBtn.dataset.originalHtml = exportBtn.innerHTML;
-            exportBtn.innerHTML = `
-                <svg class="animate-spin w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>`;
+            itemEl.disabled = true;
+            itemEl.dataset.originalText = itemEl.textContent?.trim() || '';
+            itemEl.innerHTML = `
+                <span class="inline-flex items-center gap-1.5">
+                    <svg class="animate-spin w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Export...</span>
+                </span>`;
         } else {
-            exportBtn.disabled = false;
-            if (exportBtn.dataset.originalHtml) {
-                exportBtn.innerHTML = exportBtn.dataset.originalHtml;
-                delete exportBtn.dataset.originalHtml;
-            }
+            itemEl.disabled = false;
+            itemEl.textContent = originalText || itemEl.dataset.originalText || 'Exporter';
+            delete itemEl.dataset.originalText;
         }
     }
 
