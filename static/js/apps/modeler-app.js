@@ -774,8 +774,9 @@ class ModelerApp extends AppBase {
             this._closeExportMenu();
         } catch (err) {
             console.error('Export model error', err);
-            this._setExportItemLoading(itemEl, false, originalText);
             this._showExportError(`Échec de l'export ${format.toUpperCase()}.`);
+        } finally {
+            this._setExportItemLoading(itemEl, false, originalText);
         }
     }
 
