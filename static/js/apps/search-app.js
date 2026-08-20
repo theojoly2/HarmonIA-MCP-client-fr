@@ -244,6 +244,7 @@ class SearchApp extends AppBase {
             } else if (action === 'chat') {
                 EventBus.emit('open-chat', { documentId, name });
             } else if (action === 'add-to-assistant') {
+                console.log('[SearchApp] add-to-assistant clicked', { docId, filename, extension });
                 this._toggleAssistantModel(docId, filename, extension);
             }
         });
@@ -617,6 +618,7 @@ class SearchApp extends AppBase {
     _renderAssistantModelBar() {
         const bar = this.container?.querySelector('#search-assistant-models-bar');
         const pillsSlot = this.container?.querySelector('#search-assistant-models-pills');
+        console.log('[SearchApp] _renderAssistantModelBar', { bar: !!bar, pillsSlot: !!pillsSlot, count: this.selectedAssistantModels.length, models: this.selectedAssistantModels });
         if (!bar || !pillsSlot) return;
         if (!this.selectedAssistantModels.length) {
             bar.classList.add('hidden');
@@ -627,7 +629,7 @@ class SearchApp extends AppBase {
         pillsSlot.innerHTML = this.selectedAssistantModels.map(m => {
             const displayName = m.filename.includes('__') ? m.filename.split('__').slice(0, -1).join('__') : m.filename;
             return `
-                <div class="search-assistant-model-pill" data-document-id="${this._escape(m.documentId)}">
+                <div class="search-assistant-model-pill" data-doc-id="${this._escape(m.docId)}">
                     <span title="${this._escape(m.filename)}">${this._escape(displayName)}</span>
                     <button type="button" class="search-assistant-model-remove" title="Retirer">
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -638,7 +640,7 @@ class SearchApp extends AppBase {
         pillsSlot.querySelectorAll('.search-assistant-model-remove').forEach(btn => {
             btn.addEventListener('click', () => {
                 const pill = btn.closest('.search-assistant-model-pill');
-                if (pill) this._removeAssistantModel(pill.dataset.documentId);
+                if (pill) this._removeAssistantModel(pill.dataset.docId);
             });
         });
     }
