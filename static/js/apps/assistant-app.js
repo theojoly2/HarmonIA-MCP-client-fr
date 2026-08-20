@@ -426,47 +426,43 @@ class AssistantApp extends AppBase {
     _observeMessagesScroll() {
         if (!this.messagesEl || typeof MutationObserver === 'undefined') return;
         if (this._messagesObserver) this._messagesObserver.disconnect();
-        if (this._bottomSentinelObserver) {
-            this._bottomSentinelObserver.disconnect();
-            this._bottomSentinelObserver = null;
+        if (this._scrollListener) {
+            this.chatEl?.removeEventListener('scroll', this._scrollListener);
+            this._scrollListener = null;
         }
 
-        // Use an invisible sentinel at the bottom of the messages list to know
-        // whether the user is currently at the bottom. This is far more robust
-        // than distance math because it survives abrupt height changes caused by
-        // markdown re-renders or line breaks.
-        this._bottomSentinel = document.createElement('div');
-        this._bottomSentinel.style.cssText = 'height:1px; flex-shrink:0; pointer-events:none;';
-        if (this.messagesEl.lastElementChild) {
-            this.messagesEl.appendChild(this._bottomSentinel);
-        }
-
-        if (typeof IntersectionObserver !== 'undefined' && this.chatEl) {
-            this._bottomSentinelObserver = new IntersectionObserver(
-                (entries) => {
-                    const entry = entries[0];
-                    this._sentinelVisible = entry.isIntersecting;
-                },
-                { root: this.chatEl, threshold: 0, rootMargin: '0px 0px 80px 0px' }
-            );
-            this._bottomSentinelObserver.observe(this._bottomSentinel);
-        }
+        // Start with stick-to-bottom enabled whenever a chat is present.
+        this._stickToBottom = true;
 
         let scrollRaf = null;
         this._messagesObserver = new MutationObserver(() => {
             if (!this.chatEl) return;
-            if (!this._bottomSentinel.parentNode && this.messagesEl.lastElementChild) {
-                this.messagesEl.appendChild(this._bottomSentinel);
-            }
-            if (!this._sentinelVisible) return;
+            if (!this._stickToBottom) return;
             if (scrollRaf) return;
             scrollRaf = requestAnimationFrame(() => {
                 scrollRaf = null;
-                if (!this.chatEl || !this._sentinelVisible) return;
+                if (!this.chatEl || !this._stickToBottom) return;
                 this.chatEl.scrollTo({ top: this.chatEl.scrollHeight, behavior: 'auto' });
             });
         });
         this._messagesObserver.observe(this.messagesEl, { childList: true, subtree: true });
+
+        let lastScrollTop = this.chatEl?.scrollTop || 0;
+        this._scrollListener = () => {
+            if (!this.chatEl) return;
+            const st = this.chatEl.scrollTop;
+            const distance = this.chatEl.scrollHeight - st - this.chatEl.clientHeight;
+            // If the user scrolled up significantly, disable auto-stick.
+            if (st < lastScrollTop && distance > 80) {
+                this._stickToBottom = false;
+            }
+            // If the user scrolled back to the bottom, re-enable auto-stick.
+            if (distance <= 24) {
+                this._stickToBottom = true;
+            }
+            lastScrollTop = st;
+        };
+        this.chatEl?.addEventListener('scroll', this._scrollListener, { passive: true });
     }
 
     _escape(text) {
