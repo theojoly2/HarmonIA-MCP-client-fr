@@ -183,6 +183,7 @@ def get_image_bytes(
     source_json: dict[str, list[dict[str, Any]]],
     debug: bool = False,
     simplify_large_models: bool = True,
+    output_format: str = "svg",
 ) -> BytesIO:
     if debug:
         print("SOURCE JSON:")
@@ -197,7 +198,23 @@ def get_image_bytes(
 
     elements = source_json.get("elements", [])
     connectors = source_json.get("connectors", [])
+    plantuml_text = _build_plantuml_text(elements, connectors, debug=debug)
+    return _render_plantuml(plantuml_text, elements, connectors, output_format=output_format)
 
+
+def get_image_bytes_png(
+    source_json: dict[str, list[dict[str, Any]]],
+    debug: bool = False,
+) -> BytesIO:
+    """Render a PNG image from the JSON model using PlantUML."""
+    return get_image_bytes(source_json, debug=debug, output_format="png")
+
+
+def _build_plantuml_text(
+    elements: list[dict[str, Any]],
+    connectors: list[dict[str, Any]],
+    debug: bool = False,
+) -> str:
     plantuml_lines: list[str] = []
     plantuml_lines.append("@startuml")
     plantuml_lines.append("left to right direction")
@@ -258,7 +275,7 @@ def get_image_bytes(
         display_name = _escape_display(_safe_text(element.get("name")))
         attributes = element.get("attributes", []) or []
 
-        lines: list[str] = [f'class "<<dataType>>\\n{display_name}" as {alias} {{']
+        lines: list[str] = [f'class "<<dataType>>\n{display_name}" as {alias} {{']
         for attr in attributes:
             attr_name = _safe_text(attr.get("name"))
             attr_type = _safe_text(attr.get("type")) or "Any"
@@ -368,20 +385,7 @@ def get_image_bytes(
         print("\nPLANTUML:")
         print(plantuml_text)
 
-    # 1. Use the auto-downloaded native PlantUML binary if it is ready.
-    # 2. Fall back to local PlantUML servers.
-    # 3. Fall back to the public PlantUML server.
-    # 4. Final fallback: a lightweight native SVG renderer.
-    last_error = None
-
-    return _render_plantuml(plantuml_text, elements, connectors, output_format="svg")
-
-
-def get_image_bytes_png(json_data: dict[str, Any], debug: bool = False) -> BytesIO:
-    """Render a PNG image from the JSON model using PlantUML."""
-    elements, connectors = _extract_model(json_data)
-    plantuml_text = _build_plantuml_text(elements, connectors, debug=debug)
-    return _render_plantuml(plantuml_text, elements, connectors, output_format="png")
+    return plantuml_text
 
 
 def _render_plantuml(
@@ -432,16 +436,16 @@ def _render_plantuml(
         ) from last_error
 
     # Final fallback native SVG renderer (works fully offline).
-        try:
-            svg = _render_native_svg(elements, connectors)
-            _print_render_source("native SVG fallback (offline)")
-            return svg
-        except Exception as fallback_error:
-            raise RuntimeError(
-                f"PlantUML rendering failed: {last_error}. Native SVG fallback also failed: {fallback_error}. "
-                "Check that a PlantUML server is reachable at http://127.0.0.1:8080/svg/ "
-                "or http://www.plantuml.com/plantuml/svg/"
-            ) from last_error
+    try:
+        svg = _render_native_svg(elements, connectors)
+        _print_render_source("native SVG fallback (offline)")
+        return svg
+    except Exception as fallback_error:
+        raise RuntimeError(
+            f"PlantUML rendering failed: {last_error}. Native SVG fallback also failed: {fallback_error}. "
+            "Check that a PlantUML server is reachable at http://127.0.0.1:8080/svg/ "
+            "or http://www.plantuml.com/plantuml/svg/"
+        ) from last_error
 
     raise RuntimeError(
         f"PlantUML PNG rendering failed: {last_error}. "
