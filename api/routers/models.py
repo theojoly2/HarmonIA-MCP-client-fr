@@ -286,8 +286,8 @@ async def export_model(
     format: str = "xmi",
     username: str = Depends(require_user),
 ):
-    """Export a persisted model as XMI/XML or TTL bytes."""
-    from data_model_utils import build_ttl_bytes, build_xmi_bytes
+    """Export a persisted model as XMI/XML, TTL or SVG."""
+    from data_model_utils import build_ttl_bytes, build_xmi_bytes, generate_visualisation
 
     model = await get_model(username, model_name)
     if not model:
@@ -303,6 +303,25 @@ async def export_model(
             data = build_ttl_bytes(model)
             media_type = "text/turtle"
             ext = "ttl"
+        elif fmt == "svg":
+            # Regenerate SVG from current model JSON so exports reflect edits.
+            xmi = model.get("xmi")
+            svg = model.get("svg", "")
+            if isinstance(xmi, dict) and (xmi.get("elements") or xmi.get("connectors")):
+                try:
+                    svg_result = generate_visualisation(xmi)
+                    svg_bytes = svg_result.getvalue() if hasattr(svg_result, "getvalue") else svg_result
+                    svg = svg_bytes.decode("utf-8", errors="replace")
+                except Exception as e:
+                    print(f"[export_model] SVG regeneration failed for {model_name}: {e}", flush=True)
+            if not svg:
+                return Response(
+                    status_code=422,
+                    content=json.dumps({"detail": "export_empty"}),
+                )
+            data = svg.encode("utf-8")
+            media_type = "image/svg+xml"
+            ext = "svg"
         else:
             return Response(
                 status_code=400,
