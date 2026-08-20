@@ -571,10 +571,11 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
     width: 1.25rem;
     height: 1.25rem;
     flex-shrink: 0;
-    opacity: 1;
-    transition: opacity 0.2s ease;
+    visibility: visible;
+    transition: visibility 0.2s ease, opacity 0.2s ease;
 }
 .history-panel-spinner.hidden {
+    visibility: hidden;
     opacity: 0;
     pointer-events: none;
 }
