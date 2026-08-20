@@ -458,7 +458,7 @@ class AssistantApp extends AppBase {
             // If the user actively scrolls up, disable auto-stick and lock the choice for a short grace period.
             if (isScrollingUp && distance > 40) {
                 this._stickToBottom = false;
-                this._stickLockUntil = now + 2500; // 2.5s grace period
+                this._stickLockUntil = now + 1000; // 1s grace period
             }
             // Re-enable auto-stick only after the grace period and only if truly back at the bottom.
             if (!this._stickLockUntil || now > this._stickLockUntil) {
