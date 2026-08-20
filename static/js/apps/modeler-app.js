@@ -421,10 +421,14 @@ class ModelerApp extends AppBase {
         importContainer.classList.add('modeler-import-hidden');
         if (dropZone) dropZone.style.display = 'none';
 
-        // Reveal the viewer area and fade it in as the title glides up.
+        // Reveal the viewer area and keep the spinner visible while the SVG is generated.
         viewer.classList.remove('hidden');
-        viewer.style.transition = 'none';
-        viewer.style.opacity = '0';
+        viewer.style.opacity = '1';
+        const svgViewer = this.container.querySelector('#modeler-svg-viewer');
+        if (svgViewer) {
+            svgViewer.classList.add('modeler-svg-hidden');
+            svgViewer.style.transition = 'none';
+        }
         void viewer.offsetHeight;
         this._setLoading(true);
 
@@ -452,6 +456,10 @@ class ModelerApp extends AppBase {
 
         // Keep the spinner visible until the SVG is actually rendered.
         this._setLoading(true);
+        if (viewerContainer) {
+            viewerContainer.classList.add('modeler-svg-hidden');
+            viewerContainer.style.transition = 'none';
+        }
 
         // If the live SVG viewer is already attached to the cached container,
         // just make sure the pane is visible and resume observers.
@@ -465,6 +473,7 @@ class ModelerApp extends AppBase {
                 editActions.classList.remove('hidden');
                 this._updateEditButtonStates();
             }
+            if (viewerContainer) viewerContainer.classList.remove('modeler-svg-hidden');
             this._setLoading(false);
             this._observeSvgContainerResize();
             this.setTitle(`Modéliseur: ${this.fileName}`);
@@ -504,6 +513,10 @@ class ModelerApp extends AppBase {
                         if (editActions) {
                             editActions.classList.remove('hidden');
                             this._updateEditButtonStates();
+                        }
+                        if (viewerContainer) {
+                            viewerContainer.style.transition = 'opacity 0.35s ease';
+                            viewerContainer.classList.remove('modeler-svg-hidden');
                         }
                         this.setTitle(`Modéliseur: ${this.fileName}`);
                     });
