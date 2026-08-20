@@ -453,13 +453,18 @@ class AssistantApp extends AppBase {
             if (!this.chatEl) return;
             const st = this.chatEl.scrollTop;
             const distance = this.chatEl.scrollHeight - st - this.chatEl.clientHeight;
-            // If the user scrolled up significantly, disable auto-stick.
-            if (st < lastScrollTop && distance > 80) {
+            const now = performance.now();
+            const isScrollingUp = st < lastScrollTop - 2;
+            // If the user actively scrolls up, disable auto-stick and lock the choice for a short grace period.
+            if (isScrollingUp && distance > 40) {
                 this._stickToBottom = false;
+                this._stickLockUntil = now + 2500; // 2.5s grace period
             }
-            // If the user scrolled back to the bottom, re-enable auto-stick.
-            if (distance <= 24) {
-                this._stickToBottom = true;
+            // Re-enable auto-stick only after the grace period and only if truly back at the bottom.
+            if (!this._stickLockUntil || now > this._stickLockUntil) {
+                if (distance <= 16) {
+                    this._stickToBottom = true;
+                }
             }
             lastScrollTop = st;
         };
