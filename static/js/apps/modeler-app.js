@@ -450,6 +450,9 @@ class ModelerApp extends AppBase {
         }
         this._updateExportToggleVisibility();
 
+        // Keep the spinner visible until the SVG is actually rendered.
+        this._setLoading(true);
+
         // If the live SVG viewer is already attached to the cached container,
         // just make sure the pane is visible and resume observers.
         if (this.viewer && this.viewer.svg && viewerContainer && viewerContainer.contains(this.viewer.svg)) {
@@ -473,45 +476,44 @@ class ModelerApp extends AppBase {
                 onTransform: (state) => { this.viewerState = state; }
             });
         }
-        this.viewer.setSvg(this.svgText, this.mainClassName);
-        // New import/open from history/preview: center diagram after it becomes visible.
-        // Returning from another tab with a cached DOM: the viewer stayed alive.
-        const finalize = () => {
-            this._setLoading(false);
-            if (viewer) {
-                viewer.style.transition = 'opacity 0.35s ease';
-                viewer.style.opacity = '1';
-            }
-            if (editActions) {
-                editActions.classList.remove('hidden');
-                this._updateEditButtonStates();
-            }
-            this.setTitle(`Modéliseur: ${this.fileName}`);
-        };
-        if (this._centerOnNextShow) {
-            // Wait two frames so the browser has rendered the SVG before we
-            // fade it in and center it. This avoids a visible flash/jump.
+
+        // Yield to the browser so the spinner is painted before the heavy SVG work begins.
+        requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    this.viewer.resetZoom();
-                    this._centerOnNextShow = false;
-                    finalize();
-                });
-            });
-        } else {
-            // When the viewer is remounted into a different container size
-            // (e.g. opening the assistant split), restore the saved pan/zoom state.
-            // Do NOT auto-center; the saved state is the user's chosen view.
-            this.viewer.restoreState(this.viewerState);
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    if (this.viewer && this.svgText) {
+                this.viewer.setSvg(this.svgText, this.mainClassName);
+
+                const finalize = () => {
+                    if (this._centerOnNextShow) {
+                        this.viewer.resetZoom();
+                        this._centerOnNextShow = false;
+                    } else {
+                        this.viewer.restoreState(this.viewerState);
                         this.viewer.applyTransform();
                     }
+
+                    // Force a layout so the browser finishes rendering before hiding the spinner.
+                    this.viewer.container.getBoundingClientRect();
+                    if (this.viewer.svg) this.viewer.svg.getBBox();
+
+                    requestAnimationFrame(() => {
+                        this._setLoading(false);
+                        if (viewer) {
+                            viewer.style.transition = 'opacity 0.35s ease';
+                            viewer.style.opacity = '1';
+                        }
+                        if (editActions) {
+                            editActions.classList.remove('hidden');
+                            this._updateEditButtonStates();
+                        }
+                        this.setTitle(`Modéliseur: ${this.fileName}`);
+                    });
+                };
+
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(finalize);
                 });
             });
-            finalize();
-        }
+        });
         this._observeSvgContainerResize();
     }
 
