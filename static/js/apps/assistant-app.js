@@ -54,11 +54,15 @@ class AssistantApp extends AppBase {
                 this.chatEl.classList.add('assistant-chat-mode');
                 this.welcomeEl.classList.add('assistant-welcome-top');
                 this.inputArea.classList.add('assistant-input-area-chat');
-                // When remounting from cache (e.g. switching back to a modeler with
-                // an embedded assistant), wait for the DOM layout to settle and then
-                // scroll to the very bottom, matching the behavior on first mount.
+                // When remounting from cache, wait for layout and then scroll down
+                // by the safety padding so the last message is visible above the
+                // fixed input area.
                 requestAnimationFrame(() => {
-                    requestAnimationFrame(() => this._scrollToBottom(true));
+                    requestAnimationFrame(() => {
+                        if (!this.chatEl) return;
+                        const safety = parseFloat(getComputedStyle(this.chatEl).paddingBottom) || 0;
+                        this.chatEl.scrollTo({ top: this.chatEl.scrollHeight + safety, behavior: 'auto' });
+                    });
                 });
             }
             return;
