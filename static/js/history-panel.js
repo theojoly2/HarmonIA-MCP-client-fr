@@ -8,6 +8,7 @@ class HistoryPanel {
         this.container = container;
         this.isOpen = false;
         this.models = [];
+        this._hasLoaded = false;
         this._init();
     }
 
@@ -70,11 +71,13 @@ class HistoryPanel {
     async load() {
         // Only show the loading spinner on the first fetch; subsequent reloads
         // keep the existing list visible so the panel does not flash.
-        const isFirstLoad = !this.items;
-        if (isFirstLoad && this.loadingEl) this.loadingEl.classList.remove("hidden");
-        if (this.emptyEl) this.emptyEl.classList.add("hidden");
+        if (!this._hasLoaded) {
+            if (this.loadingEl) this.loadingEl.classList.remove("hidden");
+            if (this.emptyEl) this.emptyEl.classList.add("hidden");
+        }
         if (!AuthManager.isLoggedIn()) {
             this.items = [];
+            this._hasLoaded = true;
             this._render();
             return;
         }
@@ -161,6 +164,7 @@ class HistoryPanel {
             console.error("History load error", err);
             this.items = [];
         }
+        this._hasLoaded = true;
         this._render();
     }
 
