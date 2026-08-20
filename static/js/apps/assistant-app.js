@@ -55,7 +55,8 @@ class AssistantApp extends AppBase {
                 this.welcomeEl.classList.add('assistant-welcome-top');
                 this.inputArea.classList.add('assistant-input-area-chat');
                 // When remounting from cache (e.g. switching back to a modeler with
-                // an embedded assistant), force-scroll to the bottom of the conversation.
+                // an embedded assistant), force-scroll to the very bottom of the
+                // conversation so the latest message is visible.
                 this._scrollToBottom(true);
             }
             return;
