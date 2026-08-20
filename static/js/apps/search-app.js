@@ -35,6 +35,8 @@ class SearchApp extends AppBase {
         if (this.container === container && container.querySelector('#search-wrapper-inner')) {
             this._observeResize();
             this._updateHomeModeClass();
+            this._renderAssistantModelBar();
+            this._updateAddModelButtons();
             const input = container.querySelector('#search-input');
             if (input) input.focus();
             return;
@@ -575,6 +577,8 @@ class SearchApp extends AppBase {
             return;
         }
         this.render(this.container);
+        this._renderAssistantModelBar();
+        this._updateAddModelButtons();
     }
 
     _toggleAssistantModel(docId, filename, extension) {
@@ -588,21 +592,26 @@ class SearchApp extends AppBase {
         }
         this._renderAssistantModelBar();
         this._updateAddModelButtons();
-        this._saveState();
+        // Persist immediately so the selection survives tab switches.
+        AppState.saveInstanceState(this.instanceId);
     }
 
     _removeAssistantModel(docId) {
         this.selectedAssistantModels = this.selectedAssistantModels.filter(m => m.docId !== docId);
         this._renderAssistantModelBar();
         this._updateAddModelButtons();
-        this._saveState();
+        AppState.saveInstanceState(this.instanceId);
     }
 
     _clearAssistantModels() {
         this.selectedAssistantModels = [];
         this._renderAssistantModelBar();
         this._updateAddModelButtons();
-        this._saveState();
+        AppState.saveInstanceState(this.instanceId);
+    }
+
+    _saveState() {
+        AppState.saveInstanceState(this.instanceId);
     }
 
     _renderAssistantModelBar() {
