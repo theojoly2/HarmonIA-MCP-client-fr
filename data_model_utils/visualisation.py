@@ -401,25 +401,37 @@ def _render_plantuml(
         last_error = native_error
         _logger.info("[PlantUML] Native renderer unavailable: %s", native_error)
 
-    # Network servers only support SVG; skip them for PNG.
+    # Use network servers when the native binary is unavailable.
     if output_format.lower() == "svg":
         plantuml_servers = [
             "http://127.0.0.1:8080/svg/",
             "http://localhost:8080/svg/",
-            "http://www.plantuml.com/plantuml/svg/",
+            "https://www.plantuml.com/plantuml/svg/",
         ]
-        for server_url in plantuml_servers:
-            try:
-                server = PlantUML(url=server_url)
-                image_bytes = server.processes(plantuml_text)
-                _print_render_source(f"PlantUML server: {server_url}")
-                return BytesIO(image_bytes)
-            except Exception as e:
-                last_error = e
-                _logger.info("[PlantUML] Server %s failed: %s", server_url, e)
-                continue
+    else:
+        plantuml_servers = [
+            "http://127.0.0.1:8080/png/",
+            "http://localhost:8080/png/",
+            "https://www.plantuml.com/plantuml/png/",
+        ]
+    for server_url in plantuml_servers:
+        try:
+            server = PlantUML(url=server_url)
+            image_bytes = server.processes(plantuml_text)
+            _print_render_source(f"PlantUML server: {server_url}")
+            return BytesIO(image_bytes)
+        except Exception as e:
+            last_error = e
+            _logger.info("[PlantUML] Server %s failed: %s", server_url, e)
+            continue
 
-        # Final fallback native SVG renderer (works fully offline).
+    if output_format.lower() == "png":
+        raise RuntimeError(
+            f"PlantUML PNG rendering failed: {last_error}. "
+            "Ensure the native PlantUML binary is installed or a PNG-compatible server is reachable."
+        ) from last_error
+
+    # Final fallback native SVG renderer (works fully offline).
         try:
             svg = _render_native_svg(elements, connectors)
             _print_render_source("native SVG fallback (offline)")
