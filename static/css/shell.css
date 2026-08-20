@@ -557,6 +557,20 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
 }
 .history-panel-close:hover { color: #111827; background: #f3f4f6; }
 .history-panel-delete-all:hover { color: #dc2626; background: #fef2f2; }
+.history-panel-spinner {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
+    opacity: 1;
+    transition: opacity 0.2s ease;
+}
+.history-panel-spinner.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
 .history-panel-content {
     flex: 1;
     overflow-y: auto;

@@ -20,6 +20,12 @@ class HistoryPanel {
             <div class="history-panel-header">
                 <h3 class="history-panel-title">Historique</h3>
                 <div class="history-panel-actions">
+                    <span class="history-panel-spinner" id="history-header-spinner" aria-hidden="true">
+                        <svg class="animate-spin w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </span>
                     <button type="button" class="history-panel-delete-all" id="history-delete-all" title="Tout supprimer">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -50,6 +56,7 @@ class HistoryPanel {
         this.listEl = this.panel.querySelector("#history-list");
         this.emptyEl = this.panel.querySelector("#history-empty");
         this.loadingEl = this.panel.querySelector("#history-loading");
+        this.headerSpinnerEl = this.panel.querySelector("#history-header-spinner");
         this.panel.querySelector("#history-close").addEventListener("click", () => this.close());
         this.panel.querySelector("#history-delete-all").addEventListener("click", (e) => {
             e.stopPropagation();
@@ -69,8 +76,12 @@ class HistoryPanel {
     }
 
     async load() {
-        // Only show the loading spinner on the first fetch; subsequent reloads
-        // keep the existing list visible so the panel does not flash.
+        // Show a small header spinner on every reload; it sits in a fixed-size
+        // slot so it never shifts the list or empty message.
+        if (this.headerSpinnerEl) this.headerSpinnerEl.classList.remove("hidden");
+
+        // Only show the big centered spinner on the first fetch; subsequent
+        // reloads keep the existing list/empty message visible.
         if (!this._hasLoaded) {
             if (this.loadingEl) this.loadingEl.classList.remove("hidden");
             if (this.emptyEl) this.emptyEl.classList.add("hidden");
@@ -171,6 +182,7 @@ class HistoryPanel {
     _render() {
         this.listEl.innerHTML = "";
         if (this.loadingEl) this.loadingEl.classList.add("hidden");
+        if (this.headerSpinnerEl) this.headerSpinnerEl.classList.add("hidden");
         if (!this.items.length) {
             this.emptyEl.classList.remove("hidden");
             return;
