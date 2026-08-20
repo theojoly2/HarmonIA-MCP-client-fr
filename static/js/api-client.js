@@ -78,6 +78,20 @@ const ApiClient = (() => {
         return res.json();
     }
 
+    async function importDocumentAsAssistantModel(documentId, origin = "assistant") {
+        const res = await fetch(apiUrl("assistant/import-from-document"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ document_id: documentId, origin }),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || `Assistant model import from document failed: ${res.status}`);
+        }
+        return res.json();
+    }
+
     async function getModelSvg(name) {
         const res = await fetch(apiUrl(`models/${encodeURIComponent(name)}/open`), {
             method: "POST",
@@ -352,6 +366,7 @@ const ApiClient = (() => {
         importModéliseurFile,
         importAndSaveModel,
         importAssistantModel,
+        importDocumentAsAssistantModel,
         getModelSvg,
         createEmptyModel,
         getModels,

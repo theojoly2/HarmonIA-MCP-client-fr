@@ -25,6 +25,8 @@ class SearchApp extends AppBase {
         this._introAnimating = false;
         this._introAnimationDone = false;
         this._skipHistorySave = !!props.fromHistory;
+        this.selectedAssistantModels = [];
+        this.maxAssistantModels = 3;
     }
 
     async render(container) {
@@ -79,6 +81,16 @@ class SearchApp extends AppBase {
                         <span id="elapsed-timer"></span>
                     </div>
                     <div id="results-container" class="mt-4 pb-12">${this.resultsHtml || ''}</div>
+                </div>
+                <div id="search-assistant-models-bar" class="search-assistant-models-bar hidden">
+                    <div id="search-assistant-models-pills" class="search-assistant-models-pills"></div>
+                    <button type="button" id="search-open-assistant-btn" class="search-open-assistant-btn" title="Discuter avec l'Assistant">
+                        <svg class="w-5 h-5" viewBox="0 0 24 24">
+                            <path class="sparkle-main" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
+                            <path class="sparkle-orbit-path" d="M5.5 2.5L6.34 5.16L9 6L6.34 6.84L5.5 9.5L4.66 6.84L2 6L4.66 5.16L5.5 2.5Z"></path>
+                            <path class="sparkle-orbit-path" d="M19.5 15.5L20.34 18.16L23 19L20.34 19.84L19.5 22.5L18.66 19.84L16 19L18.66 18.16L19.5 15.5Z"></path>
+                        </svg>
+                    </button>
                 </div>
             </div>
         `;
@@ -223,12 +235,21 @@ class SearchApp extends AppBase {
             const docId = btn.dataset.docId;
             const documentId = btn.dataset.documentId;
             const name = btn.dataset.name;
+            const filename = btn.dataset.filename;
+            const extension = btn.dataset.extension;
             if (action === 'preview') {
                 EventBus.emit('open-preview', { docId, documentId, name });
             } else if (action === 'chat') {
                 EventBus.emit('open-chat', { documentId, name });
+            } else if (action === 'add-to-assistant') {
+                this._toggleAssistantModel(documentId, filename, extension);
             }
         });
+
+        const assistantBtn = this.container.querySelector('#search-open-assistant-btn');
+        if (assistantBtn) {
+            assistantBtn.addEventListener('click', () => this._openAssistantWithSelectedModels());
+        }
     }
 
     async _loadTags() {
@@ -501,6 +522,7 @@ class SearchApp extends AppBase {
         // Cached DOM is re-attached; just resume the resize observer.
         this._observeResize();
         this._updateHomeModeClass();
+        this._renderAssistantModelBar();
         const input = this.container?.querySelector('#search-input');
         if (input) input.focus();
     }
@@ -518,6 +540,7 @@ class SearchApp extends AppBase {
             selectedTags: this.selectedTags,
             resultsHtml: this.resultsHtml,
             tagsHtml: this.tagsHtml,
+            selectedAssistantModels: this.selectedAssistantModels,
         };
     }
 
@@ -529,14 +552,17 @@ class SearchApp extends AppBase {
         const newSelectedTags = state.selectedTags || [];
         const newResultsHtml = state.resultsHtml || '';
         const newTagsHtml = state.tagsHtml || '';
+        const newSelectedModels = state.selectedAssistantModels || [];
         const changed = this.query !== newQuery
             || JSON.stringify(this.selectedTags) !== JSON.stringify(newSelectedTags)
             || this.resultsHtml !== newResultsHtml
-            || this.tagsHtml !== newTagsHtml;
+            || this.tagsHtml !== newTagsHtml
+            || JSON.stringify(this.selectedAssistantModels) !== JSON.stringify(newSelectedModels);
         this.query = newQuery;
         this.selectedTags = newSelectedTags;
         this.resultsHtml = newResultsHtml;
         this.tagsHtml = newTagsHtml;
+        this.selectedAssistantModels = newSelectedModels;
         if (!this.container) return;
         // If the live DOM already shows the right content, don't rebuild it.
         const liveMatchesState = !changed || (this.container.querySelector('#search-wrapper-inner')
@@ -544,9 +570,136 @@ class SearchApp extends AppBase {
         if (liveMatchesState) {
             this._observeResize();
             this._updateHomeModeClass();
+            this._renderAssistantModelBar();
+            this._updateAddModelButtons();
             return;
         }
         this.render(this.container);
+    }
+
+    _toggleAssistantModel(documentId, filename, extension) {
+        if (!documentId || !filename) return;
+        const existingIndex = this.selectedAssistantModels.findIndex(m => m.documentId === documentId);
+        if (existingIndex >= 0) {
+            this.selectedAssistantModels.splice(existingIndex, 1);
+        } else {
+            if (this.selectedAssistantModels.length >= this.maxAssistantModels) return;
+            this.selectedAssistantModels.push({ documentId, filename, extension });
+        }
+        this._renderAssistantModelBar();
+        this._updateAddModelButtons();
+        this._saveState();
+    }
+
+    _removeAssistantModel(documentId) {
+        this.selectedAssistantModels = this.selectedAssistantModels.filter(m => m.documentId !== documentId);
+        this._renderAssistantModelBar();
+        this._updateAddModelButtons();
+        this._saveState();
+    }
+
+    _clearAssistantModels() {
+        this.selectedAssistantModels = [];
+        this._renderAssistantModelBar();
+        this._updateAddModelButtons();
+        this._saveState();
+    }
+
+    _renderAssistantModelBar() {
+        const bar = this.container?.querySelector('#search-assistant-models-bar');
+        const pillsSlot = this.container?.querySelector('#search-assistant-models-pills');
+        if (!bar || !pillsSlot) return;
+        if (!this.selectedAssistantModels.length) {
+            bar.classList.add('hidden');
+            pillsSlot.innerHTML = '';
+            return;
+        }
+        bar.classList.remove('hidden');
+        pillsSlot.innerHTML = this.selectedAssistantModels.map(m => {
+            const displayName = m.filename.includes('__') ? m.filename.split('__').slice(0, -1).join('__') : m.filename;
+            return `
+                <div class="search-assistant-model-pill" data-document-id="${this._escape(m.documentId)}">
+                    <span title="${this._escape(m.filename)}">${this._escape(displayName)}</span>
+                    <button type="button" class="search-assistant-model-remove" title="Retirer">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+            `;
+        }).join('');
+        pillsSlot.querySelectorAll('.search-assistant-model-remove').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const pill = btn.closest('.search-assistant-model-pill');
+                if (pill) this._removeAssistantModel(pill.dataset.documentId);
+            });
+        });
+    }
+
+    _updateAddModelButtons() {
+        if (!this.container) return;
+        const atMax = this.selectedAssistantModels.length >= this.maxAssistantModels;
+        this.container.querySelectorAll('[data-action="add-to-assistant"]').forEach(btn => {
+            const documentId = btn.dataset.documentId;
+            const selected = this.selectedAssistantModels.some(m => m.documentId === documentId);
+            btn.disabled = atMax && !selected;
+            btn.classList.toggle('search-add-model-selected', selected);
+            btn.style.opacity = (atMax && !selected) ? '0.4' : '';
+        });
+    }
+
+    _displayNameForSearchModel(filename) {
+        return filename.includes('__') ? filename.split('__').slice(0, -1).join('__') : filename;
+    }
+
+    async _openAssistantWithSelectedModels() {
+        if (!this.selectedAssistantModels.length) return;
+        const btn = this.container?.querySelector('#search-open-assistant-btn');
+        if (btn) btn.disabled = true;
+        const imported = [];
+        for (const item of this.selectedAssistantModels) {
+            try {
+                const result = await ApiClient.importDocumentAsAssistantModel(item.documentId, 'assistant');
+                if (result?.name) {
+                    imported.push({ name: result.name, display_name: result.display_name || item.filename });
+                }
+            } catch (err) {
+                console.error('Import model from search error', err);
+                this._appendSearchError(`Erreur import de ${this._displayNameForSearchModel(item.filename)} : ${err.message}`);
+            }
+        }
+        if (btn) btn.disabled = false;
+        if (!imported.length) return;
+
+        this._clearAssistantModels();
+
+        const existing = AppState.listInstances().find(i => i.appId === 'assistant');
+        if (existing) AppState.removeInstance(existing.instanceId);
+
+        const names = imported.map(m => m.name);
+        const displayNames = {};
+        imported.forEach(m => { displayNames[m.name] = m.display_name; });
+        const { instance, instanceId } = AppState.createInstance('assistant', {
+            mode: 'tab',
+            modelNames: names,
+            modelName: names[0] || '',
+            origin: 'assistant',
+            fromHistory: false,
+            displayNames,
+        });
+        await window.windowManager._mountTab(instance);
+        AppState.setActiveInstance(instanceId);
+    }
+
+    _appendSearchError(message) {
+        const container = this.container?.querySelector('#results-container');
+        if (!container) return;
+        const div = document.createElement('div');
+        div.className = 'search-import-error';
+        div.textContent = message;
+        container.appendChild(div);
+    }
+
+    _saveState() {
+        AppState.saveInstanceState(this.instanceId);
     }
 }
 

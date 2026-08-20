@@ -102,6 +102,11 @@ def render_results(results_data: list, query: str = "") -> dict:
             import os as _os
             _, ext = _os.path.splitext(filename.lower())
             is_pdf = ext == ".pdf"
+            importable_extensions = {".xml", ".xmi", ".ttl", ".json", ".jsonld", ".sql", ".txt", ".html", ".htm", ".csv"}
+            can_add_to_assistant = ext in importable_extensions
+            add_button = f"""<button data-action="add-to-assistant" data-document-id="{document_id}" data-filename="{filename}" data-extension="{ext}" class="magic-btn search-add-model-btn flex items-center justify-center p-1.5 rounded-full bg-gray-100 hover:bg-white text-gray-500 hover:text-black focus:outline-none transition-colors" title="Ajouter au contexte de l'Assistant">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
+                        </button>""" if can_add_to_assistant else ""
             preview_button = "" if is_pdf else f"""<button data-action="preview" data-doc-id="{chunk0_id}" data-document-id="{document_id}" data-name="{safe_filename}" class="magic-btn flex items-center justify-center p-1.5 rounded-full bg-gray-100 hover:bg-white text-gray-500 hover:text-black focus:outline-none transition-colors" title="Aperçu rapide">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
                         </button>"""
@@ -122,6 +127,7 @@ def render_results(results_data: list, query: str = "") -> dict:
                         <span class="font-mono text-xs mt-0.5" title="{document_id}">ID: {str(document_id)[:8]}...</span>
                     </div>
                     <div class="flex gap-2">
+                        {add_button}
                         {preview_button}
                         <button data-action="chat" data-document-id="{document_id}" data-name="{safe_filename}" class="magic-btn flex items-center justify-center p-1.5 rounded-full bg-gray-100 hover:bg-white text-gray-400 hover:text-black focus:outline-none" title="Analyser avec l'IA">
                             <svg class="magic-svg w-5 h-5" viewBox="0 0 24 24">
