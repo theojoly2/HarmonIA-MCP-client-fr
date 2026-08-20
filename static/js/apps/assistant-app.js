@@ -54,6 +54,9 @@ class AssistantApp extends AppBase {
                 this.chatEl.classList.add('assistant-chat-mode');
                 this.welcomeEl.classList.add('assistant-welcome-top');
                 this.inputArea.classList.add('assistant-input-area-chat');
+                // When remounting from cache (e.g. switching back to a modeler with
+                // an embedded assistant), force-scroll to the bottom of the conversation.
+                this._scrollToBottom(true);
             }
             return;
         }
