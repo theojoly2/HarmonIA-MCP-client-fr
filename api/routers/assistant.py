@@ -7,6 +7,7 @@ autre_version's chat_logic in a FastAPI/Vanilla-JS stack.
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import os
 import re
