@@ -437,43 +437,10 @@ class AssistantApp extends AppBase {
             this._scrollListener = null;
         }
 
-        // Start with stick-to-bottom enabled whenever a chat is present.
-        this._stickToBottom = true;
-
-        let scrollRaf = null;
-        this._messagesObserver = new MutationObserver(() => {
-            if (!this.chatEl) return;
-            if (!this._stickToBottom) return;
-            if (scrollRaf) return;
-            scrollRaf = requestAnimationFrame(() => {
-                scrollRaf = null;
-                if (!this.chatEl || !this._stickToBottom) return;
-                this.chatEl.scrollTo({ top: this.chatEl.scrollHeight, behavior: 'auto' });
-            });
-        });
-        this._messagesObserver.observe(this.messagesEl, { childList: true, subtree: true });
-
-        let lastScrollTop = this.chatEl?.scrollTop || 0;
-        this._scrollListener = () => {
-            if (!this.chatEl) return;
-            const st = this.chatEl.scrollTop;
-            const distance = this.chatEl.scrollHeight - st - this.chatEl.clientHeight;
-            const now = performance.now();
-            const isScrollingUp = st < lastScrollTop - 2;
-            // If the user actively scrolls up, disable auto-stick and lock the choice for a short grace period.
-            if (isScrollingUp && distance > 40) {
-                this._stickToBottom = false;
-                this._stickLockUntil = now + 1000; // 1s grace period
-            }
-            // Re-enable auto-stick only after the grace period and only if truly back at the bottom.
-            if (!this._stickLockUntil || now > this._stickLockUntil) {
-                if (distance <= 16) {
-                    this._stickToBottom = true;
-                }
-            }
-            lastScrollTop = st;
-        };
-        this.chatEl?.addEventListener('scroll', this._scrollListener, { passive: true });
+        // Auto-scroll is intentionally disabled. The user controls the scroll
+        // position manually; only explicit scroll calls (e.g. sending a message)
+        // move the view.
+        this._stickToBottom = false;
     }
 
     _escape(text) {
@@ -2024,7 +1991,6 @@ class AssistantApp extends AppBase {
                     currentBubbleContent.innerHTML = this._markdown(displayedText, false);
                 }
                 this._adjustChatPadding();
-                this._throttledScrollToBottom();
             }, 20);
         };
 
