@@ -39,7 +39,7 @@ class HistoryPanel {
                     </svg>
                     <span class="text-sm font-medium">Chargement de l'historique...</span>
                 </div>
-                <div class="history-empty hidden" id="history-empty">Aucun modèle enregistré.</div>
+                <div class="history-empty hidden" id="history-empty">Historique vide.</div>
                 <ul class="history-list" id="history-list"></ul>
             </div>
         `;
@@ -68,7 +68,10 @@ class HistoryPanel {
     }
 
     async load() {
-        if (this.loadingEl) this.loadingEl.classList.remove("hidden");
+        // Only show the loading spinner on the first fetch; subsequent reloads
+        // keep the existing list visible so the panel does not flash.
+        const isFirstLoad = !this.items;
+        if (isFirstLoad && this.loadingEl) this.loadingEl.classList.remove("hidden");
         if (this.emptyEl) this.emptyEl.classList.add("hidden");
         if (!AuthManager.isLoggedIn()) {
             this.items = [];
