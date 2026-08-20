@@ -919,6 +919,14 @@
     max-width: 4rem;
 }
 
+.assistant-model-pill-loading {
+    opacity: 0.85;
+}
+
+.assistant-pill-spinner svg {
+    display: block;
+}
+
 .assistant-sources-header {
     font-size: 0.75rem;
     font-weight: 700;

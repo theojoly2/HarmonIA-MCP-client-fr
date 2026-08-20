@@ -32,6 +32,8 @@ class AssistantApp extends AppBase {
         // back, setState will replay the missed events into the new DOM.
         this._pendingEvents = [];
         this._lastRenderedEventIndex = -1;
+        // Models currently being imported. Each entry: { name, displayName, loading: true }.
+        this._loadingModels = [];
         // Text accumulated for the assistant message currently being streamed. Stored
         // on the instance so it survives a tab switch (the old DOM is discarded and
         // rebuilt from the HTML snapshot).
@@ -210,7 +212,7 @@ class AssistantApp extends AppBase {
 
         this.fileInput.addEventListener('change', (e) => {
             const files = Array.from(e.target.files || []);
-            const remaining = Math.max(0, this.modelNamesConfig.max - (this.modelNames?.length || 0));
+            const remaining = Math.max(0, this.modelNamesConfig.max - ((this.modelNames?.length || 0) + (this._loadingModels?.length || 0)));
             const toImport = files.slice(0, remaining);
             for (const file of toImport) this._importModel(file);
             if (this.fileInput) this.fileInput.value = '';
@@ -668,12 +670,21 @@ class AssistantApp extends AppBase {
 
     _displayNameForModel(name) {
         const raw = this.props.displayNames?.[name] || name;
+        return this._stripTimestampSuffix(raw);
+    }
+
+    _displayNameForSearchModel(filename) {
+        return this._stripTimestampSuffix(filename);
+    }
+
+    _stripTimestampSuffix(raw) {
+        if (!raw || typeof raw !== 'string') return raw || '';
         return raw.includes('__') ? raw.split('__').slice(0, -1).join('__') : raw;
     }
 
     _updateImportButtonState(importBtn) {
         if (!importBtn || this._embedded) return;
-        const atMax = (this.modelNames?.length || 0) >= this.modelNamesConfig.max;
+        const atMax = ((this.modelNames?.length || 0) + (this._loadingModels?.length || 0)) >= this.modelNamesConfig.max;
         importBtn.disabled = atMax;
         importBtn.style.opacity = atMax ? '0.4' : '';
         importBtn.title = atMax
@@ -683,38 +694,90 @@ class AssistantApp extends AppBase {
 
     async _importModel(file) {
         if (!file || (this.modelNames?.length || 0) >= this.modelNamesConfig.max) return;
+        const loadingKey = `loading_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        const displayName = file.name;
+        this._startImportLoading(loadingKey, displayName);
         try {
             const result = await ApiClient.importAssistantModel(file, file.name, this.origin);
             if (result?.name) {
-                const names = this.modelNames.slice();
-                if (!names.includes(result.name)) names.push(result.name);
-                this.modelNames = names.slice(0, this.modelNamesConfig.max);
                 this.props.displayNames = this.props.displayNames || {};
                 this.props.displayNames[result.name] = result.display_name || result.name;
-                this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
-                this._updateModelPill();
+                this._finishImportLoading(loadingKey, result.name);
+            } else {
+                throw new Error('Import terminé sans retour de modèle.');
             }
         } catch (err) {
             console.error('Assistant import model error', err);
-            this._appendSystemMessage(`Erreur lors de l'import du modèle : ${this._escape(err.message)}`);
+            this._failImportLoading(loadingKey, `Erreur lors de l'import de ${displayName} : ${err.message}`);
         }
     }
 
+    /**
+     * Start loading state for a model that is being imported.
+     * This shows a pill immediately and disables further imports until resolved.
+     */
+    _startImportLoading(name, displayName) {
+        if (!this._loadingModels) this._loadingModels = [];
+        this._loadingModels.push({ name, displayName, loading: true });
+        this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
+        this._updateModelPill();
+    }
+
+    /**
+     * Replace a loading placeholder with the imported model name.
+     */
+    _finishImportLoading(loadingName, importedName) {
+        if (!this._loadingModels) return;
+        this._loadingModels = this._loadingModels.filter((m) => m.name !== loadingName);
+        const names = this.modelNames.slice();
+        if (!names.includes(importedName)) names.push(importedName);
+        this.modelNames = names.slice(0, this.modelNamesConfig.max);
+        this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
+        this._updateModelPill();
+    }
+
+    /**
+     * Remove a failed loading placeholder and notify the user.
+     */
+    _failImportLoading(loadingName, message) {
+        if (!this._loadingModels) return;
+        this._loadingModels = this._loadingModels.filter((m) => m.name !== loadingName);
+        this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
+        this._updateModelPill();
+        this._appendSystemMessage(this._escape(message));
+    }
+
     _updateModelPill() {
-        if (!this.modelPillSlotEl || !this.modelNames?.length) {
-            if (this.modelPillSlotEl) this.modelPillSlotEl.innerHTML = '';
+        if (!this.modelPillSlotEl) return;
+        const showClose = !this._embedded;
+        const realModels = (this.modelNames || []).map((name) => ({
+            name,
+            displayName: this._displayNameForModel(name),
+            loading: false,
+        }));
+        const allModels = [...realModels, ...(this._loadingModels || [])];
+        if (!allModels.length) {
+            this.modelPillSlotEl.innerHTML = '';
             return;
         }
-        const showClose = !this._embedded;
-        this.modelPillSlotEl.innerHTML = this.modelNames.map((name) => {
-            const displayName = this._displayNameForModel(name);
-            return `
-            <div class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-100 border border-gray-200 text-xs font-semibold text-gray-700 assistant-model-pill" data-model-name="${this._escape(name)}">
+        this.modelPillSlotEl.innerHTML = allModels.map((model) => {
+            const displayName = model.loading ? this._displayNameForSearchModel(model.displayName) : this._displayNameForModel(model.name);
+            const loadingSpinner = model.loading ? `
+                <span class="assistant-pill-spinner w-3.5 h-3.5 inline-flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                    <svg class="animate-spin w-3.5 h-3.5 text-gray-500" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                    </svg>
+                </span>` : `
                 <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                </svg>
+                </svg>`;
+            return `
+            <div class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-100 border border-gray-200 text-xs font-semibold text-gray-700 assistant-model-pill ${model.loading ? 'assistant-model-pill-loading' : ''}" data-model-name="${this._escape(model.name)}">
+                ${loadingSpinner}
                 <span class="truncate max-w-[10rem]" title="${this._escape(displayName)}">${this._escape(displayName)}</span>
+                ${model.loading ? '' : `
                 <div class="relative">
                     <button type="button" class="assistant-model-pill-export w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors" title="Exporter le modèle">
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
@@ -732,7 +795,7 @@ class AssistantApp extends AppBase {
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                         <path d="M18 6L6 18M6 6l12 12"></path>
                     </svg>
-                </button>` : ''}
+                </button>` : ''}`}
             </div>
             `;
         }).join('');
@@ -781,6 +844,7 @@ class AssistantApp extends AppBase {
 
     _removeModelPill(name) {
         this.modelNames = (this.modelNames || []).filter((n) => n !== name);
+        this._loadingModels = (this._loadingModels || []).filter((m) => m.name !== name);
         if (this.props.displayNames) delete this.props.displayNames[name];
         this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
         this._updateModelPill();
@@ -792,6 +856,7 @@ class AssistantApp extends AppBase {
             this._pillExportCloseHandler = null;
         }
         this.modelNames = [];
+        this._loadingModels = [];
         this.props.displayNames = {};
         if (this.modelPillSlotEl) this.modelPillSlotEl.innerHTML = '';
         this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
@@ -909,6 +974,7 @@ class AssistantApp extends AppBase {
     }
 
     _appendSystemMessage(text) {
+        if (!this.messagesEl) return;
         const div = document.createElement('div');
         div.className = 'assistant-bubble assistant-bubble-assistant mb-6';
         div.innerHTML = `

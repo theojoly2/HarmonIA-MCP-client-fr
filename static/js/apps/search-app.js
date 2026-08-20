@@ -665,39 +665,57 @@ class SearchApp extends AppBase {
         if (!this.selectedAssistantModels.length) return;
         const btn = this.container?.querySelector('#search-open-assistant-btn');
         if (btn) btn.disabled = true;
-        const imported = [];
-        for (const item of this.selectedAssistantModels) {
-            try {
-                const result = await ApiClient.importDocumentAsAssistantModel(item.docId, 'assistant');
-                if (result?.name) {
-                    imported.push({ name: result.name, display_name: result.display_name || item.filename });
-                }
-            } catch (err) {
-                console.error('Import model from search error', err);
-                this._appendSearchError(`Erreur import de ${this._displayNameForSearchModel(item.filename)} : ${err.message}`);
-            }
-        }
-        if (btn) btn.disabled = false;
-        if (!imported.length) return;
 
-        this._clearAssistantModels();
-
+        // Open the Assistant immediately with loading placeholders so the user
+        // isn't stuck on Search while imports run in the background.
         const existing = AppState.listInstances().find(i => i.appId === 'assistant');
         if (existing) AppState.removeInstance(existing.instanceId);
 
-        const names = imported.map(m => m.name);
-        const displayNames = {};
-        imported.forEach(m => { displayNames[m.name] = m.display_name; });
+        const initialDisplayNames = {};
+        const loadingKeys = this.selectedAssistantModels.map((item, idx) => {
+            const key = `search_import_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 8)}`;
+            initialDisplayNames[key] = item.filename;
+            return { key, item };
+        });
+
         const { instance, instanceId } = AppState.createInstance('assistant', {
             mode: 'tab',
-            modelNames: names,
-            modelName: names[0] || '',
+            modelNames: [],
+            modelName: '',
             origin: 'assistant',
             fromHistory: false,
-            displayNames,
+            displayNames: initialDisplayNames,
         });
+
         await window.windowManager._mountTab(instance);
         AppState.setActiveInstance(instanceId);
+
+        // Register loading placeholders on the Assistant instance.
+        loadingKeys.forEach(({ key, item }) => {
+            instance._startImportLoading(key, item.filename);
+        });
+        this._clearAssistantModels();
+
+        // Import in parallel in the background and update the Assistant pills.
+        const imported = [];
+        await Promise.all(loadingKeys.map(async ({ key, item }) => {
+            try {
+                const result = await ApiClient.importDocumentAsAssistantModel(item.docId, 'assistant');
+                if (result?.name) {
+                    instance.props.displayNames = instance.props.displayNames || {};
+                    instance.props.displayNames[result.name] = result.display_name || item.filename;
+                    instance._finishImportLoading(key, result.name);
+                    imported.push({ name: result.name, display_name: result.display_name || item.filename });
+                } else {
+                    throw new Error('Import terminé sans retour de modèle.');
+                }
+            } catch (err) {
+                console.error('Import model from search error', err);
+                instance._failImportLoading(key, `Erreur import de ${this._displayNameForSearchModel(item.filename)} : ${err.message}`);
+            }
+        }));
+
+        if (btn) btn.disabled = false;
     }
 
     _appendSearchError(message) {
