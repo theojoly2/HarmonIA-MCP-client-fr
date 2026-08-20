@@ -99,7 +99,11 @@ class ModelerApp extends AppBase {
                             Exporter en TTL
                         </button>
                         <button type="button" data-format="svg" class="modeler-export-item w-full text-left px-4 py-2 hover:bg-gray-50 text-gray-700 flex items-center gap-2">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                <polyline points="21 15 16 10 5 21"></polyline>
+                            </svg>
                             Exporter en SVG
                         </button>
                     </div>
@@ -759,7 +763,7 @@ class ModelerApp extends AppBase {
             this._showExportError('Aucun modèle à exporter.');
             return;
         }
-        const originalText = itemEl?.textContent?.trim() || '';
+        const originalHtml = itemEl?.innerHTML || '';
         this._setExportItemLoading(itemEl, true);
         try {
             const blob = await ApiClient.exportModel(this.storedName, format);
@@ -776,15 +780,15 @@ class ModelerApp extends AppBase {
             console.error('Export model error', err);
             this._showExportError(`Échec de l'export ${format.toUpperCase()}.`);
         } finally {
-            this._setExportItemLoading(itemEl, false, originalText);
+            this._setExportItemLoading(itemEl, false, originalHtml);
         }
     }
 
-    _setExportItemLoading(itemEl, isLoading, originalText = '') {
+    _setExportItemLoading(itemEl, isLoading, originalHtml = '') {
         if (!itemEl) return;
         if (isLoading) {
             itemEl.disabled = true;
-            itemEl.dataset.originalText = itemEl.textContent?.trim() || '';
+            itemEl.dataset.originalHtml = itemEl.innerHTML || '';
             itemEl.innerHTML = `
                 <span class="inline-flex items-center gap-1.5">
                     <svg class="animate-spin w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24">
@@ -795,8 +799,8 @@ class ModelerApp extends AppBase {
                 </span>`;
         } else {
             itemEl.disabled = false;
-            itemEl.textContent = originalText || itemEl.dataset.originalText || 'Exporter';
-            delete itemEl.dataset.originalText;
+            itemEl.innerHTML = originalHtml || itemEl.dataset.originalHtml || 'Exporter';
+            delete itemEl.dataset.originalHtml;
         }
     }
 

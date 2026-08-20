@@ -791,7 +791,14 @@ class AssistantApp extends AppBase {
                     <div class="assistant-model-pill-export-menu hidden absolute bottom-full right-0 mb-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg py-1 text-xs z-50">
                         <button type="button" data-format="xmi" class="assistant-pill-export-item w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700">Exporter en XMI</button>
                         <button type="button" data-format="ttl" class="assistant-pill-export-item w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700">Exporter en TTL</button>
-                        <button type="button" data-format="svg" class="assistant-pill-export-item w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700">Exporter en SVG</button>
+                        <button type="button" data-format="svg" class="assistant-pill-export-item w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700 flex items-center gap-1.5">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                <polyline points="21 15 16 10 5 21"></polyline>
+                            </svg>
+                            Exporter en SVG
+                        </button>
                     </div>
                 </div>
                 ${showClose ? `<button type="button" class="assistant-model-pill-close w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors" title="Détacher le modèle">
@@ -874,7 +881,7 @@ class AssistantApp extends AppBase {
 
     async _exportModelFromPill(format, name, itemEl) {
         if (!name) return;
-        const originalText = itemEl?.textContent || '';
+        const originalHtml = itemEl?.innerHTML || '';
         this._setPillExportItemLoading(itemEl, true);
         try {
             const blob = await ApiClient.exportModel(name, format);
@@ -890,15 +897,15 @@ class AssistantApp extends AppBase {
             console.error('Export model from pill error', err);
             this._appendSystemMessage(`Erreur lors de l'export du modèle : ${this._escape(err.message)}`);
         } finally {
-            this._setPillExportItemLoading(itemEl, false, originalText);
+            this._setPillExportItemLoading(itemEl, false, originalHtml);
         }
     }
 
-    _setPillExportItemLoading(itemEl, isLoading, originalText = '') {
+    _setPillExportItemLoading(itemEl, isLoading, originalHtml = '') {
         if (!itemEl) return;
         if (isLoading) {
             itemEl.disabled = true;
-            itemEl.dataset.originalText = itemEl.textContent;
+            itemEl.dataset.originalHtml = itemEl.innerHTML || '';
             itemEl.innerHTML = `
                 <span class="inline-flex items-center gap-1.5">
                     <svg class="animate-spin w-3.5 h-3.5 text-gray-500" fill="none" viewBox="0 0 24 24">
@@ -909,8 +916,8 @@ class AssistantApp extends AppBase {
                 </span>`;
         } else {
             itemEl.disabled = false;
-            itemEl.textContent = originalText || itemEl.dataset.originalText || 'Exporter';
-            delete itemEl.dataset.originalText;
+            itemEl.innerHTML = originalHtml || itemEl.dataset.originalHtml || 'Exporter';
+            delete itemEl.dataset.originalHtml;
         }
     }
 
