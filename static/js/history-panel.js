@@ -78,15 +78,16 @@ class HistoryPanel {
     }
 
     async load() {
-        // Show a small header spinner on every reload; it sits in a fixed-size
-        // slot so it never shifts the list or empty message.
-        if (this.headerSpinnerEl) this.headerSpinnerEl.classList.remove("history-panel-spinner-hidden");
-
-        // Only show the big centered spinner on the first fetch; subsequent
-        // reloads keep the existing list/empty message visible.
+        // Only show the big centered spinner on the first fetch; hide the small
+        // header spinner during that first load so only one spinner is visible.
         if (!this._hasLoaded) {
+            if (this.headerSpinnerEl) this.headerSpinnerEl.classList.add("history-panel-spinner-hidden");
             if (this.loadingEl) this.loadingEl.classList.remove("hidden");
             if (this.emptyEl) this.emptyEl.classList.add("hidden");
+        } else {
+            // Subsequent reloads show only the small header spinner and keep
+            // the existing list/empty message visible underneath.
+            if (this.headerSpinnerEl) this.headerSpinnerEl.classList.remove("history-panel-spinner-hidden");
         }
         if (!AuthManager.isLoggedIn()) {
             this.items = [];
