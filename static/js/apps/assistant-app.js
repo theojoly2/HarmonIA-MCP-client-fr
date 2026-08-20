@@ -789,8 +789,14 @@ class AssistantApp extends AppBase {
                         </svg>
                     </button>
                     <div class="assistant-model-pill-export-menu hidden absolute bottom-full right-0 mb-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg py-1 text-xs z-50">
-                        <button type="button" data-format="xmi" class="assistant-pill-export-item w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700">Exporter en XMI</button>
-                        <button type="button" data-format="ttl" class="assistant-pill-export-item w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700">Exporter en TTL</button>
+                        <button type="button" data-format="xmi" class="assistant-pill-export-item w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700 flex items-center gap-1.5">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                            Exporter en XMI
+                        </button>
+                        <button type="button" data-format="ttl" class="assistant-pill-export-item w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700 flex items-center gap-1.5">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                            Exporter en TTL
+                        </button>
                         <button type="button" data-format="svg" class="assistant-pill-export-item w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700 flex items-center gap-1.5">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
