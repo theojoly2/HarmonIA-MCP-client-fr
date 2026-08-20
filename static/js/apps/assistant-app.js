@@ -55,15 +55,11 @@ class AssistantApp extends AppBase {
                 this.welcomeEl.classList.add('assistant-welcome-top');
                 this.inputArea.classList.add('assistant-input-area-chat');
                 // When remounting from cache, wait for layout and then scroll so
-                // the last message is visible above the floating input area. Both
-                // standalone and embedded modes reserve space at the bottom for the
-                // input, so we always subtract its real height plus a small margin.
+                // the last message is visible above the floating input area.
                 requestAnimationFrame(() => {
                     requestAnimationFrame(() => {
                         if (!this.chatEl || !this.inputArea) return;
-                        const inputHeight = this.inputArea.getBoundingClientRect().height;
-                        const target = Math.max(0, this.chatEl.scrollHeight - this.chatEl.clientHeight - inputHeight - 8);
-                        this.chatEl.scrollTo({ top: target, behavior: 'auto' });
+                        this._scrollToBottom(true);
                     });
                 });
             }
