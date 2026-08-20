@@ -498,61 +498,67 @@ class HistoryPanel {
 
         this.close();
 
+        // Open the Modeler tab immediately in loading state so the user sees
+        // the spinner while the SVG is fetched/generated in the background.
+        const existingModéliseur = AppState.listInstances().find((i) => i.appId === "modeler" && i.mode === "tab");
+        if (existingModéliseur) {
+            AppState.removeInstance(existingModéliseur.instanceId);
+        }
+        const modelerInstance = AppState.createInstance("modeler", {
+            mode: "tab",
+            loading: true,
+        });
+        await windowManager._mountTab(modelerInstance.instance);
+        AppState.setActiveInstance(modelerInstance.instanceId);
+
+        // Fetch the SVG and linked session info in parallel with opening the tab.
+        let svgText;
+        let returnedName;
         try {
-            let svgText;
-            let returnedName;
+            ({ svgText, modelName: returnedName } = await ApiClient.getModelSvg(modelName));
+        } catch (err) {
+            console.error("Fetch model SVG error", err);
+            modelerInstance.instance._setLoading(false);
+            modelerInstance.instance._showError(err.message || err);
+            alert("Impossible d'ouvrir le modèle : " + (err.message || err));
+            return;
+        }
+
+        // Update last-opened time in the background (non-blocking).
+        fetch(`api/models/${encodedName}/touch`, {
+            method: "POST",
+            credentials: "same-origin",
+        }).catch((err) => console.error("Touch model error", err));
+
+        const displayName = returnedName || modelName;
+        if (modelerInstance.instance.loadSvg) {
+            await modelerInstance.instance.loadSvg(svgText, displayName, (svgText.match(match) || ["", ""])[1], modelName);
+        }
+
+        // If this model has a linked modeler assistant conversation, prepare the
+        // modeler so its assistant split reopens that session instead of
+        // creating a blank one.
+        const li = this.listEl.querySelector(`li[data-item-name="${CSS.escape(modelName)}"][data-item-kind="model"]`);
+        const linkedSession = li?.dataset.assistantSession;
+        const linkedDisplayName = li?.dataset.assistantDisplayName;
+        if (linkedSession && modelerInstance.instance._prepareLinkedAssistantSession) {
+            modelerInstance.instance._prepareLinkedAssistantSession(linkedSession, linkedDisplayName);
+        }
+
+        // Also update the modeler assistant sub-entry mtime so it stays in
+        // sync with the model item in the history panel.
+        if (linkedSession) {
             try {
-                ({ svgText, modelName: returnedName } = await ApiClient.getModelSvg(modelName));
+                await ApiClient.touchAssistantSession(linkedSession, "modeler");
             } catch (err) {
-                console.error("Fetch model SVG error", err);
-                alert("Impossible d'ouvrir le modèle : " + (err.message || err));
-                return;
+                console.error("Touch modeler assistant session error", err);
             }
+        }
 
-            // Update last-opened time in the background (non-blocking).
-            fetch(`api/models/${encodedName}/touch`, {
-                method: "POST",
-                credentials: "same-origin",
-            }).catch((err) => console.error("Touch model error", err));
-
-            const existingModéliseur = AppState.listInstances().find((i) => i.appId === "modeler" && i.mode === "tab");
-            if (existingModéliseur) {
-                AppState.removeInstance(existingModéliseur.instanceId);
-            }
-            const modelerInstance = AppState.createInstance("modeler", {
-                mode: "tab",
-            });
-            await windowManager._mountTab(modelerInstance.instance);
-            AppState.setActiveInstance(modelerInstance.instanceId);
-            const displayName = returnedName || modelName;
-            if (modelerInstance.instance.loadSvg) {
-                await modelerInstance.instance.loadSvg(svgText, displayName, (svgText.match(match) || ["", ""])[1], modelName);
-            }
-
-            // If this model has a linked modeler assistant conversation, prepare the
-            // modeler so its assistant split reopens that session instead of
-            // creating a blank one.
-            const li = this.listEl.querySelector(`li[data-item-name="${CSS.escape(modelName)}"][data-item-kind="model"]`);
-            const linkedSession = li?.dataset.assistantSession;
-            const linkedDisplayName = li?.dataset.assistantDisplayName;
-            if (linkedSession && modelerInstance.instance._prepareLinkedAssistantSession) {
-                modelerInstance.instance._prepareLinkedAssistantSession(linkedSession, linkedDisplayName);
-            }
-
-            // Also update the modeler assistant sub-entry mtime so it stays in
-            // sync with the model item in the history panel.
-            if (linkedSession) {
-                try {
-                    await ApiClient.touchAssistantSession(linkedSession, "modeler");
-                } catch (err) {
-                    console.error("Touch modeler assistant session error", err);
-                }
-            }
-
+        try {
             await this.load();
         } catch (err) {
-            console.error("Open model error", err);
-            alert("Impossible d'ouvrir le modèle : " + (err.message || err));
+            console.error("History reload error", err);
         }
     }
 
