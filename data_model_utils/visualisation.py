@@ -494,12 +494,17 @@ def _render_with_native_plantuml(plantuml_text: str, output_format: str = "svg")
         )
 
         if not output_path.exists():
+            _logger.error(
+                "Native PlantUML %s failed. stdout: %s stderr: %s cmd: %s",
+                ext.upper(), result.stdout, result.stderr, " ".join(cmd),
+            )
             raise RuntimeError(
                 f"Native PlantUML did not generate output.\nstdout: {result.stdout}\nstderr: {result.stderr}"
             )
 
         image_bytes = output_path.read_bytes()
         if len(image_bytes) < 100:
+            _logger.error("Native PlantUML generated tiny %s file (%d bytes)", ext.upper(), len(image_bytes))
             raise RuntimeError(f"Native PlantUML generated an empty or invalid {ext.upper()}")
 
         _print_render_source(f"native binary: {binary_path}")

@@ -322,6 +322,8 @@ async def export_model(
                     ext = "png"
                 data = result.getvalue() if hasattr(result, "getvalue") else result
             except Exception as e:
+                import traceback
+                traceback.print_exc()
                 print(f"[export_model] {fmt.upper()} regeneration failed for {model_name}: {e}", flush=True)
                 return Response(
                     status_code=422,
