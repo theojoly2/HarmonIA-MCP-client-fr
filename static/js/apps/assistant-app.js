@@ -140,6 +140,7 @@ class AssistantApp extends AppBase {
 
         this._bindInputEvents();
         this._observeResize();
+        this._observeMessagesScroll();
 
         container.querySelector('#assistant-form').addEventListener('submit', (e) => {
             e.preventDefault();
@@ -1809,17 +1810,13 @@ class AssistantApp extends AppBase {
     _scrollToBottom(force = false) {
         const el = this.chatEl;
         if (!el) return;
-        // If the bottom sentinel is visible, the user is at the bottom.
-        if (force || this._sentinelVisible) {
+        if (force || this._stickToBottom) {
             el.scrollTo({ top: el.scrollHeight, behavior: force ? 'auto' : 'smooth' });
         }
     }
 
     _isNearBottom() {
-        const el = this.chatEl;
-        if (!el) return true;
-        const threshold = 56;
-        return (el.scrollHeight - el.scrollTop - el.clientHeight) < threshold;
+        return !!this._stickToBottom;
     }
 
     async _send(text) {
