@@ -286,8 +286,8 @@ async def export_model(
     format: str = "xmi",
     username: str = Depends(require_user),
 ):
-    """Export a persisted model as XMI/XML, TTL or SVG."""
-    from data_model_utils import build_ttl_bytes, build_xmi_bytes, generate_visualisation
+    """Export a persisted model as XMI/XML, TTL, SVG or PNG."""
+    from data_model_utils import build_ttl_bytes, build_xmi_bytes, generate_visualisation, generate_visualisation_png
 
     model = await get_model(username, model_name)
     if not model:
@@ -303,25 +303,30 @@ async def export_model(
             data = build_ttl_bytes(model)
             media_type = "text/turtle"
             ext = "ttl"
-        elif fmt == "svg":
-            # Regenerate SVG from current model JSON so exports reflect edits.
+        elif fmt in {"svg", "png"}:
+            # Regenerate image from current model JSON so exports reflect edits.
             xmi = model.get("xmi")
-            svg = model.get("svg", "")
-            if isinstance(xmi, dict) and (xmi.get("elements") or xmi.get("connectors")):
-                try:
-                    svg_result = generate_visualisation(xmi)
-                    svg_bytes = svg_result.getvalue() if hasattr(svg_result, "getvalue") else svg_result
-                    svg = svg_bytes.decode("utf-8", errors="replace")
-                except Exception as e:
-                    print(f"[export_model] SVG regeneration failed for {model_name}: {e}", flush=True)
-            if not svg:
+            if not isinstance(xmi, dict) or (not xmi.get("elements") and not xmi.get("connectors")):
                 return Response(
                     status_code=422,
                     content=json.dumps({"detail": "export_empty"}),
                 )
-            data = svg.encode("utf-8")
-            media_type = "image/svg+xml"
-            ext = "svg"
+            try:
+                if fmt == "svg":
+                    result = generate_visualisation(xmi)
+                    media_type = "image/svg+xml"
+                    ext = "svg"
+                else:
+                    result = generate_visualisation_png(xmi)
+                    media_type = "image/png"
+                    ext = "png"
+                data = result.getvalue() if hasattr(result, "getvalue") else result
+            except Exception as e:
+                print(f"[export_model] {fmt.upper()} regeneration failed for {model_name}: {e}", flush=True)
+                return Response(
+                    status_code=422,
+                    content=json.dumps({"detail": "export_failed", "error": str(e)}),
+                )
         else:
             return Response(
                 status_code=400,
