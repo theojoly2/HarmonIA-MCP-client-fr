@@ -527,9 +527,16 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 1rem 1.25rem;
+    padding: 0.75rem 1rem;
     border-bottom: 1px solid #f3f4f6;
     flex-shrink: 0;
+    gap: 0.75rem;
+}
+.history-panel-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
 }
 .history-panel-title {
     font-size: 1rem;
