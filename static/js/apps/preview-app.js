@@ -15,6 +15,7 @@ class PreviewApp extends AppBase {
         super(instanceId, props);
         this.docId = props.docId || '';
         this.documentId = props.documentId || '';
+        this.modelName = props.modelName || '';
         this.docName = props.name || 'Document';
         this.svgText = '';
         this.viewer = null;
@@ -90,30 +91,41 @@ class PreviewApp extends AppBase {
         }
 
         // Persist the model in the background and refresh the history panel.
-        try {
-            const fileRes = await fetch(ApiClient.getDocumentFileUrl(this.docId));
-            if (!fileRes.ok) throw new Error(`file_fetch_failed:${fileRes.status}`);
-            const blob = await fileRes.blob();
-            const file = new File([blob], this.docName, { type: blob.type || "application/octet-stream" });
-            await ApiClient.importAndSaveModel(file, this.docName);
-            if (window.historyPanel) window.historyPanel.load();
-        } catch (err) {
-            console.error("Persist preview model error", err);
+        // For document previews, fetch the original file; for imported assistant
+        // models the SVG already came from a persisted model, so no re-upload needed.
+        if (!this.modelName) {
+            try {
+                const fileRes = await fetch(ApiClient.getDocumentFileUrl(this.docId));
+                if (!fileRes.ok) throw new Error(`file_fetch_failed:${fileRes.status}`);
+                const blob = await fileRes.blob();
+                const file = new File([blob], this.docName, { type: blob.type || "application/octet-stream" });
+                await ApiClient.importAndSaveModel(file, this.docName);
+                if (window.historyPanel) window.historyPanel.load();
+            } catch (err) {
+                console.error("Persist preview model error", err);
+            }
         }
     }
 
     async _load() {
         const loading = this.container.querySelector('#preview-loading');
         const viewerContainer = this.container.querySelector('#preview-svg-viewer');
-        if (!this.docId) {
+        if (!this.docId && !this.modelName) {
             if (loading) loading.innerHTML = `<div class="text-red-500 text-sm">Aucun document sélectionné.</div>`;
             return;
         }
         try {
-            const url = ApiClient.getDocumentVisualizeUrl(this.docId);
-            const res = await fetch(url);
-            if (!res.ok) throw new Error(`Preview failed: ${res.status}`);
-            this.svgText = await res.text();
+            let svgText = '';
+            if (this.modelName) {
+                const result = await ApiClient.getModelSvg(this.modelName);
+                svgText = result.svgText || '';
+            } else {
+                const url = ApiClient.getDocumentVisualizeUrl(this.docId);
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(`Preview failed: ${res.status}`);
+                svgText = await res.text();
+            }
+            this.svgText = svgText;
             const match = this.svgText.match(/data-main-class="([^"]*)"/);
             const mainClassName = match ? match[1] : '';
             if (!this.viewer) {

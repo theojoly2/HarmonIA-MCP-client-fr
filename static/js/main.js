@@ -113,6 +113,14 @@
         });
     });
 
+    EventBus.on('open-preview-model', ({ modelName, name }) => {
+        windowManager.open('preview', {
+            mode: 'float',
+            modelName,
+            name: name || modelName,
+        });
+    });
+
     EventBus.on('open-chat', ({ documentId, name }) => {
         windowManager.open('chat', {
             mode: 'float',
