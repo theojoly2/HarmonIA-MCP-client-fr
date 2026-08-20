@@ -897,6 +897,11 @@
     max-width: 8rem;
 }
 
+/* Keep the last message visible above the fixed input area. */
+#assistant-chat {
+    padding-bottom: 1.5rem;
+}
+
 /* === Model pills in the input toolbar === */
 #assistant-model-pill-slot {
     display: flex;
