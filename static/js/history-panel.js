@@ -8,6 +8,7 @@ class HistoryPanel {
         this.container = container;
         this.isOpen = false;
         this.models = [];
+        this._hasLoaded = false;
         this._init();
     }
 
@@ -17,7 +18,15 @@ class HistoryPanel {
         this.panel.setAttribute("aria-label", "Historique des modèles");
         this.panel.innerHTML = `
             <div class="history-panel-header">
-                <h3 class="history-panel-title">Historique</h3>
+                <div class="history-panel-title-wrap">
+                    <h3 class="history-panel-title">Historique</h3>
+                    <span class="history-panel-spinner" id="history-header-spinner" aria-hidden="true">
+                        <svg class="animate-spin w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </span>
+                </div>
                 <div class="history-panel-actions">
                     <button type="button" class="history-panel-delete-all" id="history-delete-all" title="Tout supprimer">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -32,7 +41,14 @@ class HistoryPanel {
                 </div>
             </div>
             <div class="history-panel-content" id="history-content">
-                <div class="history-empty" id="history-empty">Aucun modèle enregistré.</div>
+                <div class="history-loading" id="history-loading">
+                    <svg class="animate-spin h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span class="text-sm font-medium">Chargement de l'historique...</span>
+                </div>
+                <div class="history-empty hidden" id="history-empty">Historique vide.</div>
                 <ul class="history-list" id="history-list"></ul>
             </div>
         `;
@@ -41,6 +57,8 @@ class HistoryPanel {
         this.container.appendChild(this.panel);
         this.listEl = this.panel.querySelector("#history-list");
         this.emptyEl = this.panel.querySelector("#history-empty");
+        this.loadingEl = this.panel.querySelector("#history-loading");
+        this.headerSpinnerEl = this.panel.querySelector("#history-header-spinner");
         this.panel.querySelector("#history-close").addEventListener("click", () => this.close());
         this.panel.querySelector("#history-delete-all").addEventListener("click", (e) => {
             e.stopPropagation();
@@ -60,8 +78,20 @@ class HistoryPanel {
     }
 
     async load() {
+        // Only show the big centered spinner on the first fetch; hide the small
+        // header spinner during that first load so only one spinner is visible.
+        if (!this._hasLoaded) {
+            if (this.headerSpinnerEl) this.headerSpinnerEl.classList.add("history-panel-spinner-hidden");
+            if (this.loadingEl) this.loadingEl.classList.remove("hidden");
+            if (this.emptyEl) this.emptyEl.classList.add("hidden");
+        } else {
+            // Subsequent reloads show only the small header spinner and keep
+            // the existing list/empty message visible underneath.
+            if (this.headerSpinnerEl) this.headerSpinnerEl.classList.remove("history-panel-spinner-hidden");
+        }
         if (!AuthManager.isLoggedIn()) {
             this.items = [];
+            this._hasLoaded = true;
             this._render();
             return;
         }
@@ -148,11 +178,14 @@ class HistoryPanel {
             console.error("History load error", err);
             this.items = [];
         }
+        this._hasLoaded = true;
         this._render();
     }
 
     _render() {
         this.listEl.innerHTML = "";
+        if (this.loadingEl) this.loadingEl.classList.add("hidden");
+        if (this.headerSpinnerEl) this.headerSpinnerEl.classList.add("history-panel-spinner-hidden");
         if (!this.items.length) {
             this.emptyEl.classList.remove("hidden");
             return;
@@ -169,8 +202,11 @@ class HistoryPanel {
             li.dataset.itemName = storedName;
             li.dataset.itemKind = item.kind;
             if (isSearch) li.dataset.searchId = item.id;
-            if (isAssistant || isModelerAssistant) li.dataset.modelName = item.model_name || "";
-            if (isAssistant || isModelerAssistant) li.dataset.origin = item.origin || (isModelerAssistant ? "modeler" : "assistant");
+            if (isAssistant || isModelerAssistant) {
+                li.dataset.modelName = item.model_name || "";
+                li.dataset.modelNames = Array.isArray(item.model_names) ? item.model_names.join(",") : "";
+                li.dataset.origin = item.origin || (isModelerAssistant ? "modeler" : "assistant");
+            }
             if (!isSearch && !isAssistant && !isModelerAssistant) {
                 li.dataset.assistantSession = item.assistant_session || "";
                 li.dataset.assistantDisplayName = item.assistant_display_name || "";
@@ -192,8 +228,8 @@ class HistoryPanel {
             li.addEventListener("click", (e) => {
                 if (e.target.closest(".history-action-more, .history-menu")) return;
                 if (isSearch) this._runSearch(storedName, (item.tags || "").split(",").filter(Boolean), item.id);
-                else if (isAssistant) this._openAssistant(storedName, item.model_name || "", "assistant");
-                else if (isModelerAssistant) this._openAssistant(storedName, item.model_name || "", "modeler");
+                else if (isAssistant) this._openAssistant(storedName, item.model_names || (item.model_name ? [item.model_name] : []), "assistant");
+                else if (isModelerAssistant) this._openAssistant(storedName, item.model_names || (item.model_name ? [item.model_name] : []), "modeler");
                 else this._openModel(storedName);
             });
             const moreBtn = li.querySelector(".history-action-more");
@@ -495,67 +531,74 @@ class HistoryPanel {
 
         this.close();
 
+        // Open the Modeler tab immediately in loading state so the user sees
+        // the spinner while the SVG is fetched/generated in the background.
+        const existingModéliseur = AppState.listInstances().find((i) => i.appId === "modeler" && i.mode === "tab");
+        if (existingModéliseur) {
+            AppState.removeInstance(existingModéliseur.instanceId);
+        }
+        const modelerInstance = AppState.createInstance("modeler", {
+            mode: "tab",
+            loading: true,
+        });
+        await windowManager._mountTab(modelerInstance.instance);
+        AppState.setActiveInstance(modelerInstance.instanceId);
+
+        // Fetch the SVG and linked session info in parallel with opening the tab.
+        let svgText;
+        let returnedName;
         try {
-            let svgText;
-            let returnedName;
+            ({ svgText, modelName: returnedName } = await ApiClient.getModelSvg(modelName));
+        } catch (err) {
+            console.error("Fetch model SVG error", err);
+            modelerInstance.instance._setLoading(false);
+            modelerInstance.instance._showError(err.message || err);
+            alert("Impossible d'ouvrir le modèle : " + (err.message || err));
+            return;
+        }
+
+        // Update last-opened time in the background (non-blocking).
+        fetch(`api/models/${encodedName}/touch`, {
+            method: "POST",
+            credentials: "same-origin",
+        }).catch((err) => console.error("Touch model error", err));
+
+        const displayName = returnedName || modelName;
+        if (modelerInstance.instance.loadSvg) {
+            await modelerInstance.instance.loadSvg(svgText, displayName, (svgText.match(match) || ["", ""])[1], modelName);
+        }
+
+        // If this model has a linked modeler assistant conversation, prepare the
+        // modeler so its assistant split reopens that session instead of
+        // creating a blank one.
+        const li = this.listEl.querySelector(`li[data-item-name="${CSS.escape(modelName)}"][data-item-kind="model"]`);
+        const linkedSession = li?.dataset.assistantSession;
+        const linkedDisplayName = li?.dataset.assistantDisplayName;
+        if (linkedSession && modelerInstance.instance._prepareLinkedAssistantSession) {
+            modelerInstance.instance._prepareLinkedAssistantSession(linkedSession, linkedDisplayName);
+        }
+
+        // Also update the modeler assistant sub-entry mtime so it stays in
+        // sync with the model item in the history panel.
+        if (linkedSession) {
             try {
-                ({ svgText, modelName: returnedName } = await ApiClient.getModelSvg(modelName));
+                await ApiClient.touchAssistantSession(linkedSession, "modeler");
             } catch (err) {
-                console.error("Fetch model SVG error", err);
-                alert("Impossible d'ouvrir le modèle : " + (err.message || err));
-                return;
+                console.error("Touch modeler assistant session error", err);
             }
+        }
 
-            // Update last-opened time in the background (non-blocking).
-            fetch(`api/models/${encodedName}/touch`, {
-                method: "POST",
-                credentials: "same-origin",
-            }).catch((err) => console.error("Touch model error", err));
-
-            const existingModéliseur = AppState.listInstances().find((i) => i.appId === "modeler" && i.mode === "tab");
-            if (existingModéliseur) {
-                AppState.removeInstance(existingModéliseur.instanceId);
-            }
-            const modelerInstance = AppState.createInstance("modeler", {
-                mode: "tab",
-            });
-            await windowManager._mountTab(modelerInstance.instance);
-            AppState.setActiveInstance(modelerInstance.instanceId);
-            const displayName = returnedName || modelName;
-            if (modelerInstance.instance.loadSvg) {
-                await modelerInstance.instance.loadSvg(svgText, displayName, (svgText.match(match) || ["", ""])[1], modelName);
-            }
-
-            // If this model has a linked modeler assistant conversation, prepare the
-            // modeler so its assistant split reopens that session instead of
-            // creating a blank one.
-            const li = this.listEl.querySelector(`li[data-item-name="${CSS.escape(modelName)}"][data-item-kind="model"]`);
-            const linkedSession = li?.dataset.assistantSession;
-            const linkedDisplayName = li?.dataset.assistantDisplayName;
-            if (linkedSession && modelerInstance.instance._prepareLinkedAssistantSession) {
-                modelerInstance.instance._prepareLinkedAssistantSession(linkedSession, linkedDisplayName);
-            }
-
-            // Also update the modeler assistant sub-entry mtime so it stays in
-            // sync with the model item in the history panel.
-            if (linkedSession) {
-                try {
-                    await ApiClient.touchAssistantSession(linkedSession, "modeler");
-                } catch (err) {
-                    console.error("Touch modeler assistant session error", err);
-                }
-            }
-
+        try {
             await this.load();
         } catch (err) {
-            console.error("Open model error", err);
-            alert("Impossible d'ouvrir le modèle : " + (err.message || err));
+            console.error("History reload error", err);
         }
     }
 
-    async _openAssistant(sessionName, modelName, origin = "assistant") {
+    async _openAssistant(sessionName, modelNames, origin = "assistant") {
         this.close();
         try {
+            const names = Array.isArray(modelNames) ? modelNames : (modelNames ? [modelNames] : []);
             // Touch the session on the backend so it moves to the top of the
             // history list even when it is just reopened without a new message.
             await ApiClient.touchAssistantSession(sessionName, origin);
@@ -566,7 +609,8 @@ class HistoryPanel {
             const assistantInstance = AppState.createInstance("assistant", {
                 mode: "tab",
                 session: sessionName,
-                modelName: modelName,
+                modelNames: names,
+                modelName: names[0] || "",
                 origin: origin,
                 fromHistory: true,
             });

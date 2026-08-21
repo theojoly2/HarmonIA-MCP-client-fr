@@ -183,6 +183,7 @@ def get_image_bytes(
     source_json: dict[str, list[dict[str, Any]]],
     debug: bool = False,
     simplify_large_models: bool = True,
+    output_format: str = "svg",
 ) -> BytesIO:
     if debug:
         print("SOURCE JSON:")
@@ -197,7 +198,23 @@ def get_image_bytes(
 
     elements = source_json.get("elements", [])
     connectors = source_json.get("connectors", [])
+    plantuml_text = _build_plantuml_text(elements, connectors, debug=debug)
+    return _render_plantuml(plantuml_text, elements, connectors, output_format=output_format)
 
+
+def get_image_bytes_png(
+    source_json: dict[str, list[dict[str, Any]]],
+    debug: bool = False,
+) -> BytesIO:
+    """Render a PNG image from the JSON model using PlantUML."""
+    return get_image_bytes(source_json, debug=debug, output_format="png")
+
+
+def _build_plantuml_text(
+    elements: list[dict[str, Any]],
+    connectors: list[dict[str, Any]],
+    debug: bool = False,
+) -> str:
     plantuml_lines: list[str] = []
     plantuml_lines.append("@startuml")
     plantuml_lines.append("left to right direction")
@@ -258,7 +275,7 @@ def get_image_bytes(
         display_name = _escape_display(_safe_text(element.get("name")))
         attributes = element.get("attributes", []) or []
 
-        lines: list[str] = [f'class "<<dataType>>\\n{display_name}" as {alias} {{']
+        lines: list[str] = [f'class "<<dataType>>\n{display_name}" as {alias} {{']
         for attr in attributes:
             attr_name = _safe_text(attr.get("name"))
             attr_type = _safe_text(attr.get("type")) or "Any"
@@ -368,25 +385,39 @@ def get_image_bytes(
         print("\nPLANTUML:")
         print(plantuml_text)
 
-    # 1. Use the auto-downloaded native PlantUML binary if it is ready.
-    # 2. Fall back to local PlantUML servers.
-    # 3. Fall back to the public PlantUML server.
-    # 4. Final fallback: a lightweight native SVG renderer.
+    return plantuml_text
+
+
+def _render_plantuml(
+    plantuml_text: str,
+    elements: list[dict[str, Any]],
+    connectors: list[dict[str, Any]],
+    output_format: str = "svg",
+) -> BytesIO:
+    """Render PlantUML text to image bytes (svg or png) using native binary, network
+    servers, or an SVG-only native fallback."""
     last_error = None
 
     # Try auto-downloaded native PlantUML binary first
     try:
-        return _render_with_native_plantuml(plantuml_text)
+        return _render_with_native_plantuml(plantuml_text, output_format=output_format)
     except Exception as native_error:
         last_error = native_error
         _logger.info("[PlantUML] Native renderer unavailable: %s", native_error)
 
-    # Try network servers
-    plantuml_servers = [
-        "http://127.0.0.1:8080/svg/",
-        "http://localhost:8080/svg/",
-        "http://www.plantuml.com/plantuml/svg/",
-    ]
+    # Use network servers when the native binary is unavailable.
+    if output_format.lower() == "svg":
+        plantuml_servers = [
+            "http://127.0.0.1:8080/svg/",
+            "http://localhost:8080/svg/",
+            "https://www.plantuml.com/plantuml/svg/",
+        ]
+    else:
+        plantuml_servers = [
+            "http://127.0.0.1:8080/png/",
+            "http://localhost:8080/png/",
+            "https://www.plantuml.com/plantuml/png/",
+        ]
     for server_url in plantuml_servers:
         try:
             server = PlantUML(url=server_url)
@@ -397,6 +428,12 @@ def get_image_bytes(
             last_error = e
             _logger.info("[PlantUML] Server %s failed: %s", server_url, e)
             continue
+
+    if output_format.lower() == "png":
+        raise RuntimeError(
+            f"PlantUML PNG rendering failed: {last_error}. "
+            "Ensure the native PlantUML binary is installed or a PNG-compatible server is reachable."
+        ) from last_error
 
     # Final fallback native SVG renderer (works fully offline).
     try:
@@ -410,13 +447,17 @@ def get_image_bytes(
             "or http://www.plantuml.com/plantuml/svg/"
         ) from last_error
 
+    raise RuntimeError(
+        f"PlantUML PNG rendering failed: {last_error}. "
+        "Ensure the native PlantUML binary is installed and supports PNG output."
+    ) from last_error
 
-def _render_with_native_plantuml(plantuml_text: str) -> BytesIO:
+
+def _render_with_native_plantuml(plantuml_text: str, output_format: str = "svg") -> BytesIO:
     """
-    Invoke the auto-downloaded native PlantUML binary to convert PlantUML source to SVG.
-    The binary is downloaded in the background by ``plantuml_installer``; if it is not
-    ready yet, this function raises an exception so that the caller can fall back to
-    PlantUML servers or to the native SVG renderer.
+    Invoke the auto-downloaded native PlantUML binary to convert PlantUML source to
+    SVG or PNG. The binary is downloaded in the background by ``plantuml_installer``;
+    if it is not ready yet, this function raises an exception.
     """
     binary = get_binary_path()
     if not binary:
@@ -430,10 +471,12 @@ def _render_with_native_plantuml(plantuml_text: str) -> BytesIO:
         binary_path.chmod(binary_path.stat().st_mode | 0o111)
 
     binary_dir = binary_path.resolve().parent
+    ext = output_format.lower()
+    flag = f"-t{ext}"
 
     with tempfile.TemporaryDirectory() as tmpdir:
         input_path = Path(tmpdir) / "input.puml"
-        output_path = Path(tmpdir) / "input.svg"
+        output_path = Path(tmpdir) / f"input.{ext}"
         input_path.write_text(plantuml_text, encoding="utf-8")
 
         env = os.environ.copy()
@@ -442,7 +485,7 @@ def _render_with_native_plantuml(plantuml_text: str) -> BytesIO:
 
         cmd = [
             str(binary_path),
-            "-tsvg",
+            flag,
             "-o", str(tmpdir),
             str(input_path),
         ]
@@ -455,16 +498,21 @@ def _render_with_native_plantuml(plantuml_text: str) -> BytesIO:
         )
 
         if not output_path.exists():
+            _logger.error(
+                "Native PlantUML %s failed. stdout: %s stderr: %s cmd: %s",
+                ext.upper(), result.stdout, result.stderr, " ".join(cmd),
+            )
             raise RuntimeError(
                 f"Native PlantUML did not generate output.\nstdout: {result.stdout}\nstderr: {result.stderr}"
             )
 
-        svg_bytes = output_path.read_bytes()
-        if len(svg_bytes) < 100:
-            raise RuntimeError("Native PlantUML generated an empty or invalid SVG")
+        image_bytes = output_path.read_bytes()
+        if len(image_bytes) < 100:
+            _logger.error("Native PlantUML generated tiny %s file (%d bytes)", ext.upper(), len(image_bytes))
+            raise RuntimeError(f"Native PlantUML generated an empty or invalid {ext.upper()}")
 
         _print_render_source(f"native binary: {binary_path}")
-        return BytesIO(svg_bytes)
+        return BytesIO(image_bytes)
 
 
 def _render_native_svg(

@@ -78,7 +78,12 @@ class SplitManager {
             } else {
                 ratio = ((e.clientX - rect.left) / rect.width) * 100;
             }
-            ratio = Math.max(10, Math.min(90, ratio));
+            // If a minimum ratio was requested for the right/bottom pane, enforce it.
+            // ratio is the split position from the start edge (left/top), so:
+            // - the right/bottom pane ratio is (100 - ratio)
+            // - keeping it >= minRatioAfter means ratio <= (100 - minRatioAfter)
+            const minAfter = node.minRatioAfter != null ? node.minRatioAfter : 10;
+            ratio = Math.max(35, Math.min(100 - minAfter, ratio));
             node.ratios = node.ratios || childrenRatios(node.children || []);
             node.ratios[index] = ratio;
             node.ratios[index + 1] = 100 - ratio;

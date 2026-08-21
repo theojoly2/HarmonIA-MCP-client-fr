@@ -7,6 +7,7 @@ autre_version's chat_logic in a FastAPI/Vanilla-JS stack.
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import os
 import re
@@ -36,6 +37,7 @@ class AssistantStreamRequest(BaseModel):
     session: str = "default"
     user_message: str
     model_name: str = ""
+    model_names: list[str] = []
     tags: list[str] = []
     origin: str = "assistant"
 
@@ -50,6 +52,11 @@ class LinkModelBody(BaseModel):
 
 class AssistantSessionRequest(BaseModel):
     session: str = "default"
+
+
+class ImportFromDocumentRequest(BaseModel):
+    doc_id: str
+    origin: str = "assistant"
 
 
 def _model_name_from_filename(filename: Optional[str]) -> str:
@@ -274,12 +281,17 @@ async def assistant_stream_generator(
         origin=origin,
     )
 
-    model_name = request.model_name.strip()
+    raw_names = [n.strip() for n in (request.model_names or []) if n.strip()]
+    if request.model_name and request.model_name.strip():
+        raw_names.insert(0, request.model_name.strip())
+    model_names = list(dict.fromkeys(raw_names))[:3]
     selected_tags = request.tags or []
-    # Remember the model attached to this session so we can reopen it later.
+    # Remember the models attached to this session so we can reopen them later.
     # Also record the origin so the modeler can find only its own conversations.
-    if model_name:
-        history.assistant_model_name = model_name
+    if model_names:
+        history.assistant_model_names = model_names
+        # Keep the legacy single-model field in sync for older clients.
+        history.assistant_model_name = model_names[0]
 
     # Persist the user message (and selected source tags) as display events so
     # the timeline can be replayed exactly.
@@ -289,29 +301,35 @@ async def assistant_stream_generator(
 
     state = {
         "user": username,
-        "name": model_name or session_name,
+        "name": model_names[0] if model_names else session_name,
         "package": "",
         "selected_tags": selected_tags,
+        "allowed_model_names": model_names,
     }
 
-    # Load the uploaded model from the MCP server to inject it into the LLM context.
+    # Load the uploaded models from the MCP server to inject them into the LLM context.
     current_model_prompt = ""
-    model_data: dict[str, Any] | None = None
-    if model_name:
-        try:
-            model_data = await get_model_mcp(username, model_name)
-            if model_data:
-                # The model stored by the modeler contains a rich "xmi" wrapper.
-                # Pass that canonical structure to the LLM so it sees classes,
-                # attributes and connectors, not just a flat summary.
-                xmi = model_data.get("xmi") if isinstance(model_data.get("xmi"), dict) else model_data
-                current_model_prompt = (
-                    "[CURRENT MODEL - JSON STRUCTURE]\n"
-                    + json.dumps(xmi, ensure_ascii=False, indent=2)
-                    + "\n\n[CURRENT USER MESSAGE]\n\n"
-                )
-        except Exception as e:
-            print(f"[Assistant] Failed to load model context for {model_name}: {e}")
+    loaded_models: dict[str, dict[str, Any]] = {}
+    if model_names:
+        parts: list[str] = []
+        for idx, name in enumerate(model_names, start=1):
+            try:
+                model_data = await get_model_mcp(username, name)
+                if model_data:
+                    loaded_models[name] = model_data
+                    xmi = model_data.get("xmi") if isinstance(model_data.get("xmi"), dict) else model_data
+                    parts.append(
+                        f"[MODEL {idx} - name={name}]\n"
+                        + json.dumps(xmi, ensure_ascii=False, indent=2)
+                    )
+            except Exception as e:
+                print(f"[Assistant] Failed to load model context for {name}: {e}")
+        if parts:
+            current_model_prompt = (
+                "[ATTACHED MODELS - JSON STRUCTURES]\n"
+                + "\n\n".join(parts)
+                + "\n\n[CURRENT USER MESSAGE]\n\n"
+            )
 
     history.start_new_request(user_input)
     history.add_user_message(user_input, track_trace=False)
@@ -646,17 +664,24 @@ async def assistant_stream_generator(
                         )
 
                         # SVG is only emitted on explicit model mutations or an explicit
-                        # display request. In both cases, refresh/update the single active
-                        # visualization card in place.
-                        should_display_svg = name in {"add_class", "add_attribute", "add_connector", "display_model_visualization"} and model_name
+                        # display request. Use the model name returned/used by the tool so the
+                        # correct model card is refreshed.
+                        target_model_name = ""
+                        if name == "display_model_visualization":
+                            target_model_name = arguments.get("model_name", "").strip()
+                        elif name in {"add_class", "add_attribute", "add_connector"}:
+                            target_model_name = arguments.get("model_name", state.get("name", "")).strip()
+                        if not target_model_name and model_names:
+                            target_model_name = model_names[0]
+                        should_display_svg = name in {"add_class", "add_attribute", "add_connector", "display_model_visualization"} and target_model_name
                         if should_display_svg:
                             try:
-                                current_model = await get_model_mcp(username, model_name)
+                                current_model = await get_model_mcp(username, target_model_name)
                                 if current_model:
                                     svg_text = _generate_model_svg(current_model)
                                     if svg_text:
-                                        history.add_display_event({"kind": "model_svg", "svg": svg_text, "model_name": model_name, "source": name})
-                                        yield _event("model_svg", {"svg": svg_text, "model_name": model_name, "source": name})
+                                        history.add_display_event({"kind": "model_svg", "svg": svg_text, "model_name": target_model_name, "source": name})
+                                        yield _event("model_svg", {"svg": svg_text, "model_name": target_model_name, "source": name})
                                         async for line in _drain_out_queue():
                                             yield line
                             except Exception as e:
@@ -926,6 +951,165 @@ async def import_assistant_model(
     })
 
 
+@router.post("/import-from-document")
+async def import_assistant_model_from_document(
+    request: ImportFromDocumentRequest,
+    username: str = Depends(require_user),
+):
+    """
+    Import a model for the assistant chatbot from a document already stored in
+    the vector index. Mirrors /api/assistant/import but fetches the file bytes
+    from the document store.
+    """
+    from api.services.mcp_service import fetch_document_file
+
+    session_origin = (request.origin or "assistant").strip().lower()
+    if session_origin not in {"assistant", "modeler"}:
+        session_origin = "assistant"
+
+    file_data = await fetch_document_file(request.doc_id)
+    if not file_data.get("success"):
+        raise HTTPException(status_code=404, detail=file_data.get("error", "Document introuvable"))
+
+    try:
+        file_bytes = base64.b64decode(file_data["file_base64"])
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to decode document: {e}") from e
+
+    filename = file_data.get("filename", "document")
+    display_name = filename
+    from datetime import datetime
+    session_name = f"{_model_name_from_filename(display_name)}__{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+
+    try:
+        from data_model_utils import _detect_file_type
+        from data_model_utils.import_ttl import ttl_to_json
+        from data_model_utils.import_xml import xml_to_json
+        from data_model_utils.import_json import json_file_to_model
+        from data_model_utils.import_sql import sql_to_model
+        from data_model_utils.import_text import text_to_model
+        from api.services.assistant_mcp_client import AssistantMCPClient
+
+        kind = _detect_file_type(file_bytes, filename)
+        if kind is None:
+            raise ModelProcessingError("Unsupported file format.", "Please upload an XMI/XML, TTL, JSON, SQL or text file.")
+
+        json_data: dict[str, Any] = {}
+        if kind in {"xml", "xmi"}:
+            try:
+                json_data = xml_to_json(BytesIO(file_bytes))
+            except Exception as e:
+                raise ModelProcessingError("Failed to parse the XML/XMI file.", str(e))
+
+            elements = json_data.get("elements", [])
+            if not elements:
+                raise ModelProcessingError("Parsed XML has no elements.", "Ensure the XMI version is supported.")
+
+            root_model_id = elements[0].get("ID")
+            if not root_model_id:
+                raise ModelProcessingError("Parsed XML root element is missing an ID.")
+
+            async with AssistantMCPClient(state={"user": username, "name": session_name, "package": ""}) as mcp_client:
+                generated_id = mcp_client._generate_id()
+
+                elements.append({
+                    "name": "Generated",
+                    "ID": generated_id,
+                    "type": "uml:Package",
+                    "package": root_model_id,
+                    "tags": [],
+                })
+                json_data["elements"] = elements
+                json_data["xmi"] = {
+                    "elements": json_data.get("elements", []),
+                    "connectors": json_data.get("connectors", []),
+                }
+                json_data["source_format"] = "xmi"
+                json_data["xmi_raw"] = file_bytes.decode("utf-8", errors="replace")
+                json_data["xmi_xml"] = json_data["xmi_raw"]
+        elif kind == "ttl":
+            try:
+                json_data = ttl_to_json(BytesIO(file_bytes))
+            except Exception as e:
+                raise ModelProcessingError("Failed to parse the TTL file.", str(e))
+
+            json_data["source_format"] = "ttl"
+            json_data["ttl_raw"] = file_bytes.decode("utf-8", errors="replace")
+            if "elements" in json_data or "connectors" in json_data:
+                json_data["xmi"] = {
+                    "elements": json_data.get("elements", []),
+                    "connectors": json_data.get("connectors", []),
+                }
+        elif kind == "json":
+            try:
+                json_data = json_file_to_model(BytesIO(file_bytes), filename=filename)
+            except Exception as e:
+                raise ModelProcessingError("Failed to parse the JSON/JSON-LD file.", str(e))
+            json_data["source_format"] = "json"
+            json_data["json_raw"] = file_bytes.decode("utf-8", errors="replace")
+            if isinstance(json_data.get("xmi"), dict):
+                json_data.setdefault("elements", json_data["xmi"].get("elements", []))
+                json_data.setdefault("connectors", json_data["xmi"].get("connectors", []))
+            else:
+                json_data["xmi"] = {
+                    "elements": json_data.get("elements", []),
+                    "connectors": json_data.get("connectors", []),
+                }
+        elif kind == "sql":
+            try:
+                json_data = sql_to_model(BytesIO(file_bytes), filename=filename)
+            except Exception as e:
+                raise ModelProcessingError("Failed to parse the SQL file.", str(e))
+            json_data["source_format"] = "sql"
+            json_data["sql_raw"] = file_bytes.decode("utf-8", errors="replace")
+            if isinstance(json_data.get("xmi"), dict):
+                json_data.setdefault("elements", json_data["xmi"].get("elements", []))
+                json_data.setdefault("connectors", json_data["xmi"].get("connectors", []))
+            else:
+                json_data["xmi"] = {
+                    "elements": json_data.get("elements", []),
+                    "connectors": json_data.get("connectors", []),
+                }
+        else:  # text
+            try:
+                json_data = text_to_model(BytesIO(file_bytes), filename=filename)
+            except Exception as e:
+                raise ModelProcessingError("Failed to parse the text file.", str(e))
+            json_data["source_format"] = "text"
+            json_data["text_raw"] = file_bytes.decode("utf-8", errors="replace")
+            if isinstance(json_data.get("xmi"), dict):
+                json_data.setdefault("elements", json_data["xmi"].get("elements", []))
+                json_data.setdefault("connectors", json_data["xmi"].get("connectors", []))
+            else:
+                json_data["xmi"] = {
+                    "elements": json_data.get("elements", []),
+                    "connectors": json_data.get("connectors", []),
+                }
+
+        async with AssistantMCPClient(state={"user": username, "name": session_name, "package": ""}) as mcp_client:
+            server_model = await mcp_client.upload_model({"model": json_data})
+            if not server_model:
+                raise ModelProcessingError("MCP Server Error", "Model upload returned None.")
+
+        json_data["imported_from_assistant"] = True
+        async with AssistantMCPClient(state={"user": username, "name": session_name, "package": ""}) as mcp_client:
+            await mcp_client.upload_model({"model": json_data})
+
+    except ModelProcessingError as e:
+        raise HTTPException(status_code=400, detail={"title": e.title, "details": e.details}) from e
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Import failed: {e}") from e
+
+    return JSONResponse({
+        "name": session_name,
+        "display_name": display_name,
+        "source_format": kind or "unknown",
+        "origin": session_origin,
+    })
+
+
 @router.get("/test-stream")
 async def test_stream():
     """Endpoint de test pour vérifier le streaming temps réel sans LLM."""
@@ -982,6 +1166,7 @@ async def list_assistant_sessions(
             "last_opened_at": mtime,
             "preview": preview,
             "model_name": h.assistant_model_name,
+            "model_names": h.assistant_model_names if h.assistant_model_names else ([h.assistant_model_name] if h.assistant_model_name else []),
             "origin": session_origin,
         })
     sessions.sort(key=lambda s: s["last_opened_at"], reverse=True)
@@ -1109,6 +1294,7 @@ async def rename_assistant_session(
     new_history.retained_retrieve_documents = old_history.retained_retrieve_documents
     new_history.last_tool_observations_compact = old_history.last_tool_observations_compact
     new_history.assistant_model_name = old_history.assistant_model_name
+    new_history.assistant_model_names = old_history.assistant_model_names
     new_history.display_name = new_display_name
     new_history.origin = target_origin
     new_history.save()
@@ -1142,6 +1328,7 @@ async def link_assistant_session_model(
         raise HTTPException(status_code=404, detail="Session inconnue")
 
     history.assistant_model_name = body.model_name.strip()
+    history.assistant_model_names = [body.model_name.strip()]
     history.display_name = history.display_name or history.display_fp.stem
     history.save()
     return {"ok": True}
@@ -1166,5 +1353,6 @@ async def get_assistant_history(
         "messages": messages,
         "display_events": display_events,
         "model_name": history.assistant_model_name,
+        "model_names": history.assistant_model_names if history.assistant_model_names else ([history.assistant_model_name] if history.assistant_model_name else []),
         "origin": history.origin or target_origin,
     }

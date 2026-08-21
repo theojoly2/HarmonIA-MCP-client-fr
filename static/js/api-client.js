@@ -78,6 +78,20 @@ const ApiClient = (() => {
         return res.json();
     }
 
+    async function importDocumentAsAssistantModel(docId, origin = "assistant") {
+        const res = await fetch(apiUrl("assistant/import-from-document"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ doc_id: docId, origin }),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || `Assistant model import from document failed: ${res.status}`);
+        }
+        return res.json();
+    }
+
     async function getModelSvg(name) {
         const res = await fetch(apiUrl(`models/${encodeURIComponent(name)}/open`), {
             method: "POST",
@@ -196,13 +210,19 @@ const ApiClient = (() => {
         return res.body.getReader();
     }
 
-    async function streamAssistant(session, userMessage, modelName, tags, onEvent, options = {}) {
+    async function streamAssistant(session, userMessage, modelNames, tags, onEvent, options = {}) {
         const origin = options.origin || "assistant";
+        const namesPayload = Array.isArray(modelNames)
+            ? modelNames.filter(Boolean)
+            : (modelNames ? [String(modelNames)] : []);
+        const body = namesPayload.length === 1
+            ? { session, user_message: userMessage, model_name: namesPayload[0], tags: tags || [], origin }
+            : { session, user_message: userMessage, model_names: namesPayload, tags: tags || [], origin };
         const res = await fetch(apiUrl("assistant/stream"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "same-origin",
-            body: JSON.stringify({ session, user_message: userMessage, model_name: modelName || "", tags: tags || [], origin }),
+            body: JSON.stringify(body),
         });
         if (!res.ok || !res.body) throw new Error(`Assistant stream failed: ${res.status}`);
 
@@ -346,6 +366,7 @@ const ApiClient = (() => {
         importModéliseurFile,
         importAndSaveModel,
         importAssistantModel,
+        importDocumentAsAssistantModel,
         getModelSvg,
         createEmptyModel,
         getModels,

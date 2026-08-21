@@ -669,6 +669,8 @@ class WindowManager {
                 { type: 'pane', instanceId },
             ],
             ratios: ratio,
+            // Prevent the assistant panel from being resized smaller than its initial ratio.
+            minRatioAfter: options.ratio ? options.ratio[1] : 50,
         });
 
         let mountedTarget = false;

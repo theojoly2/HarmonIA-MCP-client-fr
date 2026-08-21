@@ -14,7 +14,7 @@ from .import_json import json_to_json, json_file_to_model
 from .import_sql import sql_to_model
 from .import_text import text_to_model
 from .export_xml import json_to_xml
-from .visualisation import get_image_bytes
+from .visualisation import get_image_bytes, get_image_bytes_png
 from .export_ttl import jsonld_to_ttl_bytes
 
 
@@ -325,7 +325,7 @@ async def process_and_upload_model(
 # ----------------------------------------------------------------------
 def generate_visualisation(json_data: dict[str, Any], debug: bool = False) -> BytesIO:
     """
-    Visualizes a JSON model and returns the image bytes directly.
+    Visualizes a JSON model and returns the SVG bytes directly.
     """
     try:
         image_bytes = get_image_bytes(json_data, debug=debug)
@@ -334,3 +334,16 @@ def generate_visualisation(json_data: dict[str, Any], debug: bool = False) -> By
         return image_bytes
     except Exception as e:
         raise ModelProcessingError("Visualisation failed.", str(e))
+
+
+def generate_visualisation_png(json_data: dict[str, Any], debug: bool = False) -> BytesIO:
+    """
+    Visualizes a JSON model and returns the PNG bytes directly.
+    """
+    try:
+        image_bytes = get_image_bytes_png(json_data, debug=debug)
+        if not image_bytes:
+            raise ModelProcessingError("No PNG image could be generated from the model.")
+        return image_bytes
+    except Exception as e:
+        raise ModelProcessingError("PNG visualisation failed.", str(e))

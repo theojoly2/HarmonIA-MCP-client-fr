@@ -838,7 +838,17 @@
 }
 
 .assistant-app.assistant-embedded .assistant-embedded-intro .assistant-bubble-content {
-    font-size: 1rem;
+    font-size: clamp(0.75rem, 1.1vw, 1rem);
+    padding: 0;
+    margin: 0;
+}
+
+.assistant-app.assistant-embedded .assistant-embedded-intro .assistant-bubble-content > *:first-child {
+    margin-top: 0;
+}
+
+.assistant-app.assistant-embedded .assistant-embedded-intro .assistant-bubble-content > *:last-child {
+    margin-bottom: 0;
 }
 
 .assistant-app.assistant-embedded .assistant-bubble,
@@ -881,6 +891,45 @@
 .assistant-app.assistant-embedded #assistant-model-pill-slot .inline-flex {
     border: 1px solid #e5e7eb;
     background: #f9fafb;
+}
+
+.assistant-app.assistant-embedded #assistant-model-pill-slot .assistant-model-pill span {
+    max-width: 8rem;
+}
+
+/* Keep the last message visible above the fixed input area. */
+#assistant-chat {
+    padding-bottom: 1.5rem;
+}
+
+/* === Model pills in the input toolbar === */
+#assistant-model-pill-slot {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    max-width: 22rem;
+    overflow: visible;
+}
+
+#assistant-model-pill-slot .assistant-model-pill {
+    gap: 0.15rem;
+    padding-right: 0.35rem;
+}
+
+#assistant-model-pill-slot .assistant-model-pill .relative {
+    margin-right: -0.15rem;
+}
+
+#assistant-model-pill-slot .assistant-model-pill span {
+    max-width: 4rem;
+}
+
+.assistant-model-pill-loading {
+    opacity: 0.85;
+}
+
+.assistant-pill-spinner svg {
+    display: block;
 }
 
 .assistant-sources-header {

@@ -17,7 +17,10 @@ class AssistantApp extends AppBase {
     constructor(instanceId, props = {}) {
         super(instanceId, props);
         this.session = props.session || '';
-        this.modelName = props.modelName || '';
+        // Up to 3 models can be attached to the assistant context. For backward
+        // compatibility a single string may arrive from older sessions.
+        this.modelNames = this._normalizeModelNames(props.modelNames ?? props.modelName);
+        this.modelNamesConfig = { max: 3 };
         // Origin tracks whether this conversation was started from the modeler
         // or from the standalone assistant. It is saved by the backend so the
         // modeler can reopen only its own conversations.
@@ -29,6 +32,12 @@ class AssistantApp extends AppBase {
         // back, setState will replay the missed events into the new DOM.
         this._pendingEvents = [];
         this._lastRenderedEventIndex = -1;
+        // Models currently being imported. Each entry: { name, displayName, loading: true }.
+        this._loadingModels = [];
+        // Doc ids imported into this assistant conversation from search result cards,
+        // mapped to the final backend model name. Allows the + button to become a
+        // cross that removes the model on second click.
+        this._importedSearchDocIds = new Map();
         // Text accumulated for the assistant message currently being streamed. Stored
         // on the instance so it survives a tab switch (the old DOM is discarded and
         // rebuilt from the HTML snapshot).
@@ -49,7 +58,16 @@ class AssistantApp extends AppBase {
                 this.chatEl.classList.add('assistant-chat-mode');
                 this.welcomeEl.classList.add('assistant-welcome-top');
                 this.inputArea.classList.add('assistant-input-area-chat');
+                // When remounting from cache, wait for layout and then scroll so
+                // the last message is visible above the floating input area.
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        if (!this.chatEl || !this.inputArea) return;
+                        this._scrollToBottom(true);
+                    });
+                });
             }
+            this._updateSearchResultAddButtons();
             return;
         }
         this.container = container;
@@ -137,6 +155,7 @@ class AssistantApp extends AppBase {
 
         this._bindInputEvents();
         this._observeResize();
+        this._observeMessagesScroll();
 
         container.querySelector('#assistant-form').addEventListener('submit', (e) => {
             e.preventDefault();
@@ -151,25 +170,32 @@ class AssistantApp extends AppBase {
         const importBtn = container.querySelector('#assistant-import-model');
         if (this._embedded) {
             if (this.embeddedIntroEl) {
+                const introText = 'Je peux vous aider à explorer ou modifier le modèle affiché dans le canvas. Posez-moi une question ou demandez une modification.';
                 this.embeddedIntroEl.innerHTML = `
-                    <div class="assistant-bubble assistant-bubble-assistant mb-4">
+                    <div class="assistant-bubble assistant-bubble-assistant mb-6">
                         <div class="assistant-bubble-content markdown-body">
-                            Je peux vous aider à explorer ou modifier le modèle affiché dans le canvas. Posez-moi une question ou demandez une modification.
+                            ${this._markdown(introText, false)}
+                        </div>
+                        <div class="ai-avatar-row flex items-center gap-2">
+                            <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic" data-hidden="false">
+                                ${this._sparkleSvg()}
+                            </div>
                         </div>
                     </div>
                 `;
                 this.embeddedIntroEl.classList.remove('hidden');
             }
-            this._updateModelPill();
-            if (importBtn) {
-                importBtn.style.display = 'none';
+                this._updateModelPill();
+                if (importBtn) {
+                    importBtn.style.display = 'none';
+                }
+                if (this.embeddedModelPillEl) {
+                    this.embeddedModelPillEl.classList.add('hidden');
+                }
             }
-            if (this.embeddedModelPillEl) {
-                this.embeddedModelPillEl.classList.add('hidden');
-            }
-        }
 
-        this._updateModelPill();
+            this._updateImportButtonState(importBtn);
+            this._updateModelPill();
 
         if (window.GlowEffects && typeof window.GlowEffects.scanAndBind === 'function') {
             window.GlowEffects.scanAndBind(container);
@@ -178,6 +204,8 @@ class AssistantApp extends AppBase {
         container.querySelector('#assistant-reset').addEventListener('click', () => {
             this._newSession();
         });
+
+        this._updateImportButtonState(importBtn);
 
         if (importBtn && !this._embedded) {
             importBtn.addEventListener('click', () => {
@@ -196,13 +224,16 @@ class AssistantApp extends AppBase {
         }
 
         this.fileInput.addEventListener('change', (e) => {
-            const file = e.target.files?.[0];
-            if (file) this._importModel(file);
+            const files = Array.from(e.target.files || []);
+            const remaining = Math.max(0, this.modelNamesConfig.max - ((this.modelNames?.length || 0) + (this._loadingModels?.length || 0)));
+            const toImport = files.slice(0, remaining);
+            for (const file of toImport) this._importModel(file);
+            if (this.fileInput) this.fileInput.value = '';
         });
 
         this.sourcesBtn.addEventListener('click', () => this._toggleSourcesMenu());
 
-        // Delegate clicks for embedded search result actions (preview / chat).
+        // Delegate clicks for search result cards inside the assistant chat.
         this.messagesEl.addEventListener('click', (e) => {
             const btn = e.target.closest('[data-action]');
             if (!btn) return;
@@ -210,10 +241,19 @@ class AssistantApp extends AppBase {
             const docId = btn.dataset.docId;
             const documentId = btn.dataset.documentId;
             const name = btn.dataset.name;
+            const filename = btn.dataset.filename;
             if (action === 'preview') {
                 EventBus.emit('open-preview', { docId, documentId, name });
             } else if (action === 'chat') {
                 EventBus.emit('open-chat', { documentId, name });
+            } else if (action === 'add-to-assistant') {
+                const alreadyAdded = this._importedSearchDocIds.has(docId);
+                if (alreadyAdded) {
+                    const modelName = this._importedSearchDocIds.get(docId);
+                    if (modelName) this._removeModelPill(modelName);
+                } else {
+                    this._importSearchResultIntoAssistant(docId, filename);
+                }
             }
         });
 
@@ -237,7 +277,7 @@ class AssistantApp extends AppBase {
     getState() {
         return {
             session: this.session,
-            modelName: this.modelName,
+            modelNames: this.modelNames,
             origin: this.origin || 'assistant',
             messagesHtml: this.messagesEl ? this.messagesEl.innerHTML : '',
             welcomeTop: this.welcomeEl ? this.welcomeEl.classList.contains('assistant-welcome-top') : false,
@@ -254,7 +294,7 @@ class AssistantApp extends AppBase {
     setState(state) {
         if (!state || !Object.keys(state).length) return;
         if (state.session !== undefined) this.session = state.session;
-        if (state.modelName !== undefined) this.modelName = state.modelName;
+        if (state.modelNames !== undefined) this.modelNames = this._normalizeModelNames(state.modelNames);
         if (state.origin !== undefined) this.origin = state.origin || 'assistant';
         if (state.isStreaming !== undefined) this.isStreaming = state.isStreaming;
         // Only restore the message HTML if we actually have saved HTML. An empty
@@ -411,11 +451,15 @@ class AssistantApp extends AppBase {
     _observeMessagesScroll() {
         if (!this.messagesEl || typeof MutationObserver === 'undefined') return;
         if (this._messagesObserver) this._messagesObserver.disconnect();
-        this._messagesObserver = new MutationObserver(() => {
-            if (!this.chatEl) return;
-            this._scrollToBottom(false);
-        });
-        this._messagesObserver.observe(this.messagesEl, { childList: true, subtree: true });
+        if (this._scrollListener) {
+            this.chatEl?.removeEventListener('scroll', this._scrollListener);
+            this._scrollListener = null;
+        }
+
+        // Auto-scroll to bottom is disabled during generation so the user can
+        // freely scroll up to read earlier content. Explicit scroll calls (e.g.
+        // sending a message or returning to the tab) still move the view when needed.
+        this._stickToBottom = false;
     }
 
     _escape(text) {
@@ -451,7 +495,7 @@ class AssistantApp extends AppBase {
         this.messagesEl.innerHTML = '';
         this.props.session = '';
         this.props.fromHistory = false;
-        this._clearModelPill();
+        this._clearModelPills();
         this.chatEl.classList.remove('assistant-chat-mode');
         this.welcomeEl.classList.remove('assistant-welcome-top');
         this.inputArea.classList.remove('assistant-input-area-chat');
@@ -580,6 +624,9 @@ class AssistantApp extends AppBase {
             const bottomPadding = 0.35 * parseFloat(getComputedStyle(document.documentElement).fontSize || 16);
             const topY = window.innerHeight - inputHeight - bottomPadding;
             this.inputArea.style.setProperty('--assistant-input-top', `${topY}px`);
+            if (this.chatEl) {
+                this.chatEl.style.paddingBottom = `${(inputHeight / 2) + bottomPadding}px`;
+            }
         } else {
             // Fallback: clear explicit padding if neither state is fully active.
             this.welcomeEl.style.paddingTop = '';
@@ -607,115 +654,317 @@ class AssistantApp extends AppBase {
         this._resizeObserver.observe(this.container);
     }
 
+    _normalizeModelNames(value) {
+        if (Array.isArray(value)) return value.filter(Boolean);
+        if (typeof value === 'string' && value.trim()) return [value.trim()];
+        return [];
+    }
+
+    _displayNameForModel(name) {
+        const raw = this.props.displayNames?.[name] || name;
+        return this._stripTimestampSuffix(raw);
+    }
+
+    _displayNameForSearchModel(filename) {
+        return this._stripTimestampSuffix(filename);
+    }
+
+    _stripTimestampSuffix(raw) {
+        if (!raw || typeof raw !== 'string') return raw || '';
+        return raw.includes('__') ? raw.split('__').slice(0, -1).join('__') : raw;
+    }
+
+    _updateImportButtonState(importBtn) {
+        if (!importBtn || this._embedded) return;
+        const atMax = ((this.modelNames?.length || 0) + (this._loadingModels?.length || 0)) >= this.modelNamesConfig.max;
+        importBtn.disabled = atMax;
+        importBtn.style.opacity = atMax ? '0.4' : '';
+        importBtn.title = atMax
+            ? `Limite de ${this.modelNamesConfig.max} modèles atteinte`
+            : 'Importer un modèle';
+        // Sync the + buttons inside any search result cards rendered in the chat.
+        this._updateSearchResultAddButtons();
+    }
+
+    /**
+     * Keep the + buttons inside search result cards in sync with the current
+     * model capacity. Disabled/hidden when the limit is reached or in embedded mode.
+     */
+    _updateSearchResultAddButtons() {
+        if (!this.messagesEl) return;
+        const total = (this.modelNames?.length || 0) + (this._loadingModels?.length || 0);
+        const atMax = total >= this.modelNamesConfig.max;
+        this.messagesEl.querySelectorAll('[data-action="add-to-assistant"]').forEach((btn) => {
+            const docId = btn.dataset.docId;
+            const alreadyAdded = this._importedSearchDocIds.has(docId);
+            // A button importing from a search card is clickable either when there
+            // is room or when it is already selected (cross). In the latter case,
+            // clicking removes the imported model from the assistant context.
+            const disabled = (!alreadyAdded && atMax) || this._embedded;
+            btn.disabled = disabled;
+            btn.style.opacity = disabled ? '0.4' : '';
+            btn.style.display = this._embedded ? 'none' : '';
+            btn.classList.toggle('search-add-model-selected', alreadyAdded && !this._embedded);
+        });
+    }
+
     async _importModel(file) {
-        if (!file) return;
+        if (!file || (this.modelNames?.length || 0) >= this.modelNamesConfig.max) return;
+        const loadingKey = `loading_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        const displayName = file.name;
+        this._startImportLoading(loadingKey, displayName);
         try {
             const result = await ApiClient.importAssistantModel(file, file.name, this.origin);
             if (result?.name) {
-                this.modelName = result.name;
-                this.props.display_name = result.display_name || result.name;
-                this._updateModelPill();
+                this.props.displayNames = this.props.displayNames || {};
+                this.props.displayNames[result.name] = result.display_name || result.name;
+                this._finishImportLoading(loadingKey, result.name);
+            } else {
+                throw new Error('Import terminé sans retour de modèle.');
             }
         } catch (err) {
             console.error('Assistant import model error', err);
-            this._appendSystemMessage(`Erreur lors de l'import du modèle : ${this._escape(err.message)}`);
+            this._failImportLoading(loadingKey, `Erreur lors de l'import de ${displayName} : ${err.message}`);
         }
-        if (this.fileInput) this.fileInput.value = '';
+    }
+
+    /**
+     * Import a document returned by a search result card directly into the
+     * current assistant conversation. Reuses the existing import loading pill
+     * machinery. Does nothing if the 3-model limit is reached.
+     */
+    async _importSearchResultIntoAssistant(docId, filename) {
+        if (!docId || !filename || this._embedded) return;
+        const total = (this.modelNames?.length || 0) + (this._loadingModels?.length || 0);
+        if (total >= this.modelNamesConfig.max) return;
+        if (this._importedSearchDocIds.has(docId)) return;
+        if (this.modelNames?.includes?.(docId) || this._loadingModels?.some?.((m) => m.displayName === filename)) return;
+
+        const loadingKey = `search_card_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        this._importedSearchDocIds.set(docId, '');
+        this._startImportLoading(loadingKey, filename);
+        try {
+            const result = await ApiClient.importDocumentAsAssistantModel(docId, this.origin);
+            if (result?.name) {
+                this.props.displayNames = this.props.displayNames || {};
+                this.props.displayNames[result.name] = result.display_name || filename;
+                this._importedSearchDocIds.set(docId, result.name);
+                this._finishImportLoading(loadingKey, result.name);
+            } else {
+                throw new Error('Import terminé sans retour de modèle.');
+            }
+        } catch (err) {
+            this._importedSearchDocIds.delete(docId);
+            console.error('Assistant import search result error', err);
+            this._failImportLoading(loadingKey, `Erreur lors de l'import de ${filename} : ${err.message}`);
+        }
+    }
+
+    /**
+     * Start loading state for a model that is being imported.
+     * This shows a pill immediately and disables further imports until resolved.
+     */
+    _startImportLoading(name, displayName) {
+        if (!this._loadingModels) this._loadingModels = [];
+        this._loadingModels.push({ name, displayName, loading: true });
+        this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
+        this._updateModelPill();
+        this._updateSearchResultAddButtons();
+    }
+
+    /**
+     * Replace a loading placeholder with the imported model name.
+     */
+    _finishImportLoading(loadingName, importedName) {
+        if (!this._loadingModels) return;
+        this._loadingModels = this._loadingModels.filter((m) => m.name !== loadingName);
+        const names = this.modelNames.slice();
+        if (!names.includes(importedName)) names.push(importedName);
+        this.modelNames = names.slice(0, this.modelNamesConfig.max);
+        this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
+        this._updateModelPill();
+        this._updateSearchResultAddButtons();
+    }
+
+    /**
+     * Remove a failed loading placeholder and notify the user.
+     */
+    _failImportLoading(loadingName, message) {
+        if (!this._loadingModels) return;
+        this._loadingModels = this._loadingModels.filter((m) => m.name !== loadingName);
+        this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
+        this._updateModelPill();
+        this._updateSearchResultAddButtons();
+        this._appendSystemMessage(this._escape(message));
     }
 
     _updateModelPill() {
-        if (!this.modelPillSlotEl || !this.modelName) return;
-        const rawName = this.props.display_name || this.modelName;
-        const displayName = rawName.includes('__')
-            ? rawName.split('__').slice(0, -1).join('__')
-            : rawName;
-        this.modelPillSlotEl.innerHTML = `
-            <div class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-100 border border-gray-200 text-xs font-semibold text-gray-700" id="assistant-model-pill">
-                <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                </svg>
+        if (!this.modelPillSlotEl) return;
+        const showClose = !this._embedded;
+        const realModels = (this.modelNames || []).map((name) => ({
+            name,
+            displayName: this._displayNameForModel(name),
+            loading: false,
+        }));
+        const allModels = [...realModels, ...(this._loadingModels || [])];
+        if (!allModels.length) {
+            this.modelPillSlotEl.innerHTML = '';
+            return;
+        }
+        this.modelPillSlotEl.innerHTML = allModels.map((model) => {
+            const displayName = model.loading ? this._displayNameForSearchModel(model.displayName) : this._displayNameForModel(model.name);
+            const loadingSpinner = model.loading ? `
+                <span class="assistant-pill-spinner w-3.5 h-3.5 inline-flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                    <svg class="animate-spin w-3.5 h-3.5 text-gray-500" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                    </svg>
+                </span>` : `
+                ${!this._embedded ? `<button type="button" class="assistant-model-pill-preview w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors" title="Prévisualiser le modèle">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                    </svg>
+                </button>` : ''}`;
+            return `
+            <div class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-100 border border-gray-200 text-xs font-semibold text-gray-700 assistant-model-pill ${model.loading ? 'assistant-model-pill-loading' : ''}" data-model-name="${this._escape(model.name)}">
+                ${loadingSpinner}
                 <span class="truncate max-w-[10rem]" title="${this._escape(displayName)}">${this._escape(displayName)}</span>
+                ${model.loading ? '' : `
                 <div class="relative">
-                    <button type="button" id="assistant-model-pill-export" class="w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors" title="Exporter le modèle">
+                    <button type="button" class="assistant-model-pill-export w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors" title="Exporter le modèle">
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                             <path d="M7 10l5 5 5-5"></path>
                             <path d="M12 15V3"></path>
                         </svg>
                     </button>
-                    <div id="assistant-model-pill-export-menu" class="hidden absolute bottom-full right-0 mb-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg py-1 text-xs z-50">
-                        <button type="button" data-format="xmi" class="assistant-pill-export-item w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700">Exporter en XMI</button>
-                        <button type="button" data-format="ttl" class="assistant-pill-export-item w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700">Exporter en TTL</button>
+                    <div class="assistant-model-pill-export-menu hidden absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg py-1 text-xs z-50">
+                        <button type="button" data-format="xmi" class="assistant-pill-export-item w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700 flex items-center gap-1.5">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                            Exporter en XMI
+                        </button>
+                        <button type="button" data-format="ttl" class="assistant-pill-export-item w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700 flex items-center gap-1.5">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                            Exporter en TTL
+                        </button>
+                        <button type="button" data-format="svg" class="assistant-pill-export-item w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700 flex items-center gap-1.5">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                <polyline points="21 15 16 10 5 21"></polyline>
+                            </svg>
+                            Exporter en SVG
+                        </button>
+                        <button type="button" data-format="png" class="assistant-pill-export-item w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700 flex items-center gap-1.5">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                <polyline points="21 15 16 10 5 21"></polyline>
+                            </svg>
+                            Exporter en PNG
+                        </button>
                     </div>
                 </div>
-                <button type="button" id="assistant-model-pill-close" class="w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors hidden" title="Détacher le modèle">
+                ${showClose ? `<button type="button" class="assistant-model-pill-close w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors" title="Détacher le modèle">
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                         <path d="M18 6L6 18M6 6l12 12"></path>
                     </svg>
-                </button>
+                </button>` : ''}`}
             </div>
-        `;
-        const closeBtn = this.modelPillSlotEl.querySelector('#assistant-model-pill-close');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => this._clearModelPill());
-        }
-        const exportBtn = this.modelPillSlotEl.querySelector('#assistant-model-pill-export');
-        const exportMenu = this.modelPillSlotEl.querySelector('#assistant-model-pill-export-menu');
-        if (exportBtn && exportMenu) {
-            exportBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const isOpen = !exportMenu.classList.contains('hidden');
-                this._closePillExportMenu();
-                if (!isOpen) exportMenu.classList.remove('hidden');
-            });
-            exportMenu.querySelectorAll('.assistant-pill-export-item').forEach((item) => {
-                item.addEventListener('click', async (e) => {
-                    e.stopPropagation();
-                    const format = item.dataset.format;
-                    await this._exportModelFromPill(format);
-                    this._closePillExportMenu();
+            `;
+        }).join('');
+
+        this.modelPillSlotEl.querySelectorAll('.assistant-model-pill').forEach((pill) => {
+            const name = pill.dataset.modelName;
+            const closeBtn = pill.querySelector('.assistant-model-pill-close');
+            const previewBtn = pill.querySelector('.assistant-model-pill-preview');
+            const exportBtn = pill.querySelector('.assistant-model-pill-export');
+            const exportMenu = pill.querySelector('.assistant-model-pill-export-menu');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => this._removeModelPill(name));
+            }
+            if (previewBtn) {
+                previewBtn.addEventListener('click', () => {
+                    const displayName = this.props.displayNames?.[name] || name;
+                    EventBus.emit('open-preview-model', { modelName: name, name: displayName });
                 });
+            }
+            if (exportBtn && exportMenu) {
+                exportBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const isOpen = !exportMenu.classList.contains('hidden');
+                    this._closePillExportMenus();
+                    if (!isOpen) exportMenu.classList.remove('hidden');
+                });
+                exportMenu.querySelectorAll('.assistant-pill-export-item').forEach((item) => {
+                    item.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        await this._exportModelFromPill(item.dataset.format, name, item);
+                        this._closePillExportMenus();
+                    });
+                });
+            }
+        });
+
+        this._pillExportCloseHandler = (e) => {
+            const menus = this.modelPillSlotEl?.querySelectorAll('.assistant-model-pill-export-menu');
+            let inside = false;
+            menus?.forEach((menu) => {
+                const pill = menu.closest('.assistant-model-pill');
+                const exportBtn = pill?.querySelector('.assistant-model-pill-export');
+                if (menu.contains(e.target) || exportBtn === e.target || exportBtn?.contains(e.target)) inside = true;
             });
-            this._pillExportCloseHandler = (e) => {
-                if (!exportMenu.contains(e.target) && e.target !== exportBtn && !exportBtn.contains(e.target)) {
-                    this._closePillExportMenu();
-                }
-            };
-            setTimeout(() => document.addEventListener('click', this._pillExportCloseHandler), 0);
+            if (!inside) this._closePillExportMenus();
+        };
+        setTimeout(() => document.addEventListener('click', this._pillExportCloseHandler), 0);
+    }
+
+    _closePillExportMenus() {
+        this.modelPillSlotEl?.querySelectorAll('.assistant-model-pill-export-menu').forEach((m) => m.classList.add('hidden'));
+    }
+
+    _removeModelPill(name) {
+        this.modelNames = (this.modelNames || []).filter((n) => n !== name);
+        this._loadingModels = (this._loadingModels || []).filter((m) => m.name !== name);
+        if (this.props.displayNames) delete this.props.displayNames[name];
+        // If this model was imported from a search result card, clear the docId
+        // mapping so the card's + button becomes clickable again.
+        for (const [docId, modelName] of this._importedSearchDocIds.entries()) {
+            if (modelName === name) {
+                this._importedSearchDocIds.delete(docId);
+                break;
+            }
         }
+        this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
+        this._updateModelPill();
+        this._updateSearchResultAddButtons();
     }
 
-    _closePillExportMenu() {
-        const exportMenu = this.modelPillSlotEl?.querySelector('#assistant-model-pill-export-menu');
-        if (exportMenu) exportMenu.classList.add('hidden');
-    }
-
-    _clearModelPill() {
+    _clearModelPills() {
         if (this._pillExportCloseHandler) {
             document.removeEventListener('click', this._pillExportCloseHandler);
             this._pillExportCloseHandler = null;
         }
-        this.modelName = '';
-        this.props.modelName = '';
-        this.props.display_name = '';
+        this.modelNames = [];
+        this._loadingModels = [];
+        this._importedSearchDocIds.clear();
+        this.props.displayNames = {};
         if (this.modelPillSlotEl) this.modelPillSlotEl.innerHTML = '';
-        const importBtn = this.container?.querySelector('#assistant-import-model');
-        if (importBtn && !this._embedded) importBtn.style.display = '';
+        this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
+        this._updateSearchResultAddButtons();
     }
 
-    async _exportModelFromPill(format) {
-        if (!this.modelName) return;
+    async _exportModelFromPill(format, name, itemEl) {
+        if (!name) return;
+        const originalHtml = itemEl?.innerHTML || '';
+        this._setPillExportItemLoading(itemEl, true);
         try {
-            const blob = await ApiClient.exportModel(this.modelName, format);
+            const blob = await ApiClient.exportModel(name, format);
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            const rawName = this.props.display_name || this.modelName;
-            const displayName = rawName.includes('__')
-                ? rawName.split('__').slice(0, -1).join('__')
-                : rawName;
-            a.download = `${displayName || 'modele'}.${format}`;
+            a.download = `${this._displayNameForModel(name) || 'modele'}.${format}`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -723,6 +972,28 @@ class AssistantApp extends AppBase {
         } catch (err) {
             console.error('Export model from pill error', err);
             this._appendSystemMessage(`Erreur lors de l'export du modèle : ${this._escape(err.message)}`);
+        } finally {
+            this._setPillExportItemLoading(itemEl, false, originalHtml);
+        }
+    }
+
+    _setPillExportItemLoading(itemEl, isLoading, originalHtml = '') {
+        if (!itemEl) return;
+        if (isLoading) {
+            itemEl.disabled = true;
+            itemEl.dataset.originalHtml = itemEl.innerHTML || '';
+            itemEl.innerHTML = `
+                <span class="inline-flex items-center gap-1.5">
+                    <svg class="animate-spin w-3.5 h-3.5 text-gray-500" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Export...</span>
+                </span>`;
+        } else {
+            itemEl.disabled = false;
+            itemEl.innerHTML = originalHtml || itemEl.dataset.originalHtml || 'Exporter';
+            delete itemEl.dataset.originalHtml;
         }
     }
 
@@ -820,6 +1091,7 @@ class AssistantApp extends AppBase {
     }
 
     _appendSystemMessage(text) {
+        if (!this.messagesEl) return;
         const div = document.createElement('div');
         div.className = 'assistant-bubble assistant-bubble-assistant mb-6';
         div.innerHTML = `
@@ -844,7 +1116,8 @@ class AssistantApp extends AppBase {
         }
 
         this.session = session;
-        this.modelName = data.model_name || this.modelName || '';
+        const loadedNames = this._normalizeModelNames(data.model_names ?? data.model_name);
+        if (loadedNames.length) this.modelNames = loadedNames;
         // Persist the display name on the instance props so tab title survives
         // across remounts and renames from the history panel.
         if (data.display_name) {
@@ -980,7 +1253,7 @@ class AssistantApp extends AppBase {
                 return;
             }
             if (kind === 'model_svg') {
-                this._updateCurrentSvgCard(event.svg, event.model_name || 'Visualisation du modèle');
+                this._updateCurrentSvgCard(event.svg, event.model_name || event.label || 'Visualisation du modèle');
                 return;
             }
             if (kind === 'loop_done') {
@@ -1034,7 +1307,17 @@ class AssistantApp extends AppBase {
         div.className = 'assistant-bubble assistant-bubble-user mb-6 user-msg-anchor';
         div.innerHTML = `<div class="assistant-bubble-content">${this._escape(text)}</div>`;
         this.messagesEl.appendChild(div);
-        this._scrollToBottom();
+        // Scroll the user message into view (like the floating chat), then re-enable
+        // auto-stick so the streaming answer continues to scroll the chat down.
+        if (this.chatEl) {
+            this._stickToBottom = false;
+            requestAnimationFrame(() => {
+                div.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                // Re-enable stick-to-bottom once the smooth scroll finishes, so the
+                // assistant response keeps pulling the view down.
+                setTimeout(() => { this._stickToBottom = true; }, 350);
+            });
+        }
         return div;
     }
 
@@ -1114,6 +1397,24 @@ class AssistantApp extends AppBase {
         });
     }
 
+    _adjustChatPadding() {
+        // Keep enough bottom padding on the chat so the last message never slips
+        // behind the floating input area. This is especially important when the
+        // final markdown reparse suddenly grows the last bubble.
+        if (!this.chatEl || !this.inputArea) return;
+        const inputHeight = this.inputArea.getBoundingClientRect().height;
+        const extra = 0.5 * parseFloat(getComputedStyle(document.documentElement).fontSize || 16);
+        this.chatEl.style.paddingBottom = `${inputHeight + extra}px`;
+    }
+
+    _resetChatPadding() {
+        if (!this.chatEl) return;
+        // Do not strip the padding immediately when streaming ends; the final
+        // parsed block may be taller than the streamed placeholder and would be
+        // hidden by the input area. The padding is reapplied by _applyCentering
+        // when the user switches away/back or on the next resize.
+    }
+
     _hideAllSparkles() {
         this.chatEl.querySelectorAll('.sparkle-container').forEach((container) => {
             const avatar = container.closest('.ai-avatar-wrapper') || container;
@@ -1153,6 +1454,7 @@ class AssistantApp extends AppBase {
     }
 
     _createToolCard(name, args = {}) {
+        if (this._embedded) return null;
         const id = 'assistant-tool-' + name + '-' + Date.now();
         const div = document.createElement('div');
         div.id = id;
@@ -1206,6 +1508,7 @@ class AssistantApp extends AppBase {
     }
 
     _appendProgressCard(cardId, toolName) {
+        if (this._embedded) return null;
         const labels = {
             metadata_checker: 'Vérification des métadonnées',
             validator_check: 'Validation guide de style',
@@ -1320,6 +1623,7 @@ class AssistantApp extends AppBase {
     }
 
     _fillToolResult(name, result, display) {
+        if (this._embedded) return null;
         if (display && display.type === 'search') {
             this._fillSearchCard(display.query || '', display.results_html || '');
             return null;
@@ -1496,6 +1800,7 @@ class AssistantApp extends AppBase {
         }
         if (!target) {
             target = this._appendSearchCard(query, resultsHtml);
+            this._updateSearchResultAddButtons();
             return target;
         }
         const loading = target.querySelector('.assistant-search-loading');
@@ -1508,6 +1813,7 @@ class AssistantApp extends AppBase {
         }
         target.dataset.query = query;
         target.querySelector('.assistant-search-query').textContent = query;
+        this._updateSearchResultAddButtons();
         this._scrollToBottom();
         return target;
     }
@@ -1527,6 +1833,7 @@ class AssistantApp extends AppBase {
     }
 
     _appendSvgCard(svgText, label = 'Visualisation du modèle') {
+        if (this._embedded) return null;
         if (!svgText) return null;
         const id = 'assistant-svg-' + Date.now();
         const div = document.createElement('div');
@@ -1554,6 +1861,7 @@ class AssistantApp extends AppBase {
     }
 
     _updateCurrentSvgCard(svgText, label = 'Visualisation du modèle') {
+        if (this._embedded) return;
         if (!svgText) return;
         if (!this.activeSvgCard || !this.activeSvgViewer) {
             this._appendSvgCard(svgText, label);
@@ -1725,18 +2033,13 @@ class AssistantApp extends AppBase {
     _scrollToBottom(force = false) {
         const el = this.chatEl;
         if (!el) return;
-        const threshold = 80; // px from bottom to consider "at bottom"
-        const isNearBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < threshold;
-        if (force || isNearBottom) {
+        if (force || this._stickToBottom) {
             el.scrollTo({ top: el.scrollHeight, behavior: force ? 'auto' : 'smooth' });
         }
     }
 
     _isNearBottom() {
-        const el = this.chatEl;
-        if (!el) return true;
-        const threshold = 80;
-        return (el.scrollHeight - el.scrollTop - el.clientHeight) < threshold;
+        return !!this._stickToBottom;
     }
 
     async _send(text) {
@@ -1771,115 +2074,89 @@ class AssistantApp extends AppBase {
             }
         }, 1200);
 
-        let currentBubble = null;
-        let currentText = this._currentStreamingText || '';
-        this._currentStreamingText = currentText;
+        // ChatApp-style streaming: accumulate the full response, then display it
+        // character-by-character with live markdown reparsing.
+        let fullResponse = '';
+        let displayedText = '';
+        let streamBuffer = '';
+        let currentBubbleContent = null;
+        let typewriterInterval = null;
+
+        const startTypewriter = () => {
+            if (typewriterInterval) return;
+            typewriterInterval = setInterval(() => {
+                if (streamBuffer.length === 0) return;
+                const chunkSize = Math.min(3 + Math.floor(Math.random() * 8), streamBuffer.length);
+                displayedText += streamBuffer.slice(0, chunkSize);
+                streamBuffer = streamBuffer.slice(chunkSize);
+                if (currentBubbleContent) {
+                    currentBubbleContent.innerHTML = this._markdown(displayedText, false);
+                }
+                this._adjustChatPadding();
+            }, 10);
+        };
+
+        const stopTypewriter = () => {
+            if (typewriterInterval) {
+                clearInterval(typewriterInterval);
+                typewriterInterval = null;
+            }
+        };
+
+        const flushTypewriter = () => {
+            stopTypewriter();
+            if (streamBuffer.length > 0) {
+                displayedText += streamBuffer;
+                streamBuffer = '';
+            }
+            if (currentBubbleContent) {
+                currentBubbleContent.innerHTML = this._markdown(displayedText, false);
+            }
+            // The final parse can make the bubble much taller. Apply the safety
+            // padding so the new content is never hidden behind the input area.
+            this._adjustChatPadding();
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    this._adjustChatPadding();
+                });
+            });
+        };
+
+        const resetTypewriter = () => {
+            stopTypewriter();
+            displayedText = '';
+            streamBuffer = '';
+            currentBubbleContent = null;
+        };
+
+        const appendToStreamBuffer = (text) => {
+            streamBuffer += text;
+        };
+
+        const ensureAssistantTextBubble = () => {
+            if (currentBubbleContent) return currentBubbleContent;
+            this._removeThinkingPlaceholder();
+            this._closeAssistantBubble();
+            const wrapper = document.createElement('div');
+            wrapper.className = 'assistant-bubble assistant-bubble-assistant mb-6';
+            wrapper.dataset.role = 'assistant';
+            wrapper.dataset.active = 'true';
+            wrapper.innerHTML = `
+                <div class="assistant-bubble-content markdown-body"></div>
+                <div class="ai-avatar-row flex items-center gap-2">
+                    <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic" data-hidden="false">
+                        ${this._sparkleSvg()}
+                    </div>
+                </div>
+            `;
+            this.messagesEl.appendChild(wrapper);
+            currentBubbleContent = wrapper.querySelector('.assistant-bubble-content');
+            return currentBubbleContent;
+        };
 
         // Abort controller lets the client survive long waits and prevents duplicate streams.
         this._streamAbortController?.abort();
         this._streamAbortController = new AbortController();
-
-        // Streaming markdown renderer: tokens appear as they arrive from the LLM,
-        // but the markdown is re-rendered only when safe (no unclosed markdown
-        // markers) and at "structure breakpoints" so the visible formatting stays
-        // mostly up-to-date without freezing the UI. Tokens are appended as raw text
-        // between two re-renders, which prevents the duplication seen when mixing
-        // plain-text DOM nodes with full HTML replacement.
-        const STRUCTURE_RE = /[ \n\r\t.,;:!?*`_#\-+=~\[\](){}|'"\\/<>.]/;
-        const MIN_REPARSE_MS = 60;
-        const MAX_PLAIN_MS = 300;
-        let lastReparsedAt = 0;
-        let pendingPlain = '';
-        let lastPlainAt = 0;
-
-        const hasUnclosedMarkdown = (txt) => {
-            // Count backticks: odd means an inline code span is open.
-            const backticks = (txt.match(/`/g) || []).length;
-            if (backticks % 2 !== 0) return true;
-            // Count double-asterisks (bold). Odd count means an opener/closer is pending.
-            const doubleStars = (txt.match(/\*\*/g) || []).length;
-            if (doubleStars % 2 !== 0) return true;
-            // Single underscores/asterisks used as emphasis markers. Approximation: if the
-            // total count of unescaped emphasis markers is odd, an emphasis span is open.
-            const emphasis = (txt.match(/(^|[^\\])[_*](?=[^\s]|$)/g) || []).length;
-            if (emphasis % 2 !== 0) return true;
-            return false;
-        };
-
-        const updateCurrentText = (chunk) => {
-            currentText += chunk;
-            this._currentStreamingText = currentText;
-        };
-
-        const typewriter = this._createTypewriter((chunk) => {
-            updateCurrentText(chunk);
-            pendingPlain += chunk;
-
-            if (!currentBubble) {
-                this._removeThinkingPlaceholder();
-                this._closeAssistantBubble();
-                currentBubble = this._ensureAssistantBubble();
-                currentBubble.innerHTML = '';
-                lastReparsedAt = performance.now();
-                lastPlainAt = lastReparsedAt;
-            }
-
-            const now = performance.now();
-            const lastChar = chunk.slice(-1);
-            const isBreakpoint = STRUCTURE_RE.test(lastChar);
-            const tooLongPlain = (now - lastPlainAt > MAX_PLAIN_MS) && (now - lastReparsedAt > MIN_REPARSE_MS);
-            const safeToRender = !hasUnclosedMarkdown(currentText);
-            const shouldReparse = (isBreakpoint || tooLongPlain) && safeToRender && (now - lastReparsedAt > MIN_REPARSE_MS);
-
-            if (shouldReparse) {
-                currentBubble.innerHTML = this._markdown(currentText, false);
-                pendingPlain = '';
-                lastReparsedAt = now;
-                lastPlainAt = now;
-                this._throttledReflow();
-                this._throttledScrollToBottom();
-            } else if (currentBubble) {
-                // Fast path: append raw text to the live DOM without re-parsing
-                // markdown. We insert pendingPlain if any to keep the DOM minimal.
-                if (pendingPlain) {
-                    const tail = currentBubble.lastChild;
-                    if (tail && tail.nodeType === Node.TEXT_NODE) {
-                        tail.textContent += pendingPlain;
-                    } else {
-                        currentBubble.appendChild(document.createTextNode(pendingPlain));
-                    }
-                    pendingPlain = '';
-                    lastPlainAt = now;
-                }
-                this._throttledReflow();
-                this._throttledScrollToBottom();
-            }
-        });
-
-        const finalizeText = async () => {
-            typewriter.flush();
-            if (currentBubble) {
-                // Yield to the browser so the progress-done transition / last chunks
-                // are painted before the final markdown parse.
-                await new Promise((resolve) => requestAnimationFrame(resolve));
-                currentBubble.innerHTML = this._markdown(currentText, false);
-                this._forceReflow();
-            }
-        };
-
-        const resetBubble = () => {
-            typewriter.flush();
-            if (currentBubble) {
-                // Convert the streaming view into the final markdown render before
-                // closing this bubble so the next bubble starts clean and formatted.
-                currentBubble.innerHTML = this._markdown(currentText, false);
-            }
-            pendingPlain = '';
-            currentBubble = null;
-            currentText = '';
-            this._currentStreamingText = '';
-            this._closeAssistantBubble();
-        };
 
         const saveHtmlSnapshot = () => {
             if (this.messagesEl) {
@@ -1900,33 +2177,17 @@ class AssistantApp extends AppBase {
             const eventsToReplay = this._pendingEvents.slice(this._lastRenderedEventIndex + 1);
             this._lastRenderedEventIndex = this._pendingEvents.length - 1;
             for (const ev of eventsToReplay) {
-                this._processEvent(ev, { typewriter, resetBubble, finalizeText, saveHtmlSnapshot, placeholderRef: { value: placeholder } });
+                this._processEvent(ev, { startTypewriter, stopTypewriter, flushTypewriter, resetTypewriter, ensureAssistantTextBubble, appendToStreamBuffer, saveHtmlSnapshot, placeholderRef: { value: placeholder } });
             }
 
-            this._processEvent(event, { typewriter, resetBubble, finalizeText, saveHtmlSnapshot, placeholderRef: { value: placeholder } });
-
-            // Re-attach currentBubble if it was disconnected (rare if the DOM was
-            // rebuilt). With cached DOM it always stays connected.
-            if (this._currentStreamingText && (!currentBubble || !currentBubble.isConnected)) {
-                const wrappers = Array.from(this.messagesEl.querySelectorAll('[data-role="assistant"][data-active="true"]'));
-                const match = wrappers.find((w) => {
-                    const content = w.querySelector('.assistant-bubble-content');
-                    if (!content) return false;
-                    const text = content.textContent || '';
-                    return this._currentStreamingText.startsWith(text.trimStart().slice(0, 60)) ||
-                           text.trimStart().startsWith(this._currentStreamingText.slice(0, 60));
-                });
-                if (match) {
-                    currentBubble = match.querySelector('.assistant-bubble-content');
-                }
-            }
+            this._processEvent(event, { startTypewriter, stopTypewriter, flushTypewriter, resetTypewriter, ensureAssistantTextBubble, appendToStreamBuffer, saveHtmlSnapshot, placeholderRef: { value: placeholder } });
         };
 
         try {
             await ApiClient.streamAssistant(
                 sessionToSend,
                 text,
-                this.modelName,
+                this.modelNames,
                 this.selectedTags || [],
                 liveHandler,
                 { origin: this.origin }
@@ -1938,13 +2199,16 @@ class AssistantApp extends AppBase {
             bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(err.message)}</em>`;
         } finally {
             clearInterval(loadingInterval);
-            typewriter.stop();
+            stopTypewriter();
+            flushTypewriter();
             this.isStreaming = false;
             this._setSendEnabled(true);
             this._closeAssistantBubble();
+            // Keep the padding safety in place; _applyCentering will refresh it on
+            // tab switches / resize instead of clearing it here.
 
-            if (currentText) {
-                this.messages.push({ role: 'assistant', content: currentText });
+            if (displayedText) {
+                this.messages.push({ role: 'assistant', content: displayedText });
             }
 
             this._removeThinkingPlaceholder();
@@ -1955,7 +2219,7 @@ class AssistantApp extends AppBase {
         }
     }
 
-    _processEvent(event, { typewriter, resetBubble, finalizeText, saveHtmlSnapshot, placeholderRef }) {
+    _processEvent(event, { startTypewriter, stopTypewriter, flushTypewriter, resetTypewriter, ensureAssistantTextBubble, appendToStreamBuffer, saveHtmlSnapshot, placeholderRef }) {
         if (this._streamAliveTimeout) {
             clearTimeout(this._streamAliveTimeout);
             this._streamAliveTimeout = null;
@@ -1985,8 +2249,12 @@ class AssistantApp extends AppBase {
         }
 
         if (event.kind === 'assistant_text') {
-            if (typewriter) {
-                typewriter.append(event.content || '');
+            if (appendToStreamBuffer) {
+                // ChatApp-style live typewriter: append to the buffer and let the
+                // interval display characters one-by-one with live markdown parsing.
+                appendToStreamBuffer(event.content || '');
+                ensureAssistantTextBubble();
+                startTypewriter();
             } else {
                 // Fallback during background replay (no live typewriter available).
                 const bubble = this._ensureAssistantBubble();
@@ -2000,7 +2268,10 @@ class AssistantApp extends AppBase {
         }
 
         if (event.kind === 'assistant_tool_calls') {
-            resetBubble();
+            stopTypewriter?.();
+            flushTypewriter?.();
+            resetTypewriter?.();
+            this._closeAssistantBubble();
             // Hide the verbose tool-call list; only progress cards (and the
             // plan card) give the user feedback now.
             this.messages.push({ role: 'assistant_tool_calls', tool_calls: event.tool_calls });
@@ -2009,7 +2280,10 @@ class AssistantApp extends AppBase {
         }
 
         if (event.kind === 'tool_start') {
-            resetBubble();
+            stopTypewriter?.();
+            flushTypewriter?.();
+            resetTypewriter?.();
+            this._closeAssistantBubble();
             // Hide the sparkle on any previous assistant bubble as soon as a new
             // tool starts, so it does not stay under an intermediate message.
             this._hideAllSparkles();
@@ -2019,42 +2293,58 @@ class AssistantApp extends AppBase {
                 this._appendSearchCard(event.arguments?.search_terms || '', null);
             } else if (event.name === 'display_model_visualization') {
                 // SVG cards are created/updated by the model_svg event, no extra card here.
+                // In embedded mode the visualization lives in the modeler canvas.
             }
             // Tool cards (JSON dumps) are intentionally hidden for all tools,
             // including unknown ones. Only progress cards, plan card, search
             // results and SVG visualizations remain visible.
             // Show a transient status label while the tool runs. The helper
-            // removes any previous placeholder first.
-            placeholderRef.value = this._appendThinkingPlaceholder(this._toolStatusLabel(event.name));
+            // removes any previous placeholder first. Skip the placeholder in
+            // embedded mode to avoid visual noise; the modeler canvas shows progress.
+            if (!this._embedded) {
+                placeholderRef.value = this._appendThinkingPlaceholder(this._toolStatusLabel(event.name));
+            }
             saveHtmlSnapshot();
             return;
         }
 
         if (event.kind === 'progress_start') {
-            resetBubble();
+            stopTypewriter?.();
+            flushTypewriter?.();
+            resetTypewriter?.();
+            this._closeAssistantBubble();
             this._hideAllSparkles();
-            this._appendProgressCard(event.card_id, event.tool_name);
+            if (!this._embedded) {
+                this._appendProgressCard(event.card_id, event.tool_name);
+            }
             saveHtmlSnapshot();
             return;
         }
 
         if (event.kind === 'progress_update') {
-            this._updateProgressCard(event.card_id, event.percent, event.message);
+            if (!this._embedded) {
+                this._updateProgressCard(event.card_id, event.percent, event.message);
+            }
             saveHtmlSnapshot();
             return;
         }
 
         if (event.kind === 'progress_done') {
-            this._completeProgressCard(event.card_id);
-            this._removeProgressStatus(event.card_id);
+            if (!this._embedded) {
+                this._completeProgressCard(event.card_id);
+                this._removeProgressStatus(event.card_id);
+            }
             saveHtmlSnapshot();
             return;
         }
 
         if (event.kind === 'tool_result') {
-            resetBubble();
+            stopTypewriter?.();
+            flushTypewriter?.();
+            resetTypewriter?.();
+            this._closeAssistantBubble();
             if (event.name === 'plan_workflow_with_tools') {
-                this._renderPlan(event.result);
+                if (!this._embedded) this._renderPlan(event.result);
             } else if (event.name === 'retrieve_documents') {
                 this._fillSearchCard(event.display?.query || '', event.display?.results_html || '');
             } else {
@@ -2065,7 +2355,10 @@ class AssistantApp extends AppBase {
         }
 
         if (event.kind === 'loop_done') {
-            resetBubble();
+            stopTypewriter?.();
+            flushTypewriter?.();
+            resetTypewriter?.();
+            this._closeAssistantBubble();
             saveHtmlSnapshot();
             return;
         }
@@ -2075,37 +2368,35 @@ class AssistantApp extends AppBase {
             // When the assistant is embedded next to the modeler, the visualization
             // lives in the modeler's main canvas instead.
             const linked = this._linkedModelerInstanceId || this.props.linkedModelerInstanceId;
-            if (linked && this.modelName) {
+            if (linked && this.modelNames?.length) {
                 const modeler = AppState.getInstance(linked);
                 if (modeler && typeof modeler._reloadSvgFromServer === 'function') {
                     modeler._reloadSvgFromServer();
                 }
-            } else {
-                this._updateCurrentSvgCard(event.svg, event.label || 'Visualisation du modèle');
+            } else if (!this._embedded) {
+                const label = event.model_name || event.label || 'Visualisation du modèle';
+                this._updateCurrentSvgCard(event.svg, label);
             }
             saveHtmlSnapshot();
             return;
         }
 
         if (event.kind === 'assistant_done') {
-            resetBubble();
+            stopTypewriter?.();
+            flushTypewriter?.();
+            resetTypewriter?.();
+            this._closeAssistantBubble();
             // Remove any lingering thinking placeholder before rendering the final answer.
             this._removeThinkingPlaceholder();
-            // If the backend only sent the final message inside assistant_done
-            // (no preceding assistant_text chunks), render it now.
-            if (event.content && !this._currentStreamingText && !currentBubble) {
-                const bubble = this._ensureAssistantBubble();
-                bubble.innerHTML = this._markdown(event.content, false);
-                this._currentStreamingText = event.content;
-                this._forceReflow();
-            }
-            this._closeAssistantBubble();
             saveHtmlSnapshot();
             return;
         }
 
         if (event.kind === 'error') {
-            resetBubble();
+            stopTypewriter?.();
+            flushTypewriter?.();
+            resetTypewriter?.();
+            this._closeAssistantBubble();
             const bubble = this._ensureAssistantBubble();
             bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(event.message || '')}</em>`;
             saveHtmlSnapshot();
@@ -2114,39 +2405,35 @@ class AssistantApp extends AppBase {
     }
 
     _createTypewriter(onChunk, options = {}) {
-        // By default, render each append() as a whole token/word. This matches how
-        // the backend streams LLM tokens and avoids the artificial "character by
-        // character" feel. Very long tokens are still split at spaces to keep the
-        // UI responsive.
-        const maxTokenLength = options.maxTokenLength || 80;
+        // Character-by-character typewriter effect, matching the floating chat
+        // window. The chunk size varies slightly for a natural feel.
+        const charInterval = options.charInterval || 20;
 
         let buffer = '';
-        let rafId = null;
+        let timerId = null;
         let running = false;
 
         const emitNext = () => {
             if (buffer === '') return;
-            // Prefer emitting whole words/tokens. If a token is too long, split on
-            // spaces; if there are no spaces, take the whole chunk.
-            let chunk = buffer;
-            if (chunk.length > maxTokenLength) {
-                const cut = chunk.lastIndexOf(' ', maxTokenLength);
-                const splitAt = cut > 0 ? cut : maxTokenLength;
-                chunk = chunk.slice(0, splitAt);
-            }
-            buffer = buffer.slice(chunk.length);
+            // Emit 1 to 4 characters per tick with a small random variation.
+            const chunkSize = Math.min(1 + Math.floor(Math.random() * 4), buffer.length);
+            const chunk = buffer.slice(0, chunkSize);
+            buffer = buffer.slice(chunkSize);
             if (chunk) onChunk(chunk);
+            return chunkSize;
         };
 
         const schedule = () => {
-            if (running || rafId) return;
+            if (running || timerId) return;
             running = true;
-            rafId = requestAnimationFrame(() => {
-                emitNext();
-                rafId = null;
+            timerId = setTimeout(() => {
+                timerId = null;
                 running = false;
-                if (buffer !== '') schedule();
-            });
+                if (buffer !== '') {
+                    emitNext();
+                    if (buffer !== '') schedule();
+                }
+            }, charInterval);
         };
 
         return {
@@ -2155,9 +2442,9 @@ class AssistantApp extends AppBase {
                 schedule();
             },
             flush: () => {
-                if (rafId) {
-                    cancelAnimationFrame(rafId);
-                    rafId = null;
+                if (timerId) {
+                    clearTimeout(timerId);
+                    timerId = null;
                 }
                 running = false;
                 while (buffer !== '') {
@@ -2165,9 +2452,9 @@ class AssistantApp extends AppBase {
                 }
             },
             stop: () => {
-                if (rafId) {
-                    cancelAnimationFrame(rafId);
-                    rafId = null;
+                if (timerId) {
+                    clearTimeout(timerId);
+                    timerId = null;
                 }
                 running = false;
                 buffer = '';

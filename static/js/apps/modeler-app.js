@@ -98,6 +98,22 @@ class ModelerApp extends AppBase {
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
                             Exporter en TTL
                         </button>
+                        <button type="button" data-format="svg" class="modeler-export-item w-full text-left px-4 py-2 hover:bg-gray-50 text-gray-700 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                <polyline points="21 15 16 10 5 21"></polyline>
+                            </svg>
+                            Exporter en SVG
+                        </button>
+                        <button type="button" data-format="png" class="modeler-export-item w-full text-left px-4 py-2 hover:bg-gray-50 text-gray-700 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                <polyline points="21 15 16 10 5 21"></polyline>
+                            </svg>
+                            Exporter en PNG
+                        </button>
                     </div>
                     <button type="button" id="modeler-assistant-toggle" class="hidden absolute top-3 right-3 z-30 w-10 h-10 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-700 hover:text-black hover:bg-gray-50 transition-colors" title="Discuter avec l'assistant sémantique">
                         <svg class="w-5 h-5 overflow-visible" viewBox="0 0 24 24">
@@ -421,10 +437,14 @@ class ModelerApp extends AppBase {
         importContainer.classList.add('modeler-import-hidden');
         if (dropZone) dropZone.style.display = 'none';
 
-        // Reveal the viewer area and fade it in as the title glides up.
+        // Reveal the viewer area and keep the spinner visible while the SVG is generated.
         viewer.classList.remove('hidden');
-        viewer.style.transition = 'none';
-        viewer.style.opacity = '0';
+        viewer.style.opacity = '1';
+        const svgViewer = this.container.querySelector('#modeler-svg-viewer');
+        if (svgViewer) {
+            svgViewer.classList.add('modeler-svg-hidden');
+            svgViewer.style.transition = 'none';
+        }
         void viewer.offsetHeight;
         this._setLoading(true);
 
@@ -450,6 +470,13 @@ class ModelerApp extends AppBase {
         }
         this._updateExportToggleVisibility();
 
+        // Keep the spinner visible until the SVG is actually rendered.
+        this._setLoading(true);
+        if (viewerContainer) {
+            viewerContainer.classList.add('modeler-svg-hidden');
+            viewerContainer.style.transition = 'none';
+        }
+
         // If the live SVG viewer is already attached to the cached container,
         // just make sure the pane is visible and resume observers.
         if (this.viewer && this.viewer.svg && viewerContainer && viewerContainer.contains(this.viewer.svg)) {
@@ -462,6 +489,7 @@ class ModelerApp extends AppBase {
                 editActions.classList.remove('hidden');
                 this._updateEditButtonStates();
             }
+            if (viewerContainer) viewerContainer.classList.remove('modeler-svg-hidden');
             this._setLoading(false);
             this._observeSvgContainerResize();
             this.setTitle(`Modéliseur: ${this.fileName}`);
@@ -473,45 +501,48 @@ class ModelerApp extends AppBase {
                 onTransform: (state) => { this.viewerState = state; }
             });
         }
-        this.viewer.setSvg(this.svgText, this.mainClassName);
-        // New import/open from history/preview: center diagram after it becomes visible.
-        // Returning from another tab with a cached DOM: the viewer stayed alive.
-        const finalize = () => {
-            this._setLoading(false);
-            if (viewer) {
-                viewer.style.transition = 'opacity 0.35s ease';
-                viewer.style.opacity = '1';
-            }
-            if (editActions) {
-                editActions.classList.remove('hidden');
-                this._updateEditButtonStates();
-            }
-            this.setTitle(`Modéliseur: ${this.fileName}`);
-        };
-        if (this._centerOnNextShow) {
-            // Wait two frames so the browser has rendered the SVG before we
-            // fade it in and center it. This avoids a visible flash/jump.
+
+        // Yield to the browser so the spinner is painted before the heavy SVG work begins.
+        requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    this.viewer.resetZoom();
-                    this._centerOnNextShow = false;
-                    finalize();
-                });
-            });
-        } else {
-            // When the viewer is remounted into a different container size
-            // (e.g. opening the assistant split), restore the saved pan/zoom state.
-            // Do NOT auto-center; the saved state is the user's chosen view.
-            this.viewer.restoreState(this.viewerState);
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    if (this.viewer && this.svgText) {
+                this.viewer.setSvg(this.svgText, this.mainClassName);
+
+                const finalize = () => {
+                    if (this._centerOnNextShow) {
+                        this.viewer.resetZoom();
+                        this._centerOnNextShow = false;
+                    } else {
+                        this.viewer.restoreState(this.viewerState);
                         this.viewer.applyTransform();
                     }
+
+                    // Force a layout so the browser finishes rendering before hiding the spinner.
+                    this.viewer.container.getBoundingClientRect();
+                    if (this.viewer.svg) this.viewer.svg.getBBox();
+
+                    requestAnimationFrame(() => {
+                        this._setLoading(false);
+                        if (viewer) {
+                            viewer.style.transition = 'opacity 0.35s ease';
+                            viewer.style.opacity = '1';
+                        }
+                        if (editActions) {
+                            editActions.classList.remove('hidden');
+                            this._updateEditButtonStates();
+                        }
+                        if (viewerContainer) {
+                            viewerContainer.style.transition = 'opacity 0.35s ease';
+                            viewerContainer.classList.remove('modeler-svg-hidden');
+                        }
+                        this.setTitle(`Modéliseur: ${this.fileName}`);
+                    });
+                };
+
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(finalize);
                 });
             });
-            finalize();
-        }
+        });
         this._observeSvgContainerResize();
     }
 
@@ -702,8 +733,7 @@ class ModelerApp extends AppBase {
                 e.stopPropagation();
                 const format = item.dataset.format;
                 if (item.disabled) return;
-                await this._exportModel(format);
-                this._closeExportMenu();
+                await this._exportModel(format, item);
             });
         });
 
@@ -736,11 +766,13 @@ class ModelerApp extends AppBase {
         btn.classList.toggle('hidden', !this.svgText);
     }
 
-    async _exportModel(format) {
+    async _exportModel(format, itemEl) {
         if (!this.storedName) {
             this._showExportError('Aucun modèle à exporter.');
             return;
         }
+        const originalHtml = itemEl?.innerHTML || '';
+        this._setExportItemLoading(itemEl, true);
         try {
             const blob = await ApiClient.exportModel(this.storedName, format);
             const url = URL.createObjectURL(blob);
@@ -751,9 +783,32 @@ class ModelerApp extends AppBase {
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
+            this._closeExportMenu();
         } catch (err) {
             console.error('Export model error', err);
             this._showExportError(`Échec de l'export ${format.toUpperCase()}.`);
+        } finally {
+            this._setExportItemLoading(itemEl, false, originalHtml);
+        }
+    }
+
+    _setExportItemLoading(itemEl, isLoading, originalHtml = '') {
+        if (!itemEl) return;
+        if (isLoading) {
+            itemEl.disabled = true;
+            itemEl.dataset.originalHtml = itemEl.innerHTML || '';
+            itemEl.innerHTML = `
+                <span class="inline-flex items-center gap-1.5">
+                    <svg class="animate-spin w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Export...</span>
+                </span>`;
+        } else {
+            itemEl.disabled = false;
+            itemEl.innerHTML = originalHtml || itemEl.dataset.originalHtml || 'Exporter';
+            delete itemEl.dataset.originalHtml;
         }
     }
 
