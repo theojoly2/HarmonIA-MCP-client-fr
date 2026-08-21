@@ -27,6 +27,37 @@ class SearchApp extends AppBase {
         this._skipHistorySave = !!props.fromHistory;
         this.selectedAssistantModels = [];
         this.maxAssistantModels = 3;
+        this._assistantStateObserver = null;
+    }
+
+    /**
+     * Return the standalone Assistant instance currently open, if any.
+     * Embedded assistants (linked to a modeler) are ignored.
+     */
+    _getCurrentAssistantInstance() {
+        const list = AppState.listInstances().filter((i) => {
+            if (i.appId !== 'assistant') return false;
+            const rec = AppState.getRecord(i.instanceId);
+            const meta = rec?.meta || {};
+            return !(meta.origin === 'modeler' || meta.linkedModelerInstanceId);
+        });
+        // Prefer the active one, otherwise the most recent.
+        const activeId = AppState.getActiveInstance();
+        const active = list.find((i) => i.instanceId === activeId);
+        if (active) return AppState.getInstance(active.instanceId);
+        if (list.length) return AppState.getInstance(list[list.length - 1].instanceId);
+        return null;
+    }
+
+    /**
+     * Check whether adding another model to the current assistant would exceed
+     * the limit of 3 attached models. Loading placeholders count too.
+     */
+    _currentAssistantHasRoom() {
+        const assistant = this._getCurrentAssistantInstance();
+        if (!assistant) return true;
+        const total = (assistant.modelNames?.length || 0) + (assistant._loadingModels?.length || 0);
+        return total < assistant.modelNamesConfig.max;
     }
 
     async render(container) {
@@ -37,6 +68,11 @@ class SearchApp extends AppBase {
             this._updateHomeModeClass();
             this._renderAssistantModelBar();
             this._updateAddModelButtons();
+            if (!this._assistantStateObserver) {
+                this._assistantStateObserver = setInterval(() => {
+                    this._updateAddModelButtons();
+                }, 500);
+            }
             const input = container.querySelector('#search-input');
             if (input) input.focus();
             return;
@@ -116,6 +152,12 @@ class SearchApp extends AppBase {
                         wrapper.style.opacity = '1';
                     }
                     this._skipNextTransition = false;
+                    // Start syncing + buttons with the current assistant model count.
+                    if (!this._assistantStateObserver) {
+                        this._assistantStateObserver = setInterval(() => {
+                            this._updateAddModelButtons();
+                        }, 500);
+                    }
                     if (showTags) {
                         this._layoutReady = true;
                         this._checkRevealReady();
@@ -244,9 +286,9 @@ class SearchApp extends AppBase {
             } else if (action === 'chat') {
                 EventBus.emit('open-chat', { documentId, name });
             } else if (action === 'add-to-assistant') {
-                console.log('[SearchApp] add-to-assistant clicked', { docId, filename, extension });
-                this._toggleAssistantModel(docId, filename, extension);
-            }
+            console.log('[SearchApp] add-to-assistant clicked', { docId, filename, extension });
+            this._addToCurrentAssistant(docId, filename, extension);
+        }
         });
 
         const assistantBtn = this.container.querySelector('#search-open-assistant-btn');
@@ -518,6 +560,8 @@ class SearchApp extends AppBase {
         // Suspend the resize observer while the tab is cached; the DOM and
         // scroll state stay intact.
         if (this._resizeObserver) this._resizeObserver.disconnect();
+        if (this._assistantStateObserver) clearInterval(this._assistantStateObserver);
+        this._assistantStateObserver = null;
     }
 
     onTabActivated() {
@@ -526,6 +570,13 @@ class SearchApp extends AppBase {
         this._observeResize();
         this._updateHomeModeClass();
         this._renderAssistantModelBar();
+        this._updateAddModelButtons();
+        // Keep the + buttons in sync with the current assistant model count.
+        if (!this._assistantStateObserver) {
+            this._assistantStateObserver = setInterval(() => {
+                this._updateAddModelButtons();
+            }, 500);
+        }
         const input = this.container?.querySelector('#search-input');
         if (input) input.focus();
     }
@@ -534,6 +585,8 @@ class SearchApp extends AppBase {
         this._stopTimer();
         if (this._resizeObserver) this._resizeObserver.disconnect();
         this._resizeObserver = null;
+        if (this._assistantStateObserver) clearInterval(this._assistantStateObserver);
+        this._assistantStateObserver = null;
         super.unmount();
     }
 
@@ -647,18 +700,80 @@ class SearchApp extends AppBase {
 
     _updateAddModelButtons() {
         if (!this.container) return;
+        // In embedded mode the assistant pane belongs to the modeler; importing
+        // from search cards would be confusing, so hide the + buttons entirely.
+        const currentAssistant = this._getCurrentAssistantInstance();
+        const isEmbedded = !!currentAssistant?._embedded;
         const atMax = this.selectedAssistantModels.length >= this.maxAssistantModels;
         this.container.querySelectorAll('[data-action="add-to-assistant"]').forEach(btn => {
             const docId = btn.dataset.docId;
             const selected = this.selectedAssistantModels.some(m => m.docId === docId);
-            btn.disabled = atMax && !selected;
+            const alreadyInAssistant = currentAssistant && (currentAssistant.modelNames?.some?.(n => n === docId) || currentAssistant._loadingModels?.some?.(m => m.displayName === btn.dataset.filename));
+            const disabled = isEmbedded || (atMax && !selected) || alreadyInAssistant;
+            btn.disabled = disabled;
             btn.classList.toggle('search-add-model-selected', selected);
-            btn.style.opacity = (atMax && !selected) ? '0.4' : '';
+            btn.classList.toggle('hidden', isEmbedded);
+            btn.style.opacity = disabled ? '0.4' : '';
         });
     }
 
     _displayNameForSearchModel(filename) {
         return filename.includes('__') ? filename.split('__').slice(0, -1).join('__') : filename;
+    }
+
+    async _addToCurrentAssistant(docId, filename, extension) {
+        if (!docId || !filename) return;
+
+        let assistant = this._getCurrentAssistantInstance();
+        let isNew = false;
+        if (!assistant) {
+            isNew = true;
+            const created = AppState.createInstance('assistant', {
+                mode: 'tab',
+                modelNames: [],
+                modelName: '',
+                origin: 'assistant',
+                fromHistory: false,
+                displayNames: {},
+            });
+            assistant = created.instance;
+            await window.windowManager._mountTab(assistant);
+        }
+
+        const total = (assistant.modelNames?.length || 0) + (assistant._loadingModels?.length || 0);
+        if (total >= assistant.modelNamesConfig.max) return;
+        if (assistant.modelNames?.includes?.(docId) || assistant._loadingModels?.some?.(m => m.displayName === filename)) return;
+
+        const loadingKey = `search_card_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        assistant._startImportLoading(loadingKey, filename);
+
+        // Reflect the new loading model in search button states immediately.
+        this._updateAddModelButtons();
+
+        if (!isNew) {
+            // Bring the existing assistant tab to the front.
+            const rec = AppState.listInstances().find(i => i.appId === 'assistant' && AppState.getInstance(i.instanceId) === assistant);
+            if (rec) {
+                AppState.saveInstanceState(rec.instanceId);
+                await window.windowManager.switchTab(rec.instanceId);
+            }
+        } else {
+            AppState.setActiveInstance(assistant.instanceId);
+        }
+
+        try {
+            const result = await ApiClient.importDocumentAsAssistantModel(docId, 'assistant');
+            if (result?.name) {
+                assistant.props.displayNames = assistant.props.displayNames || {};
+                assistant.props.displayNames[result.name] = result.display_name || filename;
+                assistant._finishImportLoading(loadingKey, result.name);
+            } else {
+                throw new Error('Import terminé sans retour de modèle.');
+            }
+        } catch (err) {
+            console.error('Add to current assistant error', err);
+            assistant._failImportLoading(loadingKey, `Erreur import de ${this._displayNameForSearchModel(filename)} : ${err.message}`);
+        }
     }
 
     async _openAssistantWithSelectedModels() {
@@ -668,8 +783,11 @@ class SearchApp extends AppBase {
 
         // Open the Assistant immediately with loading placeholders so the user
         // isn't stuck on Search while imports run in the background.
-        const existing = AppState.listInstances().find(i => i.appId === 'assistant');
-        if (existing) AppState.removeInstance(existing.instanceId);
+        const existing = this._getCurrentAssistantInstance();
+        if (existing) {
+            const rec = AppState.listInstances().find(i => i.appId === 'assistant' && AppState.getInstance(i.instanceId) === existing);
+            if (rec) AppState.saveInstanceState(rec.instanceId);
+        }
 
         const initialDisplayNames = {};
         const loadingKeys = this.selectedAssistantModels.map((item, idx) => {
