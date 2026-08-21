@@ -692,6 +692,7 @@ class AssistantApp extends AppBase {
             btn.disabled = disabled;
             btn.style.opacity = disabled ? '0.4' : '';
             btn.style.display = this._embedded ? 'none' : '';
+            btn.classList.toggle('search-add-model-selected', alreadyAdded && !this._embedded);
         });
     }
 
