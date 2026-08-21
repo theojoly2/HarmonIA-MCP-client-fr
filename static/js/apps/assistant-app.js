@@ -624,6 +624,9 @@ class AssistantApp extends AppBase {
             const bottomPadding = 0.35 * parseFloat(getComputedStyle(document.documentElement).fontSize || 16);
             const topY = window.innerHeight - inputHeight - bottomPadding;
             this.inputArea.style.setProperty('--assistant-input-top', `${topY}px`);
+            if (this.chatEl) {
+                this.chatEl.style.paddingBottom = `${inputHeight + bottomPadding}px`;
+            }
         } else {
             // Fallback: clear explicit padding if neither state is fully active.
             this.welcomeEl.style.paddingTop = '';
@@ -1395,12 +1398,21 @@ class AssistantApp extends AppBase {
     }
 
     _adjustChatPadding() {
-        // Disabled: dynamic padding during streaming was causing erratic scroll
-        // jumps and blank space below the last message.
+        // Keep enough bottom padding on the chat so the last message never slips
+        // behind the floating input area. This is especially important when the
+        // final markdown reparse suddenly grows the last bubble.
+        if (!this.chatEl || !this.inputArea) return;
+        const inputHeight = this.inputArea.getBoundingClientRect().height;
+        const extra = 0.5 * parseFloat(getComputedStyle(document.documentElement).fontSize || 16);
+        this.chatEl.style.paddingBottom = `${inputHeight + extra}px`;
     }
 
     _resetChatPadding() {
-        if (this.chatEl) this.chatEl.style.paddingBottom = '';
+        if (!this.chatEl) return;
+        // Do not strip the padding immediately when streaming ends; the final
+        // parsed block may be taller than the streamed placeholder and would be
+        // hidden by the input area. The padding is reapplied by _applyCentering
+        // when the user switches away/back or on the next resize.
     }
 
     _hideAllSparkles() {
@@ -2076,6 +2088,7 @@ class AssistantApp extends AppBase {
                     currentBubbleContent.innerHTML = this._markdown(displayedText, false);
                 }
                 this._adjustChatPadding();
+                this._scrollToBottom(true);
             }, 20);
         };
 
@@ -2095,6 +2108,15 @@ class AssistantApp extends AppBase {
             if (currentBubbleContent) {
                 currentBubbleContent.innerHTML = this._markdown(displayedText, false);
             }
+            // The final parse can make the bubble much taller. Apply the safety
+            // padding and force a scroll so the new bottom stays visible.
+            this._adjustChatPadding();
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    this._adjustChatPadding();
+                    this._scrollToBottom(true);
+                });
+            });
         };
 
         const resetTypewriter = () => {
@@ -2179,7 +2201,8 @@ class AssistantApp extends AppBase {
             this.isStreaming = false;
             this._setSendEnabled(true);
             this._closeAssistantBubble();
-            this._resetChatPadding();
+            // Keep the padding safety in place; _applyCentering will refresh it on
+            // tab switches / resize instead of clearing it here.
 
             if (displayedText) {
                 this.messages.push({ role: 'assistant', content: displayedText });
