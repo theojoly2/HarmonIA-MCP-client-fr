@@ -34,6 +34,9 @@ class AssistantApp extends AppBase {
         this._lastRenderedEventIndex = -1;
         // Models currently being imported. Each entry: { name, displayName, loading: true }.
         this._loadingModels = [];
+        // Doc ids that have already been imported into this assistant conversation
+        // from search result cards. Used to keep the + button as a cross after import.
+        this._importedSearchDocIds = new Set();
         // Text accumulated for the assistant message currently being streamed. Stored
         // on the instance so it survives a tab switch (the old DOM is discarded and
         // rebuilt from the HTML snapshot).
@@ -680,14 +683,9 @@ class AssistantApp extends AppBase {
     _updateSearchResultAddButtons() {
         if (!this.messagesEl) return;
         const atMax = ((this.modelNames?.length || 0) + (this._loadingModels?.length || 0)) >= this.modelNamesConfig.max;
-        const loadedFilenames = new Set([
-            ...(this.modelNames || []),
-            ...(this._loadingModels || []).map((m) => m.displayName),
-        ]);
         this.messagesEl.querySelectorAll('[data-action="add-to-assistant"]').forEach((btn) => {
-            const filename = btn.dataset.filename;
             const docId = btn.dataset.docId;
-            const alreadyAdded = loadedFilenames.has(filename) || loadedFilenames.has(docId);
+            const alreadyAdded = this._importedSearchDocIds.has(docId);
             const disabled = atMax || alreadyAdded || this._embedded;
             btn.disabled = disabled;
             btn.style.opacity = disabled ? '0.4' : '';
@@ -725,9 +723,11 @@ class AssistantApp extends AppBase {
         if (!docId || !filename || this._embedded) return;
         const total = (this.modelNames?.length || 0) + (this._loadingModels?.length || 0);
         if (total >= this.modelNamesConfig.max) return;
+        if (this._importedSearchDocIds.has(docId)) return;
         if (this.modelNames?.includes?.(docId) || this._loadingModels?.some?.((m) => m.displayName === filename)) return;
 
         const loadingKey = `search_card_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        this._importedSearchDocIds.add(docId);
         this._startImportLoading(loadingKey, filename);
         try {
             const result = await ApiClient.importDocumentAsAssistantModel(docId, this.origin);
@@ -739,6 +739,7 @@ class AssistantApp extends AppBase {
                 throw new Error('Import terminé sans retour de modèle.');
             }
         } catch (err) {
+            this._importedSearchDocIds.delete(docId);
             console.error('Assistant import search result error', err);
             this._failImportLoading(loadingKey, `Erreur lors de l'import de ${filename} : ${err.message}`);
         }
