@@ -456,10 +456,17 @@ class AssistantApp extends AppBase {
             this._scrollListener = null;
         }
 
-        // Auto-scroll is intentionally disabled. The user controls the scroll
-        // position manually; only explicit scroll calls (e.g. sending a message)
-        // move the view.
-        this._stickToBottom = false;
+        // The user controls the scroll position manually most of the time. We only
+        // stick to the bottom while a message is being streamed and the user has
+        // not intentionally scrolled up to read earlier content.
+        this._stickToBottom = true;
+        this._scrollListener = () => {
+            if (!this.chatEl) return;
+            const threshold = 48;
+            const nearBottom = this.chatEl.scrollHeight - this.chatEl.scrollTop - this.chatEl.clientHeight < threshold;
+            this._stickToBottom = nearBottom;
+        };
+        this.chatEl.addEventListener('scroll', this._scrollListener, { passive: true });
     }
 
     _escape(text) {
@@ -2081,15 +2088,15 @@ class AssistantApp extends AppBase {
             if (typewriterInterval) return;
             typewriterInterval = setInterval(() => {
                 if (streamBuffer.length === 0) return;
-                const chunkSize = Math.min(1 + Math.floor(Math.random() * 4), streamBuffer.length);
+                const chunkSize = Math.min(3 + Math.floor(Math.random() * 8), streamBuffer.length);
                 displayedText += streamBuffer.slice(0, chunkSize);
                 streamBuffer = streamBuffer.slice(chunkSize);
                 if (currentBubbleContent) {
                     currentBubbleContent.innerHTML = this._markdown(displayedText, false);
                 }
                 this._adjustChatPadding();
-                this._scrollToBottom(true);
-            }, 20);
+                if (this._stickToBottom) this._scrollToBottom(true);
+            }, 10);
         };
 
         const stopTypewriter = () => {
@@ -2109,12 +2116,12 @@ class AssistantApp extends AppBase {
                 currentBubbleContent.innerHTML = this._markdown(displayedText, false);
             }
             // The final parse can make the bubble much taller. Apply the safety
-            // padding and force a scroll so the new bottom stays visible.
+            // padding and scroll only if the user is already near the bottom.
             this._adjustChatPadding();
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
                     this._adjustChatPadding();
-                    this._scrollToBottom(true);
+                    if (this._stickToBottom) this._scrollToBottom(true);
                 });
             });
         };
