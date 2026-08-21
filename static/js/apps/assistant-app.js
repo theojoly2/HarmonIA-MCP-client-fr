@@ -34,9 +34,10 @@ class AssistantApp extends AppBase {
         this._lastRenderedEventIndex = -1;
         // Models currently being imported. Each entry: { name, displayName, loading: true }.
         this._loadingModels = [];
-        // Doc ids that have already been imported into this assistant conversation
-        // from search result cards. Used to keep the + button as a cross after import.
-        this._importedSearchDocIds = new Set();
+        // Doc ids imported into this assistant conversation from search result cards,
+        // mapped to the final backend model name. Allows the + button to become a
+        // cross that removes the model on second click.
+        this._importedSearchDocIds = new Map();
         // Text accumulated for the assistant message currently being streamed. Stored
         // on the instance so it survives a tab switch (the old DOM is discarded and
         // rebuilt from the HTML snapshot).
@@ -246,7 +247,13 @@ class AssistantApp extends AppBase {
             } else if (action === 'chat') {
                 EventBus.emit('open-chat', { documentId, name });
             } else if (action === 'add-to-assistant') {
-                this._importSearchResultIntoAssistant(docId, filename);
+                const alreadyAdded = this._importedSearchDocIds.has(docId);
+                if (alreadyAdded) {
+                    const modelName = this._importedSearchDocIds.get(docId);
+                    if (modelName) this._removeModelPill(modelName);
+                } else {
+                    this._importSearchResultIntoAssistant(docId, filename);
+                }
             }
         });
 
@@ -682,11 +689,15 @@ class AssistantApp extends AppBase {
      */
     _updateSearchResultAddButtons() {
         if (!this.messagesEl) return;
-        const atMax = ((this.modelNames?.length || 0) + (this._loadingModels?.length || 0)) >= this.modelNamesConfig.max;
+        const total = (this.modelNames?.length || 0) + (this._loadingModels?.length || 0);
+        const atMax = total >= this.modelNamesConfig.max;
         this.messagesEl.querySelectorAll('[data-action="add-to-assistant"]').forEach((btn) => {
             const docId = btn.dataset.docId;
             const alreadyAdded = this._importedSearchDocIds.has(docId);
-            const disabled = atMax || alreadyAdded || this._embedded;
+            // A button importing from a search card is clickable either when there
+            // is room or when it is already selected (cross). In the latter case,
+            // clicking removes the imported model from the assistant context.
+            const disabled = (!alreadyAdded && atMax) || this._embedded;
             btn.disabled = disabled;
             btn.style.opacity = disabled ? '0.4' : '';
             btn.style.display = this._embedded ? 'none' : '';
@@ -727,13 +738,14 @@ class AssistantApp extends AppBase {
         if (this.modelNames?.includes?.(docId) || this._loadingModels?.some?.((m) => m.displayName === filename)) return;
 
         const loadingKey = `search_card_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        this._importedSearchDocIds.add(docId);
+        this._importedSearchDocIds.set(docId, '');
         this._startImportLoading(loadingKey, filename);
         try {
             const result = await ApiClient.importDocumentAsAssistantModel(docId, this.origin);
             if (result?.name) {
                 this.props.displayNames = this.props.displayNames || {};
                 this.props.displayNames[result.name] = result.display_name || filename;
+                this._importedSearchDocIds.set(docId, result.name);
                 this._finishImportLoading(loadingKey, result.name);
             } else {
                 throw new Error('Import terminé sans retour de modèle.');
@@ -913,6 +925,14 @@ class AssistantApp extends AppBase {
         this.modelNames = (this.modelNames || []).filter((n) => n !== name);
         this._loadingModels = (this._loadingModels || []).filter((m) => m.name !== name);
         if (this.props.displayNames) delete this.props.displayNames[name];
+        // If this model was imported from a search result card, clear the docId
+        // mapping so the card's + button becomes clickable again.
+        for (const [docId, modelName] of this._importedSearchDocIds.entries()) {
+            if (modelName === name) {
+                this._importedSearchDocIds.delete(docId);
+                break;
+            }
+        }
         this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
         this._updateModelPill();
         this._updateSearchResultAddButtons();
@@ -925,9 +945,11 @@ class AssistantApp extends AppBase {
         }
         this.modelNames = [];
         this._loadingModels = [];
+        this._importedSearchDocIds.clear();
         this.props.displayNames = {};
         if (this.modelPillSlotEl) this.modelPillSlotEl.innerHTML = '';
         this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
+        this._updateSearchResultAddButtons();
     }
 
     async _exportModelFromPill(format, name, itemEl) {
