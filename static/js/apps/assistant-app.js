@@ -63,6 +63,7 @@ class AssistantApp extends AppBase {
                     });
                 });
             }
+            this._updateSearchResultAddButtons();
             return;
         }
         this.container = container;
@@ -228,7 +229,7 @@ class AssistantApp extends AppBase {
 
         this.sourcesBtn.addEventListener('click', () => this._toggleSourcesMenu());
 
-        // Delegate clicks for embedded search result actions (preview / chat).
+        // Delegate clicks for search result cards inside the assistant chat.
         this.messagesEl.addEventListener('click', (e) => {
             const btn = e.target.closest('[data-action]');
             if (!btn) return;
@@ -236,10 +237,13 @@ class AssistantApp extends AppBase {
             const docId = btn.dataset.docId;
             const documentId = btn.dataset.documentId;
             const name = btn.dataset.name;
+            const filename = btn.dataset.filename;
             if (action === 'preview') {
                 EventBus.emit('open-preview', { docId, documentId, name });
             } else if (action === 'chat') {
                 EventBus.emit('open-chat', { documentId, name });
+            } else if (action === 'add-to-assistant') {
+                this._importSearchResultIntoAssistant(docId, filename);
             }
         });
 
@@ -665,6 +669,30 @@ class AssistantApp extends AppBase {
         importBtn.title = atMax
             ? `Limite de ${this.modelNamesConfig.max} modèles atteinte`
             : 'Importer un modèle';
+        // Sync the + buttons inside any search result cards rendered in the chat.
+        this._updateSearchResultAddButtons();
+    }
+
+    /**
+     * Keep the + buttons inside search result cards in sync with the current
+     * model capacity. Disabled/hidden when the limit is reached or in embedded mode.
+     */
+    _updateSearchResultAddButtons() {
+        if (!this.messagesEl || this._embedded) return;
+        const atMax = ((this.modelNames?.length || 0) + (this._loadingModels?.length || 0)) >= this.modelNamesConfig.max;
+        const loadedFilenames = new Set([
+            ...(this.modelNames || []),
+            ...(this._loadingModels || []).map((m) => m.displayName),
+        ]);
+        this.messagesEl.querySelectorAll('[data-action="add-to-assistant"]').forEach((btn) => {
+            const filename = btn.dataset.filename;
+            const docId = btn.dataset.docId;
+            const alreadyAdded = loadedFilenames.has(filename) || loadedFilenames.has(docId);
+            const disabled = atMax || alreadyAdded;
+            btn.disabled = disabled;
+            btn.style.opacity = disabled ? '0.4' : '';
+            btn.classList.toggle('hidden', this._embedded);
+        });
     }
 
     async _importModel(file) {
@@ -688,6 +716,34 @@ class AssistantApp extends AppBase {
     }
 
     /**
+     * Import a document returned by a search result card directly into the
+     * current assistant conversation. Reuses the existing import loading pill
+     * machinery. Does nothing if the 3-model limit is reached.
+     */
+    async _importSearchResultIntoAssistant(docId, filename) {
+        if (!docId || !filename || this._embedded) return;
+        const total = (this.modelNames?.length || 0) + (this._loadingModels?.length || 0);
+        if (total >= this.modelNamesConfig.max) return;
+        if (this.modelNames?.includes?.(docId) || this._loadingModels?.some?.((m) => m.displayName === filename)) return;
+
+        const loadingKey = `search_card_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        this._startImportLoading(loadingKey, filename);
+        try {
+            const result = await ApiClient.importDocumentAsAssistantModel(docId, this.origin);
+            if (result?.name) {
+                this.props.displayNames = this.props.displayNames || {};
+                this.props.displayNames[result.name] = result.display_name || filename;
+                this._finishImportLoading(loadingKey, result.name);
+            } else {
+                throw new Error('Import terminé sans retour de modèle.');
+            }
+        } catch (err) {
+            console.error('Assistant import search result error', err);
+            this._failImportLoading(loadingKey, `Erreur lors de l'import de ${filename} : ${err.message}`);
+        }
+    }
+
+    /**
      * Start loading state for a model that is being imported.
      * This shows a pill immediately and disables further imports until resolved.
      */
@@ -696,6 +752,7 @@ class AssistantApp extends AppBase {
         this._loadingModels.push({ name, displayName, loading: true });
         this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
         this._updateModelPill();
+        this._updateSearchResultAddButtons();
     }
 
     /**
@@ -709,6 +766,7 @@ class AssistantApp extends AppBase {
         this.modelNames = names.slice(0, this.modelNamesConfig.max);
         this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
         this._updateModelPill();
+        this._updateSearchResultAddButtons();
     }
 
     /**
@@ -719,6 +777,7 @@ class AssistantApp extends AppBase {
         this._loadingModels = this._loadingModels.filter((m) => m.name !== loadingName);
         this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
         this._updateModelPill();
+        this._updateSearchResultAddButtons();
         this._appendSystemMessage(this._escape(message));
     }
 
@@ -854,6 +913,7 @@ class AssistantApp extends AppBase {
         if (this.props.displayNames) delete this.props.displayNames[name];
         this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
         this._updateModelPill();
+        this._updateSearchResultAddButtons();
     }
 
     _clearModelPills() {
@@ -1701,6 +1761,7 @@ class AssistantApp extends AppBase {
         }
         if (!target) {
             target = this._appendSearchCard(query, resultsHtml);
+            this._updateSearchResultAddButtons();
             return target;
         }
         const loading = target.querySelector('.assistant-search-loading');
@@ -1713,6 +1774,7 @@ class AssistantApp extends AppBase {
         }
         target.dataset.query = query;
         target.querySelector('.assistant-search-query').textContent = query;
+        this._updateSearchResultAddButtons();
         this._scrollToBottom();
         return target;
     }
