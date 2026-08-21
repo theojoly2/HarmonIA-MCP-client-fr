@@ -456,17 +456,10 @@ class AssistantApp extends AppBase {
             this._scrollListener = null;
         }
 
-        // The user controls the scroll position manually most of the time. We only
-        // stick to the bottom while a message is being streamed and the user has
-        // not intentionally scrolled up to read earlier content.
-        this._stickToBottom = true;
-        this._scrollListener = () => {
-            if (!this.chatEl) return;
-            const threshold = 48;
-            const nearBottom = this.chatEl.scrollHeight - this.chatEl.scrollTop - this.chatEl.clientHeight < threshold;
-            this._stickToBottom = nearBottom;
-        };
-        this.chatEl.addEventListener('scroll', this._scrollListener, { passive: true });
+        // Auto-scroll to bottom is disabled during generation so the user can
+        // freely scroll up to read earlier content. Explicit scroll calls (e.g.
+        // sending a message or returning to the tab) still move the view when needed.
+        this._stickToBottom = false;
     }
 
     _escape(text) {
@@ -632,7 +625,7 @@ class AssistantApp extends AppBase {
             const topY = window.innerHeight - inputHeight - bottomPadding;
             this.inputArea.style.setProperty('--assistant-input-top', `${topY}px`);
             if (this.chatEl) {
-                this.chatEl.style.paddingBottom = `${inputHeight + bottomPadding}px`;
+                this.chatEl.style.paddingBottom = `${(inputHeight / 2) + bottomPadding}px`;
             }
         } else {
             // Fallback: clear explicit padding if neither state is fully active.
@@ -1461,6 +1454,7 @@ class AssistantApp extends AppBase {
     }
 
     _createToolCard(name, args = {}) {
+        if (this._embedded) return null;
         const id = 'assistant-tool-' + name + '-' + Date.now();
         const div = document.createElement('div');
         div.id = id;
@@ -1514,6 +1508,7 @@ class AssistantApp extends AppBase {
     }
 
     _appendProgressCard(cardId, toolName) {
+        if (this._embedded) return null;
         const labels = {
             metadata_checker: 'Vérification des métadonnées',
             validator_check: 'Validation guide de style',
@@ -1628,6 +1623,7 @@ class AssistantApp extends AppBase {
     }
 
     _fillToolResult(name, result, display) {
+        if (this._embedded) return null;
         if (display && display.type === 'search') {
             this._fillSearchCard(display.query || '', display.results_html || '');
             return null;
@@ -1837,6 +1833,7 @@ class AssistantApp extends AppBase {
     }
 
     _appendSvgCard(svgText, label = 'Visualisation du modèle') {
+        if (this._embedded) return null;
         if (!svgText) return null;
         const id = 'assistant-svg-' + Date.now();
         const div = document.createElement('div');
@@ -1864,6 +1861,7 @@ class AssistantApp extends AppBase {
     }
 
     _updateCurrentSvgCard(svgText, label = 'Visualisation du modèle') {
+        if (this._embedded) return;
         if (!svgText) return;
         if (!this.activeSvgCard || !this.activeSvgViewer) {
             this._appendSvgCard(svgText, label);
@@ -2095,7 +2093,6 @@ class AssistantApp extends AppBase {
                     currentBubbleContent.innerHTML = this._markdown(displayedText, false);
                 }
                 this._adjustChatPadding();
-                if (this._stickToBottom) this._scrollToBottom(true);
             }, 10);
         };
 
@@ -2116,12 +2113,11 @@ class AssistantApp extends AppBase {
                 currentBubbleContent.innerHTML = this._markdown(displayedText, false);
             }
             // The final parse can make the bubble much taller. Apply the safety
-            // padding and scroll only if the user is already near the bottom.
+            // padding so the new content is never hidden behind the input area.
             this._adjustChatPadding();
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
                     this._adjustChatPadding();
-                    if (this._stickToBottom) this._scrollToBottom(true);
                 });
             });
         };
@@ -2297,13 +2293,17 @@ class AssistantApp extends AppBase {
                 this._appendSearchCard(event.arguments?.search_terms || '', null);
             } else if (event.name === 'display_model_visualization') {
                 // SVG cards are created/updated by the model_svg event, no extra card here.
+                // In embedded mode the visualization lives in the modeler canvas.
             }
             // Tool cards (JSON dumps) are intentionally hidden for all tools,
             // including unknown ones. Only progress cards, plan card, search
             // results and SVG visualizations remain visible.
             // Show a transient status label while the tool runs. The helper
-            // removes any previous placeholder first.
-            placeholderRef.value = this._appendThinkingPlaceholder(this._toolStatusLabel(event.name));
+            // removes any previous placeholder first. Skip the placeholder in
+            // embedded mode to avoid visual noise; the modeler canvas shows progress.
+            if (!this._embedded) {
+                placeholderRef.value = this._appendThinkingPlaceholder(this._toolStatusLabel(event.name));
+            }
             saveHtmlSnapshot();
             return;
         }
@@ -2314,20 +2314,26 @@ class AssistantApp extends AppBase {
             resetTypewriter?.();
             this._closeAssistantBubble();
             this._hideAllSparkles();
-            this._appendProgressCard(event.card_id, event.tool_name);
+            if (!this._embedded) {
+                this._appendProgressCard(event.card_id, event.tool_name);
+            }
             saveHtmlSnapshot();
             return;
         }
 
         if (event.kind === 'progress_update') {
-            this._updateProgressCard(event.card_id, event.percent, event.message);
+            if (!this._embedded) {
+                this._updateProgressCard(event.card_id, event.percent, event.message);
+            }
             saveHtmlSnapshot();
             return;
         }
 
         if (event.kind === 'progress_done') {
-            this._completeProgressCard(event.card_id);
-            this._removeProgressStatus(event.card_id);
+            if (!this._embedded) {
+                this._completeProgressCard(event.card_id);
+                this._removeProgressStatus(event.card_id);
+            }
             saveHtmlSnapshot();
             return;
         }
@@ -2338,7 +2344,7 @@ class AssistantApp extends AppBase {
             resetTypewriter?.();
             this._closeAssistantBubble();
             if (event.name === 'plan_workflow_with_tools') {
-                this._renderPlan(event.result);
+                if (!this._embedded) this._renderPlan(event.result);
             } else if (event.name === 'retrieve_documents') {
                 this._fillSearchCard(event.display?.query || '', event.display?.results_html || '');
             } else {
@@ -2367,7 +2373,7 @@ class AssistantApp extends AppBase {
                 if (modeler && typeof modeler._reloadSvgFromServer === 'function') {
                     modeler._reloadSvgFromServer();
                 }
-            } else {
+            } else if (!this._embedded) {
                 const label = event.model_name || event.label || 'Visualisation du modèle';
                 this._updateCurrentSvgCard(event.svg, label);
             }
