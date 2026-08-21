@@ -678,7 +678,7 @@ class AssistantApp extends AppBase {
      * model capacity. Disabled/hidden when the limit is reached or in embedded mode.
      */
     _updateSearchResultAddButtons() {
-        if (!this.messagesEl || this._embedded) return;
+        if (!this.messagesEl) return;
         const atMax = ((this.modelNames?.length || 0) + (this._loadingModels?.length || 0)) >= this.modelNamesConfig.max;
         const loadedFilenames = new Set([
             ...(this.modelNames || []),
@@ -688,10 +688,10 @@ class AssistantApp extends AppBase {
             const filename = btn.dataset.filename;
             const docId = btn.dataset.docId;
             const alreadyAdded = loadedFilenames.has(filename) || loadedFilenames.has(docId);
-            const disabled = atMax || alreadyAdded;
+            const disabled = atMax || alreadyAdded || this._embedded;
             btn.disabled = disabled;
             btn.style.opacity = disabled ? '0.4' : '';
-            btn.classList.toggle('hidden', this._embedded);
+            btn.style.display = this._embedded ? 'none' : '';
         });
     }
 
