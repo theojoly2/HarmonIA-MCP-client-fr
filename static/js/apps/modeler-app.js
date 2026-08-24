@@ -617,11 +617,15 @@ class ModelerApp extends AppBase {
             this.viewer.destroy();
             this.viewer = null;
         }
+        // Capture the model name before clearing state so we can still find and
+        // close the linked assistant split view.
+        const previousStoredName = this.storedName;
+
         // Make sure a previously cached DOM cannot restore an old model after reset.
         this._invalidateViewCache();
         AppState.saveInstanceState?.(this.instanceId);
 
-        const existing = this._findAssistantSplitInstance();
+        const existing = this._findAssistantSplitInstance(previousStoredName);
         if (existing) {
             await window.windowManager?.collapseSplitTo(this.instanceId, existing.instanceId);
             // collapseSplitTo remounts the modeler in a fresh tab container.
@@ -850,12 +854,13 @@ class ModelerApp extends AppBase {
         this._pendingAssistantDisplayName = displayName || '';
     }
 
-    _findAssistantSplitInstance() {
-        if (!this.storedName) return null;
+    _findAssistantSplitInstance(modelName = null) {
+        const targetName = modelName || this.storedName;
+        if (!targetName) return null;
         const instances = AppState.listInstances();
         return instances.find((i) =>
             i.appId === 'assistant' &&
-            AppState.getRecord(i.instanceId)?.meta?.modelName === this.storedName &&
+            AppState.getRecord(i.instanceId)?.meta?.modelName === targetName &&
             AppState.getRecord(i.instanceId)?.meta?.origin === 'modeler' &&
             AppState.getRecord(i.instanceId)?.mode === 'split'
         ) || null;
