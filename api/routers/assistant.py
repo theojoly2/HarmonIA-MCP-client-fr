@@ -673,6 +673,15 @@ async def assistant_stream_generator(
                             target_model_name = arguments.get("model_name", state.get("name", "")).strip()
                         if not target_model_name and model_names:
                             target_model_name = model_names[0]
+
+                        # If the assistant created/mutated a model that is not yet attached
+                        # to this session (e.g. starting from scratch), attach it now so it
+                        # appears in the model pill and is loaded into the LLM context next turn.
+                        if target_model_name and target_model_name not in history.assistant_model_names:
+                            history.assistant_model_names.append(target_model_name)
+                            if not history.assistant_model_name:
+                                history.assistant_model_name = target_model_name
+
                         should_display_svg = name in {"add_class", "add_attribute", "add_connector", "display_model_visualization"} and target_model_name
                         if should_display_svg:
                             try:
