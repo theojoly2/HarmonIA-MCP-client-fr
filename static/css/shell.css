@@ -252,7 +252,25 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
 .auth-modal-header {
     text-align: center;
     margin-bottom: 1.25rem;
+    position: relative;
 }
+.auth-modal-close {
+    position: absolute;
+    top: -0.5rem;
+    right: -0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 9999px;
+    border: none;
+    background: transparent;
+    color: #9ca3af;
+    cursor: pointer;
+    transition: color 0.2s, background 0.2s;
+}
+.auth-modal-close:hover { color: #111827; background: #f3f4f6; }
 .auth-modal-title {
     font-size: 1.5rem;
     font-weight: 800;
@@ -355,6 +373,127 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
     transition: color 0.2s, background 0.2s;
 }
 .auth-close:hover { color: #111827; background: #f3f4f6; }
+
+/* === API keys modal === */
+.api-keys-create {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+.api-key-name-input {
+    flex: 1;
+    padding: 0.65rem 0.9rem;
+    font-size: 0.9rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    background: #fafafa;
+    color: #111827;
+    outline: none;
+    transition: border-color 0.2s, background 0.2s;
+}
+.api-key-name-input:focus {
+    border-color: #111827;
+    background: #ffffff;
+}
+.api-keys-add {
+    padding: 0.65rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #ffffff;
+    background: #111827;
+    border: none;
+    border-radius: 9999px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.15s;
+    white-space: nowrap;
+}
+.api-keys-add:hover { background: #1f2937; }
+.api-keys-add:active { transform: scale(0.98); }
+.api-keys-add:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.api-keys-new {
+    margin-bottom: 1rem;
+    padding: 0.75rem 1rem;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 0.75rem;
+}
+.api-keys-new.hidden { display: none; }
+.api-keys-new-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #166534;
+    margin-bottom: 0.35rem;
+}
+.api-keys-new-value {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.85rem;
+    color: #111827;
+    word-break: break-all;
+    margin-bottom: 0.5rem;
+    user-select: all;
+}
+.api-keys-copy {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #166534;
+    background: #ffffff;
+    border: 1px solid #bbf7d0;
+    border-radius: 9999px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.api-keys-copy:hover { background: #f0fdf4; }
+
+.api-keys-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 320px;
+    overflow-y: auto;
+}
+.api-keys-empty {
+    text-align: center;
+    padding: 1.5rem 1rem;
+    font-size: 0.9rem;
+    color: #6b7280;
+}
+.api-key-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+}
+.api-key-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #111827;
+}
+.api-key-meta {
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 0.15rem;
+}
+.api-key-revoke {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 9999px;
+    border: none;
+    background: #ffffff;
+    color: #ef4444;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    flex-shrink: 0;
+}
+.api-key-revoke:hover { background: #fef2f2; color: #b91c1c; }
 
 /* === Shell auth actions === */
 #shell-actions {

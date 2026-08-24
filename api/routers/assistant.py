@@ -263,7 +263,7 @@ async def assistant_stream_generator(
         return
 
     origin = (request.origin or "assistant").strip().lower()
-    if origin not in {"assistant", "modeler"}:
+    if origin not in {"assistant", "modeler", "external_api"}:
         origin = "assistant"
 
     is_new_session = not request.session.strip()

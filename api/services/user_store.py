@@ -79,3 +79,15 @@ def update_user_password(user_id: int, password: str) -> None:
     )
     conn.commit()
     conn.close()
+
+
+def get_user_by_id(user_id: int) -> Optional[dict]:
+    conn = _get_conn()
+    row = conn.execute(
+        "SELECT id, username, password_hash, salt, created_at FROM users WHERE id = ?",
+        (user_id,),
+    ).fetchone()
+    conn.close()
+    if row is None:
+        return None
+    return dict(row)

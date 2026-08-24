@@ -21,6 +21,7 @@
 
     const shell = new Shell(appShell, null);
     shell.setAuthManager(AuthManager);
+    shell.setApiKeysManager(ApiKeysManager);
     const contentArea = shell.getContentArea();
 
     // History panel attached to the dedicated overlay area so it survives tab mounts.
