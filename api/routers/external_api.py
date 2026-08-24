@@ -296,6 +296,16 @@ async def import_model_into_conversation(
             server_model = await mcp_client.upload_model({"model": json_data})
             if not server_model:
                 raise ModelProcessingError("MCP Server Error", "Model upload returned None.")
+            # Tag the uploaded model so the UI history panel knows it belongs to
+            # an assistant conversation and does not surface it as a standalone
+            # modeler item. Ignore errors: older MCP servers may not expose this.
+            try:
+                await mcp_client.call_tool(
+                    "update_model_metadata",
+                    {"user": username, "name": model_name, "metadata": {"imported_from_assistant": True}},
+                )
+            except Exception as e:
+                print(f"[External API] Failed to tag imported model {model_name}: {e}", flush=True)
     except ModelProcessingError as e:
         raise HTTPException(status_code=400, detail={"title": e.title, "details": e.details}) from e
     except Exception as e:

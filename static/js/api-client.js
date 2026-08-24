@@ -303,6 +303,26 @@ const ApiClient = (() => {
         return res.json();
     }
 
+    async function getAssistantSessionsAll() {
+        const [assistantRes, externalRes] = await Promise.all([
+            getAssistantSessions("assistant"),
+            getAssistantSessions("external_api").catch(() => ({ sessions: [] })),
+        ]);
+        const sessions = [
+            ...(assistantRes.sessions || []),
+            ...(externalRes.sessions || []),
+        ];
+        // De-duplicate by session name, keeping the first (most recent) occurrence.
+        const seen = new Set();
+        return {
+            sessions: sessions.filter((s) => {
+                if (seen.has(s.name)) return false;
+                seen.add(s.name);
+                return true;
+            }),
+        };
+    }
+
     async function findAssistantSessionByModel(modelName, origin = "modeler") {
         const res = await fetch(apiUrl(`assistant/sessions/by-model?model_name=${encodeURIComponent(modelName)}&origin=${encodeURIComponent(origin)}`), {
             credentials: "same-origin",
@@ -381,6 +401,7 @@ const ApiClient = (() => {
         streamChat,
         streamAssistant,
         getAssistantSessions,
+        getAssistantSessionsAll,
         findAssistantSessionByModel,
         getAssistantHistory,
         deleteAssistantSession,

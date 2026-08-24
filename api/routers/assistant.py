@@ -807,7 +807,7 @@ async def import_assistant_model(
     XMI/XML, and upload the model to the MCP server so it becomes context for the LLM.
     """
     session_origin = (origin or "assistant").strip().lower()
-    if session_origin not in {"assistant", "modeler"}:
+    if session_origin not in {"assistant", "modeler", "external_api"}:
         session_origin = "assistant"
 
     try:
@@ -964,7 +964,7 @@ async def import_assistant_model_from_document(
     from api.services.mcp_service import fetch_document_file
 
     session_origin = (request.origin or "assistant").strip().lower()
-    if session_origin not in {"assistant", "modeler"}:
+    if session_origin not in {"assistant", "modeler", "external_api"}:
         session_origin = "assistant"
 
     file_data = await fetch_document_file(request.doc_id)
@@ -1185,7 +1185,7 @@ async def find_assistant_session_by_model(
     (default) or to the standalone assistant.
     """
     target_origin = (origin or "modeler").strip().lower()
-    if target_origin not in {"assistant", "modeler"}:
+    if target_origin not in {"assistant", "modeler", "external_api"}:
         target_origin = "modeler"
 
     best_session = ""
@@ -1222,7 +1222,7 @@ async def delete_assistant_session(
     may be used by the modeler.
     """
     target_origin = (origin or "assistant").strip().lower()
-    if target_origin not in {"assistant", "modeler"}:
+    if target_origin not in {"assistant", "modeler", "external_api"}:
         target_origin = "assistant"
 
     history = AssistantHistory(user=username, session=session, origin=target_origin)
@@ -1247,7 +1247,7 @@ async def touch_assistant_session(
 ):
     """Update the session file mtime so it bubbles to the top of the history list."""
     target_origin = (origin or "assistant").strip().lower()
-    if target_origin not in {"assistant", "modeler"}:
+    if target_origin not in {"assistant", "modeler", "external_api"}:
         target_origin = "assistant"
 
     history = AssistantHistory(user=username, session=session, origin=target_origin)
@@ -1268,7 +1268,7 @@ async def rename_assistant_session(
 ):
     """Rename an assistant session by moving its display and llm files."""
     target_origin = (origin or "assistant").strip().lower()
-    if target_origin not in {"assistant", "modeler"}:
+    if target_origin not in {"assistant", "modeler", "external_api"}:
         target_origin = "assistant"
 
     old_history = AssistantHistory(user=username, session=session, origin=target_origin)
@@ -1320,7 +1320,7 @@ async def link_assistant_session_model(
 ):
     """Update the model name linked to a modeler-originated assistant session."""
     target_origin = (origin or "modeler").strip().lower()
-    if target_origin not in {"assistant", "modeler"}:
+    if target_origin not in {"assistant", "modeler", "external_api"}:
         target_origin = "modeler"
 
     history = AssistantHistory(user=username, session=session, origin=target_origin)
@@ -1341,7 +1341,7 @@ async def get_assistant_history(
     username: str = Depends(require_user),
 ):
     target_origin = (origin or "assistant").strip().lower()
-    if target_origin not in {"assistant", "modeler"}:
+    if target_origin not in {"assistant", "modeler", "external_api"}:
         target_origin = "assistant"
 
     history = AssistantHistory(user=username, session=session, origin=target_origin)
