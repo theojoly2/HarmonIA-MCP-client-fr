@@ -606,6 +606,10 @@ class ModelerApp extends AppBase {
             this._homeTimeout = null;
         }
 
+        // Capture the model name before clearing state so we can still find and
+        // close the linked assistant split view.
+        const previousStoredName = this.storedName;
+
         // Reset model state first so the next render knows we are in home mode.
         this.svgText = '';
         this.fileName = '';
@@ -617,9 +621,6 @@ class ModelerApp extends AppBase {
             this.viewer.destroy();
             this.viewer = null;
         }
-        // Capture the model name before clearing state so we can still find and
-        // close the linked assistant split view.
-        const previousStoredName = this.storedName;
 
         // Make sure a previously cached DOM cannot restore an old model after reset.
         this._invalidateViewCache();
@@ -856,14 +857,17 @@ class ModelerApp extends AppBase {
 
     _findAssistantSplitInstance(modelName = null) {
         const targetName = modelName || this.storedName;
-        if (!targetName) return null;
         const instances = AppState.listInstances();
-        return instances.find((i) =>
-            i.appId === 'assistant' &&
-            AppState.getRecord(i.instanceId)?.meta?.modelName === targetName &&
-            AppState.getRecord(i.instanceId)?.meta?.origin === 'modeler' &&
-            AppState.getRecord(i.instanceId)?.mode === 'split'
-        ) || null;
+        return instances.find((i) => {
+            if (i.appId !== 'assistant') return false;
+            const rec = AppState.getRecord(i.instanceId);
+            if (!rec || rec.mode !== 'split') return false;
+            const meta = rec.meta || {};
+            // Match either by linked modeler instance id or by the model name.
+            if (meta.linkedModelerInstanceId === this.instanceId) return true;
+            if (targetName && meta.modelName === targetName && meta.origin === 'modeler') return true;
+            return false;
+        }) || null;
     }
 
     _updateAssistantToggleVisibility() {
