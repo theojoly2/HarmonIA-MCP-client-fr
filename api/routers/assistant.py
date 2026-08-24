@@ -677,10 +677,20 @@ async def assistant_stream_generator(
                         # If the assistant created/mutated a model that is not yet attached
                         # to this session (e.g. starting from scratch), attach it now so it
                         # appears in the model pill and is loaded into the LLM context next turn.
+                        newly_attached = False
                         if target_model_name and target_model_name not in history.assistant_model_names:
                             history.assistant_model_names.append(target_model_name)
                             if not history.assistant_model_name:
                                 history.assistant_model_name = target_model_name
+                            newly_attached = True
+
+                        # Notify the UI live when a new model is attached so the pill
+                        # appears immediately without reloading the conversation.
+                        if newly_attached:
+                            history.add_display_event({"kind": "model_attached", "model_name": target_model_name, "source": name})
+                            yield _event("model_attached", {"model_name": target_model_name, "source": name})
+                            async for line in _drain_out_queue():
+                                yield line
 
                         should_display_svg = name in {"add_class", "add_attribute", "add_connector", "display_model_visualization"} and target_model_name
                         if should_display_svg:

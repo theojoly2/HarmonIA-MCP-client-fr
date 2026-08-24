@@ -1256,6 +1256,17 @@ class AssistantApp extends AppBase {
                 this._updateCurrentSvgCard(event.svg, event.model_name || event.label || 'Visualisation du modèle');
                 return;
             }
+            if (kind === 'model_attached') {
+                const attachedName = event.model_name;
+                if (attachedName && !this.modelNames.includes(attachedName)) {
+                    this.modelNames.push(attachedName);
+                    this.props.displayNames = this.props.displayNames || {};
+                    this.props.displayNames[attachedName] = attachedName;
+                    this._updateModelPill();
+                    this._updateSearchResultAddButtons();
+                }
+                return;
+            }
             if (kind === 'loop_done') {
                 closeReplayBubble();
                 this.activeSvgCard = null;
@@ -2376,6 +2387,19 @@ class AssistantApp extends AppBase {
             } else if (!this._embedded) {
                 const label = event.model_name || event.label || 'Visualisation du modèle';
                 this._updateCurrentSvgCard(event.svg, label);
+            }
+            saveHtmlSnapshot();
+            return;
+        }
+
+        if (event.kind === 'model_attached') {
+            const attachedName = event.model_name;
+            if (attachedName && !this.modelNames.includes(attachedName)) {
+                this.modelNames.push(attachedName);
+                this.props.displayNames = this.props.displayNames || {};
+                this.props.displayNames[attachedName] = attachedName;
+                this._updateModelPill();
+                this._updateSearchResultAddButtons();
             }
             saveHtmlSnapshot();
             return;
