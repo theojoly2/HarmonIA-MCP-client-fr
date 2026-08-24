@@ -677,12 +677,21 @@ async def assistant_stream_generator(
                         # If the assistant created/mutated a model that is not yet attached
                         # to this session (e.g. starting from scratch), attach it now so it
                         # appears in the model pill and is loaded into the LLM context next turn.
+                        # Also tag it as imported_from_assistant so it does not show up as a
+                        # standalone modeler history item.
                         newly_attached = False
                         if target_model_name and target_model_name not in history.assistant_model_names:
                             history.assistant_model_names.append(target_model_name)
                             if not history.assistant_model_name:
                                 history.assistant_model_name = target_model_name
                             newly_attached = True
+                            try:
+                                current_model = await get_model_mcp(username, target_model_name)
+                                if current_model:
+                                    current_model["imported_from_assistant"] = True
+                                    await upload_model_mcp(username, target_model_name, current_model)
+                            except Exception as e:
+                                print(f"[Assistant] Failed to tag newly attached model {target_model_name}: {e}", flush=True)
 
                         # Notify the UI live when a new model is attached so the pill
                         # appears immediately without reloading the conversation.
