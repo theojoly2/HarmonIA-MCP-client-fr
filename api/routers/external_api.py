@@ -421,18 +421,18 @@ async def chat_with_conversation(
             },
         )
 
-    events = []
-    async for line in assistant_stream_generator(req, username):
-        event = _parse_sse_line(line)
-        if event is None:
-            continue
-        external = _filter_external_event(event, model_names, {"name": model_names[0] if model_names else conversation_id})
-        if external:
-            events.append(external)
-        if external and external["kind"] == "assistant_done":
-            break
-
-    return JSONResponse({"events": events})
+    # Non-stream mode: keep the connection alive with SSE heartbeats while the
+    # assistant loop runs, then emit a single final event containing all events.
+    # This avoids 504 Gateway Timeouts from proxies that cut idle HTTP connections.
+    return StreamingResponse(
+        _external_non_stream(req, username, model_names),
+        media_type="text/event-stream",
+        headers={
+            "X-Accel-Buffering": "no",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 async def _external_stream(
@@ -448,6 +448,55 @@ async def _external_stream(
         external = _filter_external_event(event, model_names, state)
         if external:
             yield _event(external["kind"], {k: v for k, v in external.items() if k != "kind"})
+
+
+async def _external_non_stream(
+    req: AssistantStreamRequest,
+    username: str,
+    model_names: list[str],
+) -> AsyncGenerator[str, None]:
+    """Collect all external events and emit them inside a single SSE payload.
+
+    The response still uses text/event-stream so reverse proxies and gateways
+    treat it as a streaming response and keep the connection alive.
+    """
+    import asyncio
+
+    state = {"name": model_names[0] if model_names else req.session}
+    events: list[dict[str, Any]] = []
+
+    # Heartbeat task keeps the TCP connection alive while the LLM loop runs.
+    heartbeat_stop = asyncio.Event()
+
+    async def _heartbeat() -> None:
+        while not heartbeat_stop.is_set():
+            await asyncio.sleep(0.5)
+            yield _event(":heartbeat", {})
+
+    async def _collector() -> None:
+        async for line in assistant_stream_generator(req, username):
+            event = _parse_sse_line(line)
+            if event is None:
+                continue
+            external = _filter_external_event(event, model_names, state)
+            if external:
+                events.append(external)
+            if external and external["kind"] == "assistant_done":
+                break
+        heartbeat_stop.set()
+
+    # Run heartbeat and collector concurrently, flushing heartbeats while waiting.
+    collector_task = asyncio.create_task(_collector())
+    while not collector_task.done():
+        # Heartbeat
+        yield _event(":heartbeat", {})
+        try:
+            await asyncio.wait_for(heartbeat_stop.wait(), timeout=0.5)
+        except asyncio.TimeoutError:
+            pass
+    await collector_task
+
+    yield _event("events", {"events": events})
 
 
 def _parse_sse_line(line: str) -> Optional[dict[str, Any]]:
