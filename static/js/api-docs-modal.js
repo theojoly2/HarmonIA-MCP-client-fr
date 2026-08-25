@@ -94,13 +94,7 @@ class ApiDocsModal {
   -F "name={nom_affiché}"</code></pre>
                     <p>Formats acceptés : XMI/XML, TTL, JSON, SQL, texte.</p>
 
-                    <h4>5. Importer depuis un document indexé</h4>
-                    <pre><code>curl -X POST https://{serveur}/api/external/v1/conversations/{conversation_id}/import-from-document \\
-  -H "Authorization: Bearer {votre_clé_api}" \\
-  -H "Content-Type: application/json" \\
-  -d '{"doc_id": "{id_du_document}"}'</code></pre>
-
-                    <h4>6. Chat</h4>
+                    <h4>5. Chat</h4>
                     <h5>Mode non-stream</h5>
                     <pre><code>curl -X POST https://{serveur}/api/external/v1/conversations/{conversation_id}/chat \\
   -H "Authorization: Bearer {votre_clé_api}" \\
