@@ -10,6 +10,7 @@
     AppState.registerApp(PreviewApp);
     AppState.registerApp(ChatApp);
     AppState.registerApp(AssistantApp);
+    // ApiDocsManager is loaded globally so any component can open the docs.
 
     // Auth state + pending import manager
     await AuthManager.init();

@@ -73,12 +73,7 @@ class ApiKeysModal {
         return `
             <div class="auth-modal" data-mode="api-keys">
                 <div class="auth-modal-header">
-                    <div class="auth-modal-title-row">
-                        <h2 class="auth-modal-title">Clés API</h2>
-                        <button type="button" class="api-keys-info-toggle" id="api-keys-info-toggle" title="Documentation de l'API externe">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        </button>
-                    </div>
+                    <h2 class="auth-modal-title">Clés API</h2>
                     <p class="auth-modal-subtitle">Gérez les clés d'accès à l'API externe.</p>
                     <button type="button" class="auth-modal-close" aria-label="Fermer">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -93,6 +88,12 @@ class ApiKeysModal {
                     <div class="api-keys-create">
                         <input type="text" id="api-key-name" class="api-key-name-input" placeholder="Nom de la clé (optionnel)" maxlength="64">
                         <button type="button" class="api-keys-add" id="api-keys-add">Créer une clé</button>
+                    </div>
+                    <div class="api-keys-help-link">
+                        <button type="button" id="api-keys-docs-link" class="api-keys-docs-link">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            Comment utiliser l'API externe
+                        </button>
                     </div>
                     <div class="api-keys-info hidden" id="api-keys-info">
                         <div class="api-keys-info-content">
@@ -212,10 +213,9 @@ curl -X POST "$SERVER/api/external/v1/conversations/$CONV/chat" \\
             closeBtn.addEventListener("click", () => this.close());
         }
 
-        const infoToggle = this.overlay.querySelector("#api-keys-info-toggle");
-        const infoBlock = this.overlay.querySelector("#api-keys-info");
-        infoToggle?.addEventListener("click", () => {
-            infoBlock?.classList.toggle("hidden");
+        const docsLink = this.overlay.querySelector("#api-keys-docs-link");
+        docsLink?.addEventListener("click", () => {
+            if (window.ApiDocsManager) window.ApiDocsManager.show();
         });
 
         const addBtn = this.overlay.querySelector("#api-keys-add");
