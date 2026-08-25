@@ -96,40 +96,108 @@ class ApiKeysModal {
                     </div>
                     <div class="api-keys-info hidden" id="api-keys-info">
                         <div class="api-keys-info-content">
-                            <h3>Comment utiliser l'API externe</h3>
-                            <p>Toutes les routes commencent par <code>/api/external/v1</code> et s'authentifient avec le header <code>Authorization: Bearer &lt;clé_api&gt;</code>.</p>
+                            <h3>Documentation API externe</h3>
+                            <p>Base URL : <code>/api/external/v1</code>. Authentification : header <code>Authorization: Bearer {votre_clé_api}</code>.</p>
 
-                            <h4>Conversations</h4>
-                            <ul>
-                                <li><strong>Créer une conversation</strong> : <code>POST /api/external/v1/conversations</code> avec <code>{"title": "..."}</code>. Retourne <code>conversation_id</code>.</li>
-                                <li><strong>Lister les conversations</strong> : <code>GET /api/external/v1/conversations</code>.</li>
-                                <li><strong>Supprimer une conversation</strong> : <code>DELETE /api/external/v1/conversations/&lt;conversation_id&gt;</code>.</li>
-                            </ul>
+                            <h4>0. Authentification et création d'une clé API</h4>
+                            <p>Pour obtenir une clé API il faut d'abord avoir un compte et une session web. Toutes les routes d'authentification sont sous <code>/api/auth</code>.</p>
 
-                            <h4>Import de modèle</h4>
-                            <ul>
-                                <li><strong>Importer un fichier</strong> : <code>POST /api/external/v1/conversations/&lt;conversation_id&gt;/import</code> avec un fichier multipart (champ <code>file</code>) et optionnel <code>name</code>. Formats acceptés : XMI/XML, TTL, JSON, SQL, texte.</li>
-                                <li><strong>Importer depuis un document indexé</strong> : <code>POST /api/external/v1/conversations/&lt;conversation_id&gt;/import-from-document</code> avec <code>{"doc_id": "..."}</code>.</li>
-                            </ul>
+                            <h5>Créer un compte</h5>
+                            <pre><code>curl -X POST https://{serveur}/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username": "{nom_utilisateur}", "password": "{mot_de_passe}"}' \
+  -c session.txt</code></pre>
 
-                            <h4>Chat</h4>
-                            <ul>
-                                <li><strong>Envoyer un message</strong> : <code>POST /api/external/v1/conversations/&lt;conversation_id&gt;/chat</code> avec <code>{"message": "...", "stream": true|false}</code>.</li>
-                                <li>Le mode <code>stream: true</code> renvoie un flux SSE en temps réel (<code>tool_start</code>, <code>tool_end</code>, <code>assistant_text</code>, <code>assistant_done</code>).</li>
-                                <li>Le mode <code>stream: false</code> renvoie les mêmes événements agrégés dans un unique événement <code>events</code>.</li>
-                            </ul>
+                            <h5>Se connecter</h5>
+                            <pre><code>curl -X POST https://{serveur}/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "{nom_utilisateur}", "password": "{mot_de_passe}"}' \
+  -c session.txt -b session.txt</code></pre>
 
-                            <h4>Export</h4>
-                            <ul>
-                                <li><strong>Exporter un modèle</strong> : <code>GET /api/external/v1/models/&lt;model_name&gt;/export?format=&lt;xmi|ttl|svg|png&gt;</code>.</li>
-                            </ul>
+                            <h5>Créer une clé API</h5>
+                            <pre><code>curl -X POST https://{serveur}/api/external/v1/keys \
+  -H "Content-Type: application/json" \
+  -b session.txt \
+  -d '{"name": "{nom_de_la_clé}"}'</code></pre>
+                            <p>La réponse contient la clé en clair : <code>{"id": 1, "key": "sk_...", "name": "...", "created_at": "..."}</code>. Copiez-la immédiatement, elle n'est affichée qu'une seule fois.</p>
 
-                            <h4>Exemple cURL</h4>
-                            <pre><code>curl -X POST \\
-  https://&lt;serveur&gt;/api/external/v1/conversations \\
-  -H "Authorization: Bearer sk_..." \\
+                            <h5>Utiliser la clé API</h5>
+                            <p>Une fois la clé obtenue, vous pouvez appeler toutes les routes externes sans cookie de session :</p>
+                            <pre><code>curl https://{serveur}/api/external/v1/conversations \\
+  -H "Authorization: Bearer {votre_clé_api}"</code></pre>
+
+                            <h5>Révoquer une clé API</h5>
+                            <pre><code>curl -X DELETE https://{serveur}/api/external/v1/keys/{key_id} \\
+  -H "Authorization: Bearer {votre_clé_api}"</code></pre>
+                            <p>Vous pouvez aussi révoquer une clé avec la session web : <code>DELETE /api/external/v1/keys/{key_id}</code> avec le cookie de session.</p>
+
+                            <h4>1. Créer une conversation</h4>
+                            <pre><code>curl -X POST https://{serveur}/api/external/v1/conversations \\
+  -H "Authorization: Bearer {votre_clé_api}" \\
   -H "Content-Type: application/json" \\
-  -d '{"title":"Mon modèle"}'</code></pre>
+  -d '{"title": "{titre}"}'</code></pre>
+                            <p>Réponse : <code>{"conversation_id": "{id}", "title": "...", "created_at": "..."}</code></p>
+
+                            <h4>2. Lister les conversations</h4>
+                            <pre><code>curl https://{serveur}/api/external/v1/conversations \\
+  -H "Authorization: Bearer {votre_clé_api}"</code></pre>
+
+                            <h4>3. Supprimer une conversation</h4>
+                            <pre><code>curl -X DELETE https://{serveur}/api/external/v1/conversations/{conversation_id} \\
+  -H "Authorization: Bearer {votre_clé_api}"</code></pre>
+
+                            <h4>4. Importer un modèle (fichier)</h4>
+                            <pre><code>curl -X POST https://{serveur}/api/external/v1/conversations/{conversation_id}/import \\
+  -H "Authorization: Bearer {votre_clé_api}" \\
+  -F "file=@/chemin/vers/{fichier}.json" \\
+  -F "name={nom_affiché}"</code></pre>
+                            <p>Formats acceptés : XMI/XML, TTL, JSON, SQL, texte.</p>
+
+                            <h4>5. Importer depuis un document indexé</h4>
+                            <pre><code>curl -X POST https://{serveur}/api/external/v1/conversations/{conversation_id}/import-from-document \\
+  -H "Authorization: Bearer {votre_clé_api}" \\
+  -H "Content-Type: application/json" \\
+  -d '{"doc_id": "{id_du_document}"}'</code></pre>
+
+                            <h4>6. Chat</h4>
+                            <h5>Mode non-stream</h5>
+                            <pre><code>curl -X POST https://{serveur}/api/external/v1/conversations/{conversation_id}/chat \\
+  -H "Authorization: Bearer {votre_clé_api}" \\
+  -H "Content-Type: application/json" \\
+  -d '{"message": "{votre_message}", "stream": false}'</code></pre>
+                            <h5>Mode stream (SSE)</h5>
+                            <pre><code>curl -X POST https://{serveur}/api/external/v1/conversations/{conversation_id}/chat \\
+  -H "Authorization: Bearer {votre_clé_api}" \\
+  -H "Content-Type: application/json" \\
+  -H "Accept: text/event-stream" \\
+  -d '{"message": "{votre_message}", "stream": true}'</code></pre>
+
+                            <h4>7. Exporter un modèle</h4>
+                            <pre><code>curl -X GET "https://{serveur}/api/external/v1/models/{model_name}/export?format={xmi|ttl|svg|png}" \\
+  -H "Authorization: Bearer {votre_clé_api}" \\
+  --output "{model_name}.{format}"</code></pre>
+
+                            <h4>Workflow complet (copier-coller)</h4>
+                            <pre><code># Variables
+API_KEY="{votre_clé_api}"
+SERVER="https://{serveur}"
+
+# 1. Créer la conversation
+CONV=$(curl -s -X POST "$SERVER/api/external/v1/conversations" \\
+  -H "Authorization: Bearer $API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"title":"Mon modèle"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['conversation_id'])")
+
+# 2. Importer le modèle
+curl -X POST "$SERVER/api/external/v1/conversations/$CONV/import" \\
+  -H "Authorization: Bearer $API_KEY" \\
+  -F "file=@model.json"
+
+# 3. Discuter
+curl -X POST "$SERVER/api/external/v1/conversations/$CONV/chat" \\
+  -H "Authorization: Bearer $API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"message":"Ajoute une classe Personne", "stream": true}'</code></pre>
                         </div>
                     </div>
                     <div class="api-keys-list" id="api-keys-list"></div>

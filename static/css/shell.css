@@ -464,8 +464,8 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 2rem;
-    height: 2rem;
+    width: 1.75rem;
+    height: 1.75rem;
     border: none;
     border-radius: 9999px;
     background: #f3f4f6;
@@ -473,6 +473,8 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
     cursor: pointer;
     transition: background 0.2s, color 0.2s;
     flex-shrink: 0;
+    margin-left: 0.4rem;
+    vertical-align: middle;
 }
 .api-keys-info-toggle:hover { background: #e5e7eb; color: #111827; }
 
@@ -482,7 +484,7 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
     background: #f9fafb;
     border: 1px solid #e5e7eb;
     border-radius: 0.75rem;
-    max-height: 360px;
+    max-height: 420px;
     overflow-y: auto;
 }
 .api-keys-info.hidden { display: none; }
@@ -496,19 +498,20 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
     font-size: 0.9rem;
     font-weight: 700;
     color: #111827;
-    margin: 1rem 0 0.5rem;
+    margin: 1.25rem 0 0.5rem;
 }
-.api-keys-info-content p,
-.api-keys-info-content li {
+.api-keys-info-content h5 {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #4b5563;
+    margin: 0.75rem 0 0.35rem;
+}
+.api-keys-info-content p {
     font-size: 0.85rem;
     line-height: 1.5;
     color: #374151;
-}
-.api-keys-info-content ul {
     margin: 0 0 0.75rem;
-    padding-left: 1.25rem;
 }
-.api-keys-info-content li { margin-bottom: 0.35rem; }
 .api-keys-info-content code {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-size: 0.78rem;
@@ -522,18 +525,22 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
     border: 1px solid #e5e7eb;
     border-radius: 0.5rem;
     padding: 0.75rem;
+    margin: 0 0 0.75rem;
     overflow-x: auto;
 }
 .api-keys-info-content pre code {
     background: transparent;
     padding: 0;
+    font-size: 0.72rem;
+    line-height: 1.6;
+    white-space: pre;
 }
 
 .auth-modal-title-row {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
+    justify-content: flex-start;
+    gap: 0.25rem;
 }
 .api-key-item {
     display: flex;
