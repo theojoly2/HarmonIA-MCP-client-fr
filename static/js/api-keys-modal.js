@@ -73,7 +73,12 @@ class ApiKeysModal {
         return `
             <div class="auth-modal" data-mode="api-keys">
                 <div class="auth-modal-header">
-                    <h2 class="auth-modal-title">Clés API</h2>
+                    <div class="auth-modal-title-row">
+                        <h2 class="auth-modal-title">Clés API</h2>
+                        <button type="button" class="api-keys-info-toggle" id="api-keys-info-toggle" title="Documentation de l'API externe">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </button>
+                    </div>
                     <p class="auth-modal-subtitle">Gérez les clés d'accès à l'API externe.</p>
                     <button type="button" class="auth-modal-close" aria-label="Fermer">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -89,6 +94,44 @@ class ApiKeysModal {
                         <input type="text" id="api-key-name" class="api-key-name-input" placeholder="Nom de la clé (optionnel)" maxlength="64">
                         <button type="button" class="api-keys-add" id="api-keys-add">Créer une clé</button>
                     </div>
+                    <div class="api-keys-info hidden" id="api-keys-info">
+                        <div class="api-keys-info-content">
+                            <h3>Comment utiliser l'API externe</h3>
+                            <p>Toutes les routes commencent par <code>/api/external/v1</code> et s'authentifient avec le header <code>Authorization: Bearer &lt;clé_api&gt;</code>.</p>
+
+                            <h4>Conversations</h4>
+                            <ul>
+                                <li><strong>Créer une conversation</strong> : <code>POST /api/external/v1/conversations</code> avec <code>{"title": "..."}</code>. Retourne <code>conversation_id</code>.</li>
+                                <li><strong>Lister les conversations</strong> : <code>GET /api/external/v1/conversations</code>.</li>
+                                <li><strong>Supprimer une conversation</strong> : <code>DELETE /api/external/v1/conversations/&lt;conversation_id&gt;</code>.</li>
+                            </ul>
+
+                            <h4>Import de modèle</h4>
+                            <ul>
+                                <li><strong>Importer un fichier</strong> : <code>POST /api/external/v1/conversations/&lt;conversation_id&gt;/import</code> avec un fichier multipart (champ <code>file</code>) et optionnel <code>name</code>. Formats acceptés : XMI/XML, TTL, JSON, SQL, texte.</li>
+                                <li><strong>Importer depuis un document indexé</strong> : <code>POST /api/external/v1/conversations/&lt;conversation_id&gt;/import-from-document</code> avec <code>{"doc_id": "..."}</code>.</li>
+                            </ul>
+
+                            <h4>Chat</h4>
+                            <ul>
+                                <li><strong>Envoyer un message</strong> : <code>POST /api/external/v1/conversations/&lt;conversation_id&gt;/chat</code> avec <code>{"message": "...", "stream": true|false}</code>.</li>
+                                <li>Le mode <code>stream: true</code> renvoie un flux SSE en temps réel (<code>tool_start</code>, <code>tool_end</code>, <code>assistant_text</code>, <code>assistant_done</code>).</li>
+                                <li>Le mode <code>stream: false</code> renvoie les mêmes événements agrégés dans un unique événement <code>events</code>.</li>
+                            </ul>
+
+                            <h4>Export</h4>
+                            <ul>
+                                <li><strong>Exporter un modèle</strong> : <code>GET /api/external/v1/models/&lt;model_name&gt;/export?format=&lt;xmi|ttl|svg|png&gt;</code>.</li>
+                            </ul>
+
+                            <h4>Exemple cURL</h4>
+                            <pre><code>curl -X POST \\
+  https://&lt;serveur&gt;/api/external/v1/conversations \\
+  -H "Authorization: Bearer sk_..." \\
+  -H "Content-Type: application/json" \\
+  -d '{"title":"Mon modèle"}'</code></pre>
+                        </div>
+                    </div>
                     <div class="api-keys-list" id="api-keys-list"></div>
                 </div>
             </div>
@@ -100,6 +143,12 @@ class ApiKeysModal {
         if (closeBtn) {
             closeBtn.addEventListener("click", () => this.close());
         }
+
+        const infoToggle = this.overlay.querySelector("#api-keys-info-toggle");
+        const infoBlock = this.overlay.querySelector("#api-keys-info");
+        infoToggle?.addEventListener("click", () => {
+            infoBlock?.classList.toggle("hidden");
+        });
 
         const addBtn = this.overlay.querySelector("#api-keys-add");
         const nameInput = this.overlay.querySelector("#api-key-name");
