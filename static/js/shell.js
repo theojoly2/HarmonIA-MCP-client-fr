@@ -114,7 +114,8 @@ class Shell {
             </button>
             <button type="button" class="user-menu-item" id="user-menu-change-password">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                    <rect x="5" y="11" width="14" height="10" rx="2" ry="2" stroke-width="2"></rect>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11V7a5 5 0 0110 0v4"></path>
                 </svg>
                 Modifier le mot de passe
             </button>
