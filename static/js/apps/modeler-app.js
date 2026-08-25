@@ -414,7 +414,19 @@ class ModelerApp extends AppBase {
             this.viewer.destroy();
             this.viewer = null;
         }
+        // Invalidate any cached DOM for this instance so switching back from
+        // another tab always renders the new model, not a stale cached view.
+        this._invalidateViewCache();
+        // Persist the new state immediately so tab restoration/history cannot
+        // roll back to the previous model.
+        AppState.saveInstanceState?.(this.instanceId);
         this._showViewer();
+    }
+
+    _invalidateViewCache() {
+        if (window.windowManager?._viewCache) {
+            window.windowManager._viewCache.delete(this.instanceId);
+        }
     }
 
     _enterLoadingMode() {
@@ -594,9 +606,14 @@ class ModelerApp extends AppBase {
             this._homeTimeout = null;
         }
 
+        // Capture the model name before clearing state so we can still find and
+        // close the linked assistant split view.
+        const previousStoredName = this.storedName;
+
         // Reset model state first so the next render knows we are in home mode.
         this.svgText = '';
         this.fileName = '';
+        this.storedName = '';
         this.mainClassName = '';
         this.loading = false;
         this.viewerState = { scale: 1, x: 0, y: 0 };
@@ -605,7 +622,11 @@ class ModelerApp extends AppBase {
             this.viewer = null;
         }
 
-        const existing = this._findAssistantSplitInstance();
+        // Make sure a previously cached DOM cannot restore an old model after reset.
+        this._invalidateViewCache();
+        AppState.saveInstanceState?.(this.instanceId);
+
+        const existing = this._findAssistantSplitInstance(previousStoredName);
         if (existing) {
             await window.windowManager?.collapseSplitTo(this.instanceId, existing.instanceId);
             // collapseSplitTo remounts the modeler in a fresh tab container.
@@ -834,15 +855,19 @@ class ModelerApp extends AppBase {
         this._pendingAssistantDisplayName = displayName || '';
     }
 
-    _findAssistantSplitInstance() {
-        if (!this.storedName) return null;
+    _findAssistantSplitInstance(modelName = null) {
+        const targetName = modelName || this.storedName;
         const instances = AppState.listInstances();
-        return instances.find((i) =>
-            i.appId === 'assistant' &&
-            AppState.getRecord(i.instanceId)?.meta?.modelName === this.storedName &&
-            AppState.getRecord(i.instanceId)?.meta?.origin === 'modeler' &&
-            AppState.getRecord(i.instanceId)?.mode === 'split'
-        ) || null;
+        return instances.find((i) => {
+            if (i.appId !== 'assistant') return false;
+            const rec = AppState.getRecord(i.instanceId);
+            if (!rec || rec.mode !== 'split') return false;
+            const meta = rec.meta || {};
+            // Match either by linked modeler instance id or by the model name.
+            if (meta.linkedModelerInstanceId === this.instanceId) return true;
+            if (targetName && meta.modelName === targetName && meta.origin === 'modeler') return true;
+            return false;
+        }) || null;
     }
 
     _updateAssistantToggleVisibility() {
@@ -1417,6 +1442,22 @@ class ModelerApp extends AppBase {
         // The DOM was cached while the tab was hidden. The SVG viewer is still
         // attached, so we only resume observers and make sure the viewer pane
         // is visible without touching pan/zoom or re-injecting the SVG.
+        // Defensive: if the cached DOM does not match the current state
+        // (e.g. a reset/import happened while the tab was inactive), rebuild it.
+        const viewerContainer = this.container?.querySelector('#modeler-svg-viewer');
+        const cachedSvg = this.viewer?.svg;
+        const svgMatches = cachedSvg && viewerContainer?.contains(cachedSvg);
+        const stateMatches = this.svgText ? svgMatches : !cachedSvg;
+        if (!stateMatches) {
+            if (this.viewer) {
+                this.viewer.destroy();
+                this.viewer = null;
+            }
+            if (this.container) {
+                this.render(this.container);
+            }
+            return;
+        }
         const viewerPane = this.container?.querySelector('#modeler-viewer');
         if (this.viewer && this.viewer.svg) {
             if (viewerPane) {

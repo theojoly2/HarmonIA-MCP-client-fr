@@ -99,7 +99,7 @@ class HistoryPanel {
             const [modelsRes, searchesRes, assistantRes, modelerAssistantRes] = await Promise.all([
                 fetch("api/models", { credentials: "same-origin" }),
                 fetch("api/searches", { credentials: "same-origin" }),
-                ApiClient.getAssistantSessions("assistant"),
+                ApiClient.getAssistantSessionsAll(),
                 ApiClient.getAssistantSessions("modeler"),
             ]);
             let models = [];
@@ -156,8 +156,9 @@ class HistoryPanel {
                 }));
             }
             if (assistantRes && assistantRes.sessions) {
-                // Show standalone assistant conversations. Modeler-originated
-                // sessions are surfaced through the modeler item, not here.
+                // Show standalone assistant conversations (including those created
+                // via the external API). Modeler-originated sessions are surfaced
+                // through the modeler item, not here.
                 conversations = assistantRes.sessions
                     .filter((s) => s.origin !== "modeler")
                     .map((s) => ({
@@ -228,7 +229,7 @@ class HistoryPanel {
             li.addEventListener("click", (e) => {
                 if (e.target.closest(".history-action-more, .history-menu")) return;
                 if (isSearch) this._runSearch(storedName, (item.tags || "").split(",").filter(Boolean), item.id);
-                else if (isAssistant) this._openAssistant(storedName, item.model_names || (item.model_name ? [item.model_name] : []), "assistant");
+                else if (isAssistant) this._openAssistant(storedName, item.model_names || (item.model_name ? [item.model_name] : []), item.origin || "assistant");
                 else if (isModelerAssistant) this._openAssistant(storedName, item.model_names || (item.model_name ? [item.model_name] : []), "modeler");
                 else this._openModel(storedName);
             });
@@ -352,6 +353,15 @@ class HistoryPanel {
                 } else if (isAssistant) {
                     const ctx = item.origin || "assistant";
                     await ApiClient.deleteAssistantSession(item.name, ctx);
+                    // External-API sessions also own their imported models; delete them too.
+                    if (ctx === "external_api" && item.model_names?.length) {
+                        for (const modelName of item.model_names) {
+                            await fetch(`api/models/${encodeURIComponent(modelName)}`, {
+                                method: "DELETE",
+                                credentials: "same-origin",
+                            }).catch((err) => console.error("Delete linked external model error", err));
+                        }
+                    }
                     // If this conversation is linked to a model imported through the
                     // assistant, also delete the linked model.
                     if (item.model_name && (modelsData.models || []).some((m) => m.name === item.model_name && m.imported_from_assistant)) {

@@ -10,6 +10,7 @@
     AppState.registerApp(PreviewApp);
     AppState.registerApp(ChatApp);
     AppState.registerApp(AssistantApp);
+    // ApiDocsManager is loaded globally so any component can open the docs.
 
     // Auth state + pending import manager
     await AuthManager.init();
@@ -21,6 +22,7 @@
 
     const shell = new Shell(appShell, null);
     shell.setAuthManager(AuthManager);
+    shell.setApiKeysManager(ApiKeysManager);
     const contentArea = shell.getContentArea();
 
     // History panel attached to the dedicated overlay area so it survives tab mounts.

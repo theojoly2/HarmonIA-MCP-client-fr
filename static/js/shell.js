@@ -25,11 +25,16 @@ class Shell {
         this.contentArea = this.container.querySelector('#shell-content');
         this.overlayArea = this.container.querySelector('#shell-overlays');
         this.authManager = null;
+        this.apiKeysManager = null;
         this.historyPanel = null;
     }
 
     setAuthManager(authManager) {
         this.authManager = authManager;
+    }
+
+    setApiKeysManager(apiKeysManager) {
+        this.apiKeysManager = apiKeysManager;
     }
 
     setHistoryPanel(historyPanel) {
@@ -101,9 +106,16 @@ class Shell {
         menu.className = 'user-menu-dropdown';
         menu.innerHTML = `
             <div class="user-menu-header">${this._escape(user.username)}</div>
-            <button type="button" class="user-menu-item" id="user-menu-change-password">
+            <button type="button" class="user-menu-item" id="user-menu-api-keys">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                </svg>
+                Clés API
+            </button>
+            <button type="button" class="user-menu-item" id="user-menu-change-password">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <rect x="5" y="11" width="14" height="10" rx="2" ry="2" stroke-width="2"></rect>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11V7a5 5 0 0110 0v4"></path>
                 </svg>
                 Modifier le mot de passe
             </button>
@@ -120,6 +132,10 @@ class Shell {
         menu.style.top = `${rect.bottom + 6}px`;
         menu.style.right = `${document.documentElement.clientWidth - rect.right}px`;
 
+        menu.querySelector('#user-menu-api-keys').addEventListener('click', () => {
+            menu.remove();
+            if (this.apiKeysManager) this.apiKeysManager.show();
+        });
         menu.querySelector('#user-menu-change-password').addEventListener('click', () => {
             menu.remove();
             if (this.authManager) this.authManager.showChangePassword();

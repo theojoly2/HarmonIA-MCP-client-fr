@@ -263,7 +263,7 @@ async def assistant_stream_generator(
         return
 
     origin = (request.origin or "assistant").strip().lower()
-    if origin not in {"assistant", "modeler"}:
+    if origin not in {"assistant", "modeler", "external_api"}:
         origin = "assistant"
 
     is_new_session = not request.session.strip()
@@ -673,6 +673,34 @@ async def assistant_stream_generator(
                             target_model_name = arguments.get("model_name", state.get("name", "")).strip()
                         if not target_model_name and model_names:
                             target_model_name = model_names[0]
+
+                        # If the assistant created/mutated a model that is not yet attached
+                        # to this session (e.g. starting from scratch), attach it now so it
+                        # appears in the model pill and is loaded into the LLM context next turn.
+                        # Also tag it as imported_from_assistant so it does not show up as a
+                        # standalone modeler history item.
+                        newly_attached = False
+                        if target_model_name and target_model_name not in history.assistant_model_names:
+                            history.assistant_model_names.append(target_model_name)
+                            if not history.assistant_model_name:
+                                history.assistant_model_name = target_model_name
+                            newly_attached = True
+                            try:
+                                current_model = await get_model_mcp(username, target_model_name)
+                                if current_model:
+                                    current_model["imported_from_assistant"] = True
+                                    await upload_model_mcp(username, target_model_name, current_model)
+                            except Exception as e:
+                                print(f"[Assistant] Failed to tag newly attached model {target_model_name}: {e}", flush=True)
+
+                        # Notify the UI live when a new model is attached so the pill
+                        # appears immediately without reloading the conversation.
+                        if newly_attached:
+                            history.add_display_event({"kind": "model_attached", "model_name": target_model_name, "source": name})
+                            yield _event("model_attached", {"model_name": target_model_name, "source": name})
+                            async for line in _drain_out_queue():
+                                yield line
+
                         should_display_svg = name in {"add_class", "add_attribute", "add_connector", "display_model_visualization"} and target_model_name
                         if should_display_svg:
                             try:
@@ -807,7 +835,7 @@ async def import_assistant_model(
     XMI/XML, and upload the model to the MCP server so it becomes context for the LLM.
     """
     session_origin = (origin or "assistant").strip().lower()
-    if session_origin not in {"assistant", "modeler"}:
+    if session_origin not in {"assistant", "modeler", "external_api"}:
         session_origin = "assistant"
 
     try:
@@ -964,7 +992,7 @@ async def import_assistant_model_from_document(
     from api.services.mcp_service import fetch_document_file
 
     session_origin = (request.origin or "assistant").strip().lower()
-    if session_origin not in {"assistant", "modeler"}:
+    if session_origin not in {"assistant", "modeler", "external_api"}:
         session_origin = "assistant"
 
     file_data = await fetch_document_file(request.doc_id)
@@ -1185,7 +1213,7 @@ async def find_assistant_session_by_model(
     (default) or to the standalone assistant.
     """
     target_origin = (origin or "modeler").strip().lower()
-    if target_origin not in {"assistant", "modeler"}:
+    if target_origin not in {"assistant", "modeler", "external_api"}:
         target_origin = "modeler"
 
     best_session = ""
@@ -1222,7 +1250,7 @@ async def delete_assistant_session(
     may be used by the modeler.
     """
     target_origin = (origin or "assistant").strip().lower()
-    if target_origin not in {"assistant", "modeler"}:
+    if target_origin not in {"assistant", "modeler", "external_api"}:
         target_origin = "assistant"
 
     history = AssistantHistory(user=username, session=session, origin=target_origin)
@@ -1247,7 +1275,7 @@ async def touch_assistant_session(
 ):
     """Update the session file mtime so it bubbles to the top of the history list."""
     target_origin = (origin or "assistant").strip().lower()
-    if target_origin not in {"assistant", "modeler"}:
+    if target_origin not in {"assistant", "modeler", "external_api"}:
         target_origin = "assistant"
 
     history = AssistantHistory(user=username, session=session, origin=target_origin)
@@ -1268,7 +1296,7 @@ async def rename_assistant_session(
 ):
     """Rename an assistant session by moving its display and llm files."""
     target_origin = (origin or "assistant").strip().lower()
-    if target_origin not in {"assistant", "modeler"}:
+    if target_origin not in {"assistant", "modeler", "external_api"}:
         target_origin = "assistant"
 
     old_history = AssistantHistory(user=username, session=session, origin=target_origin)
@@ -1320,7 +1348,7 @@ async def link_assistant_session_model(
 ):
     """Update the model name linked to a modeler-originated assistant session."""
     target_origin = (origin or "modeler").strip().lower()
-    if target_origin not in {"assistant", "modeler"}:
+    if target_origin not in {"assistant", "modeler", "external_api"}:
         target_origin = "modeler"
 
     history = AssistantHistory(user=username, session=session, origin=target_origin)
@@ -1341,7 +1369,7 @@ async def get_assistant_history(
     username: str = Depends(require_user),
 ):
     target_origin = (origin or "assistant").strip().lower()
-    if target_origin not in {"assistant", "modeler"}:
+    if target_origin not in {"assistant", "modeler", "external_api"}:
         target_origin = "assistant"
 
     history = AssistantHistory(user=username, session=session, origin=target_origin)

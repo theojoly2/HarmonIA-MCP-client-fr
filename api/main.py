@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from api.routers import search, documents, modeler, chat, auth, models, searches, assistant
+from api.routers import search, documents, modeler, chat, auth, models, searches, assistant, external_api, external_api_keys
 
 
 from api.services.user_store import init_db
@@ -41,6 +41,8 @@ def create_app() -> FastAPI:
     app.include_router(modeler.router)
     app.include_router(chat.router)
     app.include_router(assistant.router)
+    app.include_router(external_api.router)
+    app.include_router(external_api_keys.router)
 
     static_dir = Path(__file__).resolve().parent.parent / "static"
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
