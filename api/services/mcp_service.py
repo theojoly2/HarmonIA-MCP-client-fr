@@ -1,10 +1,19 @@
 import asyncio
 import base64
+import os
+from pathlib import Path
 from typing import Any, Optional
 
+from dotenv import load_dotenv
 from fastmcp import Client
 
-MCP_SERVER_URL = "http://127.0.0.1:8001/mcp"
+# Charge le .env à la racine du client si présent
+CLIENT_ROOT = Path(__file__).resolve().parents[3]
+ENV_PATH = CLIENT_ROOT / ".env"
+if ENV_PATH.exists():
+    load_dotenv(dotenv_path=ENV_PATH, override=False)
+
+MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "http://127.0.0.1:8001/mcp")
 
 
 async def fetch_tags() -> list:
