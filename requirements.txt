@@ -1,4 +1,5 @@
 fastapi
+six
 uvicorn
 pydantic
 fastmcp
