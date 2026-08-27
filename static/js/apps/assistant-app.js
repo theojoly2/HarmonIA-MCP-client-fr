@@ -7,7 +7,7 @@
 
 class AssistantApp extends AppBase {
     static id = 'assistant';
-    static title = 'Assistant';
+    static title = 'Analyser/Fusionner/Optimiser';
     static iconSvg = `<svg class="w-4 h-4 overflow-visible" viewBox="0 0 24 24">
         <path class="sparkle-main" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
         <path class="sparkle-orbit-path" d="M5.5 2.5L6.34 5.16L9 6L6.34 6.84L5.5 9.5L4.66 6.84L2 6L4.66 5.16L5.5 2.5Z"></path>
@@ -85,8 +85,8 @@ class AssistantApp extends AppBase {
                 <div id="assistant-chat" class="flex-1 overflow-y-auto relative">
                     <div class="assistant-welcome" id="assistant-welcome">
                         <h1 class="assistant-welcome-title text-center">
-                            <button type="button" id="assistant-reset" class="assistant-title-reset" title="Nouvelle conversation">
-                                <span class="assistant-title-glow title-glow">Assistant Sémantique</span>
+                            <button type="button" id="assistant-reset" class="assistant-title-reset" title="Nouvelle analyse">
+                                <span class="assistant-title-glow title-glow">Assistant de modélisation</span>
                             </button>
                         </h1>
                         <p class="assistant-welcome-subtitle">Importez un modèle ou posez une question pour démarrer.</p>
@@ -100,7 +100,7 @@ class AssistantApp extends AppBase {
                     <div class="assistant-input-wrapper mx-auto rounded-xl border-2 border-gray-300 focus-within:border-black bg-white transition-colors shadow-sm" id="assistant-input-box">
                         <form id="assistant-form" class="flex flex-col">
                             <textarea id="assistant-input" rows="1" autocomplete="off"
-                                placeholder="Interrogez l'assistant sémantique..."
+                                placeholder="Interrogez l'assistant de modélisation..."
                                 class="w-full resize-none max-h-40 bg-transparent border-none focus:outline-none focus:ring-0 text-sm text-gray-900 placeholder-gray-500 px-2 py-1.5"></textarea>
                             <div class="flex items-center justify-between px-2 pb-1.5 pt-1.5">
                                 <div class="flex items-center gap-1.5">
@@ -336,7 +336,7 @@ class AssistantApp extends AppBase {
             }
             // Use the saved display name as the user-visible title if available.
             if (this.props.display_name && this.setTitle) {
-                this.setTitle(`Assistant: ${this.props.display_name}`);
+                this.setTitle(`Analyser/Fusionner/Optimiser: ${this.props.display_name}`);
             }
         }
         // After loading history, if messages exist switch to chat mode layout.
@@ -1122,7 +1122,7 @@ class AssistantApp extends AppBase {
         // across remounts and renames from the history panel.
         if (data.display_name) {
             this.props.display_name = data.display_name;
-            if (this.setTitle) this.setTitle(`Assistant: ${data.display_name}`);
+            if (this.setTitle) this.setTitle(`Analyser/Fusionner/Optimiser: ${data.display_name}`);
         }
         this.messages = [];
         this.messagesEl.innerHTML = '';
@@ -1785,7 +1785,7 @@ class AssistantApp extends AppBase {
             <div class="assistant-search-loading" ${loadingVisible}>
                 <div class="flex items-center gap-2 text-xs font-bold tracking-widest uppercase text-gray-400">
                     <span class="assistant-search-spinner"></span>
-                    <span>Recherche en cours</span>
+                    <span>Analyse en cours</span>
                 </div>
             </div>
             <div class="assistant-search-results markdown-body" ${resultsVisible}>
@@ -2019,7 +2019,7 @@ class AssistantApp extends AppBase {
     _toolStatusLabel(name) {
         const labels = {
             plan_workflow_with_tools: 'Planification en cours...',
-            retrieve_documents: 'Recherche de documents...',
+            retrieve_documents: 'Recherche de contexte...',
             add_class: 'Création de la classe...',
             add_attribute: "Ajout d'un attribut...",
             add_connector: 'Création de la relation...',

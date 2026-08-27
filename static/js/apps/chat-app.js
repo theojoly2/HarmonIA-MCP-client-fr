@@ -1,6 +1,6 @@
 /**
  * ChatApp
- * Assistant sémantique avec streaming LLM.
+ * Assistant de modélisation avec streaming LLM.
  */
 
 class ChatApp extends AppBase {
@@ -47,7 +47,7 @@ class ChatApp extends AppBase {
                 </div>
             </div>
         `;
-        this.setTitle(`Assistant: ${this.docName}`);
+        this.setTitle(`Analyser/Fusionner/Optimiser: ${this.docName}`);
         this._bindEvents();
     }
 

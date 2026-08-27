@@ -1,11 +1,11 @@
 /**
  * SearchApp
- * Module Recherche Sémantique.
+ * Module Explorateur de modèles.
  */
 
 class SearchApp extends AppBase {
     static id = "search";
-    static title = "Recherche";
+    static title = "Explorer";
     static iconSvg = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>`;
     static canFloat = true;
     static canSplit = true;
@@ -60,7 +60,7 @@ class SearchApp extends AppBase {
                 <div id="search-wrapper-inner" class="mx-auto" style="transition: none; opacity: 0;">
                     <h1 class="font-bold tracking-tight text-center text-black mb-5 sm:mb-8">
                         <a href="?" class="interactive-title" title="Réinitialiser la recherche">
-                            <span class="title-glow">Recherche Sémantique</span>
+                            <span class="title-glow">Explorateur de modèles</span>
                         </a>
                     </h1>
                     <form id="search-form" class="mb-4">
@@ -71,7 +71,7 @@ class SearchApp extends AppBase {
                                 value="${this._escape(this.query)}">
                             <button type="submit" id="submit-btn"
                                 class="absolute right-2 top-2 bottom-2 text-white rounded-full font-bold disabled:bg-gray-400 whitespace-nowrap overflow-hidden">
-                                <span class="btn-label">Chercher</span>
+                                <span class="btn-label">Explorer</span>
                             </button>
                         </div>
                         <div id="tags-container" class="mt-5 flex flex-wrap gap-2 justify-center ${showTags ? 'tags-staged' : ''}">
@@ -79,14 +79,14 @@ class SearchApp extends AppBase {
                         </div>
                     </form>
                     <div id="loading-indicator" class="text-center mt-2 mb-6">
-                        <span class="text-xs font-bold tracking-widest uppercase text-gray-400">Recherche en cours</span>
+                        <span class="text-xs font-bold tracking-widest uppercase text-gray-400">Exploration en cours</span>
                         <span id="elapsed-timer"></span>
                     </div>
                     <div id="results-container" class="mt-4 pb-12">${this.resultsHtml || ''}</div>
                 </div>
                 <div id="search-assistant-models-bar" class="search-assistant-models-bar hidden">
                     <div id="search-assistant-models-pills" class="search-assistant-models-pills"></div>
-                    <button type="button" id="search-open-assistant-btn" class="search-open-assistant-btn" title="Discuter avec l'Assistant">
+                    <button type="button" id="search-open-assistant-btn" class="search-open-assistant-btn" title="Discuter avec l'Assistant de modélisation">
                         <svg class="w-5 h-5" viewBox="0 0 24 24">
                             <path class="sparkle-main" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
                             <path class="sparkle-orbit-path" d="M5.5 2.5L6.34 5.16L9 6L6.34 6.84L5.5 9.5L4.66 6.84L2 6L4.66 5.16L5.5 2.5Z"></path>
@@ -392,7 +392,7 @@ class SearchApp extends AppBase {
             wrapper.classList.add('loading');
             btn.disabled = true;
             btn.style.setProperty('--glow-size', '0px');
-            btn.innerHTML = '<span class="btn-label leaving">Chercher</span>';
+            btn.innerHTML = '<span class="btn-label leaving">Explorer</span>';
 
             // Measure the target width of the dots label
             const ghost = btn.cloneNode(false);
@@ -419,7 +419,7 @@ class SearchApp extends AppBase {
             btn.classList.remove('loading');
             btn.disabled = false;
             btn.style.width = 'auto';
-            btn.innerHTML = '<span class="btn-label">Chercher</span>';
+            btn.innerHTML = '<span class="btn-label">Explorer</span>';
             indicator.classList.remove('visible');
             const resultsContainer = this.container.querySelector('#results-container');
             if (resultsContainer) {

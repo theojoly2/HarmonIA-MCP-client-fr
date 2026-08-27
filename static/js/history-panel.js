@@ -218,7 +218,7 @@ class HistoryPanel {
                 </div>
                 <div class="history-item-info">
                     <span class="history-item-name">${this._escape(displayName)}</span>
-                    ${isModelerAssistant ? '<span class="history-item-subtitle text-xs text-gray-400">Modéliseur</span>' : ''}
+                    ${isModelerAssistant ? '<span class="history-item-subtitle text-xs text-gray-400">Créer/Modifier</span>' : ''}
                 </div>
                 <button type="button" class="history-action history-action-more" title="Actions" aria-haspopup="true">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -336,7 +336,7 @@ class HistoryPanel {
             : isAssistant
             ? "cette conversation"
             : isModelerAssistant
-            ? "cette conversation modéliseur"
+            ? "cette conversation Créer/Modifier"
             : "ce modèle";
         const currentTop = parseFloat(menu.style.top) || 0;
         menu.innerHTML = `
@@ -390,7 +390,7 @@ class HistoryPanel {
                 await this.load();
             } catch (err) {
                 console.error("Delete history item error", err);
-                alert(`Impossible de supprimer ${isSearch ? "la recherche" : isAssistant ? "la conversation" : isModelerAssistant ? "la conversation modéliseur" : "le modèle"}.`);
+                alert(`Impossible de supprimer ${isSearch ? "l'exploration" : isAssistant ? "la conversation" : isModelerAssistant ? "la conversation Créer/Modifier" : "le modèle"}.`);
             }
         });
         menu.querySelector(".history-menu-cancel").addEventListener("click", (e) => {
@@ -467,7 +467,7 @@ class HistoryPanel {
                             inst.props.display_name = newName;
                             // Update the displayed title in the tab if it changed.
                             if (inst.setTitle) {
-                                inst.setTitle(`Assistant: ${newName}`);
+                                inst.setTitle(`Analyser/Fusionner/Optimiser: ${newName}`);
                             }
                         }
                     });

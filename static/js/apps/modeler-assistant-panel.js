@@ -1,6 +1,6 @@
 /**
  * ModelerAssistantPanel
- * Chat assistant intégré au Modéliseur. Discute du modèle affiché dans le
+ * Assistant de modélisation intégré au Créer/Modifier. Discute du modèle affiché dans le
  * canvas principal : les mutations (add_class, add_attribute, add_connector)
  * sont appliquées au modèle courant via le MCP, et le canvas est rechargé.
  * Aucune carte SVG n'est affichée dans le chat : la visualisation reste dans
@@ -92,7 +92,7 @@ class ModelerAssistantPanel {
         div.className = 'flex flex-col items-center justify-center h-full text-center px-4 py-8';
         div.innerHTML = `
             <div class="w-10 h-10 text-gray-900 mb-3">${this._sparkleSvg()}</div>
-            <p class="text-sm font-semibold text-gray-900">Assistant Sémantique</p>
+            <p class="text-sm font-semibold text-gray-900">Assistant de modélisation</p>
             <p class="text-xs text-gray-500 mt-1">Posez une question ou demandez une modification du modèle affiché.</p>
         `;
         this.chatEl.appendChild(div);
@@ -192,7 +192,7 @@ class ModelerAssistantPanel {
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                 <span class="truncate">${this._escape(query || '')}</span>
             </div>
-            <div class="max-h-48 overflow-y-auto p-2 text-sm">${resultsHtml || '<span class="text-gray-400">Recherche en cours...</span>'}</div>
+            <div class="max-h-48 overflow-y-auto p-2 text-sm">${resultsHtml || '<span class="text-gray-400">Analyse en cours...</span>'}</div>
         `;
         this.chatEl.appendChild(div);
         this._scrollToBottom();
@@ -416,7 +416,7 @@ class ModelerAssistantPanel {
     _toolStatusLabel(name) {
         const labels = {
             plan_workflow_with_tools: 'Planification...',
-            retrieve_documents: 'Recherche...',
+            retrieve_documents: 'Recherche de contexte...',
             add_class: 'Création de classe...',
             add_attribute: 'Ajout d\'attribut...',
             add_connector: 'Création de relation...',

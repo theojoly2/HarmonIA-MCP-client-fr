@@ -1,11 +1,11 @@
 /**
  * ModelerApp
- * Module Modéliseur Sémantique : import + visualisation SVG.
+ * Module Concepteur de modèles : import + visualisation SVG.
  */
 
 class ModelerApp extends AppBase {
     static id = "modeler";
-    static title = "Modéliseur";
+    static title = "Créer/Modifier";
     static iconSvg = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>`;
     static canFloat = true;
     static canSplit = true;
@@ -60,8 +60,8 @@ class ModelerApp extends AppBase {
             <div class="modeler-app h-full flex flex-col relative">
                 <div id="modeler-home" class="modeler-home px-4 sm:px-6 flex flex-col items-center text-center z-20 bg-white">
                     <h1 class="font-bold tracking-tight text-center text-black mb-2 mt-2">
-                        <button type="button" class="interactive-title bg-transparent border-0 p-0" title="Retour à l'accueil Modéliseur">
-                            <span class="title-glow">Modéliseur Sémantique</span>
+                        <button type="button" class="interactive-title bg-transparent border-0 p-0" title="Retour à l'accueil Créer/Modifier">
+                            <span class="title-glow">Concepteur de modèles</span>
                         </button>
                     </h1>
                     <div id="modeler-import-container" class="w-full max-w-md">
@@ -115,7 +115,7 @@ class ModelerApp extends AppBase {
                             Exporter en PNG
                         </button>
                     </div>
-                    <button type="button" id="modeler-assistant-toggle" class="hidden absolute top-3 right-3 z-30 w-10 h-10 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-700 hover:text-black hover:bg-gray-50 transition-colors" title="Discuter avec l'assistant sémantique">
+                    <button type="button" id="modeler-assistant-toggle" class="hidden absolute top-3 right-3 z-30 w-10 h-10 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-700 hover:text-black hover:bg-gray-50 transition-colors" title="Discuter avec l'assistant de modélisation">
                         <svg class="w-5 h-5 overflow-visible" viewBox="0 0 24 24">
                             <path class="sparkle-main" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
                             <path class="sparkle-orbit-path" d="M5.5 2.5L6.34 5.16L9 6L6.34 6.84L5.5 9.5L4.66 6.84L2 6L4.66 5.16L5.5 2.5Z"></path>
@@ -504,7 +504,7 @@ class ModelerApp extends AppBase {
             if (viewerContainer) viewerContainer.classList.remove('modeler-svg-hidden');
             this._setLoading(false);
             this._observeSvgContainerResize();
-            this.setTitle(`Modéliseur: ${this.fileName}`);
+            this.setTitle(`Créer/Modifier: ${this.fileName}`);
             return;
         }
 
@@ -546,7 +546,7 @@ class ModelerApp extends AppBase {
                             viewerContainer.style.transition = 'opacity 0.35s ease';
                             viewerContainer.classList.remove('modeler-svg-hidden');
                         }
-                        this.setTitle(`Modéliseur: ${this.fileName}`);
+                        this.setTitle(`Créer/Modifier: ${this.fileName}`);
                     });
                 };
 
@@ -1341,7 +1341,7 @@ class ModelerApp extends AppBase {
                 this._setLoading(false);
                 this._observeResize();
                 this._observeSvgContainerResize();
-                this.setTitle(`Modéliseur: ${this.fileName}`);
+                this.setTitle(`Créer/Modifier: ${this.fileName}`);
                 this._updateAssistantToggleVisibility();
                 this._updateExportToggleVisibility();
                 return;
@@ -1359,7 +1359,7 @@ class ModelerApp extends AppBase {
         this.storedName = newStoredName;
         if (newDisplayName) {
             this.fileName = newDisplayName;
-            const title = `Modéliseur: ${newDisplayName}`;
+            const title = `Créer/Modifier: ${newDisplayName}`;
             this.setTitle(title);
             if (window.windowManager && window.windowManager.updateTitle) {
                 window.windowManager.updateTitle(this.instanceId, title);
