@@ -71,7 +71,7 @@ class SearchApp extends AppBase {
                                 value="${this._escape(this.query)}">
                             <button type="submit" id="submit-btn"
                                 class="absolute right-2 top-2 bottom-2 text-white rounded-full font-bold disabled:bg-gray-400 whitespace-nowrap overflow-hidden">
-                                <span class="btn-label">Explorer</span>
+                                <span class="btn-label">Chercher</span>
                             </button>
                         </div>
                         <div id="tags-container" class="mt-5 flex flex-wrap gap-2 justify-center ${showTags ? 'tags-staged' : ''}">
@@ -79,7 +79,7 @@ class SearchApp extends AppBase {
                         </div>
                     </form>
                     <div id="loading-indicator" class="text-center mt-2 mb-6">
-                        <span class="text-xs font-bold tracking-widest uppercase text-gray-400">Exploration en cours</span>
+                        <span class="text-xs font-bold tracking-widest uppercase text-gray-400">Recherche en cours</span>
                         <span id="elapsed-timer"></span>
                     </div>
                     <div id="results-container" class="mt-4 pb-12">${this.resultsHtml || ''}</div>
@@ -392,7 +392,7 @@ class SearchApp extends AppBase {
             wrapper.classList.add('loading');
             btn.disabled = true;
             btn.style.setProperty('--glow-size', '0px');
-            btn.innerHTML = '<span class="btn-label leaving">Explorer</span>';
+            btn.innerHTML = '<span class="btn-label leaving">Chercher</span>';
 
             // Measure the target width of the dots label
             const ghost = btn.cloneNode(false);
@@ -419,7 +419,7 @@ class SearchApp extends AppBase {
             btn.classList.remove('loading');
             btn.disabled = false;
             btn.style.width = 'auto';
-            btn.innerHTML = '<span class="btn-label">Explorer</span>';
+            btn.innerHTML = '<span class="btn-label">Chercher</span>';
             indicator.classList.remove('visible');
             const resultsContainer = this.container.querySelector('#results-container');
             if (resultsContainer) {
