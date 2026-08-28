@@ -2225,6 +2225,21 @@ class AssistantApp extends AppBase {
             this._removeThinkingPlaceholder();
             this._updateFinalSparkle();
             saveHtmlSnapshot();
+
+    _updateFinalSparkle() {
+        const lastAssistant = this.messagesEl.lastElementChild;
+        if (lastAssistant && lastAssistant.dataset.role === 'assistant') {
+            if (!lastAssistant.querySelector('.ai-avatar-row')) {
+                lastAssistant.innerHTML += `
+                    <div class="ai-avatar-row flex items-center gap-2">
+                        <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic" data-hidden="false">
+                            ${this._sparkleSvg()}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+    }
             clearTimeout(this._streamAliveTimeout);
             this._streamAliveTimeout = null;
         }
