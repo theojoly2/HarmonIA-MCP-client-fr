@@ -2070,8 +2070,7 @@ class AssistantApp extends AppBase {
         // because a new user message begins a new assistant turn.
         this._hideAllSparkles();
 
-        let placeholder = this._appendThinkingPlaceholder();
-        const placeholderContent = placeholder.querySelector('.assistant-bubble-content');
+        let placeholder = this._appendThinkingPlaceholder('Réflexion...');
         const loadingInterval = setInterval(() => {
             // Always target the latest placeholder so the sparkle keeps beating
             // across phase changes (text -> tool -> new text, etc.).
@@ -2325,11 +2324,8 @@ class AssistantApp extends AppBase {
             // including unknown ones. Only progress cards, plan card, search
             // results and SVG visualizations remain visible.
             // Show a transient status label while the tool runs. The helper
-            // removes any previous placeholder first. Skip the placeholder in
-            // embedded mode to avoid visual noise; the modeler canvas shows progress.
-            if (!this._embedded) {
-                placeholderRef.value = this._appendThinkingPlaceholder(this._toolStatusLabel(event.name));
-            }
+            // removes any previous placeholder first.
+            placeholderRef.value = this._appendThinkingPlaceholder(this._toolStatusLabel(event.name));
             saveHtmlSnapshot();
             return;
         }
@@ -2340,26 +2336,20 @@ class AssistantApp extends AppBase {
             resetTypewriter?.();
             this._closeAssistantBubble();
             this._hideAllSparkles();
-            if (!this._embedded) {
-                this._appendProgressCard(event.card_id, event.tool_name);
-            }
+            this._appendProgressCard(event.card_id, event.tool_name);
             saveHtmlSnapshot();
             return;
         }
 
         if (event.kind === 'progress_update') {
-            if (!this._embedded) {
-                this._updateProgressCard(event.card_id, event.percent, event.message);
-            }
+            this._updateProgressCard(event.card_id, event.percent, event.message);
             saveHtmlSnapshot();
             return;
         }
 
         if (event.kind === 'progress_done') {
-            if (!this._embedded) {
-                this._completeProgressCard(event.card_id);
-                this._removeProgressStatus(event.card_id);
-            }
+            this._completeProgressCard(event.card_id);
+            this._removeProgressStatus(event.card_id);
             saveHtmlSnapshot();
             return;
         }
