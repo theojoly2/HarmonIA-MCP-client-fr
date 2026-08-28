@@ -227,7 +227,10 @@ class ModelerAssistantPanel {
         const parsed = (result.tool_results && typeof result.tool_results === 'object')
             ? result.tool_results
             : result;
-        const steps = Array.isArray(parsed.plan_steps) ? parsed.plan_steps : [];
+        const finalPlan = parsed.final_plan || parsed;
+        const steps = Array.isArray(finalPlan.plan_steps)
+            ? finalPlan.plan_steps
+            : (Array.isArray(parsed.plan_steps) ? parsed.plan_steps : []);
         if (!steps.length) return;
         const div = document.createElement('div');
         div.className = 'mb-3 bg-blue-50 border border-blue-100 rounded-xl p-3';
@@ -281,6 +284,7 @@ class ModelerAssistantPanel {
         const saveHtmlSnapshot = () => {};
 
         const liveHandler = async (event) => {
+            console.log('[embedded event]', event.kind, event.name || event.tool_name || '');
             const eventsToReplay = this._pendingEvents.slice(this._lastRenderedEventIndex + 1);
             this._lastRenderedEventIndex = this._pendingEvents.length - 1;
             for (const ev of eventsToReplay) {
