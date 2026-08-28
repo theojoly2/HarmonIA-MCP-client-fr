@@ -118,13 +118,23 @@ class Shell {
             const prefix = data.has_estimate ? '~' : '';
             const input = this._formatUsageCount(data.prompt_tokens || 0);
             const output = this._formatUsageCount(data.completion_tokens || 0);
-            const scaleLabel = this._usageScaleLabel(data.scale || scale);
-            counterEl.title = `Tokens ${scaleLabel} : input / output (cliquer pour changer l'échelle)`;
-            counterEl.innerHTML = `<span class="user-usage-prefix">${prefix}</span><span>${input} / ${output} ${scaleLabel}</span>`;
+            const scaleShort = this._usageScaleShortLabel(data.scale || scale);
+            counterEl.title = `Consommation de tokens - période : ${this._usageScaleLabel(data.scale || scale)}. Cliquez pour passer à la période suivante.`;
+            counterEl.innerHTML = `<span class="user-usage-prefix">${prefix}</span><span>${input} / ${output} (${scaleShort})</span>`;
         } catch (err) {
             console.error('[Shell] Failed to load usage:', err);
             counterEl.innerHTML = '<span>- / -</span>';
         }
+    }
+
+    _usageScaleShortLabel(scale) {
+        const labels = {
+            day: 'jour',
+            week: 'semaine',
+            month: 'mois',
+            total: 'total',
+        };
+        return labels[scale] || scale;
     }
 
     _cycleUsageScale(counterEl) {
@@ -147,8 +157,11 @@ class Shell {
         menu.className = 'user-menu-dropdown';
         menu.innerHTML = `
             <div class="user-menu-header">
-                <span>${this._escape(user.username)}</span>
-                <span class="user-usage-counter" data-scale="day" title="Tokens aujourd'hui : input / output">...</span>
+                <div class="user-menu-username">${this._escape(user.username)}</div>
+                <div class="user-menu-usage-line">
+                    <span class="user-usage-counter" data-scale="day" title="Consommation de tokens - période : aujourd'hui. Cliquez pour changer de période.">...</span>
+                    <span class="user-usage-unit">tokens</span>
+                </div>
             </div>
             <button type="button" class="user-menu-item" id="user-menu-api-keys">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
