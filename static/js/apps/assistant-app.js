@@ -2095,12 +2095,14 @@ class AssistantApp extends AppBase {
         let typewriterInterval = null;
 
         const startTypewriter = () => {
+            console.log('[AssistantApp] startTypewriter called, interval=', !!typewriterInterval);
             if (typewriterInterval) return;
             typewriterInterval = setInterval(() => {
                 if (streamBuffer.length === 0) return;
                 const chunkSize = Math.min(3 + Math.floor(Math.random() * 8), streamBuffer.length);
                 displayedText += streamBuffer.slice(0, chunkSize);
                 streamBuffer = streamBuffer.slice(chunkSize);
+                console.log('[AssistantApp] typewriter tick displayedText=', displayedText.length, 'streamBuffer=', streamBuffer.length, 'bubble=', !!currentBubbleContent);
                 if (currentBubbleContent) {
                     currentBubbleContent.innerHTML = this._markdown(displayedText, false);
                 }
@@ -2146,6 +2148,7 @@ class AssistantApp extends AppBase {
         };
 
         const ensureAssistantTextBubble = () => {
+            console.log('[AssistantApp] ensureAssistantTextBubble currentBubbleContent=', !!currentBubbleContent);
             if (currentBubbleContent) return currentBubbleContent;
             this._removeThinkingPlaceholder();
             this._closeAssistantBubble();
@@ -2247,6 +2250,7 @@ class AssistantApp extends AppBase {
     }
 
     _processEvent(event, { startTypewriter, stopTypewriter, flushTypewriter, resetTypewriter, ensureAssistantTextBubble, appendToStreamBuffer, saveHtmlSnapshot, placeholderRef }) {
+        console.log('[AssistantApp] _processEvent', event.kind, event.name || event.tool_name || '', 'embedded=', this._embedded);
         if (this._streamAliveTimeout) {
             clearTimeout(this._streamAliveTimeout);
             this._streamAliveTimeout = null;
