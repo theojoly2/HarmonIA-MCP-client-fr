@@ -118,8 +118,9 @@ class Shell {
             const prefix = data.has_estimate ? '~' : '';
             const input = this._formatUsageCount(data.prompt_tokens || 0);
             const output = this._formatUsageCount(data.completion_tokens || 0);
-            counterEl.title = `Tokens ${this._usageScaleLabel(data.scale || scale)} : input / output`;
-            counterEl.innerHTML = `<span class="user-usage-prefix">${prefix}</span><span>${input} / ${output}</span>`;
+            const scaleLabel = this._usageScaleLabel(data.scale || scale);
+            counterEl.title = `Tokens ${scaleLabel} : input / output (cliquer pour changer l'échelle)`;
+            counterEl.innerHTML = `<span class="user-usage-prefix">${prefix}</span><span>${input} / ${output} ${scaleLabel}</span>`;
         } catch (err) {
             console.error('[Shell] Failed to load usage:', err);
             counterEl.innerHTML = '<span>- / -</span>';
