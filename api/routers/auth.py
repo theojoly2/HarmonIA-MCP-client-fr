@@ -2,7 +2,7 @@
 
 import json
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from api.services.auth_service import (
