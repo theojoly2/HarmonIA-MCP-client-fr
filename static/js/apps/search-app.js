@@ -60,7 +60,7 @@ class SearchApp extends AppBase {
                 <div id="search-wrapper-inner" class="mx-auto" style="transition: none; opacity: 0;">
                     <h1 class="font-bold tracking-tight text-center text-black mb-5 sm:mb-8">
                         <a href="?" class="interactive-title" title="Réinitialiser la recherche">
-                            <span class="title-glow">Explorateur de modèles</span>
+                            <span class="title-glow">Explorer des modèles</span>
                         </a>
                     </h1>
                     <form id="search-form" class="mb-4">

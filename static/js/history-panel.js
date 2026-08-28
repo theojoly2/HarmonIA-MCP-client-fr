@@ -467,7 +467,7 @@ class HistoryPanel {
                             inst.props.display_name = newName;
                             // Update the displayed title in the tab if it changed.
                             if (inst.setTitle) {
-                                inst.setTitle(`Analyser/Fusionner/Optimiser: ${newName}`);
+                                inst.setTitle(`Analyser/Interroger: ${newName}`);
                             }
                         }
                     });

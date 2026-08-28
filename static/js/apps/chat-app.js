@@ -47,7 +47,7 @@ class ChatApp extends AppBase {
                 </div>
             </div>
         `;
-        this.setTitle(`Analyser/Fusionner/Optimiser: ${this.docName}`);
+        this.setTitle(`Analyser/Interroger: ${this.docName}`);
         this._bindEvents();
     }
 

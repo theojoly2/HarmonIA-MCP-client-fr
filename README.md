@@ -10,9 +10,9 @@ L'interface web se présente comme une application monopage (SPA) organisée aut
 
 | Outil | Onglet | Description |
 |---|---|---|
-| **Explorateur de modèles** | `Explorer` | Recherche sémantique dans le corpus indexé. Permet de trouver des concepts, classes, propriétés et définitions issus de standards (SEMIC, schema.data.gouv.fr, Schema.org, LOV, etc.) et de textes juridiques. Les résultats peuvent être filtrés par tags/source et servent de base au RAG de l'assistant. |
-| **Concepteur de modèles** | `Créer/Modifier` | Environnement de modélisation sémantique. Permet d'importer un modèle (XMI/UML, OWL/TTL, JSON, SQL, texte), de le visualiser sous forme de diagramme PlantUML, de l'éditer (ajouter/modifier classes, attributs et relations) et de l'exporter en XMI ou TTL. |
-| **Assistant de modélisation** | `Analyser/Fusionner/Optimiser` | Chat conversationnel intelligent. L'agent LLM peut analyser le modèle courant, suggérer des améliorations, fusionner des concepts, vérifier la conformité au guide SEMIC et appeler les outils du serveur MCP en arrière-plan. |
+| **Explorer des modèles** | `Explorer` | Moteur de recherche sémantique dans le corpus indexé. Permet de trouver des concepts, classes, propriétés et définitions issus de standards (SEMIC, schema.data.gouv.fr, Schema.org, LOV, FIWARE, etc.) et de textes juridiques. Les résultats peuvent être filtrés par tags/source et ajoutés au contexte de l'assistant. |
+| **Créer / modifier un modèle** | `Créer/Modifier` | Environnement de modélisation sémantique. Permet d'importer un modèle (XMI/UML, OWL/TTL, JSON natif, SQL, texte simple), de le visualiser sous forme de diagramme PlantUML, de l'éditer (ajouter/modifier classes, attributs et relations) et de l'exporter en XMI ou TTL. |
+| **Analyser / interroger des modèles** | `Analyser/Interroger` | Chat conversationnel intelligent. L'agent LLM peut analyser le modèle courant, le comparer à des standards, fusionner des concepts, suggérer des améliorations, vérifier la conformité au guide SEMIC et appeler les outils du serveur MCP en arrière-plan. |
 
 ---
 

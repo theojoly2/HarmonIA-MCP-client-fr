@@ -61,7 +61,7 @@ class ModelerApp extends AppBase {
                 <div id="modeler-home" class="modeler-home px-4 sm:px-6 flex flex-col items-center text-center z-20 bg-white">
                     <h1 class="font-bold tracking-tight text-center text-black mb-2 mt-2">
                         <button type="button" class="interactive-title bg-transparent border-0 p-0" title="Retour à l'accueil Créer/Modifier">
-                            <span class="title-glow">Concepteur de modèles</span>
+                            <span class="title-glow">Créer / modifier un modèle</span>
                         </button>
                     </h1>
                     <div id="modeler-import-container" class="w-full max-w-md">
