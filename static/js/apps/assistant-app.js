@@ -681,7 +681,7 @@ class AssistantApp extends AppBase {
         importBtn.style.opacity = atMax ? '0.4' : '';
         importBtn.title = atMax
             ? `Limite de ${this.modelNamesConfig.max} modèles atteinte`
-            : 'Importer un modèle';
+            : 'Importer un modèle (TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML)';
         // Sync the + buttons inside any search result cards rendered in the chat.
         this._updateSearchResultAddButtons();
     }
