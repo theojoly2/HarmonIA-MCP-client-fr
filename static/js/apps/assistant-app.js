@@ -1365,7 +1365,6 @@ class AssistantApp extends AppBase {
 
     _ensureAssistantBubble() {
         // Create a new assistant message bubble if the last one is not an active assistant bubble.
-        console.log('[AssistantApp] _ensureAssistantBubble messagesEl=', !!this.messagesEl, 'last=', this.messagesEl?.lastElementChild?.dataset);
         const last = this.messagesEl.lastElementChild;
         if (last && last.dataset.role === 'assistant' && last.dataset.active === 'true') {
             return last.querySelector('.assistant-bubble-content');
@@ -2095,14 +2094,12 @@ class AssistantApp extends AppBase {
         let typewriterInterval = null;
 
         const startTypewriter = () => {
-            console.log('[AssistantApp] startTypewriter called, interval=', !!typewriterInterval);
             if (typewriterInterval) return;
             typewriterInterval = setInterval(() => {
                 if (streamBuffer.length === 0) return;
                 const chunkSize = Math.min(3 + Math.floor(Math.random() * 8), streamBuffer.length);
                 displayedText += streamBuffer.slice(0, chunkSize);
                 streamBuffer = streamBuffer.slice(chunkSize);
-                console.log('[AssistantApp] typewriter tick displayedText=', displayedText.length, 'streamBuffer=', streamBuffer.length, 'bubble=', !!currentBubbleContent);
                 if (currentBubbleContent) {
                     currentBubbleContent.innerHTML = this._markdown(displayedText, false);
                 }
@@ -2148,7 +2145,6 @@ class AssistantApp extends AppBase {
         };
 
         const ensureAssistantTextBubble = () => {
-            console.log('[AssistantApp] ensureAssistantTextBubble currentBubbleContent=', !!currentBubbleContent);
             if (currentBubbleContent) return currentBubbleContent;
             this._removeThinkingPlaceholder();
             this._closeAssistantBubble();
@@ -2250,7 +2246,6 @@ class AssistantApp extends AppBase {
     }
 
     _processEvent(event, { startTypewriter, stopTypewriter, flushTypewriter, resetTypewriter, ensureAssistantTextBubble, appendToStreamBuffer, saveHtmlSnapshot, placeholderRef }) {
-        console.log('[AssistantApp] _processEvent', event.kind, event.name || event.tool_name || '', 'embedded=', this._embedded);
         if (this._streamAliveTimeout) {
             clearTimeout(this._streamAliveTimeout);
             this._streamAliveTimeout = null;
@@ -2280,7 +2275,6 @@ class AssistantApp extends AppBase {
         }
 
         if (event.kind === 'assistant_text') {
-            console.log('[AssistantApp] assistant_text embedded=', this._embedded, 'content=', event.content, 'messagesEl=', !!this.messagesEl);
             if (appendToStreamBuffer) {
                 // ChatApp-style live typewriter: append to the buffer and let the
                 // interval display characters one-by-one with live markdown parsing.
@@ -2290,7 +2284,6 @@ class AssistantApp extends AppBase {
             } else {
                 // Fallback during background replay (no live typewriter available).
                 const bubble = this._ensureAssistantBubble();
-                console.log('[AssistantApp] fallback bubble=', !!bubble);
                 this._currentStreamingText = (this._currentStreamingText || '') + (event.content || '');
                 bubble.innerHTML = this._markdown(this._currentStreamingText, false);
                 this._throttledReflow();
@@ -2377,7 +2370,7 @@ class AssistantApp extends AppBase {
             resetTypewriter?.();
             this._closeAssistantBubble();
             if (event.name === 'plan_workflow_with_tools') {
-                if (!this._embedded) this._renderPlan(event.result);
+                this._renderPlan(event.result);
             } else if (event.name === 'retrieve_documents') {
                 this._fillSearchCard(event.display?.query || '', event.display?.results_html || '');
             } else {

@@ -218,24 +218,18 @@ const ApiClient = (() => {
         const body = namesPayload.length === 1
             ? { session, user_message: userMessage, model_name: namesPayload[0], tags: tags || [], origin }
             : { session, user_message: userMessage, model_names: namesPayload, tags: tags || [], origin };
-        console.log('[api-client] streamAssistant request', body);
         const res = await fetch(apiUrl("assistant/stream"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "same-origin",
             body: JSON.stringify(body),
         });
-        console.log('[api-client] streamAssistant response status', res.status, res.ok);
-        if (!res.ok || !res.body) {
-            console.error('[api-client] streamAssistant failed', res.status, res.body);
-            throw new Error(`Assistant stream failed: ${res.status}`);
-        }
+        if (!res.ok || !res.body) throw new Error(`Assistant stream failed: ${res.status}`);
 
         // Read SSE events one at a time and force the browser to paint after each
         // event, so every assistant loop / tool card / text update is rendered
         // before the next event is consumed.
         const reader = res.body.getReader();
-        console.log('[api-client] streamAssistant reader ready');
         const decoder = new TextDecoder("utf-8");
         let buffer = "";
 
@@ -252,12 +246,9 @@ const ApiClient = (() => {
             });
 
         const handleLine = async (line) => {
-            console.log('[api-client] SSE raw line:', line.slice(0, 200));
             const ev = JSON.parse(line);
-            console.log('[api-client] SSE event:', ev.kind, ev.name || ev.tool_name || '');
             try {
                 await onEvent(ev);
-                console.log('[api-client] onEvent done for', ev.kind);
             } catch (err) {
                 console.error("Assistant event handler error", err, ev);
             }
