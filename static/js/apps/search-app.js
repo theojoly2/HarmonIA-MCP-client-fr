@@ -1,11 +1,11 @@
 /**
  * SearchApp
- * Module Explorateur de modèles.
+ * Module Chercher / explorer des modèles.
  */
 
 class SearchApp extends AppBase {
     static id = "search";
-    static title = "Explorer";
+    static title = "Chercher/Explorer";
     static iconSvg = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>`;
     static canFloat = true;
     static canSplit = true;
@@ -60,7 +60,7 @@ class SearchApp extends AppBase {
                 <div id="search-wrapper-inner" class="mx-auto" style="transition: none; opacity: 0;">
                     <h1 class="font-bold tracking-tight text-center text-black mb-5 sm:mb-8">
                         <a href="?" class="interactive-title" title="Réinitialiser la recherche">
-                            <span class="title-glow">Explorer des modèles</span>
+                            <span class="title-glow">Chercher / explorer des modèles</span>
                         </a>
                     </h1>
                     <form id="search-form" class="mb-4">
@@ -86,7 +86,7 @@ class SearchApp extends AppBase {
                 </div>
                 <div id="search-assistant-models-bar" class="search-assistant-models-bar hidden">
                     <div id="search-assistant-models-pills" class="search-assistant-models-pills"></div>
-                    <button type="button" id="search-open-assistant-btn" class="search-open-assistant-btn" title="Discuter avec l'Assistant de modélisation">
+                    <button type="button" id="search-open-assistant-btn" class="search-open-assistant-btn" title="Discuter avec l'assistant Analyser / interroger">
                         <svg class="w-5 h-5" viewBox="0 0 24 24">
                             <path class="sparkle-main" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
                             <path class="sparkle-orbit-path" d="M5.5 2.5L6.34 5.16L9 6L6.34 6.84L5.5 9.5L4.66 6.84L2 6L4.66 5.16L5.5 2.5Z"></path>

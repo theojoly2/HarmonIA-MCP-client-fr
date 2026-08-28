@@ -1,6 +1,6 @@
 /**
  * ChatApp
- * Assistant de modélisation avec streaming LLM.
+ * Module Analyser / interroger des modèles avec streaming LLM.
  */
 
 class ChatApp extends AppBase {

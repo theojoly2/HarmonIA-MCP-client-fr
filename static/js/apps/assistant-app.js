@@ -90,8 +90,8 @@ class AssistantApp extends AppBase {
                             </button>
                         </h1>
                         <p class="assistant-welcome-subtitle">
-                            Discutez avec l'assistant pour analyser, comparer, fusionner et améliorer votre modèle.
-                            <br>Formats supportés : XMI/UML, OWL/TTL, JSON, SQL, TXT.
+                            Discutez avec l'assistant pour analyser, comparer, fusionner et améliorer vos modèles.
+                            <br>Formats supportés : TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML.
                         </p>
                         <div class="assistant-welcome-input" id="assistant-welcome-input"></div>
                     </div>

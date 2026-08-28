@@ -10,8 +10,8 @@ L'interface web se présente comme une application monopage (SPA) organisée aut
 
 | Outil | Onglet | Description |
 |---|---|---|
-| **Explorer des modèles** | `Explorer` | Moteur de recherche sémantique dans le corpus indexé. Permet de trouver des concepts, classes, propriétés et définitions issus de standards (SEMIC, schema.data.gouv.fr, Schema.org, LOV, FIWARE, etc.) et de textes juridiques. Les résultats peuvent être filtrés par tags/source et ajoutés au contexte de l'assistant. |
-| **Créer / modifier un modèle** | `Créer/Modifier` | Environnement de modélisation sémantique. Permet d'importer un modèle (XMI/UML, OWL/TTL, JSON natif, SQL, texte simple), de le visualiser sous forme de diagramme PlantUML, de l'éditer (ajouter/modifier classes, attributs et relations) et de l'exporter en XMI ou TTL. |
+| **Chercher / explorer des modèles** | `Chercher/Explorer` | Moteur de recherche sémantique dans le corpus indexé. Permet de trouver des concepts, classes, propriétés et définitions issus de standards (SEMIC, schema.data.gouv.fr, Schema.org, LOV, FIWARE, etc.) et de textes juridiques. Les résultats peuvent être filtrés par tags/source et ajoutés au contexte de l'assistant. |
+| **Créer / éditer un modèle** | `Créer/Éditer` | Environnement de modélisation sémantique. Permet d'importer un modèle (XMI/UML, OWL/TTL, JSON natif, SQL, texte simple), de le visualiser sous forme de diagramme PlantUML, de l'éditer (ajouter/modifier classes, attributs et relations) et de l'exporter en XMI ou TTL. |
 | **Analyser / interroger des modèles** | `Analyser/Interroger` | Chat conversationnel intelligent. L'agent LLM peut analyser le modèle courant, le comparer à des standards, fusionner des concepts, suggérer des améliorations, vérifier la conformité au guide SEMIC et appeler les outils du serveur MCP en arrière-plan. |
 
 ---
