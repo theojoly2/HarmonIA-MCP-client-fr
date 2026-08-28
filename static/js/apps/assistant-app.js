@@ -1365,6 +1365,7 @@ class AssistantApp extends AppBase {
 
     _ensureAssistantBubble() {
         // Create a new assistant message bubble if the last one is not an active assistant bubble.
+        console.log('[AssistantApp] _ensureAssistantBubble messagesEl=', !!this.messagesEl, 'last=', this.messagesEl?.lastElementChild?.dataset);
         const last = this.messagesEl.lastElementChild;
         if (last && last.dataset.role === 'assistant' && last.dataset.active === 'true') {
             return last.querySelector('.assistant-bubble-content');
@@ -2275,6 +2276,7 @@ class AssistantApp extends AppBase {
         }
 
         if (event.kind === 'assistant_text') {
+            console.log('[AssistantApp] assistant_text embedded=', this._embedded, 'content=', event.content, 'messagesEl=', !!this.messagesEl);
             if (appendToStreamBuffer) {
                 // ChatApp-style live typewriter: append to the buffer and let the
                 // interval display characters one-by-one with live markdown parsing.
@@ -2284,6 +2286,7 @@ class AssistantApp extends AppBase {
             } else {
                 // Fallback during background replay (no live typewriter available).
                 const bubble = this._ensureAssistantBubble();
+                console.log('[AssistantApp] fallback bubble=', !!bubble);
                 this._currentStreamingText = (this._currentStreamingText || '') + (event.content || '');
                 bubble.innerHTML = this._markdown(this._currentStreamingText, false);
                 this._throttledReflow();
