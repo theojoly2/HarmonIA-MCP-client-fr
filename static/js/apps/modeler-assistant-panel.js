@@ -157,10 +157,26 @@ class ModelerAssistantPanel {
     _appendStatus(label) {
         const div = document.createElement('div');
         div.className = 'flex items-center gap-2 mb-3 text-xs font-bold tracking-widest uppercase text-gray-400';
-        div.innerHTML = `<span class="w-4 h-4 text-gray-900 flex-shrink-0">${this._sparkleSvg()}</span><span>${this._escape(label)}</span>`;
+        div.dataset.role = 'status';
+        div.innerHTML = `<span class="sparkle-container ai-avatar-wrapper trigger-magic w-4 h-4 text-gray-900 flex-shrink-0 flex items-center justify-center">${this._sparkleSvg()}</span><span class="status-label">${this._escape(label)}</span>`;
         this.chatEl.appendChild(div);
         this._scrollToBottom();
         return div;
+    }
+
+    _updateStatus(label) {
+        const target = this.chatEl.querySelector('[data-role="status"]');
+        if (!target) return null;
+        const labelEl = target.querySelector('.status-label');
+        if (labelEl) labelEl.textContent = label;
+        const avatar = target.querySelector('.ai-avatar-wrapper');
+        if (avatar) {
+            avatar.classList.remove('trigger-magic');
+            void avatar.offsetWidth;
+            avatar.classList.add('trigger-magic');
+        }
+        this._scrollToBottom();
+        return target;
     }
 
     _removeStatuses() {
@@ -302,8 +318,11 @@ class ModelerAssistantPanel {
         }
 
         if (event.kind === 'thinking') {
-            if (placeholderRef.value) placeholderRef.value.remove();
-            placeholderRef.value = this._appendStatus('Réflexion...');
+            const updated = this._updateStatus('Réflexion...');
+            if (!updated) {
+                if (placeholderRef.value) placeholderRef.value.remove();
+                placeholderRef.value = this._appendStatus('Réflexion...');
+            }
             return;
         }
 
@@ -344,28 +363,31 @@ class ModelerAssistantPanel {
 
         if (event.kind === 'assistant_tool_calls') {
             resetBubble();
-            if (placeholderRef.value) {
-                placeholderRef.value.remove();
-                placeholderRef.value = null;
-            }
             return;
         }
 
         if (event.kind === 'tool_start') {
             resetBubble();
-            if (placeholderRef.value) placeholderRef.value.remove();
+            const status = this._toolStatusLabel(event.name);
+            const updated = status ? this._updateStatus(status) : null;
+            if (!updated && status) {
+                if (placeholderRef.value) placeholderRef.value.remove();
+                placeholderRef.value = this._appendStatus(status);
+            }
             if (event.name === 'retrieve_documents') {
                 this._appendSearchCard(event.arguments?.search_terms || '', null);
             }
-            const status = this._toolStatusLabel(event.name);
-            placeholderRef.value = status ? this._appendStatus(status) : null;
             return;
         }
 
         if (event.kind === 'progress_start') {
             resetBubble();
-            if (placeholderRef.value) placeholderRef.value.remove();
-            placeholderRef.value = this._appendStatus(this._toolStatusLabel(event.tool_name));
+            const status = this._toolStatusLabel(event.tool_name);
+            const updated = status ? this._updateStatus(status) : null;
+            if (!updated && status) {
+                if (placeholderRef.value) placeholderRef.value.remove();
+                placeholderRef.value = this._appendStatus(status);
+            }
             return;
         }
 
