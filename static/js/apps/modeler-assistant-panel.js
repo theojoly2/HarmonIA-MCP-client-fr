@@ -255,6 +255,7 @@ class ModelerAssistantPanel {
     }
 
     async _send(text) {
+        console.log('[embedded] _send called', { modelName: this.modelName, text });
         if (!this.modelName) {
             this._appendAssistantMessage('Aucun modèle n\'est chargé. Importez ou créez un modèle pour discuter avec l\'assistant.');
             return;
