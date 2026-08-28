@@ -55,7 +55,7 @@ class Shell {
             const historyBtn = document.createElement('button');
             historyBtn.id = 'history-toggle';
             historyBtn.className = 'history-toggle shell-tag-style shell-glow';
-            historyBtn.title = 'Historique des modèles';
+            historyBtn.title = 'Historique des modèles, recherches et conversations';
             historyBtn.innerHTML = `
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
