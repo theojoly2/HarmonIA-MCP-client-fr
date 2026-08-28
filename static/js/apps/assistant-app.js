@@ -1519,7 +1519,6 @@ class AssistantApp extends AppBase {
     }
 
     _appendProgressCard(cardId, toolName) {
-        if (this._embedded) return null;
         const labels = {
             metadata_checker: 'Vérification des métadonnées',
             validator_check: 'Validation guide de style',
