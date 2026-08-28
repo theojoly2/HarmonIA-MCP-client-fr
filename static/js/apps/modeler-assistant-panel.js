@@ -158,7 +158,7 @@ class ModelerAssistantPanel {
         const div = document.createElement('div');
         div.className = 'flex items-center gap-2 mb-3 text-xs font-bold tracking-widest uppercase text-gray-400';
         div.dataset.role = 'status';
-        div.innerHTML = `<span class="sparkle-container ai-avatar-wrapper trigger-magic w-4 h-4 text-gray-900 flex-shrink-0 flex items-center justify-center">${this._sparkleSvg()}</span><span class="status-label">${this._escape(label)}</span>`;
+        div.innerHTML = `<span class="sparkle-container ai-avatar-wrapper trigger-magic w-4 h-4 text-gray-900 flex-shrink-0 flex items-center justify-center" style="animation:none;">${this._sparkleSvg()}</span><span class="status-label">${this._escape(label)}</span>`;
         this.chatEl.appendChild(div);
         this._scrollToBottom();
         return div;
@@ -271,6 +271,18 @@ class ModelerAssistantPanel {
         let placeholder = this._appendStatus('Réflexion...');
         const placeholderRef = { value: placeholder };
 
+        // Keep the sparkle beating by re-triggering the magic class on the latest status.
+        const statusInterval = setInterval(() => {
+            const statuses = this.chatEl.querySelectorAll('[data-role="status"]');
+            const latest = statuses.length ? statuses[statuses.length - 1] : null;
+            const avatar = latest?.querySelector('.ai-avatar-wrapper');
+            if (avatar) {
+                avatar.classList.remove('trigger-magic');
+                void avatar.offsetWidth;
+                avatar.classList.add('trigger-magic');
+            }
+        }, 1200);
+
         let currentText = '';
         this._streamAbortController?.abort();
         this._streamAbortController = new AbortController();
@@ -285,12 +297,12 @@ class ModelerAssistantPanel {
 
         const liveHandler = async (event) => {
             console.log('[embedded event]', event.kind, event.name || event.tool_name || '');
+            this._pendingEvents.push(event);
             const eventsToReplay = this._pendingEvents.slice(this._lastRenderedEventIndex + 1);
             this._lastRenderedEventIndex = this._pendingEvents.length - 1;
             for (const ev of eventsToReplay) {
                 this._processEvent(ev, { resetBubble, placeholderRef, saveHtmlSnapshot });
             }
-            this._processEvent(event, { resetBubble, placeholderRef, saveHtmlSnapshot });
         };
 
         try {
@@ -299,6 +311,7 @@ class ModelerAssistantPanel {
             console.error('Modeler assistant stream error', err);
             this._appendAssistantMessage(`Erreur : ${this._escape(err.message)}`);
         } finally {
+            clearInterval(statusInterval);
             this.isStreaming = false;
             this._setSendEnabled(true);
             this._closeAssistantBubble();
