@@ -2225,6 +2225,10 @@ class AssistantApp extends AppBase {
             this._removeThinkingPlaceholder();
             this._updateFinalSparkle();
             saveHtmlSnapshot();
+            clearTimeout(this._streamAliveTimeout);
+            this._streamAliveTimeout = null;
+        }
+    }
 
     _updateFinalSparkle() {
         const lastAssistant = this.messagesEl.lastElementChild;
@@ -2238,10 +2242,6 @@ class AssistantApp extends AppBase {
                     </div>
                 `;
             }
-        }
-    }
-            clearTimeout(this._streamAliveTimeout);
-            this._streamAliveTimeout = null;
         }
     }
 
