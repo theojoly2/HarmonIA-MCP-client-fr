@@ -56,6 +56,7 @@ class Shell {
             historyBtn.id = 'history-toggle';
             historyBtn.className = 'history-toggle shell-tag-style shell-glow';
             historyBtn.title = 'Historique des modèles, recherches et conversations';
+            historyBtn.id = 'history-toggle';
             historyBtn.innerHTML = `
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -94,6 +95,45 @@ class Shell {
         }
     }
 
+    _formatUsageCount(n) {
+        if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace('.0', '')}M`;
+        if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace('.0', '')}k`;
+        return String(n);
+    }
+
+    _usageScaleLabel(scale) {
+        const labels = {
+            day: 'aujourd\'hui',
+            week: 'cette semaine',
+            month: 'ce mois',
+            total: 'total',
+        };
+        return labels[scale] || scale;
+    }
+
+    async _loadUsageCounter(counterEl) {
+        const scale = counterEl.dataset.scale || 'day';
+        try {
+            const data = await ApiClient.getUsage(scale);
+            const prefix = data.has_estimate ? '~' : '';
+            const input = this._formatUsageCount(data.prompt_tokens || 0);
+            const output = this._formatUsageCount(data.completion_tokens || 0);
+            counterEl.title = `Tokens ${this._usageScaleLabel(data.scale || scale)} : input / output`;
+            counterEl.innerHTML = `<span class="user-usage-prefix">${prefix}</span><span>${input} / ${output}</span>`;
+        } catch (err) {
+            console.error('[Shell] Failed to load usage:', err);
+            counterEl.innerHTML = '<span>- / -</span>';
+        }
+    }
+
+    _cycleUsageScale(counterEl) {
+        const scales = ['day', 'week', 'month', 'total'];
+        const current = counterEl.dataset.scale || 'day';
+        const next = scales[(scales.indexOf(current) + 1) % scales.length];
+        counterEl.dataset.scale = next;
+        this._loadUsageCounter(counterEl);
+    }
+
     _toggleUserMenu(button, user) {
         const existing = document.querySelector('#user-menu-dropdown');
         if (existing) {
@@ -105,7 +145,10 @@ class Shell {
         menu.id = 'user-menu-dropdown';
         menu.className = 'user-menu-dropdown';
         menu.innerHTML = `
-            <div class="user-menu-header">${this._escape(user.username)}</div>
+            <div class="user-menu-header">
+                <span>${this._escape(user.username)}</span>
+                <span class="user-usage-counter" data-scale="day" title="Tokens aujourd'hui : input / output">...</span>
+            </div>
             <button type="button" class="user-menu-item" id="user-menu-api-keys">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
@@ -131,6 +174,15 @@ class Shell {
         const rect = button.getBoundingClientRect();
         menu.style.top = `${rect.bottom + 6}px`;
         menu.style.right = `${document.documentElement.clientWidth - rect.right}px`;
+
+        const usageCounter = menu.querySelector('.user-usage-counter');
+        if (usageCounter) {
+            this._loadUsageCounter(usageCounter);
+            usageCounter.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._cycleUsageScale(usageCounter);
+            });
+        }
 
         menu.querySelector('#user-menu-api-keys').addEventListener('click', () => {
             menu.remove();

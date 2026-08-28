@@ -114,8 +114,20 @@ async def _create_completion_streaming(
     """Stream assistant text in real-time and finish with tool calls summary.
 
     Yields ("text", piece) for each text chunk and ("done", {"content": str,
-    "tool_calls": [...]}) at the end of the turn.
+    "tool_calls": [...], "usage": {...}}) at the end of the turn.
     """
+    from api.services.token_counter import (
+        count_messages_tokens,
+        count_text_tokens,
+        extract_usage_from_chunk,
+    )
+
+    # Estimate prompt tokens before sending (messages + tool schemas).
+    prompt_estimate = count_messages_tokens(llm_messages, _LLM_MODEL)
+    if tools:
+        import json as _json
+        prompt_estimate += count_text_tokens(_json.dumps(tools), _LLM_MODEL)
+
     stream = await llm_client.chat.completions.create(
         model=_LLM_MODEL,
         messages=llm_messages,
@@ -130,12 +142,18 @@ async def _create_completion_streaming(
     streamed_any_text = False
     last_flush = 0.0
     flush_interval = 0.03
+    completion_estimate = 0
+    usage_from_provider = None
 
     tool_calls_buffer: dict[int, dict[str, Any]] = defaultdict(
         lambda: {"id": "", "type": "function", "function": {"name": "", "arguments": ""}}
     )
 
     async for chunk in stream:
+        # Capture usage from the provider if present in any chunk (often the last one).
+        if usage_from_provider is None:
+            usage_from_provider = extract_usage_from_chunk(chunk)
+
         choices = getattr(chunk, "choices", None) or []
         if not choices:
             continue
@@ -147,6 +165,7 @@ async def _create_completion_streaming(
         if text_piece:
             assistant_text += text_piece
             streamed_any_text = True
+            completion_estimate += count_text_tokens(text_piece, _LLM_MODEL)
             yield ("text", text_piece)
 
         delta_tool_calls = getattr(delta, "tool_calls", None) or []
@@ -165,14 +184,17 @@ async def _create_completion_streaming(
                 fargs = getattr(function, "arguments", None)
                 if fname:
                     entry["function"]["name"] += fname
+                    completion_estimate += count_text_tokens(fname, _LLM_MODEL)
                 if fargs:
                     entry["function"]["arguments"] += fargs
+                    completion_estimate += count_text_tokens(fargs, _LLM_MODEL)
 
     if pending_text:
         flushed = pending_text
         pending_text = ""
         assistant_text += flushed
         streamed_any_text = True
+        completion_estimate += count_text_tokens(flushed, _LLM_MODEL)
         yield ("text", flushed)
 
     tool_calls: list[dict[str, Any]] = []
@@ -190,12 +212,25 @@ async def _create_completion_streaming(
                 }
             )
 
+    usage = {
+        "prompt_tokens": prompt_estimate,
+        "completion_tokens": completion_estimate,
+        "source": "tiktoken",
+    }
+    if usage_from_provider:
+        usage = {
+            "prompt_tokens": usage_from_provider.get("prompt_tokens", prompt_estimate),
+            "completion_tokens": usage_from_provider.get("completion_tokens", completion_estimate),
+            "source": "usage",
+        }
+
     yield (
         "done",
         {
             "content": assistant_text,
             "tool_calls": tool_calls,
             "streamed_any_text": streamed_any_text,
+            "usage": usage,
         },
     )
 
@@ -419,6 +454,8 @@ async def assistant_stream_generator(
                 effective_tool_schemas = [] if is_last_loop else tool_schemas
                 effective_tool_choice = "none" if is_last_loop else "auto"
 
+                usage_totals = {"prompt_tokens": 0, "completion_tokens": 0, "source": "tiktoken"}
+
                 async for stage, payload in _create_completion_streaming(
                     llm_messages=llm_messages,
                     tools=effective_tool_schemas,
@@ -434,6 +471,11 @@ async def assistant_stream_generator(
                         content = payload.get("content", "") or ""
                         tool_calls = _normalize_tool_calls(payload.get("tool_calls", []))
                         streamed_any_text = bool(payload.get("streamed_any_text", False))
+                        usage = payload.get("usage", {})
+                        usage_totals["prompt_tokens"] += int(usage.get("prompt_tokens", 0))
+                        usage_totals["completion_tokens"] += int(usage.get("completion_tokens", 0))
+                        if usage.get("source") == "usage":
+                            usage_totals["source"] = "usage"
 
                 async for line in _drain_out_queue():
                     yield line
@@ -769,8 +811,20 @@ async def assistant_stream_generator(
 
                 else:
                     history.add_assistant_message(content)
-                    yield _event("assistant_done", {"content": ""})
+                    yield _event("assistant_done", {"content": "", "usage": usage_totals})
                     break
+
+            # Record accumulated token usage for the whole assistant turn once we exit the loop.
+            if usage_totals["prompt_tokens"] + usage_totals["completion_tokens"] > 0:
+                from api.services.usage_store import record_usage
+                record_usage(
+                    username=username,
+                    prompt_tokens=usage_totals["prompt_tokens"],
+                    completion_tokens=usage_totals["completion_tokens"],
+                    endpoint="assistant",
+                    model=_LLM_MODEL,
+                    source=usage_totals.get("source", "tiktoken"),
+                )
 
     except Exception as e:
         import traceback

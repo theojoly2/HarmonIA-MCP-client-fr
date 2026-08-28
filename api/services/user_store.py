@@ -36,6 +36,8 @@ def init_db():
     conn.close()
     from api.services.search_history_store import init_search_history_db
     init_search_history_db()
+    from api.services.usage_store import init_usage_table
+    init_usage_table()
 
 
 def create_user(username: str, password: str) -> dict:

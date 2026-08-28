@@ -378,6 +378,21 @@ const ApiClient = (() => {
         return res.blob();
     }
 
+    async function getUsage(scale = "day") {
+        const res = await fetch(
+            apiUrl(`auth/usage?scale=${encodeURIComponent(scale)}`),
+            {
+                method: "GET",
+                credentials: "same-origin",
+            }
+        );
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || `Usage failed: ${res.status}`);
+        }
+        return res.json();
+    }
+
     return {
         postSearch,
         getTags,
@@ -407,6 +422,7 @@ const ApiClient = (() => {
         deleteAssistantSession,
         touchAssistantSession,
         exportModel,
+        getUsage,
     };
 })();
 

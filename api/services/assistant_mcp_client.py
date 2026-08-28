@@ -113,6 +113,28 @@ async def _sampling_handler(messages: list[Any], params: Any, context: Any) -> s
             stop=getattr(params, "stopSequences", None) or None,
             stream=False,
         )
+
+        # Record token usage for this MCP sampling call if a username is available.
+        username = None
+        try:
+            if isinstance(context, dict):
+                username = context.get("user")
+            else:
+                username = getattr(context, "user", None)
+        except Exception:
+            username = None
+
+        if username and resp.usage:
+            from api.services.usage_store import record_usage
+            record_usage(
+                username=username,
+                prompt_tokens=int(resp.usage.prompt_tokens or 0),
+                completion_tokens=int(resp.usage.completion_tokens or 0),
+                endpoint="mcp_sampling",
+                model=_LLM_MODEL,
+                source="usage",
+            )
+
         if not resp.choices:
             return ""
         return (resp.choices[0].message.content or "").strip()

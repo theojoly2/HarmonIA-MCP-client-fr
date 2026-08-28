@@ -13,6 +13,7 @@ from api.services.auth_service import (
     verify_password,
 )
 from api.services.user_store import create_user, get_user_by_username, update_user_password, get_user_by_id
+from api.services.usage_store import get_usage
 
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -129,3 +130,19 @@ async def change_password(request: Request, body: ChangePasswordBody):
         return Response(status_code=401, content=json.dumps({"detail": "invalid_old_password"}))
     update_user_password(user["id"], body.password)
     return {"ok": True}
+
+
+@router.get("/usage")
+async def usage(
+    request: Request,
+    scale: str = "day",
+    username: str = Depends(require_user),
+):
+    """Return token usage for the authenticated user over a given time scale.
+
+    Scales: day, week, month, total.
+    """
+    valid_scales = {"day", "week", "month", "total"}
+    if scale not in valid_scales:
+        scale = "day"
+    return get_usage(username=username, scale=scale)
