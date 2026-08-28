@@ -89,10 +89,7 @@ class AssistantApp extends AppBase {
                                 <span class="assistant-title-glow title-glow">Analyser / interroger des modèles</span>
                             </button>
                         </h1>
-                        <p class="assistant-welcome-subtitle">
-                            Discutez avec l'assistant pour analyser, comparer, fusionner et améliorer vos modèles.
-                            <br>Formats supportés : TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML.
-                        </p>
+                        <p class="assistant-welcome-subtitle">Discutez avec l'assistant pour analyser, comparer, fusionner et améliorer vos modèles. Formats supportés : TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML.</p>
                         <div class="assistant-welcome-input" id="assistant-welcome-input"></div>
                     </div>
                     <div class="assistant-embedded-model-pill" id="assistant-embedded-model-pill"></div>
