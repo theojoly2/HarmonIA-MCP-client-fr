@@ -1,6 +1,6 @@
 /**
  * ModelerAssistantPanel
- * Assistant Analyser / interroger intégré au Créer/Éditer. Discute du modèle affiché dans le
+ * Assistant Analyser intégré au Éditer. Discute du modèle affiché dans le
  * canvas principal : les mutations (add_class, add_attribute, add_connector)
  * sont appliquées au modèle courant via le MCP, et le canvas est rechargé.
  * Aucune carte SVG n'est affichée dans le chat : la visualisation reste dans
@@ -92,7 +92,7 @@ class ModelerAssistantPanel {
         div.className = 'flex flex-col items-center justify-center h-full text-center px-4 py-8';
         div.innerHTML = `
             <div class="w-10 h-10 text-gray-900 mb-3">${this._sparkleSvg()}</div>
-            <p class="text-sm font-semibold text-gray-900">Analyser / interroger</p>
+            <p class="text-sm font-semibold text-gray-900">Analyser</p>
             <p class="text-xs text-gray-500 mt-1">Posez une question ou demandez une modification du modèle affiché.</p>
         `;
         this.chatEl.appendChild(div);

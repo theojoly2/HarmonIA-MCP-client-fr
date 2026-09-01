@@ -34,7 +34,7 @@ class PreviewApp extends AppBase {
         container.innerHTML = `
             <div class="preview-app h-full w-full flex flex-col relative bg-white">
                 <div id="preview-svg-viewer" class="flex-1 relative opacity-0"></div>
-                <button type="button" id="preview-expand" class="absolute top-3 right-3 z-20 p-2 rounded-full bg-white border border-gray-200 text-gray-600 hover:text-black hover:border-gray-400 shadow-sm transition-colors" title="Ouvrir dans Créer/Éditer">
+                <button type="button" id="preview-expand" class="absolute top-3 right-3 z-20 p-2 rounded-full bg-white border border-gray-200 text-gray-600 hover:text-black hover:border-gray-400 shadow-sm transition-colors" title="Ouvrir dans Éditer">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                         <path d="M21 9V3h-6M15 9l6-6"></path>
                         <path d="M3 15v6h6M9 15l-6 6"></path>

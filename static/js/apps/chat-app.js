@@ -1,6 +1,6 @@
 /**
  * ChatApp
- * Module Analyser / interroger des modèles avec streaming LLM.
+ * Module Analyser des modèles avec streaming LLM.
  */
 
 class ChatApp extends AppBase {
@@ -47,7 +47,7 @@ class ChatApp extends AppBase {
                 </div>
             </div>
         `;
-        this.setTitle(`Analyser/Interroger: ${this.docName}`);
+        this.setTitle(`Analyser: ${this.docName}`);
         this._bindEvents();
     }
 

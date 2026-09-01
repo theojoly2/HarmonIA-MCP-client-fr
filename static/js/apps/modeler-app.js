@@ -1,11 +1,11 @@
 /**
  * ModelerApp
- * Module Créer / éditer un modèle : import + visualisation SVG.
+ * Module Créer un modèle : import + visualisation SVG.
  */
 
 class ModelerApp extends AppBase {
     static id = "modeler";
-    static title = "Créer/Éditer";
+    static title = "Éditer";
     static iconSvg = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>`;
     static canFloat = true;
     static canSplit = true;
@@ -60,8 +60,8 @@ class ModelerApp extends AppBase {
             <div class="modeler-app h-full flex flex-col relative">
                 <div id="modeler-home" class="modeler-home px-4 sm:px-6 flex flex-col items-center text-center z-20 bg-white">
                     <h1 class="font-bold tracking-tight text-center text-black mb-2 mt-2">
-                        <button type="button" class="interactive-title bg-transparent border-0 p-0" title="Retour à l'accueil Créer/Éditer">
-                            <span class="title-glow">Créer / éditer un modèle</span>
+                        <button type="button" class="interactive-title bg-transparent border-0 p-0" title="Retour à l'accueil Éditer">
+                            <span class="title-glow">Éditer un modèle</span>
                         </button>
                     </h1>
                     <div id="modeler-import-container" class="w-full max-w-md">
@@ -504,7 +504,7 @@ class ModelerApp extends AppBase {
             if (viewerContainer) viewerContainer.classList.remove('modeler-svg-hidden');
             this._setLoading(false);
             this._observeSvgContainerResize();
-            this.setTitle(`Créer/Éditer: ${this.fileName}`);
+            this.setTitle(`Éditer: ${this.fileName}`);
             return;
         }
 
@@ -546,7 +546,7 @@ class ModelerApp extends AppBase {
                             viewerContainer.style.transition = 'opacity 0.35s ease';
                             viewerContainer.classList.remove('modeler-svg-hidden');
                         }
-                        this.setTitle(`Créer/Éditer: ${this.fileName}`);
+                        this.setTitle(`Éditer: ${this.fileName}`);
                     });
                 };
 
@@ -1341,7 +1341,7 @@ class ModelerApp extends AppBase {
                 this._setLoading(false);
                 this._observeResize();
                 this._observeSvgContainerResize();
-                this.setTitle(`Créer/Éditer: ${this.fileName}`);
+                this.setTitle(`Éditer: ${this.fileName}`);
                 this._updateAssistantToggleVisibility();
                 this._updateExportToggleVisibility();
                 return;
@@ -1359,7 +1359,7 @@ class ModelerApp extends AppBase {
         this.storedName = newStoredName;
         if (newDisplayName) {
             this.fileName = newDisplayName;
-            const title = `Créer/Éditer: ${newDisplayName}`;
+            const title = `Éditer: ${newDisplayName}`;
             this.setTitle(title);
             if (window.windowManager && window.windowManager.updateTitle) {
                 window.windowManager.updateTitle(this.instanceId, title);

@@ -7,7 +7,7 @@
 
 class AssistantApp extends AppBase {
     static id = 'assistant';
-    static title = 'Analyser/Interroger';
+    static title = 'Analyser';
     static iconSvg = `<svg class="w-4 h-4 overflow-visible" viewBox="0 0 24 24">
         <path class="sparkle-main" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
         <path class="sparkle-orbit-path" d="M5.5 2.5L6.34 5.16L9 6L6.34 6.84L5.5 9.5L4.66 6.84L2 6L4.66 5.16L5.5 2.5Z"></path>
@@ -86,7 +86,7 @@ class AssistantApp extends AppBase {
                     <div class="assistant-welcome" id="assistant-welcome">
                         <h1 class="assistant-welcome-title text-center">
                             <button type="button" id="assistant-reset" class="assistant-title-reset" title="Nouvelle analyse">
-                                <span class="assistant-title-glow title-glow">Analyser / interroger des modèles</span>
+                                <span class="assistant-title-glow title-glow">Analyser des modèles</span>
                             </button>
                         </h1>
                         <p class="assistant-welcome-subtitle">Discutez avec l'assistant pour analyser, comparer, fusionner et améliorer vos modèles. Formats supportés : TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML.</p>
@@ -336,7 +336,7 @@ class AssistantApp extends AppBase {
             }
             // Use the saved display name as the user-visible title if available.
             if (this.props.display_name && this.setTitle) {
-                this.setTitle(`Analyser/Interroger: ${this.props.display_name}`);
+                this.setTitle(`Analyser: ${this.props.display_name}`);
             }
         }
         // After loading history, if messages exist switch to chat mode layout.
@@ -1122,7 +1122,7 @@ class AssistantApp extends AppBase {
         // across remounts and renames from the history panel.
         if (data.display_name) {
             this.props.display_name = data.display_name;
-            if (this.setTitle) this.setTitle(`Analyser/Interroger: ${data.display_name}`);
+            if (this.setTitle) this.setTitle(`Analyser: ${data.display_name}`);
         }
         this.messages = [];
         this.messagesEl.innerHTML = '';
