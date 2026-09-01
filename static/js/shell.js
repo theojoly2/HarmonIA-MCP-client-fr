@@ -119,7 +119,7 @@ class Shell {
             const input = this._formatUsageCount(data.prompt_tokens || 0);
             const output = this._formatUsageCount(data.completion_tokens || 0);
             const scaleShort = this._usageScaleShortLabel(data.scale || scale);
-            counterEl.title = `Consommation de tokens - période : ${this._usageScaleLabel(data.scale || scale)}. Cliquez pour passer à la période suivante.`;
+            counterEl.title = `Consommation de tokens (input/output) - période : ${this._usageScaleLabel(data.scale || scale)}. \nCliquez pour passer à la période suivante.`;
             counterEl.innerHTML = `<span class="user-usage-prefix">${prefix}</span><span>${input} / ${output} (${scaleShort})</span>`;
         } catch (err) {
             console.error('[Shell] Failed to load usage:', err);
@@ -159,7 +159,7 @@ class Shell {
             <div class="user-menu-header">
                 <div class="user-menu-username">${this._escape(user.username)}</div>
                 <div class="user-menu-usage-line">
-                    <span class="user-usage-counter" data-scale="day" title="Consommation de tokens - période : aujourd'hui. Cliquez pour changer de période.">...</span>
+                    <span class="user-usage-counter" data-scale="day" title="Consommation de tokens (input/output) - période : aujourd'hui. \nCliquez pour changer de période.">...</span>
                     <span class="user-usage-unit">tokens</span>
                 </div>
             </div>
