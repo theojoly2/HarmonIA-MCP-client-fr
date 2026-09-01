@@ -75,7 +75,26 @@ class PreviewApp extends AppBase {
         const match = this.svgText.match(/data-main-class="([^"]*)"/);
         const mainClassName = match ? match[1] : '';
 
-        // Open Modéliseur immediately so the user sees a reaction without waiting for the network.
+        // Persist the model before opening the modeler so the opened model points
+        // to the real stored name, exactly like a direct import from the modeler tab.
+        let storedName = this.modelName;
+        let displayName = this.docName;
+        if (!this.modelName) {
+            try {
+                const fileRes = await fetch(ApiClient.getDocumentFileUrl(this.docId));
+                if (!fileRes.ok) throw new Error(`file_fetch_failed:${fileRes.status}`);
+                const blob = await fileRes.blob();
+                const file = new File([blob], this.docName, { type: blob.type || "application/octet-stream" });
+                const meta = await ApiClient.importAndSaveModel(file, this.docName);
+                storedName = meta.name || this.docName;
+                displayName = meta.display_name || this.docName;
+                if (window.historyPanel) window.historyPanel.load();
+            } catch (err) {
+                console.error("Persist preview model error", err);
+                return;
+            }
+        }
+
         const existingModéliseur = AppState.listInstances().find((i) => i.appId === "modeler" && i.mode === "tab");
         if (existingModéliseur) {
             AppState.removeInstance(existingModéliseur.instanceId);
@@ -87,23 +106,7 @@ class PreviewApp extends AppBase {
         AppState.setActiveInstance(modelerInstance.instanceId);
         windowManager.close(this.instanceId);
         if (modelerInstance.instance.loadSvg) {
-            await modelerInstance.instance.loadSvg(this.svgText, this.docName, mainClassName);
-        }
-
-        // Persist the model in the background and refresh the history panel.
-        // For document previews, fetch the original file; for imported assistant
-        // models the SVG already came from a persisted model, so no re-upload needed.
-        if (!this.modelName) {
-            try {
-                const fileRes = await fetch(ApiClient.getDocumentFileUrl(this.docId));
-                if (!fileRes.ok) throw new Error(`file_fetch_failed:${fileRes.status}`);
-                const blob = await fileRes.blob();
-                const file = new File([blob], this.docName, { type: blob.type || "application/octet-stream" });
-                await ApiClient.importAndSaveModel(file, this.docName);
-                if (window.historyPanel) window.historyPanel.load();
-            } catch (err) {
-                console.error("Persist preview model error", err);
-            }
+            await modelerInstance.instance.loadSvg(this.svgText, displayName, mainClassName, storedName);
         }
     }
 
