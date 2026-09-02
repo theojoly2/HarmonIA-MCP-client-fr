@@ -108,6 +108,17 @@
     AuthManager.onLogout(() => {
         shell.renderAuthActions(null);
         historyPanel.close();
+        // Force-remount the currently visible app so any authenticated UI
+        // (e.g. the Assistant chat) is replaced with the anonymous placeholder.
+        const activeId = AppState.getActiveInstance();
+        const activeInstance = activeId ? AppState.getInstance(activeId) : null;
+        if (activeInstance && window.windowManager) {
+            const container = document.querySelector('.app-container');
+            if (container) {
+                container.innerHTML = '';
+                activeInstance.mount(container);
+            }
+        }
     });
 
     // Anonymous users can browse Search. Protected features show their own login prompts.
