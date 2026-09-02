@@ -784,15 +784,7 @@ class ModelerApp extends AppBase {
     _updateExportToggleVisibility() {
         const btn = this.container?.querySelector('#modeler-export-toggle');
         if (!btn) return;
-        const visible = !!this.svgText;
-        btn.classList.toggle('hidden', !visible);
-        if (visible && !AuthManager.isLoggedIn()) {
-            btn.classList.add('login-required-btn');
-            btn.title = 'Connectez-vous pour exporter le modèle';
-        } else {
-            btn.classList.remove('login-required-btn');
-            btn.title = 'Exporter le modèle';
-        }
+        btn.classList.toggle('hidden', !this.svgText);
     }
 
     async _exportModel(format, itemEl) {

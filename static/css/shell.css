@@ -706,28 +706,6 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
     color: #78350f;
 }
 
-.login-required-btn {
-    position: relative;
-    opacity: 0.55;
-    cursor: not-allowed;
-}
-.login-required-btn[title]:hover::after {
-    content: attr(title);
-    position: absolute;
-    bottom: calc(100% + 6px);
-    left: 50%;
-    transform: translateX(-50%);
-    background: #111827;
-    color: #ffffff;
-    font-size: 0.75rem;
-    font-weight: 600;
-    padding: 0.4rem 0.6rem;
-    border-radius: 0.5rem;
-    white-space: nowrap;
-    z-index: 50;
-    pointer-events: none;
-}
-
 .user-menu-dropdown {
     position: fixed;
     z-index: 300;

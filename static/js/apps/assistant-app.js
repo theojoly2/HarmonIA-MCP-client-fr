@@ -2548,14 +2548,31 @@ class AssistantApp extends AppBase {
     _renderAnonymousPlaceholder(container) {
         this.container = container;
         container.innerHTML = `
-            <div class="assistant-app h-full w-full flex flex-col items-center justify-center bg-white rounded-[1.25rem] overflow-hidden relative p-8">
-                <div class="login-banner max-w-md flex-col gap-3 py-6 px-8">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-                    </svg>
-                    <div class="text-lg font-bold">Connexion requise</div>
-                    <p class="text-sm font-normal">L'onglet Analyser nécessite un compte pour importer des modèles et discuter avec l'assistant.</p>
-                    <button type="button" class="assistant-login-open shell-submit-style mt-2">Se connecter</button>
+            <div class="assistant-app h-full w-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-50 to-white rounded-[1.25rem] overflow-hidden relative p-8">
+                <div class="assistant-anonymous-card">
+                    <div class="assistant-anonymous-icon">
+                        <svg class="w-10 h-10 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8m-8 2a2 2 0 012-2h4a2 2 0 012 2v2a4 4 0 01-4 4H8V6z"></path>
+                        </svg>
+                    </div>
+                    <h2 class="assistant-anonymous-title">Analyser votre modèle</h2>
+                    <p class="assistant-anonymous-subtitle">Importez un modèle et discutez avec l'assistant pour le résumer, le vérifier ou l'améliorer.</p>
+                    <div class="assistant-anonymous-features">
+                        <div class="assistant-anonymous-feature">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            <span>Importez TTL, XMI, JSON, SQL...</span>
+                        </div>
+                        <div class="assistant-anonymous-feature">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+                            <span>Interrogez l'assistant de modélisation</span>
+                        </div>
+                        <div class="assistant-anonymous-feature">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            <span>Recevez des recommandations de standards</span>
+                        </div>
+                    </div>
+                    <button type="button" class="assistant-login-open assistant-anonymous-btn">Se connecter pour continuer</button>
+                    <p class="assistant-anonymous-hint">Pas encore de compte ? Le formulaire d'inscription s'ouvrira automatiquement.</p>
                 </div>
             </div>
         `;
