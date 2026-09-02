@@ -17,7 +17,11 @@ class AppBase {
         this.title = this.constructor.title;
         this.container = null;
         this.mounted = false;
-        this.authManager = AppState.authManager || window.AuthManager || null;
+        // authManager is set lazily so it is always the live global object.
+    }
+
+    get authManager() {
+        return AppState.authManager || window.AuthManager || null;
     }
 
     // À surcharger
