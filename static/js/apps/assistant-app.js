@@ -2550,11 +2550,6 @@ class AssistantApp extends AppBase {
         container.innerHTML = `
             <div class="assistant-app h-full w-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-50 to-white rounded-[1.25rem] overflow-hidden relative p-8">
                 <div class="assistant-anonymous-card">
-                    <div class="assistant-anonymous-icon">
-                        <svg class="w-10 h-10 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8m-8 2a2 2 0 012-2h4a2 2 0 012 2v2a4 4 0 01-4 4H8V6z"></path>
-                        </svg>
-                    </div>
                     <h2 class="assistant-anonymous-title">Analyser votre modèle</h2>
                     <p class="assistant-anonymous-subtitle">Importez un modèle et discutez avec l'assistant pour le résumer, le vérifier ou l'améliorer.</p>
                     <div class="assistant-anonymous-features">
