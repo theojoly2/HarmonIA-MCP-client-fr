@@ -172,7 +172,7 @@ class AuthModal {
         const isLogin = tab === "login";
         const isRegister = tab === "register";
         const isChangePassword = tab === "change-password";
-        let title = "SemantiQ";
+        let title = "HarmonIA";
         let subtitle = "Connectez-vous pour enregistrer vos modèles.";
         let submitText = "Se connecter";
         let usernameVisible = true;

@@ -1,6 +1,6 @@
-# SemantiQ-MCP-Client
+# HarmonIA-MCP-Client
 
-Client web de l'assistant de modélisation sémantique **SemantiQ**. Il fournit une interface utilisateur monopage (SPA) avec FastAPI en backend et un frontend JavaScript vanilla.
+Client web de l'assistant de modélisation sémantique **HarmonIA**. Il fournit une interface utilisateur monopage (SPA) avec FastAPI en backend et un frontend JavaScript vanilla.
 
 ---
 
@@ -30,7 +30,7 @@ L'interface web se présente comme une application monopage (SPA) organisée aut
 ## Structure du projet
 
 ```
-SemantiQ-MCP-client-fr/
+HarmonIA-MCP-client-fr/
 │
 ├── web_app.py                  # Point d'entrée Uvicorn (4 workers, port 8000)
 │
@@ -100,7 +100,7 @@ SemantiQ-MCP-client-fr/
 
 ```bash
 git clone <url-du-depot>
-cd SemantiQ-MCP-client-fr
+cd HarmonIA-MCP-client-fr
 ```
 
 ### 2. Créer l'environnement virtuel
@@ -128,7 +128,7 @@ Variables principales :
 | Variable | Description |
 |---|---|
 | `LLM_API_KEY` / `URL_LLM_API` / `LLM_MODEL` | API LLM compatible OpenAI utilisée par l'assistant et le chat |
-| `MCP_SERVER_URL` | URL du serveur MCP SemantiQ (par défaut `http://127.0.0.1:8001/mcp`) |
+| `MCP_SERVER_URL` | URL du serveur MCP HarmonIA (par défaut `http://127.0.0.1:8001/mcp`) |
 | `PLANTUML_*` | Options d'installation / rendering de PlantUML (optionnel) |
 
 ---
@@ -146,9 +146,9 @@ L'application est accessible sur `http://localhost:8000`.
 
 ## Prérequis côté serveur
 
-Le client web dépend du serveur MCP (`SemantiQ-MCP-server-fr`). Avant de lancer le client, assure-toi que les étapes suivantes ont été réalisées côté serveur :
+Le client web dépend du serveur MCP (`HarmonIA-MCP-server-fr`). Avant de lancer le client, assure-toi que les étapes suivantes ont été réalisées côté serveur :
 
-1. Qdrant est démarré (`docker-compose up -d` dans `SemantiQ-MCP-server-fr`).
+1. Qdrant est démarré (`docker-compose up -d` dans `HarmonIA-MCP-server-fr`).
 2. Les documents ont été indexés une fois (`python tools/index_search/load_documents/load.py`).
 3. Le serveur MCP est lancé (`python -m server`).
 
@@ -157,7 +157,7 @@ Le client web dépend du serveur MCP (`SemantiQ-MCP-server-fr`). Avant de lancer
 ## Lancement du client (en dev)
 
 ```bash
-cd SemantiQ-MCP-client-fr
+cd HarmonIA-MCP-client-fr
 source venv-client/bin/activate
 python web_app.py
 ```
