@@ -91,6 +91,18 @@
         shell.renderAuthActions(user);
         await flushPendingImport();
         historyPanel.load();
+        // Force-remount the currently visible app so any anonymous placeholder
+        // (e.g. in the Analyser tab) is replaced with the real UI after login.
+        const activeId = AppState.getActiveInstance();
+        const activeInstance = activeId ? AppState.getInstance(activeId) : null;
+        if (activeInstance && window.windowManager) {
+            const container = document.querySelector('.app-container');
+            if (container) {
+                container.innerHTML = '';
+                await activeInstance.mount(container);
+                AppState.restoreInstanceState(activeId);
+            }
+        }
     });
 
     AuthManager.onLogout(() => {

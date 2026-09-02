@@ -422,6 +422,13 @@ class AssistantApp extends AppBase {
             this.welcomeEl.classList.add('assistant-welcome-top');
             this.inputArea.classList.add('assistant-input-area-chat');
         }
+        // If the user has logged in since the anonymous placeholder was cached,
+        // replace it with the real assistant UI.
+        if (AuthManager.isLoggedIn() && this.container?.querySelector('.assistant-anonymous-card')) {
+            this.container.innerHTML = '';
+            this.mount(this.container);
+            return;
+        }
         if (this._resizeObserver) this._resizeObserver.disconnect();
         this._observeResize();
         this._observeMessagesScroll();
