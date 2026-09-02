@@ -287,7 +287,7 @@ class ModelerApp extends AppBase {
 
     async _createEmptyModel() {
         if (!AuthManager.isLoggedIn()) {
-            AuthManager.showModal();
+            if (this.authManager) this.authManager.showModal();
             return;
         }
         this._askNewModelName(async (name) => {
@@ -784,10 +784,22 @@ class ModelerApp extends AppBase {
     _updateExportToggleVisibility() {
         const btn = this.container?.querySelector('#modeler-export-toggle');
         if (!btn) return;
-        btn.classList.toggle('hidden', !this.svgText);
+        const visible = !!this.svgText;
+        btn.classList.toggle('hidden', !visible);
+        if (visible && !AuthManager.isLoggedIn()) {
+            btn.classList.add('login-required-btn');
+            btn.title = 'Connectez-vous pour exporter le modèle';
+        } else {
+            btn.classList.remove('login-required-btn');
+            btn.title = 'Exporter le modèle';
+        }
     }
 
     async _exportModel(format, itemEl) {
+        if (!AuthManager.isLoggedIn()) {
+            if (this.authManager) this.authManager.showModal();
+            return;
+        }
         if (!this.storedName) {
             this._showExportError('Aucun modèle à exporter.');
             return;
@@ -888,6 +900,10 @@ class ModelerApp extends AppBase {
     }
 
     async _toggleAssistantSplit() {
+        if (!AuthManager.isLoggedIn()) {
+            if (this.authManager) this.authManager.showModal();
+            return;
+        }
         if (!this.storedName || !window.windowManager) return;
         const existing = this._findAssistantSplitInstance();
         if (existing) {
@@ -938,26 +954,33 @@ class ModelerApp extends AppBase {
         const addConnectorBtn = this.container.querySelector('#modeler-add-connector');
         const classes = this._extractClassNames();
         const disabledClass = 'modeler-edit-btn-disabled';
+        const loginRequired = !AuthManager.isLoggedIn();
         if (addClassBtn) {
-            addClassBtn.disabled = false;
-            addClassBtn.classList.remove(disabledClass);
-            addClassBtn.title = 'Ajouter une classe';
+            addClassBtn.disabled = loginRequired;
+            addClassBtn.classList.toggle(disabledClass, loginRequired);
+            addClassBtn.title = loginRequired ? 'Connectez-vous pour modifier le modèle' : 'Ajouter une classe';
         }
         if (addAttrBtn) {
             const noClasses = classes.length === 0;
-            addAttrBtn.disabled = noClasses;
-            addAttrBtn.classList.toggle(disabledClass, noClasses);
-            addAttrBtn.title = noClasses ? 'Aucune classe disponible' : 'Ajouter un attribut';
+            const disabled = loginRequired || noClasses;
+            addAttrBtn.disabled = disabled;
+            addAttrBtn.classList.toggle(disabledClass, disabled);
+            addAttrBtn.title = loginRequired ? 'Connectez-vous pour modifier le modèle' : (noClasses ? 'Aucune classe disponible' : 'Ajouter un attribut');
         }
         if (addConnectorBtn) {
             const noClasses = classes.length === 0;
-            addConnectorBtn.disabled = noClasses;
-            addConnectorBtn.classList.toggle(disabledClass, noClasses);
-            addConnectorBtn.title = noClasses ? 'Aucune classe disponible' : 'Ajouter une relation';
+            const disabled = loginRequired || noClasses;
+            addConnectorBtn.disabled = disabled;
+            addConnectorBtn.classList.toggle(disabledClass, disabled);
+            addConnectorBtn.title = loginRequired ? 'Connectez-vous pour modifier le modèle' : (noClasses ? 'Aucune classe disponible' : 'Ajouter une relation');
         }
     }
 
     _showAddClassDialog() {
+        if (!AuthManager.isLoggedIn()) {
+            if (this.authManager) this.authManager.showModal();
+            return;
+        }
         ModelerApp._closeOpenEditDialogs();
         const fields = [
             { id: 'cls-title', label: 'Nom de la classe', required: true, help: 'Nom unique qui identifie la classe dans le modèle.' },
@@ -1000,6 +1023,10 @@ class ModelerApp extends AppBase {
     }
 
     _showAddAttributeDialog() {
+        if (!AuthManager.isLoggedIn()) {
+            if (this.authManager) this.authManager.showModal();
+            return;
+        }
         ModelerApp._closeOpenEditDialogs();
         const classes = this._extractClassNames();
         if (!classes.length) {
@@ -1084,6 +1111,10 @@ class ModelerApp extends AppBase {
     }
 
     _showAddConnectorDialog() {
+        if (!AuthManager.isLoggedIn()) {
+            if (this.authManager) this.authManager.showModal();
+            return;
+        }
         ModelerApp._closeOpenEditDialogs();
         const classes = this._extractClassNames();
         if (!classes.length) {

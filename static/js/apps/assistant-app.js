@@ -194,8 +194,9 @@ class AssistantApp extends AppBase {
                 }
             }
 
-            this._updateImportButtonState(importBtn);
-            this._updateModelPill();
+        this._updateImportButtonState(importBtn);
+        this._updateModelPill();
+        this._renderLoginBanner();
 
         if (window.GlowEffects && typeof window.GlowEffects.scanAndBind === 'function') {
             window.GlowEffects.scanAndBind(container);
@@ -325,6 +326,12 @@ class AssistantApp extends AppBase {
     }
 
     async mount(container) {
+        // Do not mount a full assistant instance for anonymous users unless it is
+        // embedded in the modeler (which already shows its own login prompt).
+        if (!this._embedded && !AuthManager.isLoggedIn()) {
+            this._renderAnonymousPlaceholder(container);
+            return;
+        }
         await super.mount(container);
         // If this instance was created from the history panel or from a modeler
         // split with a session, load the persisted messages into the UI.
@@ -709,6 +716,10 @@ class AssistantApp extends AppBase {
     }
 
     async _importModel(file) {
+        if (!AuthManager.isLoggedIn()) {
+            if (this.authManager) this.authManager.showModal();
+            return;
+        }
         if (!file || (this.modelNames?.length || 0) >= this.modelNamesConfig.max) return;
         const loadingKey = `loading_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const displayName = file.name;
@@ -734,6 +745,10 @@ class AssistantApp extends AppBase {
      * machinery. Does nothing if the 3-model limit is reached.
      */
     async _importSearchResultIntoAssistant(docId, filename) {
+        if (!AuthManager.isLoggedIn()) {
+            if (this.authManager) this.authManager.showModal();
+            return;
+        }
         if (!docId || !filename || this._embedded) return;
         const total = (this.modelNames?.length || 0) + (this._loadingModels?.length || 0);
         if (total >= this.modelNamesConfig.max) return;
@@ -2053,6 +2068,10 @@ class AssistantApp extends AppBase {
     }
 
     async _send(text) {
+        if (!AuthManager.isLoggedIn()) {
+            if (this.authManager) this.authManager.showModal();
+            return;
+        }
         // For a brand-new conversation we intentionally pass an empty session.
         // The backend will generate a unique slug + timestamp and return it in
         // the first `user` event, exactly like the modeler does for imports.
@@ -2496,6 +2515,54 @@ class AssistantApp extends AppBase {
         // Keep container reference so the live DOM can keep receiving stream updates
         // while the tab is hidden.
         this.mounted = false;
+    }
+
+    _renderLoginBanner() {
+        const container = this.container;
+        if (!container) return;
+        let banner = container.querySelector('#assistant-login-banner');
+        if (!banner) {
+            banner = document.createElement('div');
+            banner.id = 'assistant-login-banner';
+            banner.className = 'login-banner absolute top-3 left-3 right-3 z-40';
+            container.insertBefore(banner, container.firstChild);
+        }
+        if (AuthManager.isLoggedIn()) {
+            banner.classList.add('hidden');
+            return;
+        }
+        banner.classList.remove('hidden');
+        banner.innerHTML = `
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+            </svg>
+            <span>Connectez-vous pour utiliser l'assistant Analyser.</span>
+            <button type="button" class="assistant-login-open">Connexion</button>
+        `;
+        const btn = banner.querySelector('.assistant-login-open');
+        if (btn && this.authManager) {
+            btn.addEventListener('click', () => this.authManager.showModal());
+        }
+    }
+
+    _renderAnonymousPlaceholder(container) {
+        this.container = container;
+        container.innerHTML = `
+            <div class="assistant-app h-full w-full flex flex-col items-center justify-center bg-white rounded-[1.25rem] overflow-hidden relative p-8">
+                <div class="login-banner max-w-md flex-col gap-3 py-6 px-8">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                    </svg>
+                    <div class="text-lg font-bold">Connexion requise</div>
+                    <p class="text-sm font-normal">L'onglet Analyser nécessite un compte pour importer des modèles et discuter avec l'assistant.</p>
+                    <button type="button" class="assistant-login-open shell-submit-style mt-2">Se connecter</button>
+                </div>
+            </div>
+        `;
+        const btn = container.querySelector('.assistant-login-open');
+        if (btn && this.authManager) {
+            btn.addEventListener('click', () => this.authManager.showModal());
+        }
     }
 }
 

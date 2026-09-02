@@ -22,6 +22,8 @@
 
     const shell = new Shell(appShell, null);
     shell.setAuthManager(AuthManager);
+    // Make AuthManager available to all app instances via a shared reference.
+    AppState.authManager = AuthManager;
     shell.setApiKeysManager(ApiKeysManager);
     const contentArea = shell.getContentArea();
 
@@ -96,11 +98,8 @@
         historyPanel.close();
     });
 
-    // Auth modal: show when not authenticated, but allow browsing search without login.
-    // Wait until the initial search tab is mounted so the UI is not empty behind the modal.
-    if (!AuthManager.isLoggedIn()) {
-        setTimeout(() => AuthManager.showModal(), 0);
-    }
+    // Anonymous users can browse Search. Protected features show their own login prompts.
+    // Do not open the blocking auth modal automatically anymore.
 
     // Global helper
     window.AuthManager = AuthManager;

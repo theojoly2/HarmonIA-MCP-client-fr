@@ -17,6 +17,7 @@ class AppBase {
         this.title = this.constructor.title;
         this.container = null;
         this.mounted = false;
+        this.authManager = AppState.authManager || window.AuthManager || null;
     }
 
     // À surcharger

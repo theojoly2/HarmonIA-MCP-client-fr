@@ -69,7 +69,7 @@ class PreviewApp extends AppBase {
     async _openInModéliseur() {
         if (!this.svgText) return;
         if (!AuthManager.isLoggedIn()) {
-            AuthManager.showModal();
+            if (this.authManager) this.authManager.showModal();
             return;
         }
         const match = this.svgText.match(/data-main-class="([^"]*)"/);
