@@ -1,6 +1,6 @@
 """MCP client for the Assistant chatbot.
 
-Wraps the SemantiQ MCP server, exposes only the tools the assistant LLM is
+Wraps the HarmonIA MCP server, exposes only the tools the assistant LLM is
 allowed to call, and bridges server-side sampling (ctx.sample) back to the
 configured OpenAI-compatible LLM.
 """

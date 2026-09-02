@@ -14,7 +14,7 @@ from api.services.user_store import init_db
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="SemantiQ")
+    app = FastAPI(title="HarmonIA")
 
     app.add_middleware(
         CORSMiddleware,
