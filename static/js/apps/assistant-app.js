@@ -514,10 +514,29 @@ class AssistantApp extends AppBase {
     _newSession() {
         this.session = '';
         this.messages = [];
-        if (this.messagesEl) this.messagesEl.innerHTML = '';
+        this.isStreaming = false;
+        this.selectedTags = [];
+        this._linkedModelerInstanceId = '';
         this.props.session = '';
         this.props.fromHistory = false;
         this.props.display_name = '';
+        this.props.modelName = '';
+        this.props.modelNames = [];
+        if (this.setTitle) this.setTitle(this.constructor.title);
+
+        // Fully rebuild the DOM from scratch so every transient element (messages,
+        // SVG cards, tool cards, plan cards, search results...) is discarded and
+        // the welcome screen is shown exactly like on first mount.
+        if (this.container) {
+            this.container.innerHTML = '';
+            this.render(this.container).then(() => {
+                this._scheduleCentering(true);
+                AppState.saveInstanceState?.(this.instanceId);
+            });
+            return;
+        }
+
+        if (this.messagesEl) this.messagesEl.innerHTML = '';
         this._clearModelPills();
         if (this.chatEl) this.chatEl.classList.remove('assistant-chat-mode');
         if (this.welcomeEl) this.welcomeEl.classList.remove('assistant-welcome-top');
@@ -526,14 +545,8 @@ class AssistantApp extends AppBase {
             this.inputEl.value = '';
             this.inputEl.style.height = 'auto';
         }
-        this.isStreaming = false;
-        this.selectedTags = [];
-        this._linkedModelerInstanceId = '';
-        if (this.setTitle) this.setTitle(this.constructor.title);
-        AppState.saveInstanceState?.(this.instanceId);
-        // Wait for the browser to settle back into the home layout before
-        // measuring and centering, just like SearchApp/ModelerApp do.
         this._scheduleCentering(true);
+        AppState.saveInstanceState?.(this.instanceId);
     }
 
     _switchToChatMode() {
