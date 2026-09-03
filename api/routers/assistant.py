@@ -334,6 +334,9 @@ async def assistant_stream_generator(
     if selected_tags:
         history.add_display_event({"kind": "selected_tags", "tags": selected_tags})
 
+    # Build a mapping from stored model names to clean display names.
+    model_display_names = {name: _display_name(name) for name in model_names}
+
     state = {
         "user": username,
         "name": model_display_names[model_names[0]] if model_names else session_name,
@@ -345,7 +348,6 @@ async def assistant_stream_generator(
     # Load the uploaded models from the MCP server to inject them into the LLM context.
     current_model_prompt = ""
     loaded_models: dict[str, dict[str, Any]] = {}
-    model_display_names = {name: _display_name(name) for name in model_names}
     if model_names:
         parts: list[str] = []
         for idx, name in enumerate(model_names, start=1):
