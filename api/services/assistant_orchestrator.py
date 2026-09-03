@@ -22,6 +22,7 @@ from api.services.assistant_streaming import (
     _emit_progress_queue,
     _event,
     _generate_model_svg,
+    _normalize_tool_calls,
 )
 from api.services.mcp_service import fetch_search, get_model_mcp, upload_model_mcp
 
