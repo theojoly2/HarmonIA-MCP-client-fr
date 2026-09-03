@@ -75,7 +75,11 @@ const UiHelpers = {
                 </button>`;
             const chatButton = `
                 <button data-action="chat" data-document-id="${escape(r.document_id || '')}" data-name="${escape(r.safe_filename)}" class="magic-btn flex items-center justify-center p-1.5 rounded-full bg-gray-100 hover:bg-white text-gray-400 hover:text-black focus:outline-none" title="Analyser avec l'IA">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+                    <svg class="w-5 h-5 overflow-visible" viewBox="0 0 24 24">
+                        <path class="sparkle-main" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
+                        <path class="sparkle-orbit-path" d="M5.5 2.5L6.34 5.16L9 6L6.34 6.84L5.5 9.5L4.66 6.84L2 6L4.66 5.16L5.5 2.5Z"></path>
+                        <path class="sparkle-orbit-path" d="M19.5 15.5L20.34 18.16L23 19L20.34 19.84L19.5 22.5L18.66 19.84L16 19L18.66 18.16L19.5 15.5Z"></path>
+                    </svg>
                 </button>`;
             html += `
             <div class="py-6 border-b border-gray-200 last:border-0 result-item">
@@ -85,15 +89,17 @@ const UiHelpers = {
                     </a>
                 </h3>
                 <div class="text-gray-800 font-medium leading-relaxed mb-3 markdown-body">${UiHelpers.markdownPreview(r.summary)}</div>
-                <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-3">
-                    <span class="font-bold">Score: ${r.score}</span>
-                    <span>•</span>
-                    <span>${escape((r.tags || []).join(' • ') || 'Aucun tag')}</span>
-                </div>
-                <div class="flex items-center gap-2 result-actions">
-                    ${addButton}
-                    ${previewButton}
-                    ${chatButton}
+                <div class="flex items-center justify-between gap-2 text-xs text-gray-500 mb-3">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="font-bold">Score: ${r.score}</span>
+                        <span>•</span>
+                        <span>${escape((r.tags || []).join(' • ') || 'Aucun tag')}</span>
+                    </div>
+                    <div class="flex items-center gap-2 result-actions">
+                        ${addButton}
+                        ${previewButton}
+                        ${chatButton}
+                    </div>
                 </div>
             </div>`;
         }
