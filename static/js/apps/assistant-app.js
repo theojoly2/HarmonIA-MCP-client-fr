@@ -1159,10 +1159,21 @@ class AssistantApp extends AppBase {
 
     async loadHistory(session) {
         console.log('[AssistantApp] loadHistory', session, this.origin);
+
+        // Show an empty chat skeleton with a loading indicator while we fetch the
+        // persisted messages. This avoids any flicker back to the welcome screen.
+        this._enterChatModeInstantly();
+        this._removeThinkingPlaceholder();
+        const loadingPlaceholder = this._appendThinkingPlaceholder('Chargement de la conversation...');
+
         const data = await ApiClient.getAssistantHistory(session, this.origin);
         console.log('[AssistantApp] history data', data);
+
+        this._removeThinkingPlaceholder();
+
         if (!data || !Array.isArray(data.messages)) {
             console.warn('[AssistantApp] no messages in history data');
+            this._appendSystemMessage('Impossible de charger cette conversation.');
             return;
         }
         const displayEventCount = Array.isArray(data.display_events) ? data.display_events.length : 0;
@@ -1184,10 +1195,6 @@ class AssistantApp extends AppBase {
         this.messagesEl.innerHTML = '';
         this.activeSvgCard = null;
         this.activeSvgViewer = null;
-        // When replaying a saved conversation, switch to chat mode instantly
-        // without animating from the home position. The user only cares about
-        // the loaded messages, not the "first message sent" transition.
-        this._enterChatModeInstantly();
 
         // Rebuild the visible timeline from persisted display events. Events are
         // emitted in stream order and map 1:1 to the renderer methods used during
