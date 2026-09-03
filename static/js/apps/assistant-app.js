@@ -1295,7 +1295,11 @@ class AssistantApp extends AppBase {
                 return;
             }
             if (kind === 'model_svg') {
-                this._updateCurrentSvgCard(event.svg, event.model_name || event.label || 'Visualisation du modèle');
+                const rawName = event.model_name || event.label || '';
+                const label = rawName
+                    ? this._displayNameForModel(rawName)
+                    : 'Visualisation du modèle';
+                this._updateCurrentSvgCard(event.svg, label);
                 return;
             }
             if (kind === 'model_attached') {
@@ -2474,7 +2478,10 @@ class AssistantApp extends AppBase {
                     modeler._reloadSvgFromServer();
                 }
             } else if (!this._embedded) {
-                const label = event.model_name || event.label || 'Visualisation du modèle';
+                const rawName = event.model_name || event.label || '';
+                const label = rawName
+                    ? this._displayNameForModel(rawName)
+                    : 'Visualisation du modèle';
                 this._updateCurrentSvgCard(event.svg, label);
             }
             saveHtmlSnapshot();
