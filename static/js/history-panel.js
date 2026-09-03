@@ -824,6 +824,42 @@ class HistoryPanel {
 
             await Promise.all(deletions);
             await this.load();
+            // Reset every app instance that was tied to deleted history items,
+            // matching the per-item deletion behavior. This brings open tabs back
+            // to their home screen when their content has been removed.
+            AppState.listInstances().forEach((info) => {
+                const rec = AppState.getRecord(info.instanceId);
+                const inst = AppState.getInstance(info.instanceId);
+                if (!rec || !inst) return;
+                if (rec.appId === "modeler" && typeof inst._showModéliseurHome === "function") {
+                    inst._showModéliseurHome();
+                    window.windowManager._viewCache.delete(info.instanceId);
+                } else if (rec.appId === "assistant" && typeof inst._newSession === "function") {
+                    inst._newSession();
+                    window.windowManager._viewCache.delete(info.instanceId);
+                } else if (rec.appId === "search" && typeof inst._resetToHome === "function") {
+                    inst._resetToHome();
+                    window.windowManager._viewCache.delete(info.instanceId);
+                }
+            });
+            // If the currently visible tab was reset, remount it immediately.
+            const visibleId = window.windowManager._getVisibleInstanceId();
+            if (visibleId) {
+                const rec = AppState.getRecord(visibleId);
+                const inst = AppState.getInstance(visibleId);
+                if (inst && rec) {
+                    window.windowManager._clearShell();
+                    window.windowManager.splitManager.setTree(null);
+                    AppState.saveInstanceState(visibleId);
+                    const container = document.createElement("div");
+                    container.className = "app-container h-full w-full";
+                    container.dataset.instanceId = visibleId;
+                    window.windowManager.shellElement.appendChild(container);
+                    inst.mount(container).then(() => {
+                        AppState.restoreInstanceState(visibleId);
+                    });
+                }
+            }
         } catch (err) {
             console.error("Delete all error", err);
             alert("Impossible de supprimer tout l'historique.");
