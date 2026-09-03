@@ -964,7 +964,7 @@ class AssistantApp extends AppBase {
         this.modelPillSlotEl?.querySelectorAll('.assistant-model-pill-export-menu').forEach((m) => m.classList.add('hidden'));
     }
 
-    _removeModelPill(name) {
+    async _removeModelPill(name) {
         this.modelNames = (this.modelNames || []).filter((n) => n !== name);
         this._loadingModels = (this._loadingModels || []).filter((m) => m.name !== name);
         if (this.props.displayNames) delete this.props.displayNames[name];
@@ -974,6 +974,22 @@ class AssistantApp extends AppBase {
             if (modelName === name) {
                 this._importedSearchDocIds.delete(docId);
                 break;
+            }
+        }
+        // Delete the uploaded model from the server if it has not yet been sent
+        // in a message (orphan import). This avoids leaving stale model files in
+        // the MCP server storage when the user removes the pill before chatting.
+        if (name) {
+            try {
+                const res = await fetch(`api/models/${encodeURIComponent(name)}`, {
+                    method: "DELETE",
+                    credentials: "same-origin",
+                });
+                if (!res.ok) {
+                    console.error("Failed to delete orphan imported model", name, res.status);
+                }
+            } catch (err) {
+                console.error("Delete orphan imported model error", name, err);
             }
         }
         this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
