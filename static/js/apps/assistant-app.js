@@ -185,14 +185,15 @@ class AssistantApp extends AppBase {
                 `;
                 this.embeddedIntroEl.classList.remove('hidden');
             }
-                this._updateModelPill();
-                if (importBtn) {
-                    importBtn.style.display = 'none';
-                }
-                if (this.embeddedModelPillEl) {
-                    this.embeddedModelPillEl.classList.add('hidden');
-                }
+            if (importBtn) {
+                importBtn.style.display = 'none';
             }
+            // Show attached model pill in the embedded header instead of the input slot.
+            this._updateEmbeddedModelPill();
+            if (this.modelPillSlotEl) {
+                this.modelPillSlotEl.innerHTML = '';
+            }
+        }
 
         this._updateImportButtonState(importBtn);
         this._updateModelPill();
@@ -333,6 +334,20 @@ class AssistantApp extends AppBase {
             return;
         }
         await super.mount(container);
+        // If the assistant was opened from the modeler split, make sure the linked
+        // model is attached to the conversation context.
+        if (this._embedded && (this.props.modelName || this.props.modelNames)) {
+            const linkedNames = this._normalizeModelNames(this.props.modelNames ?? this.props.modelName);
+            for (const name of linkedNames) {
+                if (name && !this.modelNames.includes(name)) {
+                    this.modelNames.push(name);
+                    this.props.displayNames = this.props.displayNames || {};
+                    this.props.displayNames[name] = this.props.displayNames[name] || name;
+                }
+            }
+            this._updateModelPill();
+            this._updateEmbeddedModelPill();
+        }
         // If this instance was created from the history panel or from a modeler
         // split with a session, load the persisted messages into the UI.
         if (this.props.session && (this.props.fromHistory || this.props.fromModeler)) {
@@ -791,6 +806,7 @@ class AssistantApp extends AppBase {
         this._loadingModels.push({ name, displayName, loading: true });
         this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
         this._updateModelPill();
+        this._updateEmbeddedModelPill();
         this._updateSearchResultAddButtons();
     }
 
@@ -805,6 +821,7 @@ class AssistantApp extends AppBase {
         this.modelNames = names.slice(0, this.modelNamesConfig.max);
         this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
         this._updateModelPill();
+        this._updateEmbeddedModelPill();
         this._updateSearchResultAddButtons();
     }
 
@@ -816,6 +833,7 @@ class AssistantApp extends AppBase {
         this._loadingModels = this._loadingModels.filter((m) => m.name !== loadingName);
         this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
         this._updateModelPill();
+        this._updateEmbeddedModelPill();
         this._updateSearchResultAddButtons();
         this._appendSystemMessage(this._escape(message));
     }
@@ -960,6 +978,7 @@ class AssistantApp extends AppBase {
         }
         this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
         this._updateModelPill();
+        this._updateEmbeddedModelPill();
         this._updateSearchResultAddButtons();
     }
 
@@ -973,6 +992,7 @@ class AssistantApp extends AppBase {
         this._importedSearchDocIds.clear();
         this.props.displayNames = {};
         if (this.modelPillSlotEl) this.modelPillSlotEl.innerHTML = '';
+        this._updateEmbeddedModelPill();
         this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
         this._updateSearchResultAddButtons();
     }
@@ -1285,6 +1305,7 @@ class AssistantApp extends AppBase {
                     this.props.displayNames = this.props.displayNames || {};
                     this.props.displayNames[attachedName] = attachedName;
                     this._updateModelPill();
+                    this._updateEmbeddedModelPill();
                     this._updateSearchResultAddButtons();
                 }
                 return;
@@ -2429,6 +2450,7 @@ class AssistantApp extends AppBase {
                 this.props.displayNames = this.props.displayNames || {};
                 this.props.displayNames[attachedName] = attachedName;
                 this._updateModelPill();
+                this._updateEmbeddedModelPill();
                 this._updateSearchResultAddButtons();
             }
             saveHtmlSnapshot();
@@ -2550,6 +2572,25 @@ class AssistantApp extends AppBase {
         if (btn && this.authManager) {
             btn.addEventListener('click', () => this.authManager.showModal());
         }
+    }
+
+    _updateEmbeddedModelPill() {
+        if (!this.embeddedModelPillEl || !this._embedded) return;
+        const names = (this.modelNames || []).filter(Boolean);
+        if (!names.length) {
+            this.embeddedModelPillEl.innerHTML = '';
+            this.embeddedModelPillEl.classList.add('hidden');
+            return;
+        }
+        this.embeddedModelPillEl.classList.remove('hidden');
+        this.embeddedModelPillEl.innerHTML = names.map((name) => {
+            const displayName = this._displayNameForModel(name);
+            return `
+                <div class="assistant-model-pill inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-100 border border-gray-200 text-xs font-semibold text-gray-700" data-model-name="${this._escape(name)}">
+                    <span class="truncate max-w-[10rem]" title="${this._escape(displayName)}">${this._escape(displayName)}</span>
+                </div>
+            `;
+        }).join('');
     }
 
     _renderAnonymousPlaceholder(container) {

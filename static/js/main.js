@@ -65,25 +65,37 @@
     shell.renderAuthActions(AuthManager.getUser());
 
     // Persist a pending import only if its Modéliseur instance is still open when login happens.
-    function isPendingImportStillOpen() {
+    function findPendingModelerInstance() {
         const pending = AuthManager.getPendingImport();
-        if (!pending || !pending.svgText) return false;
+        if (!pending || !pending.svgText) return null;
         const instances = AppState.listInstances();
-        return instances.some((i) => i.appId === "modeler" && AppState.getInstance(i.instanceId)?.svgText === pending.svgText);
+        return instances
+            .filter((i) => i.appId === "modeler")
+            .map((i) => AppState.getInstance(i.instanceId))
+            .find((inst) => inst?.svgText === pending.svgText);
     }
 
     async function flushPendingImport() {
-        if (!isPendingImportStillOpen()) {
+        const modelerInstance = findPendingModelerInstance();
+        if (!modelerInstance) {
             AuthManager.clearPendingImport();
             return;
         }
         const pending = AuthManager.getPendingImport();
         try {
-            await ApiClient.importAndSaveModel(pending.file, pending.fileName);
+            const meta = await ApiClient.importAndSaveModel(pending.file, pending.fileName);
             AuthManager.clearPendingImport();
             historyPanel.load();
+            // Update the open modeler instance so it uses the real stored name.
+            if (meta?.name) {
+                modelerInstance.storedName = meta.name;
+                modelerInstance.fileName = meta.display_name || meta.name;
+                modelerInstance.mainClassName = modelerInstance.mainClassName || '';
+                AppState.saveInstanceState(modelerInstance.instanceId);
+            }
         } catch (err) {
             console.error("Flush pending import error", err);
+            // Keep pending import so the user can retry after fixing the issue.
         }
     }
 
@@ -101,6 +113,17 @@
                 container.innerHTML = '';
                 await activeInstance.mount(container);
                 AppState.restoreInstanceState(activeId);
+            }
+        }
+        // Also remount any visible modeler so it picks up the real storedName.
+        const modelerRec = AppState.listInstances().find((i) => i.appId === 'modeler');
+        const modeler = modelerRec ? AppState.getInstance(modelerRec.instanceId) : null;
+        if (modeler && modeler.container && modeler.storedName && modeler.svgText) {
+            const visibleModeler = document.querySelector(`[data-instance-id="${modeler.instanceId}"]`);
+            if (visibleModeler) {
+                visibleModeler.innerHTML = '';
+                await modeler.mount(visibleModeler);
+                AppState.restoreInstanceState(modeler.instanceId);
             }
         }
     });

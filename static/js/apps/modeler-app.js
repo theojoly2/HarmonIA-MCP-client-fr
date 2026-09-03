@@ -402,6 +402,13 @@ class ModelerApp extends AppBase {
         this.svgText = svgText;
         this.fileName = fileName;
         this.storedName = storedName || fileName;
+        // If the model was previously an anonymous preview, the storedName may
+        // still be the original filename. Try to find the real backend name from
+        // the history panel if it is now available.
+        if (this.storedName === this.fileName && window.historyPanel) {
+            const match = window.historyPanel.findModelBySvgText?.(svgText);
+            if (match?.name) this.storedName = match.name;
+        }
         this.mainClassName = mainClassName;
         this._centerOnNextShow = true;
         this.viewerState = { scale: 1, x: 0, y: 0 };
@@ -928,6 +935,7 @@ class ModelerApp extends AppBase {
         try {
             await window.windowManager.splitPanel(this.instanceId, 'assistant', {
                 modelName: this.storedName,
+                modelNames: [this.storedName],
                 linkedModelerInstanceId: this.instanceId,
                 origin: 'modeler',
                 session,
