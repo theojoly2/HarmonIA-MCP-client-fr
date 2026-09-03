@@ -69,6 +69,13 @@ def _model_name_from_filename(filename: Optional[str]) -> str:
     return base
 
 
+def _display_model_name(stored_name: str) -> str:
+    """Strip the timestamp suffix from a stored model name for UI display."""
+    if "__" in stored_name:
+        return stored_name.rsplit("__", 1)[0]
+    return stored_name
+
+
 def _safe_json_loads(text: str | None) -> Any:
     if not text:
         return None
@@ -335,7 +342,7 @@ async def assistant_stream_generator(
         history.add_display_event({"kind": "selected_tags", "tags": selected_tags})
 
     # Build a mapping from stored model names to clean display names.
-    model_display_names = {name: _display_name(name) for name in model_names}
+    model_display_names = {name: _display_model_name(name) for name in model_names}
 
     state = {
         "user": username,
