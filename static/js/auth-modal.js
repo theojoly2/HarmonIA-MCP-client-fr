@@ -30,8 +30,11 @@ const AuthManager = (() => {
         return !!currentUser;
     }
 
-    function setPendingImport(file, fileName, svgText) {
-        pendingImport = { file, fileName, svgText };
+    async function setPendingImport(file, fileName, svgText) {
+        // Store file content as ArrayBuffer because File objects cannot be reused
+        // reliably across asynchronous login flows.
+        const buffer = await file.arrayBuffer();
+        pendingImport = { fileName, svgText, content: buffer, mimeType: file.type || "application/octet-stream" };
     }
 
     function getPendingImport() {

@@ -387,7 +387,7 @@ class ModelerApp extends AppBase {
                     console.error('Model save error', err);
                 }
             } else {
-                AuthManager.setPendingImport(file, file.name, this.svgText);
+                await AuthManager.setPendingImport(file, file.name, this.svgText);
             }
             await this.loadSvg(this.svgText, displayName, mainClassName, storedName);
         } catch (err) {
