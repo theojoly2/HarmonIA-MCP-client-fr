@@ -201,15 +201,6 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
     100% { fill: currentColor; }
 }
 
-@keyframes magicColorStroke {
-    0%   { stroke: currentColor; }
-    20%  { stroke: #f472b6; }
-    40%  { stroke: #fbbf24; }
-    60%  { stroke: #34d399; }
-    80%  { stroke: #818cf8; }
-    100% { stroke: currentColor; }
-}
-
 /* === Magic buttons global styles === */
 .magic-btn, .shell-glow {
     position: relative;
@@ -223,22 +214,6 @@ body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMac
 .ai-sparkle-icon { overflow: visible; }
 .sparkle-main { transform-box: fill-box; fill: currentColor; transform-origin: center; }
 .sparkle-orbit-path { transform-box: view-box; fill: currentColor; transform-origin: 12px 12px; }
-
-/* Outline/hollow style: transparent fill + colored stroke on hover */
-.sparkle-outline {
-    fill: transparent;
-    stroke: currentColor;
-    stroke-width: 1.8;
-    stroke-linejoin: round;
-}
-.magic-btn:hover .sparkle-outline.sparkle-main,
-.trigger-magic .sparkle-outline.sparkle-main {
-    animation: sparkleCenterPulse 0.8s ease-in-out forwards, magicColorStroke 0.8s linear forwards;
-}
-.magic-btn:hover .sparkle-outline.sparkle-orbit-path,
-.trigger-magic .sparkle-outline.sparkle-orbit-path {
-    animation: sparkleOrbit 0.8s ease-in-out forwards, magicColorStroke 0.8s linear forwards;
-}
 
 .magic-btn:hover .sparkle-main, .trigger-magic .sparkle-main {
     animation: sparkleCenterPulse 0.8s ease-in-out forwards, magicColor 0.8s linear forwards;

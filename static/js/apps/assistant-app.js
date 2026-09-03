@@ -118,10 +118,8 @@ class AssistantApp extends AppBase {
                                         <span id="assistant-sources-label">Sources</span>
                                     </button>
                                     <button type="submit" id="assistant-send" class="magic-btn assistant-send-btn flex-shrink-0 w-8 h-8 text-white bg-black hover:bg-gray-800 rounded-xl flex items-center justify-center transition-colors">
-                                        <svg class="w-4 h-4 overflow-visible" viewBox="0 0 24 24">
-                                            <path class="sparkle-main sparkle-outline" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
-                                            <path class="sparkle-orbit-path sparkle-outline" d="M5.5 2.5L6.34 5.16L9 6L6.34 6.84L5.5 9.5L4.66 6.84L2 6L4.66 5.16L5.5 2.5Z"></path>
-                                            <path class="sparkle-orbit-path sparkle-outline" d="M19.5 15.5L20.34 18.16L23 19L20.34 19.84L19.5 22.5L18.66 19.84L16 19L18.66 18.16L19.5 15.5Z"></path>
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19V5M5 12l7-7 7 7"></path>
                                         </svg>
                                     </button>
                                     <div id="assistant-sources-menu" class="assistant-sources-menu hidden"></div>
