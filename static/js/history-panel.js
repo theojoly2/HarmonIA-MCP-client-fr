@@ -397,6 +397,7 @@ class HistoryPanel {
                 if (errors.length) {
                     console.error("Delete history item partial errors", errors);
                 }
+                this._closeOpenTabForDeletedItem(item);
             } catch (err) {
                 console.error("Delete history item error", err);
                 alert(`Impossible de supprimer ${isSearch ? "l'exploration" : isAssistant ? "la conversation" : isModelerAssistant ? "la conversation Créer/Éditer" : "le modèle"}.`);
@@ -417,6 +418,60 @@ class HistoryPanel {
                 menu.style.top = `${Math.max(gap, currentTop - (bottom - window.innerHeight))}px`;
             }
         });
+    }
+
+    _closeOpenTabForDeletedItem(item) {
+        if (!window.windowManager) return;
+        const isSearch = item.kind === "search";
+        const isAssistant = item.kind === "assistant";
+        const isModelerAssistant = item.kind === "modeler_assistant";
+        const visibleId = window.windowManager._getVisibleInstanceId();
+        if (!visibleId) return;
+        const record = AppState.getRecord(visibleId);
+        if (!record) return;
+
+        let shouldReturnHome = false;
+        if (isSearch) {
+            if (record.appId === "search") {
+                const inst = AppState.getInstance(visibleId);
+                if (inst && (inst.searchId === item.id || inst.query === item.name)) {
+                    shouldReturnHome = true;
+                }
+            }
+        } else if (isAssistant || isModelerAssistant) {
+            if (record.appId === "assistant") {
+                const inst = AppState.getInstance(visibleId);
+                const sessionName = (record.meta || {}).session || inst?.props?.session;
+                if (sessionName && sessionName === item.name) {
+                    shouldReturnHome = true;
+                }
+            }
+        } else {
+            // Model
+            if (record.appId === "modeler") {
+                const inst = AppState.getInstance(visibleId);
+                if (inst && inst.storedName === item.name) {
+                    shouldReturnHome = true;
+                }
+            }
+        }
+
+        if (!shouldReturnHome) return;
+
+        const visibleInstance = AppState.getInstance(visibleId);
+        if (visibleInstance && typeof visibleInstance._newSession === "function") {
+            visibleInstance._newSession();
+        }
+        if (window.windowManager) {
+            window.windowManager._clearShell();
+            if (visibleInstance) {
+                const container = document.createElement("div");
+                container.className = "app-container h-full w-full";
+                container.dataset.instanceId = visibleId;
+                window.windowManager.shellElement.appendChild(container);
+                visibleInstance.mount(container);
+            }
+        }
     }
 
     _startInlineRename(nameEl, item, li) {
