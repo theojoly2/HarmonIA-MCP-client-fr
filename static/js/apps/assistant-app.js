@@ -1288,7 +1288,7 @@ class AssistantApp extends AppBase {
                 } else if (event.name === 'retrieve_documents') {
                     const display = event.display || {};
                     const results = display.results || [];
-                    const resultsHtml = this._buildSearchResultsHtml(results, display.result_count || results.length);
+                    const resultsHtml = this.ui.buildResultsHtml(results, display.result_count || results.length, { hideEmpty: false });
                     this._fillSearchCard(display.query || '', resultsHtml);
                 } else {
                     this._fillToolResult(event.name, event.result, event.display);
@@ -1683,7 +1683,7 @@ class AssistantApp extends AppBase {
         if (this._embedded) return null;
         if (display && display.type === 'search') {
             const results = display.results || [];
-            const resultsHtml = this._buildSearchResultsHtml(results, display.result_count || results.length);
+            const resultsHtml = this.ui.buildResultsHtml(results, display.result_count || results.length, { hideEmpty: false });
             this._fillSearchCard(display.query || '', resultsHtml);
             return null;
         }
@@ -2451,7 +2451,7 @@ class AssistantApp extends AppBase {
             } else if (event.name === 'retrieve_documents') {
                 const display = event.display || {};
                 const results = display.results || [];
-                const resultsHtml = this._buildSearchResultsHtml(results, display.result_count || results.length);
+                const resultsHtml = this.ui.buildResultsHtml(results, display.result_count || results.length, { hideEmpty: false });
                 this._fillSearchCard(display.query || '', resultsHtml);
             } else {
                 this._fillToolResult(event.name, event.result, event.display);
