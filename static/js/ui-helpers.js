@@ -55,7 +55,7 @@ const UiHelpers = {
      * assistant SSE tool_result events.
      */
     buildResultsHtml(results, count, options = {}) {
-        const escape = this.escape;
+        const escape = UiHelpers.escape;
         if (!results.length) {
             return options.hideEmpty ? '' : `
                 <div class="text-center py-20 text-black font-bold text-lg">
@@ -84,7 +84,7 @@ const UiHelpers = {
                         ${escape(r.filename)}
                     </a>
                 </h3>
-                <div class="text-gray-800 font-medium leading-relaxed mb-3 markdown-body">${this.markdownPreview(r.summary)}</div>
+                <div class="text-gray-800 font-medium leading-relaxed mb-3 markdown-body">${UiHelpers.markdownPreview(r.summary)}</div>
                 <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-3">
                     <span class="font-bold">Score: ${r.score}</span>
                     <span>•</span>
