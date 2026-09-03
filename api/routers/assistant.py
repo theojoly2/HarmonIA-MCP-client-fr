@@ -353,8 +353,10 @@ async def assistant_stream_generator(
                 if model_data:
                     loaded_models[name] = model_data
                     xmi = model_data.get("xmi") if isinstance(model_data.get("xmi"), dict) else model_data
+                    # Use the display name (without timestamp suffix) in the LLM prompt.
+                    display_name = _display_name(name)
                     parts.append(
-                        f"[MODEL {idx} - name={name}]\n"
+                        f"[MODEL {idx} - name={display_name}]\n"
                         + json.dumps(xmi, ensure_ascii=False, indent=2)
                     )
             except Exception as e:
