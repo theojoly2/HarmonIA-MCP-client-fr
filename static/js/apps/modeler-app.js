@@ -1050,10 +1050,7 @@ class ModelerApp extends AppBase {
     }
 
     _showAddConnectorDialog() {
-        if (!AuthManager.isLoggedIn()) {
-            if (this.authManager) this.authManager.showModal();
-            return;
-        }
+        if (!this._requireAuth()) return;
         ModelerApp._closeOpenEditDialogs();
         const classes = this._extractClassNames();
         if (!classes.length) {

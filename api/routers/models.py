@@ -5,6 +5,7 @@ resources/semantic_model/models/{user}/{name}.json.
 """
 
 import json
+import re
 from typing import Optional
 
 from fastapi import APIRouter, Request, Response, UploadFile, File, Form, Depends
