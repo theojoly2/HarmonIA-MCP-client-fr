@@ -528,11 +528,13 @@ class AssistantApp extends AppBase {
         // SVG cards, tool cards, plan cards, search results...) is discarded and
         // the welcome screen is shown exactly like on first mount.
         if (this.container) {
-            this.container.innerHTML = '';
-            this.render(this.container).then(() => {
-                this._scheduleCentering(true);
-                AppState.saveInstanceState?.(this.instanceId);
-            });
+            // Force a fresh render by breaking the cached-live-DOM guard in render().
+            const oldContainer = this.container;
+            this.container = null;
+            oldContainer.innerHTML = '';
+            this.render(oldContainer);
+            this._scheduleCentering(true);
+            AppState.saveInstanceState?.(this.instanceId);
             return;
         }
 
