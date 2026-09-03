@@ -341,16 +341,16 @@ async def assistant_stream_generator(
     if selected_tags:
         history.add_display_event({"kind": "selected_tags", "tags": selected_tags})
 
-    # Build a mapping from stored model names to clean display names.
-    model_display_names = {name: _display_model_name(name) for name in model_names}
-
     state = {
         "user": username,
-        "name": model_display_names[model_names[0]] if model_names else session_name,
+        "name": model_names[0] if model_names else session_name,
         "package": "",
         "selected_tags": selected_tags,
-        "allowed_model_names": [model_display_names.get(n, n) for n in model_names],
+        "allowed_model_names": model_names,
     }
+
+    # Build a mapping from stored model names to clean display names.
+    model_display_names = {name: _display_model_name(name) for name in model_names}
 
     # Load the uploaded models from the MCP server to inject them into the LLM context.
     current_model_prompt = ""
@@ -720,17 +720,11 @@ async def assistant_stream_generator(
                         # SVG is only emitted on explicit model mutations or an explicit
                         # display request. Use the model name returned/used by the tool so the
                         # correct model card is refreshed.
-                        # Note: tool arguments may contain display names, so map them back
-                        # to the stored backend names before persisting/loading.
                         target_model_name = ""
                         if name == "display_model_visualization":
                             target_model_name = arguments.get("model_name", "").strip()
                         elif name in {"add_class", "add_attribute", "add_connector"}:
                             target_model_name = arguments.get("model_name", state.get("name", "")).strip()
-                        # Map display name back to stored name if needed.
-                        reverse_display_map = {display: stored for stored, display in model_display_names.items()}
-                        if target_model_name in reverse_display_map:
-                            target_model_name = reverse_display_map[target_model_name]
                         if not target_model_name and model_names:
                             target_model_name = model_names[0]
 
