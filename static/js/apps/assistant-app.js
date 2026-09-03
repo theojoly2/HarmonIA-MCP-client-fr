@@ -92,7 +92,6 @@ class AssistantApp extends AppBase {
                         <p class="assistant-welcome-subtitle">Discutez avec l'assistant pour analyser, comparer, fusionner et améliorer vos modèles. Formats supportés : TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML.</p>
                         <div class="assistant-welcome-input" id="assistant-welcome-input"></div>
                     </div>
-                    <div class="assistant-embedded-model-pill" id="assistant-embedded-model-pill"></div>
                     <div class="assistant-embedded-intro" id="assistant-embedded-intro"></div>
                     <div class="assistant-messages" id="assistant-messages"></div>
                 </div>
@@ -138,7 +137,6 @@ class AssistantApp extends AppBase {
         this.welcomeInputSlot = container.querySelector('#assistant-welcome-input');
         this.messagesEl = container.querySelector('#assistant-messages');
         this.embeddedIntroEl = container.querySelector('#assistant-embedded-intro');
-        this.embeddedModelPillEl = container.querySelector('#assistant-embedded-model-pill');
         this.modelPillSlotEl = container.querySelector('#assistant-model-pill-slot');
         this.embeddedHeader = container.querySelector('#assistant-embedded-header');
         this.inputArea = container.querySelector('#assistant-input-area');
@@ -188,11 +186,7 @@ class AssistantApp extends AppBase {
             if (importBtn) {
                 importBtn.style.display = 'none';
             }
-            // Show attached model pill in the embedded header instead of the input slot.
-            this._updateEmbeddedModelPill();
-            if (this.modelPillSlotEl) {
-                this.modelPillSlotEl.innerHTML = '';
-            }
+
         }
 
         this._updateImportButtonState(importBtn);
@@ -346,7 +340,6 @@ class AssistantApp extends AppBase {
                 }
             }
             this._updateModelPill();
-            this._updateEmbeddedModelPill();
         }
         // If this instance was created from the history panel or from a modeler
         // split with a session, load the persisted messages into the UI.
@@ -806,7 +799,6 @@ class AssistantApp extends AppBase {
         this._loadingModels.push({ name, displayName, loading: true });
         this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
         this._updateModelPill();
-        this._updateEmbeddedModelPill();
         this._updateSearchResultAddButtons();
     }
 
@@ -821,7 +813,6 @@ class AssistantApp extends AppBase {
         this.modelNames = names.slice(0, this.modelNamesConfig.max);
         this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
         this._updateModelPill();
-        this._updateEmbeddedModelPill();
         this._updateSearchResultAddButtons();
     }
 
@@ -833,7 +824,6 @@ class AssistantApp extends AppBase {
         this._loadingModels = this._loadingModels.filter((m) => m.name !== loadingName);
         this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
         this._updateModelPill();
-        this._updateEmbeddedModelPill();
         this._updateSearchResultAddButtons();
         this._appendSystemMessage(this._escape(message));
     }
@@ -994,7 +984,6 @@ class AssistantApp extends AppBase {
         }
         this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
         this._updateModelPill();
-        this._updateEmbeddedModelPill();
         this._updateSearchResultAddButtons();
     }
 
@@ -1008,7 +997,6 @@ class AssistantApp extends AppBase {
         this._importedSearchDocIds.clear();
         this.props.displayNames = {};
         if (this.modelPillSlotEl) this.modelPillSlotEl.innerHTML = '';
-        this._updateEmbeddedModelPill();
         this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
         this._updateSearchResultAddButtons();
     }
@@ -1324,13 +1312,12 @@ class AssistantApp extends AppBase {
                     this.modelNames.push(attachedName);
                     this.props.displayNames = this.props.displayNames || {};
                     this.props.displayNames[attachedName] = attachedName;
-                    this._updateModelPill();
-                    this._updateEmbeddedModelPill();
-                    this._updateSearchResultAddButtons();
-                }
-                return;
-            }
-            if (kind === 'loop_done') {
+            this._updateModelPill();
+            this._updateSearchResultAddButtons();
+        }
+        return;
+    }
+    if (kind === 'loop_done') {
                 closeReplayBubble();
                 this.activeSvgCard = null;
                 this.activeSvgViewer = null;
@@ -2511,7 +2498,6 @@ class AssistantApp extends AppBase {
                 this.props.displayNames = this.props.displayNames || {};
                 this.props.displayNames[attachedName] = attachedName;
                 this._updateModelPill();
-                this._updateEmbeddedModelPill();
                 this._updateSearchResultAddButtons();
             }
             saveHtmlSnapshot();
@@ -2635,24 +2621,7 @@ class AssistantApp extends AppBase {
         }
     }
 
-    _updateEmbeddedModelPill() {
-        if (!this.embeddedModelPillEl || !this._embedded) return;
-        const names = (this.modelNames || []).filter(Boolean);
-        if (!names.length) {
-            this.embeddedModelPillEl.innerHTML = '';
-            this.embeddedModelPillEl.classList.add('hidden');
-            return;
-        }
-        this.embeddedModelPillEl.classList.remove('hidden');
-        this.embeddedModelPillEl.innerHTML = names.map((name) => {
-            const displayName = this._displayNameForModel(name);
-            return `
-                <div class="assistant-model-pill inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-100 border border-gray-200 text-xs font-semibold text-gray-700" data-model-name="${this._escape(name)}">
-                    <span class="truncate max-w-[10rem]" title="${this._escape(displayName)}">${this._escape(displayName)}</span>
-                </div>
-            `;
-        }).join('');
-    }
+
 
     _renderAnonymousPlaceholder(container) {
         this.container = container;
