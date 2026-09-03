@@ -1737,11 +1737,48 @@ class AssistantApp extends AppBase {
 
         const planSteps = parsed.plan_steps || [];
         const toolsToCall = parsed.tools_to_call || [];
-        const notes = parsed.notes || '';
+        let notes = parsed.notes || '';
 
         if (!Array.isArray(planSteps) || planSteps.length === 0) {
             return null;
         }
+
+        // Replace timestamped model names with their display names. We first find
+        // candidates with a cheap regex, then only replace if the full match is a
+        // known stored model name. This avoids false positives and stays efficient.
+        const knownNames = new Set([
+            ...(this.modelNames || []),
+            ...Object.keys(this.props.displayNames || {}),
+        ]);
+
+        const displayForName = (storedName) => {
+            if (!storedName) return '';
+            return this.props.displayNames?.[storedName]
+                || this._displayNameForModel(storedName);
+        };
+
+        const TIMESTAMP_SUFFIX_RE = /[A-Za-z0-9_.\-]+__\d{16,20}\b/g;
+
+        const cleanModelName = (text) => {
+            if (typeof text !== 'string') return text;
+            return text.replace(TIMESTAMP_SUFFIX_RE, (match) => {
+                return knownNames.has(match) ? displayForName(match) : match;
+            });
+        };
+
+        const cleanStep = (step) => {
+            if (typeof step === 'string') return cleanModelName(step);
+            if (step && typeof step === 'object') {
+                return {
+                    ...step,
+                    step: cleanModelName(step.step || ''),
+                    notes: cleanModelName(step.notes || ''),
+                };
+            }
+            return step;
+        };
+
+        notes = cleanModelName(notes);
 
         const div = document.createElement('div');
         div.className = 'assistant-plan-card mb-4';
@@ -1760,7 +1797,8 @@ class AssistantApp extends AppBase {
         const stepsList = div.querySelector('.assistant-plan-steps');
         const notesEl = div.querySelector('.assistant-plan-notes');
 
-        planSteps.forEach((step, index) => {
+        planSteps.forEach((rawStep, index) => {
+            const step = cleanStep(rawStep);
             const tool = toolsToCall.find((t) => t.step_index === index);
             const toolName = tool?.tool || '';
             const toolBadge = toolName
