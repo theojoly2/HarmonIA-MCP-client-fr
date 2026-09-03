@@ -426,66 +426,70 @@ class HistoryPanel {
         const isAssistant = item.kind === "assistant";
         const isModelerAssistant = item.kind === "modeler_assistant";
         const visibleId = window.windowManager._getVisibleInstanceId();
-        if (!visibleId) return;
-        const record = AppState.getRecord(visibleId);
-        if (!record) return;
 
-        let shouldReturnHome = false;
-        if (isSearch) {
-            if (record.appId === "search") {
-                const inst = AppState.getInstance(visibleId);
-                if (inst && (inst.searchId === item.id || inst.query === item.name)) {
-                    shouldReturnHome = true;
+        // Helper to reset an instance whether it is currently visible or cached.
+        const resetInstance = (instanceId, record) => {
+            const inst = AppState.getInstance(instanceId);
+            if (!inst) return;
+            if (record.appId === "modeler" && typeof inst._showModéliseurHome === "function") {
+                inst._showModéliseurHome();
+                window.windowManager._viewCache.delete(instanceId);
+            } else if (record.appId === "assistant" && typeof inst._newSession === "function") {
+                inst._newSession();
+                window.windowManager._viewCache.delete(instanceId);
+            } else if (record.appId === "search" && typeof inst._resetToHome === "function") {
+                inst._resetToHome();
+                window.windowManager._viewCache.delete(instanceId);
+            }
+        };
+
+        const maybeResetById = (instanceId) => {
+            const rec = AppState.getRecord(instanceId);
+            if (!rec) return false;
+            let matches = false;
+            if (isSearch) {
+                if (rec.appId === "search") {
+                    const inst = AppState.getInstance(instanceId);
+                    if (inst && (inst.searchId === item.id || inst.query === item.name)) matches = true;
+                }
+            } else if (isAssistant || isModelerAssistant) {
+                if (rec.appId === "assistant") {
+                    const inst = AppState.getInstance(instanceId);
+                    const sessionName = (rec.meta || {}).session || inst?.props?.session;
+                    if (sessionName && sessionName === item.name) matches = true;
+                }
+            } else {
+                if (rec.appId === "modeler") {
+                    const inst = AppState.getInstance(instanceId);
+                    if (inst && inst.storedName === item.name) matches = true;
                 }
             }
-        } else if (isAssistant || isModelerAssistant) {
-            if (record.appId === "assistant") {
-                const inst = AppState.getInstance(visibleId);
-                const sessionName = (record.meta || {}).session || inst?.props?.session;
-                if (sessionName && sessionName === item.name) {
-                    shouldReturnHome = true;
-                }
+            if (matches) {
+                resetInstance(instanceId, rec);
             }
-        } else {
-            // Model
-            if (record.appId === "modeler") {
-                const inst = AppState.getInstance(visibleId);
-                if (inst && inst.storedName === item.name) {
-                    shouldReturnHome = true;
-                }
+            return matches;
+        };
+
+        // Reset every open/cached instance tied to the deleted item, not just the
+        // currently visible one. This prevents stale DOM from being restored when the
+        // user switches back to that tab.
+        AppState.listInstances().forEach((info) => {
+            maybeResetById(info.instanceId);
+        });
+
+        // If the currently visible instance was among those reset, remount it now
+        // so the user immediately sees the home screen.
+        if (visibleId && maybeResetById(visibleId)) {
+            const rec = AppState.getRecord(visibleId);
+            const inst = AppState.getInstance(visibleId);
+            if (inst && rec) {
+                window.windowManager._clearShell();
+                const container = document.createElement("div");
+                container.className = "app-container h-full w-full";
+                container.dataset.instanceId = visibleId;
+                window.windowManager.shellElement.appendChild(container);
+                inst.mount(container);
             }
-        }
-
-        if (!shouldReturnHome) return;
-
-        const visibleInstance = AppState.getInstance(visibleId);
-        if (!visibleInstance || !window.windowManager) return;
-
-        if (record.appId === "modeler" && typeof visibleInstance._showModéliseurHome === "function") {
-            visibleInstance._showModéliseurHome();
-            return;
-        }
-        if (record.appId === "assistant" && typeof visibleInstance._newSession === "function") {
-            visibleInstance._newSession();
-            window.windowManager._clearShell();
-            const container = document.createElement("div");
-            container.className = "app-container h-full w-full";
-            container.dataset.instanceId = visibleId;
-            window.windowManager.shellElement.appendChild(container);
-            visibleInstance.mount(container);
-            return;
-        }
-        if (record.appId === "search") {
-            if (typeof visibleInstance._resetToHome === "function") {
-                visibleInstance._resetToHome();
-            }
-            window.windowManager._clearShell();
-            const container = document.createElement("div");
-            container.className = "app-container h-full w-full";
-            container.dataset.instanceId = visibleId;
-            window.windowManager.shellElement.appendChild(container);
-            visibleInstance.mount(container);
-            return;
         }
     }
 
