@@ -514,15 +514,23 @@ class AssistantApp extends AppBase {
     _newSession() {
         this.session = '';
         this.messages = [];
-        this.messagesEl.innerHTML = '';
+        if (this.messagesEl) this.messagesEl.innerHTML = '';
         this.props.session = '';
         this.props.fromHistory = false;
+        this.props.display_name = '';
         this._clearModelPills();
-        this.chatEl.classList.remove('assistant-chat-mode');
-        this.welcomeEl.classList.remove('assistant-welcome-top');
-        this.inputArea.classList.remove('assistant-input-area-chat');
-        this.inputEl.value = '';
-        this.inputEl.style.height = 'auto';
+        if (this.chatEl) this.chatEl.classList.remove('assistant-chat-mode');
+        if (this.welcomeEl) this.welcomeEl.classList.remove('assistant-welcome-top');
+        if (this.inputArea) this.inputArea.classList.remove('assistant-input-area-chat');
+        if (this.inputEl) {
+            this.inputEl.value = '';
+            this.inputEl.style.height = 'auto';
+        }
+        this.isStreaming = false;
+        this.selectedTags = [];
+        this._linkedModelerInstanceId = '';
+        if (this.setTitle) this.setTitle(this.constructor.title);
+        AppState.saveInstanceState?.(this.instanceId);
         // Wait for the browser to settle back into the home layout before
         // measuring and centering, just like SearchApp/ModelerApp do.
         this._scheduleCentering(true);

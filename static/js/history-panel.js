@@ -484,11 +484,15 @@ class HistoryPanel {
             const inst = AppState.getInstance(visibleId);
             if (inst && rec) {
                 window.windowManager._clearShell();
+                window.windowManager.splitManager.setTree(null);
+                AppState.saveInstanceState(visibleId);
                 const container = document.createElement("div");
                 container.className = "app-container h-full w-full";
                 container.dataset.instanceId = visibleId;
                 window.windowManager.shellElement.appendChild(container);
-                inst.mount(container);
+                inst.mount(container).then(() => {
+                    AppState.restoreInstanceState(visibleId);
+                });
             }
         }
     }
