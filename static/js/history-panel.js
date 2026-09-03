@@ -455,7 +455,7 @@ class HistoryPanel {
             } else if (isAssistant || isModelerAssistant) {
                 if (rec.appId === "assistant") {
                     const inst = AppState.getInstance(instanceId);
-                    const sessionName = (rec.meta || {}).session || inst?.props?.session;
+                    const sessionName = inst?.session || (rec.meta || {}).session || inst?.props?.session;
                     if (sessionName && sessionName === item.name) matches = true;
                 }
             } else {
@@ -479,7 +479,8 @@ class HistoryPanel {
 
         // If the currently visible instance was among those reset, remount it now
         // so the user immediately sees the home screen.
-        if (visibleId && maybeResetById(visibleId)) {
+        let visibleMatches = maybeResetById(visibleId);
+        if (visibleId && visibleMatches) {
             const rec = AppState.getRecord(visibleId);
             const inst = AppState.getInstance(visibleId);
             if (inst && rec) {
