@@ -83,7 +83,8 @@ class AssistantHistory:
         for dp in (display_dir, llm_dir):
             if dp.exists():
                 for fp in dp.glob("*.json"):
-                    sessions.add(fp.stem)
+                    if fp.is_file():
+                        sessions.add(fp.stem)
         return sorted(sessions)
 
     def _session_exists(self) -> bool:

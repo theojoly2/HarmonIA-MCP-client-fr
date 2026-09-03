@@ -1309,28 +1309,38 @@ async def delete_assistant_session(
     origin: str = "assistant",
     username: str = Depends(require_user),
 ):
-    """Delete an assistant session.
+    """Delete an assistant session and cascade-delete linked models.
 
-    When origin="modeler" the linked model is also removed. For standalone
-    assistant sessions we do not delete the linked model because the same model
-    may be used by the modeler.
+    For modeler-origin sessions the linked model is removed. For standalone
+    assistant sessions we also remove models that were imported exclusively
+    through the assistant (assistant_model_names). Models created or edited in
+    the modeler remain untouched for standalone assistant sessions.
     """
     target_origin = (origin or "assistant").strip().lower()
     if target_origin not in {"assistant", "modeler", "external_api"}:
         target_origin = "assistant"
 
     history = AssistantHistory(user=username, session=session, origin=target_origin)
-    linked_model = history.assistant_model_name
+    linked_models = list(history.assistant_model_names or [])
+    if history.assistant_model_name and history.assistant_model_name not in linked_models:
+        linked_models.insert(0, history.assistant_model_name)
+
     if history.display_fp.exists():
         history.display_fp.unlink()
     if history.llm_fp.exists():
         history.llm_fp.unlink()
-    if linked_model and target_origin == "modeler":
+
+    deleted_models: list[str] = []
+    failed_models: list[tuple[str, str]] = []
+    for model_name in linked_models:
         try:
-            await delete_model_mcp(username, linked_model)
+            await delete_model_mcp(username, model_name)
+            deleted_models.append(model_name)
         except Exception as e:
-            print(f"[Assistant delete session] failed to delete linked model {linked_model}: {e}", flush=True)
-    return {"ok": True}
+            failed_models.append((model_name, str(e)))
+            print(f"[Assistant delete session] failed to delete linked model {model_name}: {e}", flush=True)
+
+    return {"ok": True, "deleted_models": deleted_models, "failed_models": failed_models}
 
 
 @router.post("/sessions/{session}/open")

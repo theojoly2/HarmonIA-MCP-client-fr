@@ -347,39 +347,45 @@ class HistoryPanel {
         menu.querySelector(".history-menu-confirm-delete").addEventListener("click", async (e) => {
             e.stopPropagation();
             this._closeMenu();
+            const errors = [];
             try {
                 if (isSearch) {
                     await ApiClient.deleteSearch(item.id);
                 } else if (isAssistant) {
                     const ctx = item.origin || "assistant";
-                    await ApiClient.deleteAssistantSession(item.name, ctx);
-                    // External-API sessions also own their imported models; delete them too.
-                    if (ctx === "external_api" && item.model_names?.length) {
-                        for (const modelName of item.model_names) {
-                            await fetch(`api/models/${encodeURIComponent(modelName)}`, {
-                                method: "DELETE",
-                                credentials: "same-origin",
-                            }).catch((err) => console.error("Delete linked external model error", err));
-                        }
+                    // Cascade-delete linked models first; the session delete endpoint
+                    // already does this on the backend, but we keep the explicit calls
+                    // for external_api origins and older sessions.
+                    const linkedModels = Array.isArray(item.model_names) ? item.model_names : [];
+                    if (item.model_name && !linkedModels.includes(item.model_name)) {
+                        linkedModels.push(item.model_name);
                     }
-                    // If this conversation is linked to a model imported through the
-                    // assistant, also delete the linked model.
-                    if (item.model_name && (modelsData.models || []).some((m) => m.name === item.model_name && m.imported_from_assistant)) {
-                        await fetch(`api/models/${encodeURIComponent(item.model_name)}`, {
+                    await Promise.all(linkedModels.map(async (modelName) => {
+                        const res = await fetch(`api/models/${encodeURIComponent(modelName)}`, {
                             method: "DELETE",
                             credentials: "same-origin",
-                        }).catch((err) => console.error("Delete linked model error", err));
-                    }
+                        });
+                        if (!res.ok) errors.push(`modèle ${modelName}: ${res.status}`);
+                    }));
+                    const res = await fetch(
+                        `api/assistant/sessions/${encodeURIComponent(item.name)}?origin=${encodeURIComponent(ctx)}`,
+                        { method: "DELETE", credentials: "same-origin" }
+                    );
+                    if (!res.ok) errors.push(`session: ${res.status}`);
                 } else if (isModelerAssistant) {
                     const ctx = item.origin || "modeler";
-                    await ApiClient.deleteAssistantSession(item.name, ctx);
+                    const res = await fetch(
+                        `api/assistant/sessions/${encodeURIComponent(item.name)}?origin=${encodeURIComponent(ctx)}`,
+                        { method: "DELETE", credentials: "same-origin" }
+                    );
+                    if (!res.ok) errors.push(`session: ${res.status}`);
                 } else {
                     const encodedName = encodeURIComponent(item.name);
                     const res = await fetch(`api/models/${encodedName}`, {
                         method: "DELETE",
                         credentials: "same-origin",
                     });
-                    if (!res.ok) throw new Error("delete_failed");
+                    if (!res.ok) errors.push(`modèle: ${res.status}`);
                     // If this model has a linked modeler assistant session, also delete it.
                     if (item.assistant_session) {
                         await ApiClient.deleteAssistantSession(item.assistant_session, "modeler").catch((err) =>
@@ -388,6 +394,9 @@ class HistoryPanel {
                     }
                 }
                 await this.load();
+                if (errors.length) {
+                    console.error("Delete history item partial errors", errors);
+                }
             } catch (err) {
                 console.error("Delete history item error", err);
                 alert(`Impossible de supprimer ${isSearch ? "l'exploration" : isAssistant ? "la conversation" : isModelerAssistant ? "la conversation Créer/Éditer" : "le modèle"}.`);
