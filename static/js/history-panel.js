@@ -459,18 +459,33 @@ class HistoryPanel {
         if (!shouldReturnHome) return;
 
         const visibleInstance = AppState.getInstance(visibleId);
-        if (visibleInstance && typeof visibleInstance._newSession === "function") {
-            visibleInstance._newSession();
+        if (!visibleInstance || !window.windowManager) return;
+
+        if (record.appId === "modeler" && typeof visibleInstance._showModéliseurHome === "function") {
+            visibleInstance._showModéliseurHome();
+            return;
         }
-        if (window.windowManager) {
+        if (record.appId === "assistant" && typeof visibleInstance._newSession === "function") {
+            visibleInstance._newSession();
             window.windowManager._clearShell();
-            if (visibleInstance) {
-                const container = document.createElement("div");
-                container.className = "app-container h-full w-full";
-                container.dataset.instanceId = visibleId;
-                window.windowManager.shellElement.appendChild(container);
-                visibleInstance.mount(container);
+            const container = document.createElement("div");
+            container.className = "app-container h-full w-full";
+            container.dataset.instanceId = visibleId;
+            window.windowManager.shellElement.appendChild(container);
+            visibleInstance.mount(container);
+            return;
+        }
+        if (record.appId === "search") {
+            if (typeof visibleInstance._resetToHome === "function") {
+                visibleInstance._resetToHome();
             }
+            window.windowManager._clearShell();
+            const container = document.createElement("div");
+            container.className = "app-container h-full w-full";
+            container.dataset.instanceId = visibleId;
+            window.windowManager.shellElement.appendChild(container);
+            visibleInstance.mount(container);
+            return;
         }
     }
 

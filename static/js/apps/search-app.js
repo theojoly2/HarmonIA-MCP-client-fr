@@ -146,6 +146,30 @@ class SearchApp extends AppBase {
         }
     }
 
+    _resetToHome() {
+        this.query = '';
+        this.resultsHtml = '';
+        this.results = [];
+        this.selectedTags = [];
+        this.selectedAssistantModels = [];
+        this.searchId = null;
+        if (this.container) {
+            const input = this.container.querySelector('#search-input');
+            const resultsContainer = this.container.querySelector('#results-container');
+            if (input) input.value = '';
+            if (resultsContainer) {
+                resultsContainer.innerHTML = '';
+                resultsContainer.classList.remove('results-visible', 'results-hiding');
+                resultsContainer.style.display = '';
+                resultsContainer.style.visibility = '';
+            }
+            this._updateHomeModeClass();
+            this._renderAssistantModelBar();
+            this._updateAddModelButtons();
+        }
+        this._stopTimer();
+    }
+
     _escape(text) {
         return text.replace(/"/g, '&quot;');
     }
