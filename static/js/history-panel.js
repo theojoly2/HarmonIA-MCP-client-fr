@@ -430,17 +430,9 @@ class HistoryPanel {
         // Helper to reset an instance whether it is currently visible or cached.
         const resetInstance = (instanceId, record) => {
             const inst = AppState.getInstance(instanceId);
-            if (!inst) return;
-            if (record.appId === "modeler" && typeof inst._showModéliseurHome === "function") {
-                inst._showModéliseurHome();
-                window.windowManager._viewCache.delete(instanceId);
-            } else if (record.appId === "assistant" && typeof inst._newSession === "function") {
-                inst._newSession();
-                window.windowManager._viewCache.delete(instanceId);
-            } else if (record.appId === "search" && typeof inst._resetToHome === "function") {
-                inst._resetToHome();
-                window.windowManager._viewCache.delete(instanceId);
-            }
+            if (!inst || typeof inst.resetToHome !== "function") return;
+            inst.resetToHome();
+            window.windowManager._viewCache.delete(instanceId);
         };
 
         const maybeResetById = (instanceId) => {
@@ -824,23 +816,14 @@ class HistoryPanel {
 
             await Promise.all(deletions);
             await this.load();
-            // Reset every app instance that was tied to deleted history items,
-            // matching the per-item deletion behavior. This brings open tabs back
-            // to their home screen when their content has been removed.
+            // Reset every app instance tied to deleted history items via the common
+            // AppBase.resetToHome() contract, so removing any app tab never requires
+            // changing other apps.
             AppState.listInstances().forEach((info) => {
-                const rec = AppState.getRecord(info.instanceId);
                 const inst = AppState.getInstance(info.instanceId);
-                if (!rec || !inst) return;
-                if (rec.appId === "modeler" && typeof inst._showModéliseurHome === "function") {
-                    inst._showModéliseurHome();
-                    window.windowManager._viewCache.delete(info.instanceId);
-                } else if (rec.appId === "assistant" && typeof inst._newSession === "function") {
-                    inst._newSession();
-                    window.windowManager._viewCache.delete(info.instanceId);
-                } else if (rec.appId === "search" && typeof inst._resetToHome === "function") {
-                    inst._resetToHome();
-                    window.windowManager._viewCache.delete(info.instanceId);
-                }
+                if (!inst || typeof inst.resetToHome !== "function") return;
+                inst.resetToHome();
+                window.windowManager._viewCache.delete(info.instanceId);
             });
             // If the currently visible tab was reset, remount it immediately.
             const visibleId = window.windowManager._getVisibleInstanceId();

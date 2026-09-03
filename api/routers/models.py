@@ -5,14 +5,17 @@ resources/semantic_model/models/{user}/{name}.json.
 """
 
 import json
-import re
-from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Request, Response, UploadFile, File, Form, Depends
 from pydantic import BaseModel
 
 from api.dependencies import generate_svg_for_bytes
+from api.naming import (
+    display_name_from_stored as _display_name,
+    safe_filename as _safe_filename,
+    unique_model_name as _unique_model_name,
+)
 from api.routers.auth import require_user
 from api.services.model_store import (
     add_attribute,
@@ -25,24 +28,6 @@ from api.services.model_store import (
     save_model,
     touch_model,
 )
-
-
-def _safe_filename(name: str) -> str:
-    """Remove path separators and control characters from a display name."""
-    return re.sub(r'[^\w\s\-\.]', "_", name).strip() or "model"
-
-
-def _unique_model_name(name: str) -> str:
-    """Append a timestamp suffix so duplicate names never overwrite files."""
-    timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
-    return f"{name}__{timestamp}"
-
-
-def _display_name(stored_name: str) -> str:
-    """Strip the timestamp suffix for UI display."""
-    if "__" in stored_name:
-        return stored_name.rsplit("__", 1)[0]
-    return stored_name
 
 
 router = APIRouter(prefix="/api/models", tags=["models"])

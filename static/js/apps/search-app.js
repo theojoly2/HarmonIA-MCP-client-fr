@@ -136,17 +136,7 @@ class SearchApp extends AppBase {
         }
     }
 
-    _updateHomeModeClass() {
-        const app = this.container.querySelector('.search-app');
-        if (!app) return;
-        if (!this.query && !this.resultsHtml) {
-            app.classList.add('home-mode');
-        } else {
-            app.classList.remove('home-mode');
-        }
-    }
-
-    _resetToHome() {
+    resetToHome() {
         this.query = '';
         this.resultsHtml = '';
         this.results = [];
@@ -168,6 +158,16 @@ class SearchApp extends AppBase {
             this._updateAddModelButtons();
         }
         this._stopTimer();
+    }
+
+    _updateHomeModeClass() {
+        const app = this.container.querySelector('.search-app');
+        if (!app) return;
+        if (!this.query && !this.resultsHtml) {
+            app.classList.add('home-mode');
+        } else {
+            app.classList.remove('home-mode');
+        }
     }
 
     _escape(text) {
@@ -373,8 +373,10 @@ class SearchApp extends AppBase {
         this.resultsHtml = '';
         try {
             const data = await ApiClient.postSearch(this.query, this.selectedTags, 20);
-            this.resultsHtml = data.results_html || '';
-            this.tagsHtml = data.tags_html || this.tagsHtml;
+            const tags = data.tags || [];
+            const results = data.results || [];
+            this.tagsHtml = this._buildTagsHtml(tags);
+            this.resultsHtml = this._buildResultsHtml(results, data.result_count || results.length);
             this._renderTagsFromHtml(this.tagsHtml);
             this._setLoading(false);
             this._stopTimer();
@@ -411,6 +413,26 @@ class SearchApp extends AppBase {
     _renderTagsFromHtml(html) {
         const tagsContainer = this.container.querySelector('#tags-container');
         if (tagsContainer) tagsContainer.innerHTML = html;
+    }
+
+    _buildResultsHtml(results, count) {
+        return (this.ui.buildResultsHtml || this.constructor._fallbackResultsHtml)(results, count, { hideEmpty: !this.query });
+    }
+
+    static _fallbackResultsHtml(results, count, options) {
+        // Local fallback if ui-helpers.js is not loaded (should not happen).
+        if (!results.length) {
+            return options?.hideEmpty ? '' : `
+                <div class="text-center py-20 text-black font-bold text-lg">
+                    <p>Aucun document ne correspond à cette recherche.</p>
+                </div>
+            `;
+        }
+        return `<p id="results-header" class="text-xs font-bold text-gray-500 mb-5 border-b border-gray-200 pb-2">${count} RÉSULTAT(S)</p>`;
+    }
+
+    _markdownPreview(text) {
+        return (this.ui.markdownPreview || this._escape)(text);
     }
 
     _setLoading(isLoading) {

@@ -2,14 +2,10 @@
 
 import os
 import sqlite3
-from pathlib import Path
 from typing import Optional
 
 from api.services.auth_service import hash_password
-
-
-DB_DIR = Path(__file__).resolve().parent.parent.parent / "data"
-DB_PATH = DB_DIR / "users.db"
+from api.services.db import DB_DIR, DB_PATH
 
 
 def _get_conn() -> sqlite3.Connection:

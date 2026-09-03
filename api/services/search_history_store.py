@@ -1,15 +1,11 @@
 """SQLite persistence for user search history."""
 
 from datetime import datetime
-from pathlib import Path
 from typing import Optional
 
 import sqlite3
 
-from api.services.user_store import DB_DIR
-
-
-DB_PATH = DB_DIR / "users.db"
+from api.services.db import DB_DIR, DB_PATH
 
 
 def _get_conn() -> sqlite3.Connection:

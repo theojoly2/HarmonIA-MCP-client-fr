@@ -184,6 +184,25 @@
         });
     });
 
+    EventBus.on('assistant-split-close', ({ linkedModelerInstanceId }) => {
+        const modeler = AppState.getInstance(linkedModelerInstanceId);
+        if (modeler && typeof modeler._toggleAssistantSplit === 'function') {
+            modeler._toggleAssistantSplit();
+        }
+    });
+
+    EventBus.on('update-instance-title', ({ instanceId, title }) => {
+        if (windowManager && windowManager.updateTitle) {
+            windowManager.updateTitle(instanceId, title);
+        }
+    });
+
+    EventBus.on('invalidate-view-cache', ({ instanceId }) => {
+        if (windowManager && windowManager._viewCache) {
+            windowManager._viewCache.delete(instanceId);
+        }
+    });
+
     // Initialize glow effects
     GlowEffects.init();
 

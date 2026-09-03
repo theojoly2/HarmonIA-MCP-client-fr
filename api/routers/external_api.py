@@ -17,10 +17,10 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from api.naming import model_name_from_filename as _model_name_from_filename
 from api.routers.assistant import (
     AssistantStreamRequest,
     _event,
-    _model_name_from_filename,
     assistant_stream_generator,
 )
 from api.routers.auth import require_user_or_api_key
@@ -121,8 +121,9 @@ def _generate_conversation_id() -> str:
 
 
 def _external_model_name(conversation_id: str, filename: str) -> str:
+    from api.naming import unique_model_name
     base = _model_name_from_filename(filename)
-    return f"{_conversation_model_prefix(conversation_id)}{base}__{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+    return unique_model_name(f"{_conversation_model_prefix(conversation_id)}{base}")
 
 
 def _extract_target_model_name(tool_name: str, arguments: dict[str, Any], state: dict[str, Any], model_names: list[str]) -> Optional[str]:

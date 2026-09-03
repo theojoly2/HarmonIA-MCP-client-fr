@@ -67,7 +67,7 @@ class AssistantApp extends AppBase {
                     });
                 });
             }
-            this._updateSearchResultAddButtons();
+            this._syncModelUi();
             return;
         }
         this.container = container;
@@ -189,8 +189,7 @@ class AssistantApp extends AppBase {
 
         }
 
-        this._updateImportButtonState(importBtn);
-        this._updateModelPill();
+        this._syncModelUi();
         this._renderLoginBanner();
 
         if (window.GlowEffects && typeof window.GlowEffects.scanAndBind === 'function') {
@@ -201,8 +200,6 @@ class AssistantApp extends AppBase {
             this._newSession();
         });
 
-        this._updateImportButtonState(importBtn);
-
         if (importBtn && !this._embedded) {
             importBtn.addEventListener('click', () => {
                 this.fileInput.click();
@@ -212,10 +209,7 @@ class AssistantApp extends AppBase {
         const closeSplitBtn = container.querySelector('#assistant-close-split');
         if (closeSplitBtn && this._embedded && this.props.linkedModelerInstanceId) {
             closeSplitBtn.addEventListener('click', () => {
-                const modeler = AppState.getInstance(this.props.linkedModelerInstanceId);
-                if (modeler && typeof modeler._toggleAssistantSplit === 'function') {
-                    modeler._toggleAssistantSplit();
-                }
+                EventBus.emit('assistant-split-close', { linkedModelerInstanceId: this.props.linkedModelerInstanceId });
             });
         }
 
@@ -339,7 +333,7 @@ class AssistantApp extends AppBase {
                     this.props.displayNames[name] = this.props.displayNames[name] || name;
                 }
             }
-            this._updateModelPill();
+            this._syncModelUi();
         }
         // If this instance was created from the history panel or from a modeler
         // split with a session, load the persisted messages into the UI.
@@ -485,11 +479,7 @@ class AssistantApp extends AppBase {
     }
 
     _escape(text) {
-        return String(text || '')
-            .replace(/&/g, '&amp;')
-            .replace(/"/g, '&quot;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
+        return this.ui.escape(text);
     }
 
     _slugify(text) {
@@ -511,7 +501,7 @@ class AssistantApp extends AppBase {
         this.sendBtn.classList.toggle('assistant-send-btn-disabled', !enabled);
     }
 
-    _newSession() {
+    resetToHome() {
         this.session = '';
         this.messages = [];
         this.isStreaming = false;
@@ -549,6 +539,10 @@ class AssistantApp extends AppBase {
         }
         this._scheduleCentering(true);
         AppState.saveInstanceState?.(this.instanceId);
+    }
+
+    _newSession() {
+        this.resetToHome();
     }
 
     _switchToChatMode() {
@@ -707,16 +701,11 @@ class AssistantApp extends AppBase {
 
     _displayNameForModel(name) {
         const raw = this.props.displayNames?.[name] || name;
-        return this._stripTimestampSuffix(raw);
+        return this.ui.displayNameFromStored(raw);
     }
 
     _displayNameForSearchModel(filename) {
-        return this._stripTimestampSuffix(filename);
-    }
-
-    _stripTimestampSuffix(raw) {
-        if (!raw || typeof raw !== 'string') return raw || '';
-        return raw.includes('__') ? raw.split('__').slice(0, -1).join('__') : raw;
+        return this.ui.displayNameFromStored(filename);
     }
 
     _updateImportButtonState(importBtn) {
@@ -727,8 +716,6 @@ class AssistantApp extends AppBase {
         importBtn.title = atMax
             ? `Limite de ${this.modelNamesConfig.max} modèles atteinte`
             : 'Importer un modèle (TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML)';
-        // Sync the + buttons inside any search result cards rendered in the chat.
-        this._updateSearchResultAddButtons();
     }
 
     /**
@@ -754,10 +741,7 @@ class AssistantApp extends AppBase {
     }
 
     async _importModel(file) {
-        if (!AuthManager.isLoggedIn()) {
-            if (this.authManager) this.authManager.showModal();
-            return;
-        }
+        if (!this._requireAuth()) return;
         if (!file || (this.modelNames?.length || 0) >= this.modelNamesConfig.max) return;
         const loadingKey = `loading_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const displayName = file.name;
@@ -783,10 +767,7 @@ class AssistantApp extends AppBase {
      * machinery. Does nothing if the 3-model limit is reached.
      */
     async _importSearchResultIntoAssistant(docId, filename) {
-        if (!AuthManager.isLoggedIn()) {
-            if (this.authManager) this.authManager.showModal();
-            return;
-        }
+        if (!this._requireAuth()) return;
         if (!docId || !filename || this._embedded) return;
         const total = (this.modelNames?.length || 0) + (this._loadingModels?.length || 0);
         if (total >= this.modelNamesConfig.max) return;
@@ -820,9 +801,7 @@ class AssistantApp extends AppBase {
     _startImportLoading(name, displayName) {
         if (!this._loadingModels) this._loadingModels = [];
         this._loadingModels.push({ name, displayName, loading: true });
-        this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
-        this._updateModelPill();
-        this._updateSearchResultAddButtons();
+        this._syncModelUi();
     }
 
     /**
@@ -834,9 +813,7 @@ class AssistantApp extends AppBase {
         const names = this.modelNames.slice();
         if (!names.includes(importedName)) names.push(importedName);
         this.modelNames = names.slice(0, this.modelNamesConfig.max);
-        this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
-        this._updateModelPill();
-        this._updateSearchResultAddButtons();
+        this._syncModelUi();
     }
 
     /**
@@ -845,9 +822,7 @@ class AssistantApp extends AppBase {
     _failImportLoading(loadingName, message) {
         if (!this._loadingModels) return;
         this._loadingModels = this._loadingModels.filter((m) => m.name !== loadingName);
-        this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
-        this._updateModelPill();
-        this._updateSearchResultAddButtons();
+        this._syncModelUi();
         this._appendSystemMessage(this._escape(message));
     }
 
@@ -1005,9 +980,7 @@ class AssistantApp extends AppBase {
                 console.error("Delete orphan imported model error", name, err);
             }
         }
-        this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
-        this._updateModelPill();
-        this._updateSearchResultAddButtons();
+        this._syncModelUi();
     }
 
     _clearModelPills() {
@@ -1020,8 +993,7 @@ class AssistantApp extends AppBase {
         this._importedSearchDocIds.clear();
         this.props.displayNames = {};
         if (this.modelPillSlotEl) this.modelPillSlotEl.innerHTML = '';
-        this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
-        this._updateSearchResultAddButtons();
+        this._syncModelUi();
     }
 
     async _exportModelFromPill(format, name, itemEl) {
@@ -1314,7 +1286,10 @@ class AssistantApp extends AppBase {
                 if (event.name === 'plan_workflow_with_tools') {
                     this._renderPlan(event.result);
                 } else if (event.name === 'retrieve_documents') {
-                    this._fillSearchCard(event.display?.query || '', event.display?.results_html || '');
+                    const display = event.display || {};
+                    const results = display.results || [];
+                    const resultsHtml = this._buildSearchResultsHtml(results, display.result_count || results.length);
+                    this._fillSearchCard(display.query || '', resultsHtml);
                 } else {
                     this._fillToolResult(event.name, event.result, event.display);
                 }
@@ -1335,11 +1310,10 @@ class AssistantApp extends AppBase {
                     this.modelNames.push(attachedName);
                     this.props.displayNames = this.props.displayNames || {};
                     this.props.displayNames[attachedName] = attachedName;
-            this._updateModelPill();
-            this._updateSearchResultAddButtons();
-        }
-        return;
-    }
+                    this._syncModelUi();
+                }
+                return;
+            }
     if (kind === 'loop_done') {
                 closeReplayBubble();
                 this.activeSvgCard = null;
@@ -1708,7 +1682,9 @@ class AssistantApp extends AppBase {
     _fillToolResult(name, result, display) {
         if (this._embedded) return null;
         if (display && display.type === 'search') {
-            this._fillSearchCard(display.query || '', display.results_html || '');
+            const results = display.results || [];
+            const resultsHtml = this._buildSearchResultsHtml(results, display.result_count || results.length);
+            this._fillSearchCard(display.query || '', resultsHtml);
             return null;
         }
 
@@ -2164,10 +2140,7 @@ class AssistantApp extends AppBase {
     }
 
     async _send(text) {
-        if (!AuthManager.isLoggedIn()) {
-            if (this.authManager) this.authManager.showModal();
-            return;
-        }
+        if (!this._requireAuth()) return;
         // For a brand-new conversation we intentionally pass an empty session.
         // The backend will generate a unique slug + timestamp and return it in
         // the first `user` event, exactly like the modeler does for imports.
@@ -2476,7 +2449,10 @@ class AssistantApp extends AppBase {
             if (event.name === 'plan_workflow_with_tools') {
                 this._renderPlan(event.result);
             } else if (event.name === 'retrieve_documents') {
-                this._fillSearchCard(event.display?.query || '', event.display?.results_html || '');
+                const display = event.display || {};
+                const results = display.results || [];
+                const resultsHtml = this._buildSearchResultsHtml(results, display.result_count || results.length);
+                this._fillSearchCard(display.query || '', resultsHtml);
             } else {
                 this._fillToolResult(event.name, event.result, event.display);
             }
@@ -2520,8 +2496,7 @@ class AssistantApp extends AppBase {
                 this.modelNames.push(attachedName);
                 this.props.displayNames = this.props.displayNames || {};
                 this.props.displayNames[attachedName] = attachedName;
-                this._updateModelPill();
-                this._updateSearchResultAddButtons();
+                this._syncModelUi();
             }
             saveHtmlSnapshot();
             return;

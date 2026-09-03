@@ -256,7 +256,7 @@ class ModelerApp extends AppBase {
                 if (this._returningHome) return;
                 this._returningHome = true;
                 try {
-                    await this._showModéliseurHome();
+                    await this.resetToHome();
                 } finally {
                     this._returningHome = false;
                 }
@@ -286,10 +286,7 @@ class ModelerApp extends AppBase {
     }
 
     async _createEmptyModel() {
-        if (!AuthManager.isLoggedIn()) {
-            if (this.authManager) this.authManager.showModal();
-            return;
-        }
+        if (!this._requireAuth()) return;
         this._askNewModelName(async (name) => {
             this._enterLoadingMode();
             try {
@@ -431,9 +428,7 @@ class ModelerApp extends AppBase {
     }
 
     _invalidateViewCache() {
-        if (window.windowManager?._viewCache) {
-            window.windowManager._viewCache.delete(this.instanceId);
-        }
+        EventBus.emit('invalidate-view-cache', { instanceId: this.instanceId });
     }
 
     _enterLoadingMode() {
@@ -606,7 +601,7 @@ class ModelerApp extends AppBase {
         }
     }
 
-    async _showModéliseurHome() {
+    async resetToHome() {
         // Cancel any in-flight animation.
         if (this._homeTimeout) {
             clearTimeout(this._homeTimeout);
@@ -795,10 +790,7 @@ class ModelerApp extends AppBase {
     }
 
     async _exportModel(format, itemEl) {
-        if (!AuthManager.isLoggedIn()) {
-            if (this.authManager) this.authManager.showModal();
-            return;
-        }
+        if (!this._requireAuth()) return;
         if (!this.storedName) {
             this._showExportError('Aucun modèle à exporter.');
             return;
@@ -899,10 +891,7 @@ class ModelerApp extends AppBase {
     }
 
     async _toggleAssistantSplit() {
-        if (!AuthManager.isLoggedIn()) {
-            if (this.authManager) this.authManager.showModal();
-            return;
-        }
+        if (!this._requireAuth()) return;
         if (!this.storedName || !window.windowManager) return;
         const existing = this._findAssistantSplitInstance();
         if (existing) {
@@ -977,10 +966,7 @@ class ModelerApp extends AppBase {
     }
 
     _showAddClassDialog() {
-        if (!AuthManager.isLoggedIn()) {
-            if (this.authManager) this.authManager.showModal();
-            return;
-        }
+        if (!this._requireAuth()) return;
         ModelerApp._closeOpenEditDialogs();
         const fields = [
             { id: 'cls-title', label: 'Nom de la classe', required: true, help: 'Nom unique qui identifie la classe dans le modèle.' },
@@ -990,43 +976,18 @@ class ModelerApp extends AppBase {
             { id: 'cls-package', label: 'Package (optionnel)', help: 'Groupe logique auquel rattacher cette classe (ex. Admin, Produit).' },
         ];
         this._showFloatingDialog('Ajouter une classe', fields, async (values, overlay) => {
-            overlay.querySelector('.modeler-edit-submit').disabled = true;
-            overlay.querySelector('.modeler-edit-submit').textContent = 'Enregistrement...';
-            try {
-                this._setLoading(true);
-                const res = await fetch(`api/models/${encodeURIComponent(this.storedName || this.fileName)}/add-class`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'same-origin',
-                    body: JSON.stringify({
-                        title: values['cls-title'],
-                        definition: values['cls-definition'] || '',
-                        usage_note: values['cls-usage'] || '',
-                        uri: values['cls-uri'] || null,
-                        package: values['cls-package'] || null,
-                    }),
-                });
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok) throw new Error(data.detail || `Erreur ${res.status}`);
-                await this._reloadSvgFromServer();
-            } catch (err) {
-                console.error('Add class error', err);
-                alert(err.message || "Impossible d'ajouter la classe.");
-            } finally {
-                this._setLoading(false);
-                if (overlay.parentNode) {
-                    overlay.querySelector('.modeler-edit-submit').disabled = false;
-                    overlay.querySelector('.modeler-edit-submit').textContent = 'Enregistrer';
-                }
-            }
+            await this._applyMutation('add-class', overlay, {
+                title: values['cls-title'],
+                definition: values['cls-definition'] || '',
+                usage_note: values['cls-usage'] || '',
+                uri: values['cls-uri'] || null,
+                package: values['cls-package'] || null,
+            }, "Impossible d'ajouter la classe.");
         });
     }
 
     _showAddAttributeDialog() {
-        if (!AuthManager.isLoggedIn()) {
-            if (this.authManager) this.authManager.showModal();
-            return;
-        }
+        if (!this._requireAuth()) return;
         ModelerApp._closeOpenEditDialogs();
         const classes = this._extractClassNames();
         if (!classes.length) {
@@ -1071,42 +1032,20 @@ class ModelerApp extends AppBase {
             }
         };
         this._showFloatingDialog("Ajouter un attribut", fields, async (values, overlay) => {
-            overlay.querySelector('.modeler-edit-submit').disabled = true;
-            overlay.querySelector('.modeler-edit-submit').textContent = 'Enregistrement...';
-            try {
-                this._setLoading(true);
-                let attrType = values['attr-type'];
-                if (attrType === '__other__') {
-                    attrType = values['attr-type-other'];
-                }
-                const res = await fetch(`api/models/${encodeURIComponent(this.storedName || this.fileName)}/add-attribute`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'same-origin',
-                    body: JSON.stringify({
-                        class_name: values['attr-class'],
-                        attr_label: values['attr-label'],
-                        attr_definition: values['attr-definition'] || '',
-                        attr_uri: values['attr-uri'] || '',
-                        attr_usage_note: values['attr-usage'] || '',
-                        attr_type: attrType || '',
-                        lower_bounds: values['attr-lower'] || '',
-                        upper_bounds: values['attr-upper'] || '',
-                    }),
-                });
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok) throw new Error(data.detail || `Erreur ${res.status}`);
-                await this._reloadSvgFromServer();
-            } catch (err) {
-                console.error('Add attribute error', err);
-                alert(err.message || "Impossible d'ajouter l'attribut.");
-            } finally {
-                this._setLoading(false);
-                if (overlay.parentNode) {
-                    overlay.querySelector('.modeler-edit-submit').disabled = false;
-                    overlay.querySelector('.modeler-edit-submit').textContent = 'Enregistrer';
-                }
+            let attrType = values['attr-type'];
+            if (attrType === '__other__') {
+                attrType = values['attr-type-other'];
             }
+            await this._applyMutation('add-attribute', overlay, {
+                class_name: values['attr-class'],
+                attr_label: values['attr-label'],
+                attr_definition: values['attr-definition'] || '',
+                attr_uri: values['attr-uri'] || '',
+                attr_usage_note: values['attr-usage'] || '',
+                attr_type: attrType || '',
+                lower_bounds: values['attr-lower'] || '',
+                upper_bounds: values['attr-upper'] || '',
+            }, "Impossible d'ajouter l'attribut.");
         }, onOpen);
     }
 
@@ -1151,41 +1090,19 @@ class ModelerApp extends AppBase {
             { id: 'conn-usage', label: "Note d'utilisation", type: 'textarea', help: 'Précisions sur les conditions d\'utilisation ou les contraintes.' },
         ];
         this._showFloatingDialog('Ajouter une relation', fields, async (values, overlay) => {
-            overlay.querySelector('.modeler-edit-submit').disabled = true;
-            overlay.querySelector('.modeler-edit-submit').textContent = 'Enregistrement...';
-            try {
-                this._setLoading(true);
-                const res = await fetch(`api/models/${encodeURIComponent(this.storedName || this.fileName)}/add-connector`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'same-origin',
-                    body: JSON.stringify({
-                        source_name: values['conn-source'],
-                        target_name: values['conn-target'],
-                        rel_label: values['conn-label'],
-                        rel_definition: values['conn-definition'] || '',
-                        rel_uri: values['conn-uri'] || '',
-                        relationship: values['conn-type'] || 'Association',
-                        lb: values['conn-lb'] || '',
-                        rb: values['conn-rb'] || '',
-                        lt: values['conn-lt'] || '',
-                        rt: values['conn-rt'] || '',
-                        rel_usage_note: values['conn-usage'] || '',
-                    }),
-                });
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok) throw new Error(data.detail || `Erreur ${res.status}`);
-                await this._reloadSvgFromServer();
-            } catch (err) {
-                console.error('Add connector error', err);
-                alert(err.message || "Impossible d'ajouter la relation.");
-            } finally {
-                this._setLoading(false);
-                if (overlay.parentNode) {
-                    overlay.querySelector('.modeler-edit-submit').disabled = false;
-                    overlay.querySelector('.modeler-edit-submit').textContent = 'Enregistrer';
-                }
-            }
+            await this._applyMutation('add-connector', overlay, {
+                source_name: values['conn-source'],
+                target_name: values['conn-target'],
+                rel_label: values['conn-label'],
+                rel_definition: values['conn-definition'] || '',
+                rel_uri: values['conn-uri'] || '',
+                relationship: values['conn-type'] || 'Association',
+                lb: values['conn-lb'] || '',
+                rb: values['conn-rb'] || '',
+                lt: values['conn-lt'] || '',
+                rt: values['conn-rt'] || '',
+                rel_usage_note: values['conn-usage'] || '',
+            }, "Impossible d'ajouter la relation.");
         });
     }
 
@@ -1197,6 +1114,35 @@ class ModelerApp extends AppBase {
             scrollArea.style.maxHeight = (body.clientHeight) + 'px';
         }
         body.style.height = (win.clientHeight - (win.querySelector('.window-header')?.offsetHeight || 40) - (win.querySelector('.resize-handle')?.offsetHeight || 0)) + 'px';
+    }
+
+    async _applyMutation(endpoint, overlay, body, fallbackMessage) {
+        const submitBtn = overlay.querySelector('.modeler-edit-submit');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Enregistrement...';
+        }
+        try {
+            this._setLoading(true);
+            const res = await fetch(`api/models/${encodeURIComponent(this.storedName || this.fileName)}/${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify(body),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.detail || `Erreur ${res.status}`);
+            await this._reloadSvgFromServer();
+        } catch (err) {
+            console.error(`Mutation ${endpoint} error`, err);
+            alert(err.message || fallbackMessage);
+        } finally {
+            this._setLoading(false);
+            if (submitBtn && overlay.parentNode) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Enregistrer';
+            }
+        }
     }
 
     async _reloadSvgFromServer() {
@@ -1392,9 +1338,7 @@ class ModelerApp extends AppBase {
             this.fileName = newDisplayName;
             const title = `Éditer: ${newDisplayName}`;
             this.setTitle(title);
-            if (window.windowManager && window.windowManager.updateTitle) {
-                window.windowManager.updateTitle(this.instanceId, title);
-            }
+            EventBus.emit('update-instance-title', { instanceId: this.instanceId, title });
         }
         AppState.saveInstanceState?.(this.instanceId);
     }

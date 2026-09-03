@@ -211,6 +211,7 @@ class WindowManager {
 
         const mounted = new Set();
         leaves.forEach((leaf) => {
+
             const inst = AppState.getInstance(leaf.instanceId);
             if (!inst) return;
             this.splitManager.unregisterRenderer(leaf.instanceId);
@@ -218,10 +219,7 @@ class WindowManager {
                 if (mounted.has(leaf.instanceId)) return;
                 mounted.add(leaf.instanceId);
                 pane.innerHTML = '';
-                await inst.mount(pane);
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(() => AppState.restoreInstanceState(leaf.instanceId));
-                });
+                await this._mountIntoPane(inst, pane);
             });
         });
         this.splitManager.setActiveLeaf(instanceId);
@@ -359,21 +357,10 @@ class WindowManager {
             height,
             onClose: () => this.close(instance.instanceId),
             onFocus: () => this._bringToFront(instance.instanceId),
-            onResizeStart: () => {
-                if (instance.viewer && instance.viewer.saveResizeAnchor) {
-                    instance.viewer.saveResizeAnchor();
-                    resizeAnchorSaved = true;
-                }
-            },
-            onResize: () => {
-                if (resizeAnchorSaved && instance.viewer && instance.viewer.restoreResizeAnchor) {
-                    instance.viewer.restoreResizeAnchor();
-                }
-            },
+            onResizeStart: () => this._saveResizeAnchor(instance, () => { resizeAnchorSaved = true; }),
+            onResize: () => this._restoreResizeAnchor(instance, resizeAnchorSaved),
             onResizeEnd: () => {
-                if (resizeAnchorSaved && instance.viewer && instance.viewer.restoreResizeAnchor) {
-                    instance.viewer.restoreResizeAnchor();
-                }
+                this._restoreResizeAnchor(instance, resizeAnchorSaved);
                 resizeAnchorSaved = false;
             },
         });
@@ -393,6 +380,19 @@ class WindowManager {
             this.floatWindows.set(instance.instanceId, floatWin);
             this._bringToFront(instance.instanceId);
         });
+    }
+
+    _saveResizeAnchor(instance, onSuccess) {
+        if (instance.viewer && instance.viewer.saveResizeAnchor) {
+            instance.viewer.saveResizeAnchor();
+            onSuccess();
+        }
+    }
+
+    _restoreResizeAnchor(instance, shouldRestore) {
+        if (shouldRestore && instance.viewer && instance.viewer.restoreResizeAnchor) {
+            instance.viewer.restoreResizeAnchor();
+        }
     }
 
     _mountSplit(instance, props) {
@@ -429,22 +429,17 @@ class WindowManager {
             this.splitManager.registerRenderer(targetInstanceId, async (pane) => {
                 const targetInstance = AppState.getInstance(targetInstanceId);
                 if (!targetInstance) return;
-                await targetInstance.mount(pane);
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(() => AppState.restoreInstanceState(targetInstanceId));
-                });
-            });
-            this.splitManager.registerRenderer(instance.instanceId, async (pane) => {
-                await instance.mount(pane);
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(() => AppState.restoreInstanceState(instance.instanceId));
-                });
-            });
-            this.splitManager.render();
-            return Promise.resolve();
-        }
+            await this._mountIntoPane(targetInstance, pane);
+        });
+        this.splitManager.registerRenderer(instance.instanceId, async (pane) => {
+            await this._mountIntoPane(instance, pane);
+        });
+        this.splitManager.render();
+        return Promise.resolve();
+    }
 
-        if (targetInstanceId) {
+    if (targetInstanceId) {
+
             this.splitManager.splitLeaf(targetInstanceId, direction, { type: 'pane', instanceId: instance.instanceId });
         } else {
             const leaves = this._collectLeaves(tree);
@@ -453,15 +448,13 @@ class WindowManager {
                 this.splitManager.splitLeaf(target.instanceId, direction, { type: 'pane', instanceId: instance.instanceId });
             }
         }
-        this.splitManager.registerRenderer(instance.instanceId, async (pane) => {
-            await instance.mount(pane);
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => AppState.restoreInstanceState(instance.instanceId));
-            });
-        });
-        this.splitManager.render();
-        return Promise.resolve();
-    }
+    this.splitManager.registerRenderer(instance.instanceId, async (pane) => {
+        await this._mountIntoPane(instance, pane);
+    });
+    this.splitManager.render();
+    return Promise.resolve();
+}
+
 
     _collectLeaves(node, out = []) {
         if (!node) return out;
@@ -471,6 +464,17 @@ class WindowManager {
         }
         (node.children || []).forEach(c => this._collectLeaves(c, out));
         return out;
+    }
+
+    /**
+     * Helper to mount an app instance into a pane with the standard
+     * double-requestAnimationFrame state restore.
+     */
+    async _mountIntoPane(instance, pane) {
+        await instance.mount(pane);
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => AppState.restoreInstanceState(instance.instanceId));
+        });
     }
 
     _bringToFront(instanceId) {
@@ -678,10 +682,7 @@ class WindowManager {
             if (mountedTarget) return;
             mountedTarget = true;
             pane.innerHTML = '';
-            await targetInstance.mount(pane);
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => AppState.restoreInstanceState(targetInstanceId));
-            });
+            await this._mountIntoPane(targetInstance, pane);
         });
 
         let mountedAssistant = false;
@@ -689,10 +690,7 @@ class WindowManager {
             if (mountedAssistant) return;
             mountedAssistant = true;
             pane.innerHTML = '';
-            await instance.mount(pane);
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => AppState.restoreInstanceState(instanceId));
-            });
+            await this._mountIntoPane(instance, pane);
         });
 
         this.splitManager.render();
