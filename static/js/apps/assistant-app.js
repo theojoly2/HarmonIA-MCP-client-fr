@@ -572,6 +572,21 @@ class AssistantApp extends AppBase {
         }
     }
 
+    _enterChatModeInstantly() {
+        if (!this.chatEl || !this.welcomeEl || !this.inputArea) return;
+        // Disable transitions, switch classes, apply chat layout, then re-enable.
+        this.welcomeEl.style.transition = 'none';
+        this.inputArea.style.transition = 'none';
+        this.chatEl.classList.add('assistant-chat-mode');
+        this.welcomeEl.classList.add('assistant-welcome-top');
+        this.inputArea.classList.add('assistant-input-area-chat');
+        this._applyCentering(true);
+        void this.welcomeEl.offsetHeight;
+        void this.inputArea.offsetHeight;
+        this.welcomeEl.style.transition = '';
+        this.inputArea.style.transition = '';
+    }
+
     _measureWelcomeContentHeight() {
         if (!this.welcomeEl) return 360;
         let height = 0;
@@ -1169,7 +1184,10 @@ class AssistantApp extends AppBase {
         this.messagesEl.innerHTML = '';
         this.activeSvgCard = null;
         this.activeSvgViewer = null;
-        this._switchToChatMode();
+        // When replaying a saved conversation, switch to chat mode instantly
+        // without animating from the home position. The user only cares about
+        // the loaded messages, not the "first message sent" transition.
+        this._enterChatModeInstantly();
 
         // Rebuild the visible timeline from persisted display events. Events are
         // emitted in stream order and map 1:1 to the renderer methods used during
