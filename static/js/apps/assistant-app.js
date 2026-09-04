@@ -512,6 +512,9 @@ class AssistantApp extends AppBase {
         this.props.display_name = '';
         this.props.modelName = '';
         this.props.modelNames = [];
+        // Detach all imported/linked models so the fresh conversation starts
+        // with an empty context, exactly like a brand-new assistant session.
+        this._clearModelPills();
         if (this.setTitle) this.setTitle(this.constructor.title);
 
         // Fully rebuild the DOM from scratch so every transient element (messages,
@@ -529,7 +532,6 @@ class AssistantApp extends AppBase {
         }
 
         if (this.messagesEl) this.messagesEl.innerHTML = '';
-        this._clearModelPills();
         if (this.chatEl) this.chatEl.classList.remove('assistant-chat-mode');
         if (this.welcomeEl) this.welcomeEl.classList.remove('assistant-welcome-top');
         if (this.inputArea) this.inputArea.classList.remove('assistant-input-area-chat');
