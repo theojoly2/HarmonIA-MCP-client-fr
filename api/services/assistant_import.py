@@ -6,17 +6,12 @@ Shared helpers used by the /api/assistant/import and
 
 from __future__ import annotations
 
-from io import BytesIO
-from typing import Any, Optional
+from typing import Any
 
 from api.naming import model_name_from_filename as _model_name_from_filename, unique_model_name
 from api.services.assistant_mcp_client import AssistantMCPClient
-from data_model_utils import _detect_file_type, ModelProcessingError
-from data_model_utils.import_json import json_file_to_model
-from data_model_utils.import_sql import sql_to_model
-from data_model_utils.import_text import text_to_model
-from data_model_utils.import_ttl import ttl_to_json
-from data_model_utils.import_xml import xml_to_json
+from api.services.model_import import parse_model_file
+from data_model_utils import ModelProcessingError
 
 
 async def parse_and_upload_model_file(
@@ -32,33 +27,14 @@ async def parse_and_upload_model_file(
     source fields set). The model is uploaded twice if needed: once raw and
     once tagged with ``imported_from_assistant=True``.
     """
-    kind = _detect_file_type(file_bytes, filename)
-    if kind is None:
-        raise ModelProcessingError(
-            "Unsupported file format.",
-            "Please upload an XMI/XML, TTL, JSON, SQL or text file.",
-        )
+    json_data = parse_model_file(file_bytes, filename)
 
-    json_data: dict[str, Any] = {}
-
-    if kind in {"xml", "xmi"}:
-        try:
-            json_data = xml_to_json(BytesIO(file_bytes))
-        except Exception as e:
-            raise ModelProcessingError("Failed to parse the XML/XMI file.", str(e))
-
-        elements = json_data.get("elements", [])
-        if not elements:
-            raise ModelProcessingError("Parsed XML has no elements.", "Ensure the XMI version is supported.")
-
+    elements = json_data.setdefault("elements", [])
+    if add_generated_package and json_data.get("source_format") == "xmi" and elements:
         root_model_id = elements[0].get("ID")
-        if not root_model_id:
-            raise ModelProcessingError("Parsed XML root element is missing an ID.")
-
-        if add_generated_package:
+        if root_model_id:
             async with AssistantMCPClient(state={"user": username, "name": session_name, "package": ""}) as mcp_client:
                 generated_id = mcp_client._generate_id()
-
             elements.append({
                 "name": "Generated",
                 "ID": generated_id,
@@ -67,77 +43,6 @@ async def parse_and_upload_model_file(
                 "tags": [],
             })
             json_data["elements"] = elements
-
-        json_data["xmi"] = {
-            "elements": json_data.get("elements", []),
-            "connectors": json_data.get("connectors", []),
-        }
-        json_data["source_format"] = "xmi"
-        json_data["xmi_raw"] = file_bytes.decode("utf-8", errors="replace")
-        json_data["xmi_xml"] = json_data["xmi_raw"]
-    elif kind == "ttl":
-        try:
-            json_data = ttl_to_json(BytesIO(file_bytes))
-        except Exception as e:
-            raise ModelProcessingError("Failed to parse the TTL file.", str(e))
-
-        json_data["source_format"] = "ttl"
-        json_data["ttl_raw"] = file_bytes.decode("utf-8", errors="replace")
-        if "elements" in json_data or "connectors" in json_data:
-            json_data["xmi"] = {
-                "elements": json_data.get("elements", []),
-                "connectors": json_data.get("connectors", []),
-            }
-    elif kind == "json":
-        try:
-            json_data = json_file_to_model(BytesIO(file_bytes), filename=filename)
-        except Exception as e:
-            raise ModelProcessingError("Failed to parse the JSON/JSON-LD file.", str(e))
-        json_data["source_format"] = "json"
-        json_data["json_raw"] = file_bytes.decode("utf-8", errors="replace")
-        if isinstance(json_data.get("xmi"), dict):
-            json_data.setdefault("elements", json_data["xmi"].get("elements", []))
-            json_data.setdefault("connectors", json_data["xmi"].get("connectors", []))
-        else:
-            json_data["xmi"] = {
-                "elements": json_data.get("elements", []),
-                "connectors": json_data.get("connectors", []),
-            }
-    elif kind == "sql":
-        try:
-            json_data = sql_to_model(BytesIO(file_bytes), filename=filename)
-        except Exception as e:
-            raise ModelProcessingError("Failed to parse the SQL file.", str(e))
-        json_data["source_format"] = "sql"
-        json_data["sql_raw"] = file_bytes.decode("utf-8", errors="replace")
-        if isinstance(json_data.get("xmi"), dict):
-            json_data.setdefault("elements", json_data["xmi"].get("elements", []))
-            json_data.setdefault("connectors", json_data["xmi"].get("connectors", []))
-        else:
-            json_data["xmi"] = {
-                "elements": json_data.get("elements", []),
-                "connectors": json_data.get("connectors", []),
-            }
-    else:  # text
-        try:
-            json_data = text_to_model(BytesIO(file_bytes), filename=filename)
-        except Exception as e:
-            raise ModelProcessingError("Failed to parse the text file.", str(e))
-        json_data["source_format"] = "text"
-        json_data["text_raw"] = file_bytes.decode("utf-8", errors="replace")
-        if isinstance(json_data.get("xmi"), dict):
-            json_data.setdefault("elements", json_data["xmi"].get("elements", []))
-            json_data.setdefault("connectors", json_data["xmi"].get("connectors", []))
-        else:
-            json_data["xmi"] = {
-                "elements": json_data.get("elements", []),
-                "connectors": json_data.get("connectors", []),
-            }
-
-    # Ensure elements/connectors are populated for formats that don't set them.
-    if isinstance(json_data.get("xmi"), dict):
-        json_data.setdefault("elements", json_data["xmi"].get("elements", []))
-        json_data.setdefault("connectors", json_data["xmi"].get("connectors", []))
 
     async with AssistantMCPClient(state={"user": username, "name": session_name, "package": ""}) as mcp_client:
         server_model = await mcp_client.upload_model({"model": json_data})

@@ -18,22 +18,16 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from api.naming import model_name_from_filename as _model_name_from_filename
-from api.routers.assistant import (
-    AssistantStreamRequest,
-    _event,
-    assistant_stream_generator,
-)
 from api.routers.auth import require_user_or_api_key
+from api.schemas.assistant import AssistantStreamRequest
+from api.services.assistant_orchestrator import assistant_stream_generator
 from api.services.assistant_history import AssistantHistory
 from api.services.assistant_mcp_client import AssistantMCPClient
+from api.services.assistant_streaming import _event
 from api.services.mcp_service import delete_model_mcp
+from api.services.model_import import parse_model_file
 from api.services.model_store import export_model
-from data_model_utils import _detect_file_type, ModelProcessingError
-from data_model_utils.import_json import json_file_to_model
-from data_model_utils.import_sql import sql_to_model
-from data_model_utils.import_text import text_to_model
-from data_model_utils.import_ttl import ttl_to_json
-from data_model_utils.import_xml import xml_to_json
+from data_model_utils import ModelProcessingError
 
 
 router = APIRouter(prefix="/api/external/v1", tags=["external-api"])
@@ -292,7 +286,7 @@ async def import_model_into_conversation(
     model_name = _external_model_name(conversation_id, filename)
 
     try:
-        json_data = _parse_model_file(file_bytes, filename)
+        json_data = parse_model_file(file_bytes, filename)
         async with AssistantMCPClient(state={"user": username, "name": model_name, "package": ""}) as mcp_client:
             server_model = await mcp_client.upload_model({"model": json_data})
             if not server_model:
@@ -320,76 +314,12 @@ async def import_model_into_conversation(
 
 
 def _parse_model_file(file_bytes: bytes, filename: str) -> dict[str, Any]:
-    kind = _detect_file_type(file_bytes, filename)
-    if kind is None:
-        raise ModelProcessingError("Unsupported file format.", "Please upload an XMI/XML, TTL, JSON, SQL or text file.")
+    """Deprecated: use api.services.model_import.parse_model_file instead.
 
-    json_data: dict[str, Any] = {}
-
-    if kind in {"xml", "xmi"}:
-        try:
-            json_data = xml_to_json(BytesIO(file_bytes))
-        except Exception as e:
-            raise ModelProcessingError("Failed to parse the XML/XMI file.", str(e))
-        elements = json_data.get("elements", [])
-        if not elements:
-            raise ModelProcessingError("Parsed XML has no elements.", "Ensure the XMI version is supported.")
-        root_model_id = elements[0].get("ID")
-        if not root_model_id:
-            raise ModelProcessingError("Parsed XML root element is missing an ID.")
-        json_data["xmi"] = {
-            "elements": json_data.get("elements", []),
-            "connectors": json_data.get("connectors", []),
-        }
-        json_data["source_format"] = "xmi"
-        json_data["xmi_raw"] = file_bytes.decode("utf-8", errors="replace")
-        json_data["xmi_xml"] = json_data["xmi_raw"]
-    elif kind == "ttl":
-        json_data = ttl_to_json(BytesIO(file_bytes))
-        json_data["source_format"] = "ttl"
-        json_data["ttl_raw"] = file_bytes.decode("utf-8", errors="replace")
-        json_data.setdefault("xmi", {
-            "elements": json_data.get("elements", []),
-            "connectors": json_data.get("connectors", []),
-        })
-    elif kind == "json":
-        json_data = json_file_to_model(BytesIO(file_bytes), filename=filename)
-        json_data["source_format"] = "json"
-        json_data["json_raw"] = file_bytes.decode("utf-8", errors="replace")
-        if isinstance(json_data.get("xmi"), dict):
-            json_data.setdefault("elements", json_data["xmi"].get("elements", []))
-            json_data.setdefault("connectors", json_data["xmi"].get("connectors", []))
-        else:
-            json_data["xmi"] = {
-                "elements": json_data.get("elements", []),
-                "connectors": json_data.get("connectors", []),
-            }
-    elif kind == "sql":
-        json_data = sql_to_model(BytesIO(file_bytes), filename=filename)
-        json_data["source_format"] = "sql"
-        json_data["sql_raw"] = file_bytes.decode("utf-8", errors="replace")
-        if isinstance(json_data.get("xmi"), dict):
-            json_data.setdefault("elements", json_data["xmi"].get("elements", []))
-            json_data.setdefault("connectors", json_data["xmi"].get("connectors", []))
-        else:
-            json_data["xmi"] = {
-                "elements": json_data.get("elements", []),
-                "connectors": json_data.get("connectors", []),
-            }
-    else:  # text
-        json_data = text_to_model(BytesIO(file_bytes), filename=filename)
-        json_data["source_format"] = "text"
-        json_data["text_raw"] = file_bytes.decode("utf-8", errors="replace")
-        if isinstance(json_data.get("xmi"), dict):
-            json_data.setdefault("elements", json_data["xmi"].get("elements", []))
-            json_data.setdefault("connectors", json_data["xmi"].get("connectors", []))
-        else:
-            json_data["xmi"] = {
-                "elements": json_data.get("elements", []),
-                "connectors": json_data.get("connectors", []),
-            }
-
-    return json_data
+    Kept here for backwards compatibility with any external callers; it now
+    delegates to the unified parser.
+    """
+    return parse_model_file(file_bytes, filename)
 
 
 # ---------------------------------------------------------------------------

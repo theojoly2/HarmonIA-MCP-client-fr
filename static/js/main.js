@@ -54,6 +54,12 @@
     window.historyPanel = historyPanel;
     window.windowManager = windowManager;
 
+    // Register shared services in the locator so apps don't reach into window.*
+    ServiceLocator.register('windowManager', windowManager);
+    ServiceLocator.register('historyPanel', historyPanel);
+    ServiceLocator.register('authManager', AuthManager);
+    ServiceLocator.register('shell', shell);
+
     // Wire shell buttons to window manager
     shell.windowManager = windowManager;
 

@@ -14,70 +14,29 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, File
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel
 
 from api.naming import display_name_from_stored as _display_model_name, model_name_from_filename as _model_name_from_filename, unique_model_name
 from api.routers.auth import require_user
+from api.schemas.assistant import (
+    AssistantStreamRequest,
+    AssistantRenameBody,
+    LinkModelBody,
+    AssistantSessionRequest,
+    ImportFromDocumentRequest,
+)
 from api.services.assistant_history import AssistantHistory
 from api.services.assistant_import import build_import_session_name, parse_and_upload_model_file
 from api.services.assistant_orchestrator import assistant_stream_generator
 from api.services.assistant_streaming import _event
 from api.services.mcp_service import delete_model_mcp, fetch_document_file
+from api.utils.sse import _safe_json_loads
+from api.utils.text import _slugify_session_name
 from data_model_utils import ModelProcessingError
 
 router = APIRouter(prefix="/api/assistant", tags=["assistant"])
 
 
-class AssistantStreamRequest(BaseModel):
-    session: str = "default"
-    user_message: str
-    model_name: str = ""
-    model_names: list[str] = []
-    tags: list[str] = []
-    origin: str = "assistant"
-
-
-class AssistantRenameBody(BaseModel):
-    name: str
-
-
-class LinkModelBody(BaseModel):
-    model_name: str
-
-
-class AssistantSessionRequest(BaseModel):
-    session: str = "default"
-
-
-class ImportFromDocumentRequest(BaseModel):
-    doc_id: str
-    origin: str = "assistant"
-
-
-def _safe_json_loads(text: str | None) -> Any:
-    if not text:
-        return None
-    try:
-        return json.loads(text)
-    except Exception:
-        return None
-
-
-def _slugify_session_name(text: str) -> str:
-    slug = (
-        text.lower()
-        .strip()
-        .replace("'", " ")
-        .replace("-", " ")
-        .replace("_", " ")
-        .replace(".", " ")
-    )
-    slug = re.sub(r"[^a-z0-9\s]", "", slug)
-    slug = re.sub(r"\s+", "_", slug)
-    slug = slug[:40]
-    if not slug:
-        slug = "session"
-    return f"{slug}"
+__all__ = ["router", "AssistantStreamRequest", "_event", "_safe_json_loads", "_slugify_session_name", "_normalize_search_result"]
 
 
 @router.post("/stream")

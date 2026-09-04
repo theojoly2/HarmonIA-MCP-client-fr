@@ -1628,8 +1628,12 @@ class AssistantApp extends AppBase {
         return div;
     }
 
+    _findProgressCard(cardId) {
+        return this.messagesEl ? this.messagesEl.querySelector(`[id="${cardId}"]`) : null;
+    }
+
     _startFakeProgress(cardId) {
-        const card = document.getElementById(cardId);
+        const card = this._findProgressCard(cardId);
         if (!card) return;
         const fill = card.querySelector('.assistant-progress-bar-fill');
         card.dataset.realPercent = '0';
@@ -1639,7 +1643,7 @@ class AssistantApp extends AppBase {
         let lastTime = performance.now();
 
         const step = (now) => {
-            if (!document.getElementById(cardId)) return;
+            if (!this._findProgressCard(cardId)) return;
             const reported = parseInt(card.dataset.realPercent || '0', 10);
             const dt = Math.min((now - lastTime) / 1000, 0.5);
             lastTime = now;
@@ -1669,7 +1673,7 @@ class AssistantApp extends AppBase {
     }
 
     _stopFakeProgress(cardId) {
-        const card = document.getElementById(cardId);
+        const card = this._findProgressCard(cardId);
         if (!card) return;
         if (card._fakeProgressFrame) {
             cancelAnimationFrame(card._fakeProgressFrame);
@@ -1678,7 +1682,7 @@ class AssistantApp extends AppBase {
     }
 
     _updateProgressCard(cardId, percent, message) {
-        const card = document.getElementById(cardId);
+        const card = this._findProgressCard(cardId);
         if (!card) return;
         const fill = card.querySelector('.assistant-progress-bar-fill');
         const msg = card.querySelector('.assistant-progress-message');
@@ -1695,7 +1699,7 @@ class AssistantApp extends AppBase {
     }
 
     _completeProgressCard(cardId) {
-        const card = document.getElementById(cardId);
+        const card = this._findProgressCard(cardId);
         if (!card) return;
         this._stopFakeProgress(cardId);
         const fill = card.querySelector('.assistant-progress-bar-fill');
@@ -2497,26 +2501,24 @@ class AssistantApp extends AppBase {
             return;
         }
 
-        if (event.kind === 'model_svg') {
-            // In standalone assistant mode, update the active SVG card inside the chat.
-            // When the assistant is embedded next to the modeler, the visualization
-            // lives in the modeler's main canvas instead.
-            const linked = this._linkedModelerInstanceId || this.props.linkedModelerInstanceId;
-            if (linked && this.modelNames?.length) {
-                const modeler = AppState.getInstance(linked);
-                if (modeler && typeof modeler._reloadSvgFromServer === 'function') {
-                    modeler._reloadSvgFromServer();
+            if (event.kind === 'model_svg') {
+                // In standalone assistant mode, update the active SVG card inside the chat.
+                // When the assistant is embedded next to the modeler, the visualization
+                // lives in the modeler's main canvas instead.
+                const linked = this._linkedModelerInstanceId || this.props.linkedModelerInstanceId;
+                if (linked && this.modelNames?.length) {
+                    AssistantBridge.notifySvgRefresh(linked);
+                } else if (!this._embedded) {
+                    const rawName = event.model_name || event.label || '';
+                    const label = rawName
+                        ? this._displayNameForModel(rawName)
+                        : 'Visualisation du modèle';
+                    this._updateCurrentSvgCard(event.svg, label);
                 }
-            } else if (!this._embedded) {
-                const rawName = event.model_name || event.label || '';
-                const label = rawName
-                    ? this._displayNameForModel(rawName)
-                    : 'Visualisation du modèle';
-                this._updateCurrentSvgCard(event.svg, label);
+                saveHtmlSnapshot();
+                return;
             }
-            saveHtmlSnapshot();
-            return;
-        }
+
 
         if (event.kind === 'model_attached') {
             const attachedName = event.model_name;

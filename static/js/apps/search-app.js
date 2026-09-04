@@ -391,7 +391,8 @@ class SearchApp extends AppBase {
             if (AuthManager.isLoggedIn() && !this._skipHistorySave) {
                 try {
                     await ApiClient.saveSearch(this.query, this.selectedTags);
-                    if (window.historyPanel) window.historyPanel.load();
+                    const historyPanel = ServiceLocator.get('historyPanel');
+                    if (historyPanel) historyPanel.load();
                 } catch (err) {
                     console.error('Save search error', err);
                 }
@@ -744,7 +745,8 @@ class SearchApp extends AppBase {
             displayNames: initialDisplayNames,
         });
 
-        await window.windowManager._mountTab(instance);
+        const windowManager = ServiceLocator.get('windowManager');
+        await windowManager._mountTab(instance);
         AppState.setActiveInstance(instanceId);
 
         // Register loading placeholders on the Assistant instance.

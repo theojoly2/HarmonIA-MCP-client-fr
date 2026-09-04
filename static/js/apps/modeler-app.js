@@ -303,7 +303,8 @@ class ModelerApp extends AppBase {
                 if (!res.ok) throw new Error(`open_failed:${res.status}`);
                 const svgText = await res.text();
                 await this.loadSvg(svgText, displayName, '', modelName);
-                if (window.historyPanel) window.historyPanel.load();
+                const historyPanel = ServiceLocator.get('historyPanel');
+                if (historyPanel) historyPanel.load();
             } catch (err) {
                 console.error('Create empty model error', err);
                 this._setLoading(false);
@@ -382,7 +383,8 @@ class ModelerApp extends AppBase {
                     const meta = await ApiClient.importAndSaveModel(file, file.name);
                     storedName = meta.name || file.name;
                     displayName = meta.display_name || file.name;
-                    if (window.historyPanel) window.historyPanel.load();
+                    const historyPanel = ServiceLocator.get('historyPanel');
+                    if (historyPanel) historyPanel.load();
                 } catch (err) {
                     console.error('Model save error', err);
                 }
@@ -405,8 +407,9 @@ class ModelerApp extends AppBase {
         // If the model was previously an anonymous preview, the storedName may
         // still be the original filename. Try to find the real backend name from
         // the history panel if it is now available.
-        if (this.storedName === this.fileName && window.historyPanel) {
-            const match = window.historyPanel.findModelBySvgText?.(svgText);
+        if (this.storedName === this.fileName) {
+            const historyPanel = ServiceLocator.get('historyPanel');
+            const match = historyPanel?.findModelBySvgText?.(svgText);
             if (match?.name) this.storedName = match.name;
         }
         this.mainClassName = mainClassName;
@@ -633,7 +636,8 @@ class ModelerApp extends AppBase {
 
         const existing = this._findAssistantSplitInstance(previousStoredName);
         if (existing) {
-            await window.windowManager?.collapseSplitTo(this.instanceId, existing.instanceId);
+            const windowManager = ServiceLocator.get('windowManager');
+            await windowManager?.collapseSplitTo(this.instanceId, existing.instanceId);
             // collapseSplitTo remounts the modeler in a fresh tab container.
             const liveContainer = document.querySelector(`.app-container[data-instance-id="${this.instanceId}"]`);
             if (liveContainer) this.container = liveContainer;
@@ -885,17 +889,19 @@ class ModelerApp extends AppBase {
 
     _closeAssistantSplit() {
         const existing = this._findAssistantSplitInstance();
-        if (!existing || !window.windowManager) return;
+        const windowManager = ServiceLocator.get('windowManager');
+        if (!existing || !windowManager) return;
         // Collapse the split around the modeler pane, then remove the assistant
         // instance. The helper explicitly remounts the modeler in a fresh tab
         // container so its DOM reference stays valid.
-        window.windowManager.collapseSplitTo(this.instanceId, existing.instanceId);
+        windowManager.collapseSplitTo(this.instanceId, existing.instanceId);
         this._updateAssistantToggleVisibility();
     }
 
     async _toggleAssistantSplit() {
         if (!this._requireAuth()) return;
-        if (!this.storedName || !window.windowManager) return;
+        const windowManager = ServiceLocator.get('windowManager');
+        if (!this.storedName || !windowManager) return;
         const existing = this._findAssistantSplitInstance();
         if (existing) {
             this._closeAssistantSplit();
@@ -925,7 +931,7 @@ class ModelerApp extends AppBase {
         if (this._openingAssistant) return;
         this._openingAssistant = true;
         try {
-            await window.windowManager.splitPanel(this.instanceId, 'assistant', {
+            await windowManager.splitPanel(this.instanceId, 'assistant', {
                 modelName: this.storedName,
                 modelNames: [this.storedName],
                 linkedModelerInstanceId: this.instanceId,

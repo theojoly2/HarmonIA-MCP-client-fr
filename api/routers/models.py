@@ -18,6 +18,7 @@ from api.naming import (
     unique_model_name as _unique_model_name,
 )
 from api.routers.auth import require_user
+from api.services.model_import import base64_for_bytes, parse_model_file
 from api.services.model_store import (
     add_attribute,
     add_class,
@@ -104,49 +105,15 @@ async def import_model(
     stored_name = _unique_model_name(display_name)
 
     # Generate SVG to validate + extract model JSON
-    from io import BytesIO
     svg_text = generate_svg_for_bytes(file_bytes, filename)
 
-    # Reconstruct the JSON model used by generate_svg_for_bytes
-    from data_model_utils import _detect_file_type, json_file_to_model, sql_to_model, text_to_model, ttl_to_json, xml_to_json
-    kind = _detect_file_type(file_bytes, filename)
-    if not kind and filename:
-        import os as _os
-        _, ext = _os.path.splitext(filename.lower())
-        if ext == ".ttl":
-            kind = "ttl"
-        elif ext in (".xml", ".xmi"):
-            kind = "xml"
-        elif ext in (".json", ".jsonld"):
-            kind = "json"
-        elif ext == ".sql":
-            kind = "sql"
-        elif ext in (".txt", ".html", ".htm", ".csv"):
-            kind = "text"
+    # Parse the file into the canonical JSON model representation.
+    model_data = parse_model_file(file_bytes, filename)
 
-    if kind in {"xml", "xmi"}:
-        model_data = xml_to_json(BytesIO(file_bytes))
-    elif kind == "ttl":
-        model_data = ttl_to_json(BytesIO(file_bytes))
-    elif kind == "json":
-        model_data = json_file_to_model(BytesIO(file_bytes), filename=filename)
-    elif kind == "sql":
-        model_data = sql_to_model(BytesIO(file_bytes), filename=filename)
-    elif kind == "text":
-        model_data = text_to_model(BytesIO(file_bytes), filename=filename)
-    else:
-        raise ValueError("Format non supporté pour la modélisation.")
-
-    # Always keep the canonical xmi wrapper structure
-    if isinstance(model_data, dict) and "xmi" in model_data:
-        stored_data = model_data
-    else:
-        stored_data = {"xmi": model_data}
-
+    stored_data = dict(model_data)
     stored_data["svg"] = svg_text
     stored_data["source_filename"] = filename
     stored_data["source_bytes_b64"] = base64_for_bytes(file_bytes)
-    stored_data["source_format"] = kind or "unknown"
     # Keep the displayable model name inside the JSON; the technical file name
     # is only used for the file path, never for package/ontology labels.
     stored_data["name"] = display_name
@@ -159,7 +126,7 @@ async def import_model(
     return ImportResponse(
         name=stored_name,
         display_name=_display_name(payload.get("name", stored_name)),
-        source_format=payload.get("source_format", kind or "unknown"),
+        source_format=payload.get("source_format", model_data.get("source_format", "unknown")),
     )
 
 

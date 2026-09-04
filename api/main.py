@@ -4,7 +4,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from api.routers import search, documents, modeler, chat, auth, models, searches, assistant, external_api, external_api_keys
@@ -57,7 +57,7 @@ def create_app() -> FastAPI:
 
             data = await fetch_document_file(download_id)
             if not data.get("success"):
-                return FastAPIHTMLResponse(f"<h3>Erreur de récupération: {data.get('error')}</h3>", status_code=404)
+                return JSONResponse({"detail": f"Erreur de récupération: {data.get('error')}"}, status_code=404)
             b64_str = data["file_base64"]
             filename = data.get("filename", "document")
             ext = data.get("extension", "").lower()
@@ -79,7 +79,7 @@ def create_app() -> FastAPI:
         index_path = static_dir / "index.html"
         if index_path.exists():
             return FileResponse(index_path)
-        return HTMLResponse("<h1>Frontend not built</h1>", status_code=404)
+        return JSONResponse({"detail": "Frontend not built"}, status_code=404)
 
     return app
 

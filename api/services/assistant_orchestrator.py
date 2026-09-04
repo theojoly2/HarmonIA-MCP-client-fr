@@ -14,7 +14,8 @@ from uuid import uuid4
 from openai.types.chat import ChatCompletionSystemMessageParam
 
 from api.naming import display_name_from_stored as _display_model_name
-from api.routers.search import _normalize_search_result
+from api.schemas.assistant import AssistantStreamRequest
+from api.schemas.search import _normalize_search_result
 from api.services.assistant_history import AssistantHistory
 from api.services.assistant_mcp_client import AssistantMCPClient
 from api.services.assistant_streaming import (
@@ -25,13 +26,14 @@ from api.services.assistant_streaming import (
     _normalize_tool_calls,
 )
 from api.services.mcp_service import fetch_search, get_model_mcp, upload_model_mcp
+from api.utils.sse import _safe_json_loads
+from api.utils.text import _slugify_session_name
 
 
 async def assistant_stream_generator(
     request: Any,
     username: str,
 ) -> AsyncGenerator[str, None]:
-    from api.routers.assistant import AssistantStreamRequest, _safe_json_loads, _slugify_session_name
 
     user_input = request.user_message.strip()
     if not user_input:

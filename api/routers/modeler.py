@@ -1,8 +1,8 @@
 import os
 from io import BytesIO
 
-from fastapi import APIRouter, Request, UploadFile, File
-from fastapi.responses import HTMLResponse, Response
+from fastapi import APIRouter, Request, UploadFile, File, HTTPException
+from fastapi.responses import JSONResponse, Response
 
 from api.dependencies import generate_svg_for_bytes
 
@@ -19,4 +19,4 @@ async def modeler_import(file: UploadFile = File(...)):
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return HTMLResponse(f"<h3>Erreur d'import : {e}</h3>", status_code=500)
+        raise HTTPException(status_code=500, detail=f"Erreur d'import : {e}") from e

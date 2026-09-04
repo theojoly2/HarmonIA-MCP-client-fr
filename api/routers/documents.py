@@ -1,8 +1,8 @@
 import base64
 import urllib.parse
 
-from fastapi import APIRouter, Request, Response
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import APIRouter, Request, Response, HTTPException
+from fastapi.responses import JSONResponse
 
 from api.dependencies import extract_filename_from_disposition, generate_svg_for_bytes
 from api.services.mcp_service import fetch_document_file
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api/documents", tags=["documents"])
 async def get_document_file(document_id: str):
     data = await fetch_document_file(document_id)
     if not data.get("success"):
-        return HTMLResponse(f"<h3>Erreur de récupération: {data.get('error')}</h3>", status_code=404)
+        raise HTTPException(status_code=404, detail=f"Erreur de récupération: {data.get('error')}")
     b64_str = data["file_base64"]
     filename = data.get("filename", "document")
     ext = data.get("extension", "").lower()
@@ -38,7 +38,7 @@ async def get_document_file(document_id: str):
 async def visualize_document(document_id: str):
     data = await fetch_document_file(document_id)
     if not data.get("success"):
-        return HTMLResponse(f"<h3>Erreur de récupération: {data.get('error')}</h3>", status_code=404)
+        raise HTTPException(status_code=404, detail=f"Erreur de récupération: {data.get('error')}")
     file_bytes = base64.b64decode(data["file_base64"])
     filename = data.get("filename", "document")
     try:
@@ -47,4 +47,4 @@ async def visualize_document(document_id: str):
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return HTMLResponse(f"<h3>Erreur de visualisation : {e}</h3>", status_code=500)
+        raise HTTPException(status_code=500, detail=f"Erreur de visualisation : {e}") from e
