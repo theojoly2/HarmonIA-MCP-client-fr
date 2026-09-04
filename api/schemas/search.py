@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import urllib.parse
 from typing import Any
 
@@ -38,7 +39,7 @@ def _normalize_search_result(row: list | tuple) -> dict[str, Any] | None:
     score = float(row[4]) if row[4] else 0.0
     doc_tags = row[5] if isinstance(row[5], list) else []
     document_id = row[6] if len(row) > 6 else None
-    _, ext = urllib.parse.splitext(filename.lower())
+    _, ext = os.path.splitext(filename.lower())
     return {
         "filename": filename,
         "safe_filename": urllib.parse.quote(filename),
