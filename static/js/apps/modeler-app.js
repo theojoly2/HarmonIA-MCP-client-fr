@@ -264,6 +264,9 @@ class ModelerApp extends AppBase {
         }
 
         if (newEmptyBtn) {
+            // Prevent duplicate listeners when the DOM is rebuilt (e.g. after resetToHome).
+            if (newEmptyBtn.dataset.bound === 'true') return;
+            newEmptyBtn.dataset.bound = 'true';
             newEmptyBtn.addEventListener('click', () => this._createEmptyModel());
         }
 
