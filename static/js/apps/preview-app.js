@@ -168,7 +168,7 @@ class PreviewApp extends AppBase {
     getState() {
         // Avoid saving state before the first load so restoreInstanceState doesn't
         // trigger a redundant render while _load is still async.
-        if (!this.svgText && !this.viewer) {
+        if (!this.svgText && !this.svgController?.viewer) {
             return {};
         }
         return {

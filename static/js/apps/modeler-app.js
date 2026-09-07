@@ -1087,7 +1087,7 @@ class ModelerApp extends AppBase {
 
     async _reloadSvgFromServer() {
         this.svgText = await ModelGateway.reloadSvg(this.storedName || this.fileName);
-        if (this.viewer) {
+        if (this.svgController) {
             this.svgController.renderSvg(this.container, this.svgText, this.mainClassName, {
                 shouldCenter: false,
                 stateToRestore: this.viewerState,
