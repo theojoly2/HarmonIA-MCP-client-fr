@@ -5,7 +5,7 @@ import json
 from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel, Field
 
-from api.security import clear_session_cookie, require_user, set_session_cookie
+from api.security import clear_session_cookie, get_session_cookie, require_user, set_session_cookie
 from api.services.auth_service import verify_password
 from api.services.user_store import create_user, get_user_by_username, update_user_password
 from api.services.usage_store import get_usage
