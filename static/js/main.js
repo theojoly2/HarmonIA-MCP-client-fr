@@ -51,14 +51,21 @@
 
     // Window manager
     const windowManager = new WindowManager(contentArea, splitManager);
-    window.historyPanel = historyPanel;
-    window.windowManager = windowManager;
 
     // Register shared services in the locator so apps don't reach into window.*
     ServiceLocator.register('windowManager', windowManager);
     ServiceLocator.register('historyPanel', historyPanel);
     ServiceLocator.register('authManager', AuthManager);
     ServiceLocator.register('shell', shell);
+    ServiceLocator.register('uiHelpers', UiHelpers);
+    ServiceLocator.register('glowEffects', GlowEffects);
+    ServiceLocator.register('eventBus', EventBus);
+    ServiceLocator.register('appState', AppState);
+
+    // Expose minimal globals for legacy callers and browser console debugging.
+    // New code should prefer ServiceLocator.get(...).
+    window.historyPanel = historyPanel;
+    window.windowManager = windowManager;
 
     // Wire shell buttons to window manager
     shell.windowManager = windowManager;
@@ -161,7 +168,7 @@
     // Anonymous users can browse Search. Protected features show their own login prompts.
     // Do not open the blocking auth modal automatically anymore.
 
-    // Global helper
+    // Global helper (legacy/debug only)
     window.AuthManager = AuthManager;
 
     // Event bus handlers

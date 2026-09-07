@@ -97,7 +97,8 @@ class PreviewApp extends AppBase {
                 const meta = await ModelGateway.importAndSave(file, this.docName);
                 storedName = meta.name || this.docName;
                 displayName = meta.display_name || this.docName;
-                if (window.historyPanel) window.historyPanel.load();
+                const historyPanel = ServiceLocator.get('historyPanel');
+                if (historyPanel) historyPanel.load();
             } catch (err) {
                 console.error("Persist preview model error", err);
                 return;

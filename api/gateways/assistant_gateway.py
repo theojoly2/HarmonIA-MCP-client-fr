@@ -192,7 +192,7 @@ async def rename_assistant_session(
     target_origin = _normalize_origin(origin, "assistant")
     old_history = AssistantHistory(user=username, session=session, origin=target_origin)
     if not old_history._session_exists():
-        raise HTTPException(status_code=404, detail="Session inconnue")
+        raise HTTPException(status_code=404, detail={"error": "session_not_found", "message": "Session inconnue"})
 
     new_stored_name = _slugify_session_name(new_display_name.strip())
     new_stored_name = f"{new_stored_name}__{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
@@ -238,7 +238,7 @@ async def link_assistant_session_model(
     target_origin = _normalize_origin(origin, "modeler")
     history = AssistantHistory(user=username, session=session, origin=target_origin)
     if not history._session_exists():
-        raise HTTPException(status_code=404, detail="Session inconnue")
+        raise HTTPException(status_code=404, detail={"error": "session_not_found", "message": "Session inconnue"})
 
     history.assistant_model_name = model_name.strip()
     history.assistant_model_names = [model_name.strip()]

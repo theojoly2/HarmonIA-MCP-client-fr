@@ -18,7 +18,10 @@ from api.services.mcp_service import fetch_document_context, fetch_document_file
 async def serve_document_file(document_id: str) -> Response:
     data = await fetch_document_file(document_id)
     if not data.get("success"):
-        raise HTTPException(status_code=404, detail=f"Erreur de récupération: {data.get('error')}")
+        raise HTTPException(
+            status_code=404,
+            detail={"error": "document_not_found", "message": data.get("error")},
+        )
 
     b64_str = data["file_base64"]
     filename = data.get("filename", "document")
@@ -44,17 +47,30 @@ async def serve_document_file(document_id: str) -> Response:
 async def visualize_document(document_id: str) -> Response:
     data = await fetch_document_file(document_id)
     if not data.get("success"):
-        raise HTTPException(status_code=404, detail=f"Erreur de récupération: {data.get('error')}")
+        raise HTTPException(
+            status_code=404,
+            detail={"error": "document_not_found", "message": data.get("error")},
+        )
 
     file_bytes = base64.b64decode(data["file_base64"])
     filename = data.get("filename", "document")
     try:
         svg_text = generate_svg_for_bytes(file_bytes, filename)
         return Response(content=svg_text.encode("utf-8"), media_type="image/svg+xml")
-    except Exception as e:
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "unsupported_format", "message": str(exc)},
+        ) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Erreur de visualisation : {e}") from e
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "visualisation_failed", "message": str(exc)},
+        ) from exc
 
 
 async def stream_chat_document(request: Any, http_request: Any) -> Any:

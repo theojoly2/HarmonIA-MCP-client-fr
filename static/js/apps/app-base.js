@@ -24,19 +24,44 @@ class AppBase {
     }
 
     get authManager() {
-        // Lazy access to the global auth manager so apps do not hardcode it.
+        // Prefer the explicit locator registration; fall back to AppState then
+        // legacy globals for older callers.
+        if (typeof ServiceLocator !== "undefined") {
+            const fromLocator = ServiceLocator.get("authManager");
+            if (fromLocator) return fromLocator;
+        }
         return (typeof AppState !== "undefined" && AppState.authManager)
             || (typeof window !== "undefined" && window.AuthManager)
             || null;
     }
 
     get ui() {
+        if (typeof ServiceLocator !== "undefined") {
+            const ui = ServiceLocator.get("uiHelpers");
+            if (ui) return ui;
+        }
         return (typeof window !== "undefined" && window.UiHelpers) || {};
     }
 
+    _scanGlow(containerOrSelector) {
+        const glow = (typeof ServiceLocator !== "undefined" && ServiceLocator.get("glowEffects"))
+            || (typeof window !== "undefined" && window.GlowEffects)
+            || null;
+        if (!glow || typeof glow.scanAndBind !== "function") return;
+        if (containerOrSelector) {
+            const target = typeof containerOrSelector === "string"
+                ? document.querySelector(containerOrSelector)
+                : containerOrSelector;
+            glow.scanAndBind(target);
+        } else {
+            glow.scanAndBind();
+        }
+    }
+
     _requireAuth() {
-        if (AuthManager.isLoggedIn()) return true;
-        if (this.authManager) this.authManager.showModal();
+        const auth = this.authManager;
+        if (auth && auth.isLoggedIn()) return true;
+        if (auth && typeof auth.showModal === "function") auth.showModal();
         return false;
     }
 

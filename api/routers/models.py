@@ -293,8 +293,3 @@ async def add_connector_route(model_name: str, body: ConnectorEditBody, username
         rel_usage_note=body.rel_usage_note.strip(),
     )
     return result
-
-
-def base64_for_bytes(data: bytes) -> str:
-    import base64
-    return base64.b64encode(data).decode("ascii")

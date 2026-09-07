@@ -322,7 +322,7 @@ class SearchApp extends AppBase {
         const tagsContainer = this.container ? this.container.querySelector('#tags-container') : null;
         if (!tagsContainer) return;
         tagsContainer.innerHTML = this.tagsHtml || '<span class="text-gray-500 font-medium text-sm">Aucune source disponible.</span>';
-        if (window.GlowEffects) window.GlowEffects.scanAndBind();
+        this._scanGlow(tagsContainer);
     }
 
     _renderTags(tags) {
@@ -336,7 +336,7 @@ class SearchApp extends AppBase {
         if (!tagsContainer) return;
         tagsContainer.classList.remove('tags-staged');
         tagsContainer.innerHTML = this.tagsHtml || '<span class="text-gray-500 font-medium text-sm">Aucune source disponible.</span>';
-        if (window.GlowEffects) window.GlowEffects.scanAndBind();
+        this._scanGlow(tagsContainer);
         // Re-measure with tags and glide the title/bar upward.
         if (wrapper) wrapper.offsetHeight;
         this._applyCentering();

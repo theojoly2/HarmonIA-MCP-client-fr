@@ -202,9 +202,7 @@ class AssistantApp extends AppBase {
         this._syncModelUi();
         this._renderLoginBanner();
 
-        if (window.GlowEffects && typeof window.GlowEffects.scanAndBind === 'function') {
-            window.GlowEffects.scanAndBind(container);
-        }
+        this._scanGlow(container);
 
         container.querySelector('#assistant-reset').addEventListener('click', () => {
             this._newSession();

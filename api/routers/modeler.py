@@ -13,7 +13,11 @@ async def modeler_import(file: UploadFile = File(...)):
         filename = file.filename or "document.txt"
         svg_text = generate_svg_for_bytes(file_bytes, filename)
         return Response(content=svg_text.encode("utf-8"), media_type="image/svg+xml")
-    except Exception as e:
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail={"error": "unsupported_format", "message": str(exc)}) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Erreur d'import : {e}") from e
+        raise HTTPException(status_code=500, detail={"error": "import_failed", "message": str(exc)}) from exc
