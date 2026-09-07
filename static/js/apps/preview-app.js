@@ -77,7 +77,7 @@ class PreviewApp extends AppBase {
 
     async _openInModéliseur() {
         if (!this.svgText) return;
-        if (!AuthManager.isLoggedIn()) {
+        if (!(this.authManager && this.authManager.isLoggedIn())) {
             if (this.authManager) this.authManager.showModal();
             return;
         }

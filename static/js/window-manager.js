@@ -77,7 +77,7 @@ class WindowManager {
 
         // Cache whatever is currently visible before replacing it with a new tab.
         if (mode === 'tab') {
-            const visibleId = this._getVisibleInstanceId();
+            const visibleId = this.getVisibleInstanceId();
             if (visibleId) {
                 this._cacheView(visibleId);
             }
@@ -103,8 +103,11 @@ class WindowManager {
     /**
      * Return the instanceId whose DOM is currently in the shell.
      * For a split, returns the active pane (or the first pane if none is active).
+     *
+     * Public so external components (e.g. HistoryPanel) can read the visible
+     * instance without depending on private internals.
      */
-    _getVisibleInstanceId() {
+    getVisibleInstanceId() {
         if (this.splitManager.tree) {
             const activePane = this.shellElement.querySelector('.split-pane.split-pane-active');
             if (activePane) return activePane.dataset.instanceId || null;
@@ -119,7 +122,7 @@ class WindowManager {
         const instance = AppState.getInstance(instanceId);
         if (!instance) return;
 
-        const visibleId = this._getVisibleInstanceId();
+        const visibleId = this.getVisibleInstanceId();
 
         // Already visible and target is the visible one -> nothing to do.
         if (visibleId === instanceId) {
@@ -300,10 +303,30 @@ class WindowManager {
         AppState.setActiveInstance(instanceId);
     }
 
+    clearShell() {
+        this._clearShell();
+    }
+
     _clearShell() {
         while (this.shellElement.firstChild) {
             this.shellElement.removeChild(this.shellElement.firstChild);
         }
+    }
+
+    clearSplit() {
+        this.splitManager.setTree(null);
+    }
+
+    appendToShell(element) {
+        this.shellElement.appendChild(element);
+    }
+
+    invalidateViewCache(instanceId) {
+        this._viewCache.delete(instanceId);
+    }
+
+    mountTab(instance) {
+        return this._mountTab(instance);
     }
 
     _mountTab(instance) {

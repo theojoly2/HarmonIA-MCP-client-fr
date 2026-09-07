@@ -371,7 +371,7 @@ class ModelerApp extends AppBase {
 
             let storedName = file.name;
             let displayName = file.name;
-            if (AuthManager.isLoggedIn()) {
+            if (this.authManager?.isLoggedIn()) {
                 try {
                     const meta = await ModelGateway.importAndSave(file, file.name);
                     storedName = meta.name || file.name;
@@ -382,7 +382,7 @@ class ModelerApp extends AppBase {
                     console.error('Model save error', err);
                 }
             } else {
-                await AuthManager.setPendingImport(file, file.name, this.svgText);
+                await this.authManager?.setPendingImport?.(file, file.name, this.svgText);
             }
             await this.loadSvg(this.svgText, displayName, mainClassName, storedName);
         } catch (err) {
@@ -893,7 +893,7 @@ class ModelerApp extends AppBase {
         const addConnectorBtn = this.container.querySelector('#modeler-add-connector');
         const classes = this._extractClassNames();
         const disabledClass = 'modeler-edit-btn-disabled';
-        const loginRequired = !AuthManager.isLoggedIn();
+        const loginRequired = !(this.authManager && this.authManager.isLoggedIn());
         if (addClassBtn) {
             addClassBtn.disabled = loginRequired;
             addClassBtn.classList.toggle(disabledClass, loginRequired);

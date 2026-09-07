@@ -271,7 +271,7 @@ class SearchApp extends AppBase {
             } else if (action === 'chat') {
                 EventBus.emit('open-chat', { documentId, name });
             } else if (action === 'add-to-assistant') {
-                if (!AuthManager.isLoggedIn()) {
+                if (!(this.authManager && this.authManager.isLoggedIn())) {
                     if (this.authManager) this.authManager.showModal();
                     return;
                 }
@@ -388,7 +388,7 @@ class SearchApp extends AppBase {
             this._applyCentering();
 
             // Persist search query to user history when logged in.
-            if (AuthManager.isLoggedIn() && !this._skipHistorySave) {
+            if (this.authManager?.isLoggedIn() && !this._skipHistorySave) {
                 try {
                     await SearchGateway.saveSearch(this.query, this.selectedTags);
                     const historyPanel = ServiceLocator.get('historyPanel');
@@ -716,7 +716,7 @@ class SearchApp extends AppBase {
     }
 
     async _openAssistantWithSelectedModels() {
-        if (!AuthManager.isLoggedIn()) {
+        if (!(this.authManager && this.authManager.isLoggedIn())) {
             if (this.authManager) this.authManager.showModal();
             return;
         }
@@ -789,7 +789,7 @@ class SearchApp extends AppBase {
     _renderLoginBanner() {
         const slot = this.container?.querySelector('#search-login-banner');
         if (!slot) return;
-        if (AuthManager.isLoggedIn()) {
+        if (this.authManager?.isLoggedIn()) {
             slot.classList.add('hidden');
             slot.innerHTML = '';
             return;

@@ -152,10 +152,10 @@ class AssistantApp extends AppBase {
         this._tagsReady = false;
         this._renderer = new AssistantRenderer(this.messagesEl, this.chatEl, {
             escape: (t) => this._escape(t),
-            markdown: (t, streaming = false) => this._markdown(t, streaming),
-            sparkleSvg: () => this._sparkleSvg(),
-            toolStatusLabel: (n) => this._toolStatusLabel(n),
-            toolSummary: (result) => this._toolSummary(result),
+            markdown: (t, streaming = false) => AssistantMarkdown.markdown(t, (x) => this._escape(x), streaming),
+            sparkleSvg: () => AssistantMarkdown.sparkleSvg(),
+            toolStatusLabel: (n) => AssistantEventProcessor.toolStatusLabel(n),
+            toolSummary: (result) => AssistantEventProcessor.toolSummary(result),
             buildResultsHtml: (results, count, opts) => this.ui.buildResultsHtml(results, count, opts),
             onUpdateSearchButtons: () => this._updateSearchResultAddButtons(),
             onScroll: (force) => this._scrollToBottom(force),
@@ -182,11 +182,11 @@ class AssistantApp extends AppBase {
                 this.embeddedIntroEl.innerHTML = `
                     <div class="assistant-bubble assistant-bubble-assistant mb-6">
                         <div class="assistant-bubble-content markdown-body">
-                            ${this._markdown(introText, false)}
+                            ${AssistantMarkdown.markdown(introText, (t) => this._escape(t), false)}
                         </div>
                         <div class="ai-avatar-row flex items-center gap-2">
                             <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic" data-hidden="false">
-                                ${this._sparkleSvg()}
+                                ${AssistantMarkdown.sparkleSvg()}
                             </div>
                         </div>
                     </div>
@@ -325,7 +325,7 @@ class AssistantApp extends AppBase {
     async mount(container) {
         // Do not mount a full assistant instance for anonymous users unless it is
         // embedded in the modeler (which already shows its own login prompt).
-        if (!this._embedded && !AuthManager.isLoggedIn()) {
+        if (!this._embedded && !(this.authManager && this.authManager.isLoggedIn())) {
             this._renderAnonymousPlaceholder(container);
             return;
         }
@@ -434,7 +434,7 @@ class AssistantApp extends AppBase {
         }
         // If the user has logged in since the anonymous placeholder was cached,
         // replace it with the real assistant UI.
-        if (AuthManager.isLoggedIn() && this.container?.querySelector('.assistant-anonymous-card')) {
+        if (this.authManager?.isLoggedIn() && this.container?.querySelector('.assistant-anonymous-card')) {
             this.container.innerHTML = '';
             this.mount(this.container);
             return;
@@ -1157,7 +1157,7 @@ class AssistantApp extends AppBase {
         const div = document.createElement('div');
         div.className = 'assistant-bubble assistant-bubble-assistant mb-6';
         div.innerHTML = `
-            <div class="assistant-bubble-content markdown-body">${this._markdown(text)}</div>
+            <div class="assistant-bubble-content markdown-body">${AssistantMarkdown.markdown(text, (t) => this._escape(t), false)}</div>
         `;
         this.messagesEl.appendChild(div);
         this._scrollToBottom();
@@ -1250,7 +1250,7 @@ class AssistantApp extends AppBase {
                 }
                 currentText += event.content || '';
                 const bubble = ensureReplayBubble();
-                bubble.innerHTML = this._markdown(currentText, false);
+                bubble.innerHTML = AssistantMarkdown.markdown(currentText, (t) => this._escape(t), false);
                 lastRole = 'assistant';
                 return;
             }
@@ -1258,7 +1258,7 @@ class AssistantApp extends AppBase {
                 if (event.content && !currentText) {
                     currentText = event.content;
                     const bubble = ensureReplayBubble();
-                    bubble.innerHTML = this._markdown(currentText, false);
+                    bubble.innerHTML = AssistantMarkdown.markdown(currentText, (t) => this._escape(t), false);
                 }
                 closeReplayBubble();
                 this._renderer.activeSvgCard = null;
@@ -1274,7 +1274,7 @@ class AssistantApp extends AppBase {
                 this._renderer.hideAllSparkles();
                 this._renderer.removeThinkingPlaceholder();
                 const bubble = ensureReplayBubble();
-                bubble.innerHTML = this._markdown(event.content || '', false);
+                bubble.innerHTML = AssistantMarkdown.markdown(event.content || '', (t) => this._escape(t), false);
                 closeReplayBubble();
                 lastRole = 'assistant';
                 return;
@@ -1388,31 +1388,6 @@ class AssistantApp extends AppBase {
     }
 
 
-    _toolStatusLabel(name) {
-        const labels = {
-            plan_workflow_with_tools: 'Planification en cours...',
-            retrieve_documents: 'Recherche de contexte...',
-            add_class: 'Création de la classe...',
-            add_attribute: "Ajout d'un attribut...",
-            add_connector: 'Création de la relation...',
-            style_guide_check: 'Synthèse de la réponse...',
-        };
-        return labels[name] || `${name}...`;
-    }
-
-    _toolSummary(result) {
-        if (!result || typeof result !== 'object') return '';
-        const toolResults = result.tool_results;
-        if (!toolResults || typeof toolResults !== 'object') return '';
-        if (Array.isArray(toolResults) && toolResults.length > 0) {
-            return ` (${toolResults.length} résultats)`;
-        }
-        if (Object.keys(toolResults).length > 0) {
-            return ` (${Object.keys(toolResults).length} entrées)`;
-        }
-        return '';
-    }
-
     _scrollToBottom(force = false) {
         const el = this.chatEl;
         if (!el) return;
@@ -1459,83 +1434,13 @@ class AssistantApp extends AppBase {
 
         // ChatApp-style streaming: accumulate the full response, then display it
         // character-by-character with live markdown reparsing.
-        let fullResponse = '';
-        let displayedText = '';
-        let streamBuffer = '';
-        let currentBubbleContent = null;
-        let typewriterInterval = null;
-
-        const startTypewriter = () => {
-            if (typewriterInterval) return;
-            typewriterInterval = setInterval(() => {
-                if (streamBuffer.length === 0) return;
-                const chunkSize = Math.min(3 + Math.floor(Math.random() * 8), streamBuffer.length);
-                displayedText += streamBuffer.slice(0, chunkSize);
-                streamBuffer = streamBuffer.slice(chunkSize);
-                if (currentBubbleContent) {
-                    currentBubbleContent.innerHTML = this._markdown(displayedText, false);
-                }
-                this._adjustChatPadding();
-            }, 10);
-        };
-
-        const stopTypewriter = () => {
-            if (typewriterInterval) {
-                clearInterval(typewriterInterval);
-                typewriterInterval = null;
-            }
-        };
-
-        const flushTypewriter = () => {
-            stopTypewriter();
-            if (streamBuffer.length > 0) {
-                displayedText += streamBuffer;
-                streamBuffer = '';
-            }
-            if (currentBubbleContent) {
-                currentBubbleContent.innerHTML = this._markdown(displayedText, false);
-            }
-            // The final parse can make the bubble much taller. Apply the safety
-            // padding so the new content is never hidden behind the input area.
-            this._adjustChatPadding();
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    this._adjustChatPadding();
-                });
-            });
-        };
-
-        const resetTypewriter = () => {
-            stopTypewriter();
-            displayedText = '';
-            streamBuffer = '';
-            currentBubbleContent = null;
-        };
-
-        const appendToStreamBuffer = (text) => {
-            streamBuffer += text;
-        };
-
-        const ensureAssistantTextBubble = () => {
-            if (currentBubbleContent) return currentBubbleContent;
-            this._renderer.removeThinkingPlaceholder();
-            this._renderer.closeAssistantBubble();
-            const wrapper = document.createElement('div');
-            wrapper.className = 'assistant-bubble assistant-bubble-assistant mb-6';
-            wrapper.dataset.role = 'assistant';
-            wrapper.dataset.active = 'true';
-            wrapper.innerHTML = `
-                <div class="assistant-bubble-content markdown-body"></div>
-                <div class="ai-avatar-row flex items-center gap-2">
-                    <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic" data-hidden="false">
-                        ${this._sparkleSvg()}
-                    </div>
-                </div>
-            `;
-            this.messagesEl.appendChild(wrapper);
-            currentBubbleContent = wrapper.querySelector('.assistant-bubble-content');
-            return currentBubbleContent;
-        };
+        const typewriter = new AssistantTypewriter({
+            messagesEl: this.messagesEl,
+            renderer: this._renderer,
+            sparkleSvg: () => AssistantMarkdown.sparkleSvg(),
+            markdown: (t) => AssistantMarkdown.markdown(t, (x) => this._escape(x), false),
+            adjustPadding: () => this._adjustChatPadding(),
+        });
 
         // Abort controller lets the client survive long waits and prevents duplicate streams.
         this._streamAbortController?.abort();
@@ -1560,10 +1465,10 @@ class AssistantApp extends AppBase {
             const eventsToReplay = this._pendingEvents.slice(this._lastRenderedEventIndex + 1);
             this._lastRenderedEventIndex = this._pendingEvents.length - 1;
             for (const ev of eventsToReplay) {
-                this._processEvent(ev, { startTypewriter, stopTypewriter, flushTypewriter, resetTypewriter, ensureAssistantTextBubble, appendToStreamBuffer, saveHtmlSnapshot, placeholderRef: { value: placeholder } });
+                this._processEvent(ev, { typewriter, saveHtmlSnapshot, placeholderRef: { value: placeholder } });
             }
 
-            this._processEvent(event, { startTypewriter, stopTypewriter, flushTypewriter, resetTypewriter, ensureAssistantTextBubble, appendToStreamBuffer, saveHtmlSnapshot, placeholderRef: { value: placeholder } });
+            this._processEvent(event, { typewriter, saveHtmlSnapshot, placeholderRef: { value: placeholder } });
         };
 
         try {
@@ -1582,16 +1487,16 @@ class AssistantApp extends AppBase {
             bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(err.message)}</em>`;
         } finally {
             clearInterval(loadingInterval);
-            stopTypewriter();
-            flushTypewriter();
+            typewriter.stop();
+            typewriter.flush();
             this.isStreaming = false;
             this._setSendEnabled(true);
             this._renderer.closeAssistantBubble();
             // Keep the padding safety in place; _applyCentering will refresh it on
             // tab switches / resize instead of clearing it here.
 
-            if (displayedText) {
-                this.messages.push({ role: 'assistant', content: displayedText });
+            if (typewriter.displayedText) {
+                this.messages.push({ role: 'assistant', content: typewriter.displayedText });
             }
 
             this._renderer.removeThinkingPlaceholder();
@@ -1606,200 +1511,33 @@ class AssistantApp extends AppBase {
         this._renderer.updateFinalSparkle();
     }
 
-    _processEvent(event, { startTypewriter, stopTypewriter, flushTypewriter, resetTypewriter, ensureAssistantTextBubble, appendToStreamBuffer, saveHtmlSnapshot, placeholderRef }) {
-        if (this._streamAliveTimeout) {
-            clearTimeout(this._streamAliveTimeout);
-            this._streamAliveTimeout = null;
-        }
-        // Restart the watchdog each time something arrives (2 min silence = dead).
-        this._streamAliveTimeout = setTimeout(() => {
-            this._streamAbortController?.abort();
-        }, 120000);
-
-        if (event.kind === 'user') {
-            if (event.session) this.session = event.session;
-            // A new user message starts a new turn: freeze any previous SVG card
-            // immediately so mutations in this turn create a fresh visualization card.
-            this._renderer.freezeCurrentSvgCard();
-            saveHtmlSnapshot();
-            return;
-        }
-
-        if (event.kind === 'thinking') {
-            // Each thinking event starts a new reasoning step. The helper
-            // removes any previous placeholder first, so stale sparkles from
-            // earlier phases do not linger on screen.
-            this._renderer.removeThinkingPlaceholder();
-            placeholderRef.value = this._renderer.appendThinkingPlaceholder('Réflexion...');
-            saveHtmlSnapshot();
-            return;
-        }
-
-        if (event.kind === 'assistant_text') {
-            if (appendToStreamBuffer) {
-                // ChatApp-style live typewriter: append to the buffer and let the
-                // interval display characters one-by-one with live markdown parsing.
-                appendToStreamBuffer(event.content || '');
-                ensureAssistantTextBubble();
-                startTypewriter();
-            } else {
-                // Fallback during background replay (no live typewriter available).
-                const bubble = this._renderer.ensureAssistantBubble();
-                this._currentStreamingText = (this._currentStreamingText || '') + (event.content || '');
-                bubble.innerHTML = this._markdown(this._currentStreamingText, false);
-                this._throttledReflow();
-                this._throttledScrollToBottom();
-            }
-            saveHtmlSnapshot();
-            return;
-        }
-
-        if (event.kind === 'assistant_tool_calls') {
-            stopTypewriter?.();
-            flushTypewriter?.();
-            resetTypewriter?.();
-            this._renderer.closeAssistantBubble();
-            // Hide the verbose tool-call list; only progress cards (and the
-            // plan card) give the user feedback now.
-            this.messages.push({ role: 'assistant_tool_calls', tool_calls: event.tool_calls });
-            saveHtmlSnapshot();
-            return;
-        }
-
-        if (event.kind === 'tool_start') {
-            stopTypewriter?.();
-            flushTypewriter?.();
-            resetTypewriter?.();
-            this._renderer.closeAssistantBubble();
-            // Hide the sparkle on any previous assistant bubble as soon as a new
-            // tool starts, so it does not stay under an intermediate message.
-            this._renderer.hideAllSparkles();
-            // Render the tool card/search card BEFORE the placeholder so the
-            // sparkle/"Réflexion" label stays at the bottom of the current step.
-            if (event.name === 'retrieve_documents') {
-                this._renderer.appendSearchCard(event.arguments?.search_terms || '', null);
-            } else if (event.name === 'display_model_visualization') {
-                // SVG cards are created/updated by the model_svg event, no extra card here.
-                // In embedded mode the visualization lives in the modeler canvas.
-            }
-            // Tool cards (JSON dumps) are intentionally hidden for all tools,
-            // including unknown ones. Only progress cards, plan card, search
-            // results and SVG visualizations remain visible.
-            // Show a transient status label while the tool runs. The helper
-            // removes any previous placeholder first.
-            placeholderRef.value = this._renderer.appendThinkingPlaceholder(this._toolStatusLabel(event.name));
-            saveHtmlSnapshot();
-            return;
-        }
-
-        if (event.kind === 'progress_start') {
-            stopTypewriter?.();
-            flushTypewriter?.();
-            resetTypewriter?.();
-            this._renderer.closeAssistantBubble();
-            this._renderer.hideAllSparkles();
-            this._renderer.appendProgressCard(event.card_id, event.tool_name);
-            saveHtmlSnapshot();
-            return;
-        }
-
-        if (event.kind === 'progress_update') {
-            this._renderer.updateProgressCard(event.card_id, event.percent, event.message);
-            saveHtmlSnapshot();
-            return;
-        }
-
-        if (event.kind === 'progress_done') {
-            this._renderer.completeProgressCard(event.card_id);
-            this._renderer.removeProgressStatus(event.card_id);
-            saveHtmlSnapshot();
-            return;
-        }
-
-        if (event.kind === 'tool_result') {
-            stopTypewriter?.();
-            flushTypewriter?.();
-            resetTypewriter?.();
-            this._renderer.closeAssistantBubble();
-            if (event.name === 'plan_workflow_with_tools') {
-                this._renderer.renderPlan(event.result);
-            } else if (event.name === 'retrieve_documents') {
-                const display = event.display || {};
-                const results = display.results || [];
-                const resultsHtml = this.ui.buildResultsHtml(results, display.result_count || results.length, { hideEmpty: false });
-                this._renderer.fillSearchCard(display.query || '', resultsHtml);
-            } else {
-                this._renderer.fillToolResult(event.name, event.result, event.display);
-            }
-            saveHtmlSnapshot();
-            return;
-        }
-
-        if (event.kind === 'loop_done') {
-            stopTypewriter?.();
-            flushTypewriter?.();
-            resetTypewriter?.();
-            this._renderer.closeAssistantBubble();
-            saveHtmlSnapshot();
-            return;
-        }
-
-            if (event.kind === 'model_svg') {
-                // In standalone assistant mode, update the active SVG card inside the chat.
-                // When the assistant is embedded next to the modeler, the visualization
-                // lives in the modeler's main canvas instead.
-                const linked = this._linkedModelerInstanceId || this.props.linkedModelerInstanceId;
-                if (linked && this.modelNames?.length) {
-                    AssistantBridge.notifySvgRefresh(linked);
-                } else if (!this._embedded) {
-                    const rawName = event.model_name || event.label || '';
-                    const label = rawName
-                        ? this._displayNameForModel(rawName)
-                        : 'Visualisation du modèle';
-                    this._renderer.updateCurrentSvgCard(event.svg, label);
-                }
-                saveHtmlSnapshot();
-                return;
-            }
-
-
-        if (event.kind === 'model_attached') {
-            const attachedName = event.model_name;
-            if (attachedName && !this.modelNames.includes(attachedName)) {
-                this.modelNames.push(attachedName);
+    _processEvent(event, { typewriter, saveHtmlSnapshot, placeholderRef }) {
+        AssistantEventProcessor.processEvent(event, {
+            renderer: this._renderer,
+            ui: this.ui,
+            escape: (t) => this._escape(t),
+            markdown: (t, streaming = false) => AssistantMarkdown.markdown(t, (x) => this._escape(x), streaming),
+            embedded: this._embedded,
+            linkedModelerInstanceId: this._linkedModelerInstanceId || this.props.linkedModelerInstanceId,
+            modelNames: this.modelNames,
+            onModelAttached: (name) => {
                 this.props.displayNames = this.props.displayNames || {};
-                this.props.displayNames[attachedName] = attachedName;
+                this.props.displayNames[name] = this.props.displayNames[name] || name;
                 this._syncModelUi();
-            }
-            saveHtmlSnapshot();
-            return;
-        }
-
-        if (event.kind === 'assistant_done') {
-            stopTypewriter?.();
-            flushTypewriter?.();
-            resetTypewriter?.();
-            this._renderer.closeAssistantBubble();
-            // Remove any lingering thinking placeholder before rendering the final answer.
-            this._renderer.removeThinkingPlaceholder();
-            saveHtmlSnapshot();
-            return;
-        }
-
-        if (event.kind === 'error') {
-            stopTypewriter?.();
-            flushTypewriter?.();
-            resetTypewriter?.();
-            this._renderer.closeAssistantBubble();
-            const bubble = this._renderer.ensureAssistantBubble();
-            bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(event.message || '')}</em>`;
-            saveHtmlSnapshot();
-            return;
-        }
+            },
+            onSvgRefresh: (linked) => AssistantBridge.notifySvgRefresh(linked),
+            getCurrentStreamingText: () => this._currentStreamingText || '',
+            setCurrentStreamingText: (text) => { this._currentStreamingText = text; },
+            getSession: () => this.session,
+            setSession: (session) => { this.session = session; },
+            saveHtmlSnapshot,
+            typewriter,
+            placeholderRef,
+            streamAliveTimeoutRef: { timeout: this._streamAliveTimeout },
+            abortController: this._streamAbortController,
+        });
+        this._streamAliveTimeout = (typewriter?.streamAliveTimeout) || null;
     }
-
-    // Renderer helpers for bubbles/cards are now provided by this._renderer.
-    // The following helpers remain on AssistantApp because they are stateful or tied to streaming internals.
 
     _forceReflow() {
         if (this.chatEl) {
@@ -1841,196 +1579,6 @@ class AssistantApp extends AppBase {
         // when the user switches away/back or on the next resize.
     }
 
-    _sparkleSvg() {
-        return `
-            <svg class="w-5 h-5 overflow-visible ai-sparkle-icon" viewBox="0 0 24 24">
-                <path class="sparkle-main" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
-                <path class="sparkle-orbit-path" d="M5.5 2.5L6.34 5.16L9 6L6.34 6.84L5.5 9.5L4.66 6.84L2 6L4.66 5.16L5.5 2.5Z"></path>
-                <path class="sparkle-orbit-path" d="M19.5 15.5L20.34 18.16L23 19L20.34 19.84L19.5 22.5L18.66 19.84L16 19L18.66 18.16L19.5 15.5Z"></path>
-            </svg>
-        `;
-    }
-
-    _stripLatexText(label) {
-        if (!label) return '';
-        // Remove \text{...} wrappers while preserving the content.
-        return label.replace(/\\text\{([^{}]*)\}/g, '$1').trim();
-    }
-
-    _preprocessLatex(text) {
-        if (!text) return '';
-        // Convert extensible arrows with text above/below: \xrightarrow{text} / \xleftarrow{text}
-        // The label may itself contain nested braces (e.g. \text{...}), so we match balanced
-        // braces to capture the whole argument.
-        const balancedArg = /\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/;
-        text = text.replace(
-            new RegExp('\\\\xrightarrow' + balancedArg.source, 'g'),
-            (_, label) => {
-                const clean = this._stripLatexText(label).trim();
-                return clean ? `${clean} →` : '→';
-            }
-        );
-        text = text.replace(
-            new RegExp('\\\\xleftarrow' + balancedArg.source, 'g'),
-            (_, label) => {
-                const clean = this._stripLatexText(label).trim();
-                return clean ? `← ${clean}` : '←';
-            }
-        );
-        text = text.replace(
-            new RegExp('\\\\xleftrightarrow' + balancedArg.source, 'g'),
-            (_, label) => {
-                const clean = this._stripLatexText(label).trim();
-                return clean ? `↔ ${clean}` : '↔';
-            }
-        );
-        // Single-pass replacement table for common LaTeX commands.
-        // Using one regex with a lookup map is much faster than chaining 200+
-        // .replace() calls on long assistant answers.
-        const latexMap = {
-            rightarrow: '→', leftarrow: '←', leftrightarrow: '↔',
-            Rightarrow: '⇒', Leftarrow: '⇐', Leftrightarrow: '⇔',
-            longrightarrow: '⟶', longleftarrow: '⟵', mapsto: '↦',
-            to: '→', gets: '←', iff: '⇔', implies: '⇒', impliedby: '⇐',
-            uparrow: '↑', downarrow: '↓', nearrow: '↗', searrow: '↘',
-            swarrow: '↙', nwarrow: '↖',
-            alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', epsilon: 'ε',
-            zeta: 'ζ', eta: 'η', theta: 'θ', iota: 'ι', kappa: 'κ',
-            lambda: 'λ', mu: 'μ', nu: 'ν', xi: 'ξ', pi: 'π', rho: 'ρ',
-            sigma: 'σ', tau: 'τ', upsilon: 'υ', phi: 'φ', chi: 'χ', psi: 'ψ',
-            omega: 'ω',
-            Gamma: 'Γ', Delta: 'Δ', Theta: 'Θ', Lambda: 'Λ', Xi: 'Ξ', Pi: 'Π',
-            Sigma: 'Σ', Phi: 'Φ', Psi: 'Ψ', Omega: 'Ω',
-            cdot: '·', times: '×', div: '÷', pm: '±', mp: '∓',
-            leq: '≤', le: '≤', geq: '≥', ge: '≥', neq: '≠',
-            approx: '≈', sim: '∼', cong: '≅', equiv: '≡', propto: '∝',
-            infty: '∞', partial: '∂', nabla: '∇',
-            sum: 'Σ', prod: 'Π', int: '∫', oint: '∮', sqrt: '√',
-            forall: '∀', exists: '∃', in: '∈', notin: '∉',
-            subset: '⊂', supset: '⊃', subseteq: '⊆', supseteq: '⊇',
-            cup: '∪', cap: '∩', emptyset: '∅', varnothing: '∅',
-            setminus: '\\', backslash: '\\',
-            wedge: '∧', vee: '∨', neg: '¬', lnot: '¬',
-            top: '⊤', bot: '⊥', angle: '∠', perp: '⊥', parallel: '∥', mid: '|',
-            dots: '…', cdots: '⋯', vdots: '⋮', ddots: '⋱', ldots: '…',
-            prime: '′', circ: '°', bullet: '•', star: '★', ast: '*',
-            dagger: '†', ddagger: '‡', S: '§', P: '¶', copyright: '©',
-            pounds: '£', euro: '€',
-            textdegree: '°', textcelsius: '°C', texteuro: '€',
-            textleftarrow: '←', textrightarrow: '→', textuparrow: '↑',
-            textdownarrow: '↓', textbullet: '•', textasteriskcentered: '*',
-            textbardbl: '‖', textbigcircle: '○', textblank: '␣',
-            textbrokenbar: '¦', textcent: '¢', textcopyright: '©',
-            textcurrency: '¤', textdagger: '†', textdaggerdbl: '‡',
-            textdiscount: '⁒', textdivorced: '⚮', textestimated: '℮',
-            textfractionsolidus: '⁄', textgravedbl: '̏', textinterrobang: '‽',
-            textlangle: '⟨', textlbrackdbl: '⟦', textlnot: '¬',
-            textmarried: '⚭', textmusicalnote: '♪', textnineoldstyle: '9',
-            textnumero: '№', textopenbullet: '◦', textparagraph: '¶',
-            textperiodcentered: '·', textpertenthousand: '‱',
-            textperthousand: '‰', textphi: 'φ', textpilcrow: '¶', textpm: '±',
-            textquestiondown: '¿', textrangle: '⟩', textrbrackdbl: '⟧',
-            textrecipe: '℞', textreferencemark: '※', textregistered: '®',
-            textsection: '§', textservicemark: '℠', textsevenoldstyle: '7',
-            textsixoldstyle: '6', textsterling: '£', textthreeoldstyle: '3',
-            textthreesuperior: '³', texttildelow: '˜', texttimes: '×',
-            texttrademark: '™', texttwooldstyle: '2', texttwosuperior: '²',
-            textunderscore: '_', textuparrow: '↑', textvisiblespace: '␣',
-            textwon: '₩', textyen: '¥',
-        };
-        const latexRegex = /\\([A-Za-z]+|\$)/g;
-        text = text.replace(latexRegex, (match, command) => {
-            if (command === '$') return '';
-            return latexMap[command] !== undefined ? latexMap[command] : match;
-        });
-
-        // Remove remaining inline math delimiters and their content if simple
-        text = text.replace(/\$([^$]+)\$/g, '$1');
-        return text;
-    }
-
-    _markdown(text, streaming = false) {
-        if (!text) return '';
-        if (typeof marked === 'undefined') {
-            return this._escape(text).replace(/\n/g, '<br>');
-        }
-        // During streaming, skip the expensive full re-parse of markdown and
-        // just render plain escaped text with line breaks. This avoids UI
-        // freezes when the assistant produces a long final answer. We do a final
-        // proper markdown render once streaming ends.
-        if (streaming) {
-            return this._escape(text).replace(/\n/g, '<br>');
-        }
-        return marked.parse(this._preprocessLatex(text), { breaks: true, gfm: true });
-    }
-
-
-    _createTypewriter(onChunk, options = {}) {
-        // Character-by-character typewriter effect, matching the floating chat
-        // window. The chunk size varies slightly for a natural feel.
-        const charInterval = options.charInterval || 20;
-
-        let buffer = '';
-        let timerId = null;
-        let running = false;
-
-        const emitNext = () => {
-            if (buffer === '') return;
-            // Emit 1 to 4 characters per tick with a small random variation.
-            const chunkSize = Math.min(1 + Math.floor(Math.random() * 4), buffer.length);
-            const chunk = buffer.slice(0, chunkSize);
-            buffer = buffer.slice(chunkSize);
-            if (chunk) onChunk(chunk);
-            return chunkSize;
-        };
-
-        const schedule = () => {
-            if (running || timerId) return;
-            running = true;
-            timerId = setTimeout(() => {
-                timerId = null;
-                running = false;
-                if (buffer !== '') {
-                    emitNext();
-                    if (buffer !== '') schedule();
-                }
-            }, charInterval);
-        };
-
-        return {
-            append: (text) => {
-                buffer += text;
-                schedule();
-            },
-            flush: () => {
-                if (timerId) {
-                    clearTimeout(timerId);
-                    timerId = null;
-                }
-                running = false;
-                while (buffer !== '') {
-                    emitNext();
-                }
-            },
-            stop: () => {
-                if (timerId) {
-                    clearTimeout(timerId);
-                    timerId = null;
-                }
-                running = false;
-                buffer = '';
-            },
-        };
-    }
-
-    unmount() {
-        if (this._resizeObserver) this._resizeObserver.disconnect();
-        this._resizeObserver = null;
-        // Keep container reference so the live DOM can keep receiving stream updates
-        // while the tab is hidden.
-        this.mounted = false;
-    }
-
     _renderLoginBanner() {
         const container = this.container;
         if (!container) return;
@@ -2041,7 +1589,7 @@ class AssistantApp extends AppBase {
             banner.className = 'login-banner absolute top-3 left-3 right-3 z-40';
             container.insertBefore(banner, container.firstChild);
         }
-        if (AuthManager.isLoggedIn()) {
+        if (this.authManager?.isLoggedIn()) {
             banner.classList.add('hidden');
             return;
         }

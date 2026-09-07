@@ -89,7 +89,8 @@ class HistoryPanel {
             // the existing list/empty message visible underneath.
             if (this.headerSpinnerEl) this.headerSpinnerEl.classList.remove("history-panel-spinner-hidden");
         }
-        if (!AuthManager.isLoggedIn()) {
+        const authManager = ServiceLocator.get('authManager');
+        if (!authManager?.isLoggedIn()) {
             this.items = [];
             this._hasLoaded = true;
             this._render();
@@ -399,19 +400,24 @@ class HistoryPanel {
         });
     }
 
+    _getWindowManager() {
+        return ServiceLocator.get('windowManager') || window.windowManager || null;
+    }
+
     _closeOpenTabForDeletedItem(item) {
-        if (!window.windowManager) return;
+        const windowManager = this._getWindowManager();
+        if (!windowManager) return;
         const isSearch = item.kind === "search";
         const isAssistant = item.kind === "assistant";
         const isModelerAssistant = item.kind === "modeler_assistant";
-        const visibleId = window.windowManager._getVisibleInstanceId();
+        const visibleId = windowManager.getVisibleInstanceId();
 
         // Helper to reset an instance whether it is currently visible or cached.
         const resetInstance = (instanceId, record) => {
             const inst = AppState.getInstance(instanceId);
             if (!inst || typeof inst.resetToHome !== "function") return;
             inst.resetToHome();
-            window.windowManager._viewCache.delete(instanceId);
+            windowManager._viewCache?.delete(instanceId);
         };
 
         const maybeResetById = (instanceId) => {
@@ -455,13 +461,13 @@ class HistoryPanel {
             const rec = AppState.getRecord(visibleId);
             const inst = AppState.getInstance(visibleId);
             if (inst && rec) {
-                window.windowManager._clearShell();
-                window.windowManager.splitManager.setTree(null);
+                windowManager.clearShell();
+                windowManager.clearSplit();
                 AppState.saveInstanceState(visibleId);
                 const container = document.createElement("div");
                 container.className = "app-container h-full w-full";
                 container.dataset.instanceId = visibleId;
-                window.windowManager.shellElement.appendChild(container);
+                windowManager.appendToShell(container);
                 inst.mount(container).then(() => {
                     AppState.restoreInstanceState(visibleId);
                 });
@@ -583,7 +589,9 @@ class HistoryPanel {
             mode: "tab",
             loading: true,
         });
-        await windowManager._mountTab(modelerInstance.instance);
+        const windowManager = this._getWindowManager();
+        if (!windowManager) return;
+        await windowManager.mountTab(modelerInstance.instance);
         AppState.setActiveInstance(modelerInstance.instanceId);
 
         // Fetch the SVG and linked session info in parallel with opening the tab.
@@ -653,7 +661,8 @@ class HistoryPanel {
                 origin: origin,
                 fromHistory: true,
             });
-            await windowManager._mountTab(assistantInstance.instance);
+            const windowManager = this._getWindowManager();
+            if (windowManager) await windowManager.mountTab(assistantInstance.instance);
             AppState.setActiveInstance(assistantInstance.instanceId);
             await this.load();
         } catch (err) {
@@ -671,6 +680,8 @@ class HistoryPanel {
                 console.error("Touch search error", err);
             }
         }
+        const windowManager = this._getWindowManager();
+        if (!windowManager) return;
         const existingSearch = AppState.listInstances().find((i) => i.appId === "search");
         if (existingSearch) {
             const inst = AppState.getInstance(existingSearch.instanceId);
@@ -766,21 +777,21 @@ class HistoryPanel {
                 const inst = AppState.getInstance(info.instanceId);
                 if (!inst || typeof inst.resetToHome !== "function") return;
                 inst.resetToHome();
-                window.windowManager._viewCache.delete(info.instanceId);
+                windowManager.invalidateViewCache(info.instanceId);
             });
             // If the currently visible tab was reset, remount it immediately.
-            const visibleId = window.windowManager._getVisibleInstanceId();
+            const visibleId = windowManager.getVisibleInstanceId();
             if (visibleId) {
                 const rec = AppState.getRecord(visibleId);
                 const inst = AppState.getInstance(visibleId);
                 if (inst && rec) {
-                    window.windowManager._clearShell();
-                    window.windowManager.splitManager.setTree(null);
+                    windowManager.clearShell();
+                    windowManager.clearSplit();
                     AppState.saveInstanceState(visibleId);
                     const container = document.createElement("div");
                     container.className = "app-container h-full w-full";
                     container.dataset.instanceId = visibleId;
-                    window.windowManager.shellElement.appendChild(container);
+                    windowManager.appendToShell(container);
                     inst.mount(container).then(() => {
                         AppState.restoreInstanceState(visibleId);
                     });
