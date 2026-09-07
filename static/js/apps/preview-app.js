@@ -112,6 +112,8 @@ class PreviewApp extends AppBase {
         const modelerInstance = AppState.createInstance("modeler", {
             mode: "tab",
         });
+        const windowManager = ServiceLocator.get('windowManager');
+        if (!windowManager) return;
         await windowManager._mountTab(modelerInstance.instance);
         AppState.setActiveInstance(modelerInstance.instanceId);
         windowManager.close(this.instanceId);
