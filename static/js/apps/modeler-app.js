@@ -22,13 +22,11 @@ class ModelerApp extends AppBase {
         this._lastSplitRatios = props.lastSplitRatios || [70, 30];
         // New imports/opened models should always start centered/scaled to fit.
         this.viewerState = { scale: 1, x: 0, y: 0 };
-        this.viewer = null;
+        this.svgController = null;
         this._centerOnNextShow = true;
         this._homeTimeout = null;
         this._loadingTimeout = null;
         this._resizeObserver = null;
-        this._svgResizeObserver = null;
-        this._lastSvgContainerSize = null;
         this._skipNextTransition = false;
     }
 
@@ -45,16 +43,16 @@ class ModelerApp extends AppBase {
         // When the container is already the cached live DOM, do not rebuild it.
         // This keeps the SVG viewer, pan/zoom, scroll and running streams alive
         // across tab switches.
-        if (this.container === container && this.viewer && container.querySelector('#modeler-svg-viewer')) {
+        if (this.container === container && this.svgController && container.querySelector('#modeler-svg-viewer')) {
             this._observeResize();
-            this._observeSvgContainerResize();
+            this.svgController.observeResize(this.container);
             this._updateAssistantToggleVisibility();
             this._updateExportToggleVisibility();
             return;
         }
         // Any previous viewer is tied to a DOM container that will be replaced;
         // discard the reference so a fresh viewer is created for the new container.
-        this.viewer = null;
+        this.svgController = null;
         this.container = container;
         container.innerHTML = `
             <div class="modeler-app h-full flex flex-col relative">
@@ -415,9 +413,9 @@ class ModelerApp extends AppBase {
             clearTimeout(this._homeTimeout);
             this._homeTimeout = null;
         }
-        if (this.viewer) {
-            this.viewer.destroy();
-            this.viewer = null;
+        if (this.svgController) {
+            this.svgController.destroy();
+            this.svgController = null;
         }
         // Invalidate any cached DOM for this instance so switching back from
         // another tab always renders the new model, not a stale cached view.
@@ -472,9 +470,17 @@ class ModelerApp extends AppBase {
         }, 550);
     }
 
+    _getSvgController() {
+        if (!this.svgController) {
+            this.svgController = new SvgViewerController('#modeler-svg-viewer', {
+                onTransform: (state) => { this.viewerState = state; }
+            });
+        }
+        return this.svgController;
+    }
+
     _showViewer() {
-        const viewerContainer = this.container.querySelector('#modeler-svg-viewer');
-        const viewer = this.container.querySelector('#modeler-viewer');
+        const viewerPane = this.container.querySelector('#modeler-viewer');
         const app = this.container.querySelector('.modeler-app');
         const editActions = this.container.querySelector('#modeler-edit-actions');
         const assistantToggle = this.container.querySelector('#modeler-assistant-toggle');
@@ -485,121 +491,61 @@ class ModelerApp extends AppBase {
         }
         this._updateExportToggleVisibility();
 
-        // Keep the spinner visible until the SVG is actually rendered.
         this._setLoading(true);
-        if (viewerContainer) {
-            viewerContainer.classList.add('modeler-svg-hidden');
-            viewerContainer.style.transition = 'none';
+        const controller = this._getSvgController();
+        const container = controller.getContainer(this.container);
+        if (container) {
+            container.classList.add('modeler-svg-hidden');
+            container.style.transition = 'none';
         }
 
         // If the live SVG viewer is already attached to the cached container,
         // just make sure the pane is visible and resume observers.
-        if (this.viewer && this.viewer.svg && viewerContainer && viewerContainer.contains(this.viewer.svg)) {
-            this.viewerState = this.viewer.getState();
-            if (viewer) {
-                viewer.classList.remove('hidden');
-                viewer.style.opacity = '1';
+        if (controller.viewer && controller.viewer.svg && container && container.contains(controller.viewer.svg)) {
+            this.viewerState = controller.getState();
+            if (viewerPane) {
+                viewerPane.classList.remove('hidden');
+                viewerPane.style.opacity = '1';
             }
             if (editActions) {
                 editActions.classList.remove('hidden');
                 this._updateEditButtonStates();
             }
-            if (viewerContainer) viewerContainer.classList.remove('modeler-svg-hidden');
+            if (container) container.classList.remove('modeler-svg-hidden');
             this._setLoading(false);
-            this._observeSvgContainerResize();
+            controller.observeResize(this.container);
             this.setTitle(`Éditer: ${this.fileName}`);
             return;
         }
 
-        if (!this.viewer) {
-            this.viewer = new SvgViewer(viewerContainer, {
-                onTransform: (state) => { this.viewerState = state; }
-            });
-        }
-
-        // Yield to the browser so the spinner is painted before the heavy SVG work begins.
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                this.viewer.setSvg(this.svgText, this.mainClassName);
-
-                const finalize = () => {
-                    if (this._centerOnNextShow) {
-                        this.viewer.resetZoom();
-                        this._centerOnNextShow = false;
-                    } else {
-                        this.viewer.restoreState(this.viewerState);
-                        this.viewer.applyTransform();
-                    }
-
-                    // Force a layout so the browser finishes rendering before hiding the spinner.
-                    this.viewer.container.getBoundingClientRect();
-                    if (this.viewer.svg) this.viewer.svg.getBBox();
-
-                    requestAnimationFrame(() => {
-                        this._setLoading(false);
-                        if (viewer) {
-                            viewer.style.transition = 'opacity 0.35s ease';
-                            viewer.style.opacity = '1';
-                        }
-                        if (editActions) {
-                            editActions.classList.remove('hidden');
-                            this._updateEditButtonStates();
-                        }
-                        if (viewerContainer) {
-                            viewerContainer.style.transition = 'opacity 0.35s ease';
-                            viewerContainer.classList.remove('modeler-svg-hidden');
-                        }
-                        this.setTitle(`Éditer: ${this.fileName}`);
-                    });
-                };
-
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(finalize);
-                });
-            });
+        controller.renderSvg(this.container, this.svgText, this.mainClassName, {
+            shouldCenter: this._centerOnNextShow,
+            stateToRestore: this.viewerState,
+            onComplete: () => {
+                this._centerOnNextShow = false;
+                this._setLoading(false);
+                if (viewerPane) {
+                    viewerPane.style.transition = 'opacity 0.35s ease';
+                    viewerPane.style.opacity = '1';
+                }
+                if (editActions) {
+                    editActions.classList.remove('hidden');
+                    this._updateEditButtonStates();
+                }
+                if (container) {
+                    container.style.transition = 'opacity 0.35s ease';
+                    container.classList.remove('modeler-svg-hidden');
+                }
+                this.setTitle(`Éditer: ${this.fileName}`);
+            },
+        }).then(() => {
+            controller.observeResize(this.container);
         });
-        this._observeSvgContainerResize();
-    }
-
-    _observeSvgContainerResize() {
-        const viewerContainer = this.container?.querySelector('#modeler-svg-viewer');
-        if (!viewerContainer || typeof ResizeObserver === 'undefined') return;
-        if (this._svgResizeObserver) this._svgResizeObserver.disconnect();
-        this._svgResizeObserver = new ResizeObserver((entries) => {
-            if (!this.viewer || !this.svgText || this._centerOnNextShow) return;
-            const entry = entries[0];
-            if (!entry) return;
-            const cr = entry.contentRect;
-            // Ignore the first event so the initial mount/restore state is not shifted.
-            if (!this._lastSvgContainerSize) {
-                this._lastSvgContainerSize = { width: cr.width, height: cr.height };
-                return;
-            }
-            // Only nudge the pan when the container size actually changed by a
-            // non-trivial amount (e.g. dragging the split resizer). Tiny changes
-            // from tab visibility switches should not accumulate.
-            const prev = this._lastSvgContainerSize;
-            const dw = cr.width - prev.width;
-            const dh = cr.height - prev.height;
-            if (Math.abs(dw) < 2 && Math.abs(dh) < 2) {
-                this._lastSvgContainerSize = { width: cr.width, height: cr.height };
-                return;
-            }
-            const dx = dw / 2;
-            const dy = dh / 2;
-            this.viewer.state.x += dx;
-            this.viewer.state.y += dy;
-            this.viewer.applyTransform();
-            this._lastSvgContainerSize = { width: cr.width, height: cr.height };
-        });
-        this._lastSvgContainerSize = null;
-        this._svgResizeObserver.observe(viewerContainer);
     }
 
     _centerSvgInPane() {
-        if (this.viewer && this.svgText) {
-            this.viewer.centerDiagram(this.mainClassName);
-        }
+        const controller = this.svgController;
+        if (controller && this.svgText) controller.centerDiagram(this.mainClassName);
     }
 
     async resetToHome() {
@@ -620,9 +566,9 @@ class ModelerApp extends AppBase {
         this.mainClassName = '';
         this.loading = false;
         this.viewerState = { scale: 1, x: 0, y: 0 };
-        if (this.viewer) {
-            this.viewer.destroy();
-            this.viewer = null;
+        if (this.svgController) {
+            this.svgController.destroy();
+            this.svgController = null;
         }
 
         // Make sure a previously cached DOM cannot restore an old model after reset.
@@ -666,9 +612,9 @@ class ModelerApp extends AppBase {
         this.svgText = '';
         this.fileName = '';
         this.mainClassName = '';
-        if (this.viewer) {
-            this.viewer.destroy();
-            this.viewer = null;
+        if (this.svgController) {
+            this.svgController.destroy();
+            this.svgController = null;
         }
         this._updateHomeVisibility(skipTransition);
         this.setTitle(this.constructor.title);
@@ -1142,8 +1088,10 @@ class ModelerApp extends AppBase {
     async _reloadSvgFromServer() {
         this.svgText = await ModelGateway.reloadSvg(this.storedName || this.fileName);
         if (this.viewer) {
-            this.viewer.setSvg(this.svgText, this.mainClassName);
-            this.viewer.restoreState(this.viewerState);
+            this.svgController.renderSvg(this.container, this.svgText, this.mainClassName, {
+                shouldCenter: false,
+                stateToRestore: this.viewerState,
+            });
         }
         this._updateEditButtonStates();
     }
@@ -1279,7 +1227,7 @@ class ModelerApp extends AppBase {
             storedName: this.storedName,
             svgText: this.svgText,
             mainClassName: this.mainClassName,
-            viewerState: this.viewer ? this.viewer.getState() : this.viewerState,
+            viewerState: this.svgController ? this.svgController.getState() : this.viewerState,
             assistantInstanceId: this._assistantInstanceId || '',
             lastSplitRatios: this._lastSplitRatios || [70, 30],
         };
@@ -1300,12 +1248,12 @@ class ModelerApp extends AppBase {
         this.viewerState = sameSvg ? (state.viewerState || this.viewerState || { scale: 1, x: 0, y: 0 }) : { scale: 1, x: 0, y: 0 };
         this._centerOnNextShow = !sameSvg;
         if (this.container) {
-            if (this.container.querySelector('#modeler-svg-viewer') && this.viewer && this.viewer.svg && sameSvg && hadSvg) {
+            if (this.container.querySelector('#modeler-svg-viewer') && this.svgController && this.svgController.viewer && this.svgController.viewer.svg && sameSvg && hadSvg) {
                 // The live DOM already shows the right SVG with the right state.
                 // Just make sure observers are running, hide any stale loader and update the title.
                 this._setLoading(false);
                 this._observeResize();
-                this._observeSvgContainerResize();
+                this.svgController.observeResize(this.container);
                 this.setTitle(`Éditer: ${this.fileName}`);
                 this._updateAssistantToggleVisibility();
                 this._updateExportToggleVisibility();
@@ -1397,7 +1345,7 @@ class ModelerApp extends AppBase {
         // leave the SVG viewer and its pan/zoom state intact so switching back
         // feels instant.
         if (this._resizeObserver) this._resizeObserver.disconnect();
-        if (this._svgResizeObserver) this._svgResizeObserver.disconnect();
+        if (this.svgController) this.svgController.destroy();
     }
 
     onTabActivated() {
@@ -1408,13 +1356,13 @@ class ModelerApp extends AppBase {
         // Defensive: if the cached DOM does not match the current state
         // (e.g. a reset/import happened while the tab was inactive), rebuild it.
         const viewerContainer = this.container?.querySelector('#modeler-svg-viewer');
-        const cachedSvg = this.viewer?.svg;
+        const cachedSvg = this.svgController?.viewer?.svg;
         const svgMatches = cachedSvg && viewerContainer?.contains(cachedSvg);
         const stateMatches = this.svgText ? svgMatches : !cachedSvg;
         if (!stateMatches) {
-            if (this.viewer) {
-                this.viewer.destroy();
-                this.viewer = null;
+            if (this.svgController) {
+                this.svgController.destroy();
+                this.svgController = null;
             }
             if (this.container) {
                 this.render(this.container);
@@ -1422,31 +1370,29 @@ class ModelerApp extends AppBase {
             return;
         }
         const viewerPane = this.container?.querySelector('#modeler-viewer');
-        if (this.viewer && this.viewer.svg) {
+        if (this.svgController?.viewer?.svg) {
             if (viewerPane) {
                 viewerPane.classList.remove('hidden');
                 viewerPane.style.opacity = '1';
             }
-            this._observeSvgContainerResize();
+            this.svgController.observeResize(this.container);
         }
         this._observeResize();
         this._updateAssistantToggleVisibility();
     }
 
     unmount() {
-        if (this.viewer) {
-            this.viewerState = this.viewer.getState();
-            this.viewer.destroy();
-            this.viewer = null;
+        if (this.svgController) {
+            this.viewerState = this.svgController.getState();
+            this.svgController.destroy();
+            this.svgController = null;
         }
         if (this._resizeObserver) this._resizeObserver.disconnect();
-        if (this._svgResizeObserver) this._svgResizeObserver.disconnect();
         if (this._closeExportMenuOnClick) {
             document.removeEventListener('click', this._closeExportMenuOnClick);
             this._closeExportMenuOnClick = null;
         }
         this._resizeObserver = null;
-        this._svgResizeObserver = null;
         super.unmount();
     }
 }

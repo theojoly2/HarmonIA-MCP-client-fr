@@ -18,17 +18,26 @@ class PreviewApp extends AppBase {
         this.modelName = props.modelName || '';
         this.docName = props.name || 'Document';
         this.svgText = '';
-        this.viewer = null;
+        this.svgController = null;
         this.viewerState = { scale: 1, x: 0, y: 0 };
+    }
+
+    _getSvgController() {
+        if (!this.svgController) {
+            this.svgController = new SvgViewerController('#preview-svg-viewer', {
+                onTransform: (state) => { this.viewerState = state; }
+            });
+        }
+        return this.svgController;
     }
 
     render(container) {
         // Any previous viewer is tied to a DOM container that will be replaced;
         // discard the reference so a fresh viewer is created for the new container.
-        if (this.viewer) {
-            this.viewerState = this.viewer.getState();
-            this.viewer.destroy();
-            this.viewer = null;
+        if (this.svgController) {
+            this.viewerState = this.svgController.getState();
+            this.svgController.destroy();
+            this.svgController = null;
         }
         this.container = container;
         container.innerHTML = `
@@ -131,12 +140,7 @@ class PreviewApp extends AppBase {
             this.svgText = svgText;
             const match = this.svgText.match(/data-main-class="([^"]*)"/);
             const mainClassName = match ? match[1] : '';
-            if (!this.viewer) {
-                this.viewer = new SvgViewer(viewerContainer, {
-                    onTransform: (state) => { this.viewerState = state; }
-                });
-            }
-            // Reopen from tab switch: keep pan/zoom. First preview: center the diagram.
+            const controller = this._getSvgController();
             const isFirstOpen = !this.viewerState || (this.viewerState.scale === 1 && this.viewerState.x === 0 && this.viewerState.y === 0);
             const finalize = () => {
                 if (loading) {
@@ -150,19 +154,11 @@ class PreviewApp extends AppBase {
                     viewerEl.style.opacity = '1';
                 }
             };
-            if (isFirstOpen) {
-                this.viewer.setSvg(this.svgText, mainClassName);
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
-                        this.viewer.resetZoom();
-                        finalize();
-                    });
-                });
-            } else {
-                this.viewer.setSvg(this.svgText, mainClassName);
-                this.viewer.restoreState(this.viewerState);
-                finalize();
-            }
+            controller.renderSvg(this.container, this.svgText, mainClassName, {
+                shouldCenter: isFirstOpen,
+                stateToRestore: isFirstOpen ? null : this.viewerState,
+                onComplete: finalize,
+            });
         } catch (err) {
             console.error('Preview load error', err);
             if (loading) loading.innerHTML = `<div class="text-red-500 text-sm">Erreur de chargement du diagramme.</div>`;
@@ -179,7 +175,7 @@ class PreviewApp extends AppBase {
             docId: this.docId,
             documentId: this.documentId,
             docName: this.docName,
-            viewerState: this.viewer ? this.viewer.getState() : this.viewerState,
+            viewerState: this.svgController ? this.svgController.getState() : this.viewerState,
         };
     }
 
@@ -192,10 +188,10 @@ class PreviewApp extends AppBase {
     }
 
     unmount() {
-        if (this.viewer) {
-            this.viewerState = this.viewer.getState();
-            this.viewer.destroy();
-            this.viewer = null;
+        if (this.svgController) {
+            this.viewerState = this.svgController.getState();
+            this.svgController.destroy();
+            this.svgController = null;
         }
         super.unmount();
     }
