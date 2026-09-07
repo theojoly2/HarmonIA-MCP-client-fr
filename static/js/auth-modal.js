@@ -13,10 +13,7 @@ const AuthManager = (() => {
 
     async function init() {
         try {
-            const res = await fetch("api/auth/me", { credentials: "same-origin" });
-            if (res.ok) {
-                currentUser = await res.json();
-            }
+            currentUser = await AuthGateway.me();
         } catch (err) {
             console.error("Auth init error", err);
         }
@@ -62,58 +59,29 @@ const AuthManager = (() => {
     }
 
     async function register(username, password) {
-        const res = await fetch("api/auth/register", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "same-origin",
-            body: JSON.stringify({ username, password }),
-        });
-        if (!res.ok) {
-            const data = await res.json().catch(() => ({}));
-            throw new Error(data.detail || `Erreur ${res.status}`);
-        }
-        currentUser = await res.json();
+        currentUser = await AuthGateway.register(username, password);
         emitLogin(currentUser);
         return currentUser;
     }
 
     async function login(username, password) {
-        const res = await fetch("api/auth/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "same-origin",
-            body: JSON.stringify({ username, password }),
-        });
-        if (!res.ok) {
-            const data = await res.json().catch(() => ({}));
-            throw new Error(data.detail || `Erreur ${res.status}`);
-        }
-        currentUser = await res.json();
+        currentUser = await AuthGateway.login(username, password);
         emitLogin(currentUser);
         return currentUser;
     }
 
     async function logout() {
-        await fetch("api/auth/logout", {
-            method: "POST",
-            credentials: "same-origin",
-        });
+        try {
+            await AuthGateway.logout();
+        } catch (err) {
+            console.error("Logout error", err);
+        }
         currentUser = null;
         emitLogout();
     }
 
     async function changePassword(oldPassword, password) {
-        const res = await fetch("api/auth/change-password", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "same-origin",
-            body: JSON.stringify({ old_password: oldPassword, password }),
-        });
-        if (!res.ok) {
-            const data = await res.json().catch(() => ({}));
-            throw new Error(data.detail || `Erreur ${res.status}`);
-        }
-        return await res.json();
+        return AuthGateway.changePassword(oldPassword, password);
     }
 
     function showModal() {

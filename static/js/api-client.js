@@ -160,40 +160,19 @@ const ApiClient = (() => {
     }
 
     async function me() {
-        const res = await fetch(apiUrl("auth/me"), { credentials: "same-origin" });
-        if (!res.ok) throw new Error("not_authenticated");
-        return res.json();
+        return AuthGateway.me();
     }
 
     async function login(username, password) {
-        const res = await fetch(apiUrl("auth/login"), {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "same-origin",
-            body: JSON.stringify({ username, password }),
-        });
-        if (!res.ok) throw new Error(`Login failed: ${res.status}`);
-        return res.json();
+        return AuthGateway.login(username, password);
     }
 
     async function register(username, password) {
-        const res = await fetch(apiUrl("auth/register"), {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "same-origin",
-            body: JSON.stringify({ username, password }),
-        });
-        if (!res.ok) throw new Error(`Register failed: ${res.status}`);
-        return res.json();
+        return AuthGateway.register(username, password);
     }
 
     async function logout() {
-        const res = await fetch(apiUrl("auth/logout"), {
-            method: "POST",
-            credentials: "same-origin",
-        });
-        if (!res.ok) throw new Error(`Logout failed: ${res.status}`);
-        return res.json();
+        return AuthGateway.logout();
     }
 
     async function streamChat(documentId, userMessage, history = []) {
@@ -379,18 +358,7 @@ const ApiClient = (() => {
     }
 
     async function getUsage(scale = "day") {
-        const res = await fetch(
-            apiUrl(`auth/usage?scale=${encodeURIComponent(scale)}`),
-            {
-                method: "GET",
-                credentials: "same-origin",
-            }
-        );
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.detail || `Usage failed: ${res.status}`);
-        }
-        return res.json();
+        return AuthGateway.getUsage(scale);
     }
 
     return {

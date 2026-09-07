@@ -113,7 +113,7 @@ class Shell {
     async _loadUsageCounter(counterEl) {
         const scale = counterEl.dataset.scale || 'day';
         try {
-            const data = await ApiClient.getUsage(scale);
+            const data = await AuthGateway.getUsage(scale);
             const prefix = data.has_estimate ? '~' : '';
             const input = this._formatUsageCount(data.prompt_tokens || 0);
             const output = this._formatUsageCount(data.completion_tokens || 0);

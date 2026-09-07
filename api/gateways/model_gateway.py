@@ -6,6 +6,7 @@ package so that routers/services do not depend directly on its internals.
 
 from __future__ import annotations
 
+import base64
 import re
 from io import BytesIO
 from typing import Any
@@ -97,6 +98,43 @@ def _safe_text(value) -> str:
 
 def escape_xml_attr(value: str) -> str:
     return value.replace("\u0026", "\u0026amp;").replace('"', "\u0026quot;").replace("<", "\u0026lt;").replace(">", "\u0026gt;")
+
+
+def base64_for_bytes(data: bytes) -> str:
+    return base64.b64encode(data).decode("ascii")
+
+
+def generate_empty_model(display_name: str) -> tuple[str, dict[str, Any]]:
+    """Return (svg_text, stored_data) for a brand-new empty model."""
+    xmi = {"elements": [], "connectors": []}
+    svg_text = generate_svg(xmi)
+    stored_data = {
+        "xmi": xmi,
+        "svg": svg_text,
+        "source_filename": "",
+        "source_format": "empty",
+        "name": display_name,
+    }
+    return svg_text, stored_data
+
+
+def regenerate_svg_for_model(model: dict[str, Any]) -> str:
+    """Regenerate SVG from model JSON, preserving main-class hint."""
+    svg = model.get("svg", "")
+    xmi = model.get("xmi")
+    if isinstance(xmi, dict) and (xmi.get("elements") or xmi.get("connectors")):
+        try:
+            svg = generate_svg(xmi)
+        except Exception as e:
+            print(f"[regenerate_svg_for_model] SVG regeneration failed: {e}", flush=True)
+            return svg
+    # Preserve main-class hint from the original SVG if present.
+    if svg:
+        match = re.search(r'data-main-class="([^"]*)"', model.get("svg", ""))
+        main_class = match.group(1) if match else ""
+        if main_class and "data-main-class=" not in svg:
+            svg = svg.replace("<svg", f'<svg data-main-class="{escape_xml_attr(main_class)}"', 1)
+    return svg
 
 
 def generate_svg_for_bytes(file_bytes: bytes, filename: str) -> str:

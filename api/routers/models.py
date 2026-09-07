@@ -5,20 +5,24 @@ resources/semantic_model/models/{user}/{name}.json.
 """
 
 import json
-import re
 from typing import Optional
 
 from fastapi import APIRouter, Request, Response, UploadFile, File, Form, Depends
 from pydantic import BaseModel
 
-from api.dependencies import generate_svg_for_bytes
+from api.gateways.model_gateway import (
+    base64_for_bytes,
+    generate_empty_model,
+    generate_svg_for_bytes,
+    regenerate_svg_for_model,
+)
 from api.naming import (
     display_name_from_stored as _display_name,
     safe_filename as _safe_filename,
     unique_model_name as _unique_model_name,
 )
 from api.security import require_user
-from api.services.model_import import base64_for_bytes, parse_model_file
+from api.services.model_import import parse_model_file
 from api.services.model_store import (
     add_attribute,
     add_class,
@@ -133,22 +137,9 @@ async def import_model(
 @router.post("/create-empty", response_model=ImportResponse)
 async def create_empty_model(body: EmptyModelBody, username: str = Depends(require_user)):
     """Create a brand-new empty model with an empty-class placeholder SVG."""
-    from data_model_utils import generate_visualisation
-    from io import BytesIO
-
     display_name = body.name.strip() or "Nouveau modèle"
     stored_name = _unique_model_name(display_name)
-    xmi = {"elements": [], "connectors": []}
-    svg_bytes = generate_visualisation(xmi)
-    svg_text = svg_bytes.getvalue().decode("utf-8", errors="replace")
-
-    stored_data = {
-        "xmi": xmi,
-        "svg": svg_text,
-        "source_filename": "",
-        "source_format": "empty",
-        "name": display_name,
-    }
+    svg_text, stored_data = generate_empty_model(display_name)
 
     payload = await save_model(
         username=username,
@@ -175,31 +166,13 @@ async def open_model(model_name: str, username: str = Depends(require_user)):
     model = await get_model(username, model_name)
     if not model:
         return Response(status_code=404, content=json.dumps({"detail": "model_not_found"}))
-    svg = model.get("svg", "")
-    # If the model JSON was mutated after import (e.g. add_class/add_attribute/add_connector),
-    # regenerate the SVG from the current model JSON so edits are visible.
-    xmi = model.get("xmi")
-    if isinstance(xmi, dict) and (xmi.get("elements") or xmi.get("connectors")):
-        try:
-            from data_model_utils import generate_visualisation
-            svg_result = generate_visualisation(xmi)
-            svg_bytes = svg_result.getvalue() if hasattr(svg_result, "getvalue") else svg_result
-            svg = svg_bytes.decode("utf-8", errors="replace")
-        except Exception as e:
-            print(f"[open_model] SVG regeneration failed: {e}", flush=True)
+    svg = regenerate_svg_for_model(model)
     if not svg:
         return Response(status_code=422, content=json.dumps({"detail": "no_svg_for_model"}))
     # Update last-opened time in the background so it bubbles to the top of the history list.
     # Do not block the SVG response if the MCP server is temporarily unreachable.
     import asyncio
     asyncio.create_task(touch_model(username, model_name))
-    # Preserve main-class hint from the original SVG if present.
-    main_class = ""
-    if svg and model.get("svg"):
-        match = re.search(r'data-main-class="([^"]*)"', model.get("svg", ""))
-        main_class = match.group(1) if match else ""
-    if main_class and "data-main-class=" not in svg:
-        svg = svg.replace("<svg", f'<svg data-main-class="{main_class}"', 1)
     return Response(content=svg.encode("utf-8"), media_type="image/svg+xml", headers={
         "X-Model-Name": _display_name(model.get("name", "")),
     })

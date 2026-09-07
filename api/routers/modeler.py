@@ -1,10 +1,7 @@
-import os
-from io import BytesIO
+from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi.responses import Response
 
-from fastapi import APIRouter, Request, UploadFile, File, HTTPException
-from fastapi.responses import JSONResponse, Response
-
-from api.dependencies import generate_svg_for_bytes
+from api.gateways.model_gateway import generate_svg_for_bytes
 
 router = APIRouter(prefix="/api/modeler", tags=["modeler"])
 
