@@ -1389,6 +1389,32 @@ class AssistantApp extends AppBase {
         console.log('[AssistantApp] loaded messages count', this.messages.length);
     }
 
+
+    _toolStatusLabel(name) {
+        const labels = {
+            plan_workflow_with_tools: 'Planification en cours...',
+            retrieve_documents: 'Recherche de contexte...',
+            add_class: 'Création de la classe...',
+            add_attribute: "Ajout d'un attribut...",
+            add_connector: 'Création de la relation...',
+            style_guide_check: 'Synthèse de la réponse...',
+        };
+        return labels[name] || `${name}...`;
+    }
+
+    _toolSummary(result) {
+        if (!result || typeof result !== 'object') return '';
+        const toolResults = result.tool_results;
+        if (!toolResults || typeof toolResults !== 'object') return '';
+        if (Array.isArray(toolResults) && toolResults.length > 0) {
+            return ` (${toolResults.length} résultats)`;
+        }
+        if (Object.keys(toolResults).length > 0) {
+            return ` (${Object.keys(toolResults).length} entrées)`;
+        }
+        return '';
+    }
+
     _scrollToBottom(force = false) {
         const el = this.chatEl;
         if (!el) return;
