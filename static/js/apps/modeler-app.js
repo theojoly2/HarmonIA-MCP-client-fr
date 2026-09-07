@@ -293,15 +293,10 @@ class ModelerApp extends AppBase {
         this._askNewModelName(async (name) => {
             this._enterLoadingMode();
             try {
-                const meta = await ApiClient.createEmptyModel(name.trim());
+                const meta = await ModelGateway.createEmpty(name.trim());
                 const modelName = meta.name || name.trim();
                 const displayName = meta.display_name || modelName;
-                const res = await fetch(`api/models/${encodeURIComponent(modelName)}/open`, {
-                    method: 'POST',
-                    credentials: 'same-origin',
-                });
-                if (!res.ok) throw new Error(`open_failed:${res.status}`);
-                const svgText = await res.text();
+                const { svgText } = await ModelGateway.openSvg(modelName);
                 await this.loadSvg(svgText, displayName, '', modelName);
                 const historyPanel = ServiceLocator.get('historyPanel');
                 if (historyPanel) historyPanel.load();
@@ -372,7 +367,7 @@ class ModelerApp extends AppBase {
     async _handleFile(file) {
         this._enterLoadingMode();
         try {
-            this.svgText = await ApiClient.importModéliseurFile(file);
+            this.svgText = await ModelGateway.importFile(file);
             const match = this.svgText.match(/data-main-class="([^"]*)"/);
             const mainClassName = match ? match[1] : '';
 
@@ -380,7 +375,7 @@ class ModelerApp extends AppBase {
             let displayName = file.name;
             if (AuthManager.isLoggedIn()) {
                 try {
-                    const meta = await ApiClient.importAndSaveModel(file, file.name);
+                    const meta = await ModelGateway.importAndSave(file, file.name);
                     storedName = meta.name || file.name;
                     displayName = meta.display_name || file.name;
                     const historyPanel = ServiceLocator.get('historyPanel');
@@ -805,7 +800,7 @@ class ModelerApp extends AppBase {
         const originalHtml = itemEl?.innerHTML || '';
         this._setExportItemLoading(itemEl, true);
         try {
-            const blob = await ApiClient.exportModel(this.storedName, format);
+            const blob = await ModelGateway.exportAsBlob(this.storedName, format);
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -915,7 +910,7 @@ class ModelerApp extends AppBase {
         let displayName = this._pendingAssistantDisplayName || '';
         if (!session) {
             try {
-                const data = await ApiClient.findAssistantSessionByModel(this.storedName, 'modeler');
+                const data = await ModelGateway.findAssistantSession(this.storedName, 'modeler');
                 if (data.session) {
                     session = data.session;
                     displayName = '';
@@ -1130,14 +1125,7 @@ class ModelerApp extends AppBase {
         }
         try {
             this._setLoading(true);
-            const res = await fetch(`api/models/${encodeURIComponent(this.storedName || this.fileName)}/${endpoint}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'same-origin',
-                body: JSON.stringify(body),
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data.detail || `Erreur ${res.status}`);
+            await ModelGateway.applyMutation(this.storedName || this.fileName, endpoint, body);
             await this._reloadSvgFromServer();
         } catch (err) {
             console.error(`Mutation ${endpoint} error`, err);
@@ -1152,13 +1140,7 @@ class ModelerApp extends AppBase {
     }
 
     async _reloadSvgFromServer() {
-        const encodedName = encodeURIComponent(this.storedName || this.fileName);
-        const res = await fetch(`api/models/${encodedName}/open`, {
-            method: 'POST',
-            credentials: 'same-origin',
-        });
-        if (!res.ok) throw new Error('reload_failed');
-        this.svgText = await res.text();
+        this.svgText = await ModelGateway.reloadSvg(this.storedName || this.fileName);
         if (this.viewer) {
             this.viewer.setSvg(this.svgText, this.mainClassName);
             this.viewer.restoreState(this.viewerState);

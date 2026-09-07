@@ -17,7 +17,7 @@ from api.naming import (
     safe_filename as _safe_filename,
     unique_model_name as _unique_model_name,
 )
-from api.routers.auth import require_user
+from api.security import require_user
 from api.services.model_import import base64_for_bytes, parse_model_file
 from api.services.model_store import (
     add_attribute,

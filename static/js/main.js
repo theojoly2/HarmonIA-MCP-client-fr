@@ -97,7 +97,7 @@
             // can persist it with the usual unique timestamped name.
             const blob = new Blob([pending.content], { type: pending.mimeType || "application/octet-stream" });
             const file = new File([blob], pending.fileName, { type: pending.mimeType || "application/octet-stream" });
-            const meta = await ApiClient.importAndSaveModel(file, pending.fileName);
+            const meta = await ModelGateway.importAndSave(file, pending.fileName);
             AuthManager.clearPendingImport();
             historyPanel.load();
             // Update the open modeler instance so it uses the real stored name.

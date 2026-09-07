@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from api.naming import display_name_from_stored as _display_model_name, model_name_from_filename as _model_name_from_filename, unique_model_name
-from api.routers.auth import require_user
+from api.security import require_user
 from api.schemas.assistant import (
     AssistantStreamRequest,
     AssistantRenameBody,

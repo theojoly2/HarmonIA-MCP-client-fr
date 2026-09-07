@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel, Field
 
-from api.routers.auth import require_user
+from api.security import require_user
 from api.services.search_history_store import (
     delete_search,
     list_searches,

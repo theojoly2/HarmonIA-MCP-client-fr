@@ -764,7 +764,7 @@ class AssistantApp extends AppBase {
         const displayName = file.name;
         this._startImportLoading(loadingKey, displayName);
         try {
-            const result = await ApiClient.importAssistantModel(file, file.name, this.origin);
+            const result = await ModelGateway.importAssistantModel(file, file.name, this.origin);
             if (result?.name) {
                 this.props.displayNames = this.props.displayNames || {};
                 this.props.displayNames[result.name] = result.display_name || result.name;
@@ -795,7 +795,7 @@ class AssistantApp extends AppBase {
         this._importedSearchDocIds.set(docId, '');
         this._startImportLoading(loadingKey, filename);
         try {
-            const result = await ApiClient.importDocumentAsAssistantModel(docId, this.origin);
+            const result = await ModelGateway.importDocumentAsAssistantModel(docId, this.origin);
             if (result?.name) {
                 this.props.displayNames = this.props.displayNames || {};
                 this.props.displayNames[result.name] = result.display_name || filename;
@@ -986,13 +986,9 @@ class AssistantApp extends AppBase {
         // the MCP server storage when the user removes the pill before chatting.
         if (name) {
             try {
-                const res = await fetch(`api/models/${encodeURIComponent(name)}`, {
-                    method: "DELETE",
-                    credentials: "same-origin",
+                await ModelGateway.deleteModel(name).catch((err) => {
+                    console.error("Failed to delete orphan imported model", name, err?.message || err);
                 });
-                if (!res.ok) {
-                    console.error("Failed to delete orphan imported model", name, res.status);
-                }
             } catch (err) {
                 console.error("Delete orphan imported model error", name, err);
             }
@@ -1018,7 +1014,7 @@ class AssistantApp extends AppBase {
         const originalHtml = itemEl?.innerHTML || '';
         this._setPillExportItemLoading(itemEl, true);
         try {
-            const blob = await ApiClient.exportModel(name, format);
+            const blob = await ModelGateway.exportAsBlob(name, format);
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;

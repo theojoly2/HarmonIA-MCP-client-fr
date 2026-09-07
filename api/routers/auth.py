@@ -2,17 +2,12 @@
 
 import json
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel, Field
 
-from api.services.auth_service import (
-    create_session,
-    get_session_cookie,
-    SESSION_COOKIE,
-    SESSION_MAX_AGE_DAYS,
-    verify_password,
-)
-from api.services.user_store import create_user, get_user_by_username, update_user_password, get_user_by_id
+from api.security import clear_session_cookie, require_user, set_session_cookie
+from api.services.auth_service import verify_password
+from api.services.user_store import create_user, get_user_by_username, update_user_password
 from api.services.usage_store import get_usage
 
 
@@ -32,51 +27,6 @@ class ChangePasswordBody(BaseModel):
 class UserResponse(BaseModel):
     id: int
     username: str
-
-
-def set_session_cookie(response: Response, username: str):
-    cookie = create_session(username)
-    max_age = SESSION_MAX_AGE_DAYS * 24 * 60 * 60
-    response.set_cookie(
-        key=SESSION_COOKIE,
-        value=cookie,
-        httponly=True,
-        secure=False,  # adjust to True when served over HTTPS
-        samesite="lax",
-        max_age=max_age,
-        path="/",
-    )
-
-
-def clear_session_cookie(response: Response):
-    response.delete_cookie(key=SESSION_COOKIE, path="/")
-
-
-async def require_user(request: Request) -> str:
-    username = get_session_cookie(request)
-    if not username:
-        raise HTTPException(status_code=401, detail="not_authenticated")
-    return username
-
-
-async def require_user_or_api_key(request: Request) -> str:
-    """Allow authentication either via web session cookie or API key header."""
-    username = get_session_cookie(request)
-    if username:
-        return username
-
-    auth_header = request.headers.get("Authorization", "")
-    if auth_header.lower().startswith("bearer "):
-        key = auth_header[7:].strip()
-        from api.services.api_key_store import verify_api_key
-
-        api_key = verify_api_key(key)
-        if api_key:
-            user = get_user_by_id(api_key.user_id)
-            if user:
-                return user["username"]
-
-    raise HTTPException(status_code=401, detail="not_authenticated")
 
 
 @router.post("/register")

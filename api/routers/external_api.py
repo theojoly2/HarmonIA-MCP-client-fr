@@ -18,7 +18,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from api.naming import model_name_from_filename as _model_name_from_filename
-from api.routers.auth import require_user_or_api_key
+from api.security import require_user_or_api_key
 from api.schemas.assistant import AssistantStreamRequest
 from api.services.assistant_orchestrator import assistant_stream_generator
 from api.services.assistant_history import AssistantHistory

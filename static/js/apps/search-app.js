@@ -759,7 +759,7 @@ class SearchApp extends AppBase {
         const imported = [];
         await Promise.all(loadingKeys.map(async ({ key, item }) => {
             try {
-                const result = await ApiClient.importDocumentAsAssistantModel(item.docId, 'assistant');
+                const result = await ModelGateway.importDocumentAsAssistantModel(item.docId, 'assistant');
                 if (result?.name) {
                     instance.props.displayNames = instance.props.displayNames || {};
                     instance.props.displayNames[result.name] = result.display_name || item.filename;

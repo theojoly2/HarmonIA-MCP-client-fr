@@ -5,7 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from api.routers.auth import require_user
+from api.security import require_user
 from api.services.api_key_store import create_api_key, list_api_keys, revoke_api_key
 from api.services.user_store import get_user_by_username
 

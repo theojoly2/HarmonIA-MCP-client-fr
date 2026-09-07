@@ -361,11 +361,8 @@ class HistoryPanel {
                         linkedModels.push(item.model_name);
                     }
                     await Promise.all(linkedModels.map(async (modelName) => {
-                        const res = await fetch(`api/models/${encodeURIComponent(modelName)}`, {
-                            method: "DELETE",
-                            credentials: "same-origin",
-                        });
-                        if (!res.ok) errors.push(`modèle ${modelName}: ${res.status}`);
+                        const res = await ModelGateway.deleteModel(modelName).catch(() => ({ ok: false }));
+                        if (!res.ok) errors.push(`modèle ${modelName}: delete_failed`);
                     }));
                     const res = await fetch(
                         `api/assistant/sessions/${encodeURIComponent(item.name)}?origin=${encodeURIComponent(ctx)}`,
@@ -380,12 +377,8 @@ class HistoryPanel {
                     );
                     if (!res.ok) errors.push(`session: ${res.status}`);
                 } else {
-                    const encodedName = encodeURIComponent(item.name);
-                    const res = await fetch(`api/models/${encodedName}`, {
-                        method: "DELETE",
-                        credentials: "same-origin",
-                    });
-                    if (!res.ok) errors.push(`modèle: ${res.status}`);
+                    const res = await ModelGateway.deleteModel(item.name).catch(() => ({ ok: false }));
+                    if (!res.ok) errors.push(`modèle: delete_failed`);
                     // If this model has a linked modeler assistant session, also delete it.
                     if (item.assistant_session) {
                         await ApiClient.deleteAssistantSession(item.assistant_session, "modeler").catch((err) =>
@@ -552,18 +545,7 @@ class HistoryPanel {
                         }
                     });
                 } else {
-                    const encodedName = encodeURIComponent(storedName);
-                    res = await fetch(`api/models/${encodedName}/rename`, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        credentials: "same-origin",
-                        body: JSON.stringify({ name: newName }),
-                    });
-                    if (!res.ok) {
-                        const err = await res.json().catch(() => ({}));
-                        throw new Error(err.detail || `rename_failed_${res.status}`);
-                    }
-                    const result = await res.json().catch(() => ({}));
+                    const result = await ModelGateway.renameModel(storedName, newName);
                     const newStoredName = result.name || storedName;
                     // Update the DOM so subsequent renames use the new stored name.
                     li.dataset.itemName = newStoredName;
@@ -638,7 +620,7 @@ class HistoryPanel {
         let svgText;
         let returnedName;
         try {
-            ({ svgText, modelName: returnedName } = await ApiClient.getModelSvg(modelName));
+            ({ svgText, modelName: returnedName } = await ModelGateway.openSvg(modelName));
         } catch (err) {
             console.error("Fetch model SVG error", err);
             modelerInstance.instance._setLoading(false);
@@ -648,10 +630,7 @@ class HistoryPanel {
         }
 
         // Update last-opened time in the background (non-blocking).
-        fetch(`api/models/${encodedName}/touch`, {
-            method: "POST",
-            credentials: "same-origin",
-        }).catch((err) => console.error("Touch model error", err));
+        ModelGateway.touchModel(modelName).catch((err) => console.error("Touch model error", err));
 
         const displayName = returnedName || modelName;
         if (modelerInstance.instance.loadSvg) {
@@ -777,10 +756,7 @@ class HistoryPanel {
                     if (item.model_name && !deletedModels.has(item.model_name)) {
                         deletedModels.add(item.model_name);
                         deletions.push(
-                            fetch(`api/models/${encodeURIComponent(item.model_name)}`, {
-                                method: "DELETE",
-                                credentials: "same-origin",
-                            }).catch((err) => console.error("Delete all linked model error", err))
+                            ModelGateway.deleteModel(item.model_name).catch((err) => console.error("Delete all linked model error", err))
                         );
                     }
                     return;
@@ -798,10 +774,7 @@ class HistoryPanel {
                 if (!deletedModels.has(item.name)) {
                     deletedModels.add(item.name);
                     deletions.push(
-                        fetch(`api/models/${encodeURIComponent(item.name)}`, {
-                            method: "DELETE",
-                            credentials: "same-origin",
-                        })
+                        ModelGateway.deleteModel(item.name)
                     );
                 }
                 if (item.assistant_session && !deletedSessions.has(`modeler__${item.assistant_session}`)) {
