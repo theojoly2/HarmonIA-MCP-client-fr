@@ -175,7 +175,7 @@ class ChatApp extends AppBase {
         }, 20);
 
         try {
-            const reader = await ApiClient.streamChat(this.documentId, text, historySnapshot);
+            const reader = await DocumentGateway.streamChat(this.documentId, text, historySnapshot);
             const decoder = new TextDecoder('utf-8');
             let first = false;
             while (true) {

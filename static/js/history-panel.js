@@ -96,57 +96,43 @@ class HistoryPanel {
             return;
         }
         try {
-            const [modelsRes, searchesRes, assistantRes, modelerAssistantRes] = await Promise.all([
-                fetch("api/models", { credentials: "same-origin" }),
-                fetch("api/searches", { credentials: "same-origin" }),
-                ApiClient.getAssistantSessionsAll(),
-                ApiClient.getAssistantSessions("modeler"),
+            const [modelsDataRaw, searchesDataRaw, assistantRes, modelerAssistantRes] = await Promise.all([
+                ModelGateway.getModels().catch((err) => { console.error("Models list error", err); return { models: [] }; }),
+                SearchGateway.getSearches().catch((err) => { console.error("Searches list error", err); return { searches: [] }; }),
+                AssistantGateway.getAssistantSessionsAll(),
+                AssistantGateway.getAssistantSessions("modeler"),
             ]);
             let models = [];
             let searches = [];
             let conversations = [];
-            let modelsData = { models: [] };
-            if (modelsRes.ok) {
-                modelsData = await modelsRes.json();
-                // Build a map from model name to modeler assistant session so modeler items
-                // know which conversation to reopen when the user opens the chat split.
-                const assistantSessionByModel = new Map();
-                (modelerAssistantRes.sessions || []).forEach((s) => {
-                    if (!s.model_name) return;
-                    // Keep the most recently touched session for each model.
-                    const existing = assistantSessionByModel.get(s.model_name);
-                    if (!existing || (s.last_opened_at || 0) > (existing.last_opened_at || 0)) {
-                        assistantSessionByModel.set(s.model_name, s);
-                    }
+            const modelsData = modelsDataRaw || { models: [] };
+            // Only sessions created from the modeler are attached to modeler
+            // items. Standalone assistant conversations remain separate.
+            const modelerSessionByModel = new Map();
+            (modelerAssistantRes.sessions || []).forEach((s) => {
+                if (!s.model_name || s.origin !== "modeler") return;
+                const existing = modelerSessionByModel.get(s.model_name);
+                if (!existing || (s.last_opened_at || 0) > (existing.last_opened_at || 0)) {
+                    modelerSessionByModel.set(s.model_name, s);
+                }
+            });
+            models = (modelsData.models || [])
+                .filter((m) => {
+                    if (m.imported_from_assistant) return false;
+                    return true;
+                })
+                .map((m) => {
+                    const linked = modelerSessionByModel.get(m.name);
+                    return {
+                        ...m,
+                        kind: "model",
+                        sortKey: Number(m.last_opened_at) || 0,
+                        assistant_session: linked?.name || "",
+                        assistant_display_name: linked?.display_name || "",
+                    };
                 });
-                // Only sessions created from the modeler are attached to modeler
-                // items. Standalone assistant conversations remain separate.
-                const modelerSessionByModel = new Map();
-                (modelerAssistantRes.sessions || []).forEach((s) => {
-                    if (!s.model_name || s.origin !== "modeler") return;
-                    const existing = modelerSessionByModel.get(s.model_name);
-                    if (!existing || (s.last_opened_at || 0) > (existing.last_opened_at || 0)) {
-                        modelerSessionByModel.set(s.model_name, s);
-                    }
-                });
-                models = (modelsData.models || [])
-                    .filter((m) => {
-                        if (m.imported_from_assistant) return false;
-                        return true;
-                    })
-                    .map((m) => {
-                        const linked = modelerSessionByModel.get(m.name);
-                        return {
-                            ...m,
-                            kind: "model",
-                            sortKey: Number(m.last_opened_at) || 0,
-                            assistant_session: linked?.name || "",
-                            assistant_display_name: linked?.display_name || "",
-                        };
-                    });
-            }
-            if (searchesRes.ok) {
-                const data = await searchesRes.json();
+            {
+                const data = searchesDataRaw || { searches: [] };
                 searches = (data.searches || []).map((s) => ({
                     ...s,
                     kind: "search",
@@ -350,7 +336,7 @@ class HistoryPanel {
             const errors = [];
             try {
                 if (isSearch) {
-                    await ApiClient.deleteSearch(item.id);
+                    await SearchGateway.deleteSearch(item.id);
                 } else if (isAssistant) {
                     const ctx = item.origin || "assistant";
                     // Cascade-delete linked models first; the session delete endpoint
@@ -381,7 +367,7 @@ class HistoryPanel {
                     if (!res.ok) errors.push(`modèle: delete_failed`);
                     // If this model has a linked modeler assistant session, also delete it.
                     if (item.assistant_session) {
-                        await ApiClient.deleteAssistantSession(item.assistant_session, "modeler").catch((err) =>
+                        await AssistantGateway.deleteAssistantSession(item.assistant_session, "modeler").catch((err) =>
                             console.error("Delete linked assistant error", err)
                         );
                     }
@@ -510,18 +496,7 @@ class HistoryPanel {
                 let res;
                 if (kind === "assistant" || kind === "modeler_assistant") {
                     const ctx = item.origin || (kind === "modeler_assistant" ? "modeler" : "assistant");
-                    const encodedSession = encodeURIComponent(storedName);
-                    res = await fetch(`api/assistant/sessions/${encodedSession}/rename?origin=${encodeURIComponent(ctx)}`, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        credentials: "same-origin",
-                        body: JSON.stringify({ name: newName }),
-                    });
-                    if (!res.ok) {
-                        const err = await res.json().catch(() => ({}));
-                        throw new Error(err.detail || `rename_failed_${res.status}`);
-                    }
-                    const result = await res.json().catch(() => ({}));
+                    const result = await AssistantGateway.renameAssistantSession(storedName, newName, ctx);
                     const newStoredName = result.name || storedName;
                     // Update the DOM so subsequent renames use the new stored name.
                     li.dataset.itemName = newStoredName;
@@ -556,12 +531,7 @@ class HistoryPanel {
                     const linkedSession = li.dataset.assistantSession;
                     if (linkedSession) {
                         try {
-                            await fetch(`api/assistant/sessions/${encodeURIComponent(linkedSession)}/link-model`, {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                credentials: "same-origin",
-                                body: JSON.stringify({ model_name: newStoredName }),
-                            });
+                            await AssistantGateway.linkAssistantSessionModel(linkedSession, newStoredName, "modeler");
                         } catch (err) {
                             console.error("Update linked model name after rename error", err);
                         }
@@ -651,7 +621,7 @@ class HistoryPanel {
         // sync with the model item in the history panel.
         if (linkedSession) {
             try {
-                await ApiClient.touchAssistantSession(linkedSession, "modeler");
+                await AssistantGateway.touchAssistantSession(linkedSession, "modeler");
             } catch (err) {
                 console.error("Touch modeler assistant session error", err);
             }
@@ -670,7 +640,7 @@ class HistoryPanel {
             const names = Array.isArray(modelNames) ? modelNames : (modelNames ? [modelNames] : []);
             // Touch the session on the backend so it moves to the top of the
             // history list even when it is just reopened without a new message.
-            await ApiClient.touchAssistantSession(sessionName, origin);
+            await AssistantGateway.touchAssistantSession(sessionName, origin);
             const existingAssistant = AppState.listInstances().find((i) => i.appId === "assistant");
             if (existingAssistant) {
                 AppState.removeInstance(existingAssistant.instanceId);
@@ -696,7 +666,7 @@ class HistoryPanel {
         this.close();
         if (searchId) {
             try {
-                await ApiClient.touchSearch(searchId);
+                await SearchGateway.touchSearch(searchId);
             } catch (err) {
                 console.error("Touch search error", err);
             }
@@ -743,7 +713,7 @@ class HistoryPanel {
 
             this.items.forEach((item) => {
                 if (item.kind === "search") {
-                    deletions.push(ApiClient.deleteSearch(item.id));
+                    deletions.push(SearchGateway.deleteSearch(item.id));
                     return;
                 }
                 if (item.kind === "assistant") {
@@ -751,7 +721,7 @@ class HistoryPanel {
                     const sessionKey = `${ctx}__${item.name}`;
                     if (!deletedSessions.has(sessionKey)) {
                         deletedSessions.add(sessionKey);
-                        deletions.push(ApiClient.deleteAssistantSession(item.name, ctx));
+                        deletions.push(AssistantGateway.deleteAssistantSession(item.name, ctx));
                     }
                     if (item.model_name && !deletedModels.has(item.model_name)) {
                         deletedModels.add(item.model_name);
@@ -766,7 +736,7 @@ class HistoryPanel {
                     const sessionKey = `${ctx}__${item.name}`;
                     if (!deletedSessions.has(sessionKey)) {
                         deletedSessions.add(sessionKey);
-                        deletions.push(ApiClient.deleteAssistantSession(item.name, ctx));
+                        deletions.push(AssistantGateway.deleteAssistantSession(item.name, ctx));
                     }
                     return;
                 }
@@ -780,7 +750,7 @@ class HistoryPanel {
                 if (item.assistant_session && !deletedSessions.has(`modeler__${item.assistant_session}`)) {
                     deletedSessions.add(`modeler__${item.assistant_session}`);
                     deletions.push(
-                        ApiClient.deleteAssistantSession(item.assistant_session, "modeler").catch((err) =>
+                        AssistantGateway.deleteAssistantSession(item.assistant_session, "modeler").catch((err) =>
                             console.error("Delete all linked session error", err)
                         )
                     );

@@ -81,7 +81,7 @@ class PreviewApp extends AppBase {
         let displayName = this.docName;
         if (!this.modelName) {
             try {
-                const fileRes = await fetch(ApiClient.getDocumentFileUrl(this.docId));
+                const fileRes = await DocumentGateway.fetchFile(this.docId);
                 if (!fileRes.ok) throw new Error(`file_fetch_failed:${fileRes.status}`);
                 const blob = await fileRes.blob();
                 const file = new File([blob], this.docName, { type: blob.type || "application/octet-stream" });
@@ -123,7 +123,7 @@ class PreviewApp extends AppBase {
                 const result = await ModelGateway.openSvg(this.modelName);
                 svgText = result.svgText || '';
             } else {
-                const url = ApiClient.getDocumentVisualizeUrl(this.docId);
+                const url = DocumentGateway.getVisualizeUrl(this.docId);
                 const res = await fetch(url);
                 if (!res.ok) throw new Error(`Preview failed: ${res.status}`);
                 svgText = await res.text();

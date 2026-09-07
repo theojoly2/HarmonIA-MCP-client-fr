@@ -289,7 +289,7 @@ class SearchApp extends AppBase {
     async _loadTags() {
         if (this.tagsHtml) return;
         try {
-            const data = await ApiClient.getTags();
+            const data = await SearchGateway.getTags();
             const tags = data.tags || [];
             this.tagsHtml = this._buildTagsHtml(tags);
             this._tagsReady = true;
@@ -372,7 +372,7 @@ class SearchApp extends AppBase {
         }
         this.resultsHtml = '';
         try {
-            const data = await ApiClient.postSearch(this.query, this.selectedTags, 20);
+            const data = await SearchGateway.postSearch(this.query, this.selectedTags, 20);
             const tags = data.tags || [];
             const results = data.results || [];
             this.tagsHtml = this._buildTagsHtml(tags);
@@ -390,7 +390,7 @@ class SearchApp extends AppBase {
             // Persist search query to user history when logged in.
             if (AuthManager.isLoggedIn() && !this._skipHistorySave) {
                 try {
-                    await ApiClient.saveSearch(this.query, this.selectedTags);
+                    await SearchGateway.saveSearch(this.query, this.selectedTags);
                     const historyPanel = ServiceLocator.get('historyPanel');
                     if (historyPanel) historyPanel.load();
                 } catch (err) {

@@ -11,28 +11,77 @@
  */
 
 const ModelGateway = (() => {
-    function importFile(file) {
-        return ApiClient.importModéliseurFile(file);
+    async function importFile(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await fetch('api/modeler/import', {
+            method: 'POST',
+            credentials: 'same-origin',
+            body: formData,
+        });
+        if (!res.ok) throw new Error(`Modéliseur import failed: ${res.status}`);
+        return res.text();
     }
 
-    function importAndSave(file, name) {
-        return ApiClient.importAndSaveModel(file, name);
+    async function importAndSave(file, name) {
+        const formData = new FormData();
+        formData.append('file', file);
+        if (name) formData.append('name', name);
+        const res = await fetch('api/models/import', {
+            method: 'POST',
+            credentials: 'same-origin',
+            body: formData,
+        });
+        if (!res.ok) {
+            if (res.status === 401) throw new Error('not_authenticated');
+            throw new Error(`Model import failed: ${res.status}`);
+        }
+        return res.json();
     }
 
-    function createEmpty(name) {
-        return ApiClient.createEmptyModel(name);
+    async function createEmpty(name) {
+        const res = await fetch('api/models/create-empty', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ name }),
+        });
+        if (!res.ok) {
+            if (res.status === 401) throw new Error('not_authenticated');
+            throw new Error(`Create empty model failed: ${res.status}`);
+        }
+        return res.json();
     }
 
-    function openSvg(name) {
-        return ApiClient.getModelSvg(name);
+    async function openSvg(name) {
+        const res = await fetch(`api/models/${encodeURIComponent(name)}/open`, {
+            method: 'POST',
+            credentials: 'same-origin',
+        });
+        if (!res.ok) throw new Error(`Model open failed: ${res.status}`);
+        return { svgText: await res.text(), modelName: res.headers.get('X-Model-Name') || name };
     }
 
-    function exportAsBlob(name, format) {
-        return ApiClient.exportModel(name, format);
+    async function exportAsBlob(name, format) {
+        const res = await fetch(
+            `api/models/${encodeURIComponent(name)}/export?format=${encodeURIComponent(format)}`,
+            { method: 'GET', credentials: 'same-origin' }
+        );
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || `Export failed: ${res.status}`);
+        }
+        return res.blob();
     }
 
     function findAssistantSession(name, origin = 'modeler') {
-        return ApiClient.findAssistantSessionByModel(name, origin);
+        return AssistantGateway.findAssistantSessionByModel(name, origin);
+    }
+
+    async function getModels() {
+        const res = await fetch('api/models', { credentials: 'same-origin' });
+        if (!res.ok) throw new Error(`Models list failed: ${res.status}`);
+        return res.json();
     }
 
     async function applyMutation(name, endpoint, body) {
@@ -88,12 +137,35 @@ const ModelGateway = (() => {
         return { ok: res.ok, status: res.status, body: await res.json().catch(() => ({})) };
     }
 
-    function importAssistantModel(file, name, origin = 'assistant') {
-        return ApiClient.importAssistantModel(file, name, origin);
+    async function importAssistantModel(file, name, origin = 'assistant') {
+        const form = new FormData();
+        form.append('file', file);
+        if (name) form.append('name', name);
+        form.append('origin', origin);
+        const res = await fetch('api/assistant/import', {
+            method: 'POST',
+            credentials: 'same-origin',
+            body: form,
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || `Assistant model import failed: ${res.status}`);
+        }
+        return res.json();
     }
 
-    function importDocumentAsAssistantModel(docId, origin = 'assistant') {
-        return ApiClient.importDocumentAsAssistantModel(docId, origin);
+    async function importDocumentAsAssistantModel(docId, origin = 'assistant') {
+        const res = await fetch('api/assistant/import-from-document', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ doc_id: docId, origin }),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || `Assistant model import from document failed: ${res.status}`);
+        }
+        return res.json();
     }
 
     return {
@@ -108,6 +180,7 @@ const ModelGateway = (() => {
         deleteModel,
         renameModel,
         touchModel,
+        getModels,
         importAssistantModel,
         importDocumentAsAssistantModel,
     };

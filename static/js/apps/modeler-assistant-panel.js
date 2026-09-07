@@ -306,7 +306,7 @@ class ModelerAssistantPanel {
         };
 
         try {
-            await ApiClient.streamAssistant(this.session || '', text, this.modelName, [], liveHandler);
+            await AssistantGateway.streamAssistant(this.session || '', text, this.modelName, [], liveHandler, { origin: 'modeler' });
         } catch (err) {
             console.error('Modeler assistant stream error', err);
             this._appendAssistantMessage(`Erreur : ${this._escape(err.message)}`);

@@ -1072,7 +1072,7 @@ class AssistantApp extends AppBase {
     async _loadTags() {
         if (this._tagsReady) return;
         try {
-            const data = await ApiClient.getTags();
+            const data = await SearchGateway.getTags();
             const tags = data.tags || [];
             this.tagsHtml = this._buildTagsHtml(tags);
             this._tagsReady = true;
@@ -1165,7 +1165,7 @@ class AssistantApp extends AppBase {
         this._removeThinkingPlaceholder();
         const loadingPlaceholder = this._appendThinkingPlaceholder('Chargement de la conversation...');
 
-        const data = await ApiClient.getAssistantHistory(session, this.origin);
+            const data = await AssistantGateway.getAssistantHistory(session, this.origin);
         console.log('[AssistantApp] history data', data);
 
         this._removeThinkingPlaceholder();
@@ -2309,7 +2309,7 @@ class AssistantApp extends AppBase {
         };
 
         try {
-            await ApiClient.streamAssistant(
+            await AssistantGateway.streamAssistant(
                 sessionToSend,
                 text,
                 this.modelNames,
