@@ -1389,6 +1389,391 @@ class AssistantApp extends AppBase {
         console.log('[AssistantApp] loaded messages count', this.messages.length);
     }
 
+    _scrollToBottom(force = false) {
+        const el = this.chatEl;
+        if (!el) return;
+        if (force || this._stickToBottom) {
+            el.scrollTo({ top: el.scrollHeight, behavior: force ? 'auto' : 'smooth' });
+        }
+    }
+
+    _isNearBottom() {
+        return !!this._stickToBottom;
+    }
+
+    async _send(text) {
+        if (!this._requireAuth()) return;
+        // For a brand-new conversation we intentionally pass an empty session.
+        // The backend will generate a unique slug + timestamp and return it in
+        // the first `user` event, exactly like the modeler does for imports.
+        const sessionToSend = this.session || '';
+
+        this.messages.push({ role: 'user', content: text });
+        this._appendUserMessage(text);
+        this.isStreaming = true;
+        this._setSendEnabled(false);
+        // Reset the background event queue for each new turn.
+        this._pendingEvents = [];
+        this._lastRenderedEventIndex = -1;
+        // Start with a clean thinking placeholder. Hide stale sparkles first,
+        // because a new user message begins a new assistant turn.
+        this._hideAllSparkles();
+
+        let placeholder = this._appendThinkingPlaceholder('Réflexion...');
+        const loadingInterval = setInterval(() => {
+            // Always target the latest placeholder so the sparkle keeps beating
+            // across phase changes (text -> tool -> new text, etc.).
+            const placeholders = Array.from(this.chatEl.querySelectorAll('.assistant-thinking-placeholder'));
+            const latest = placeholders.length ? placeholders[placeholders.length - 1] : null;
+            const avatar = latest?.querySelector('.ai-avatar-wrapper');
+            if (avatar) {
+                avatar.classList.remove('trigger-magic');
+                void avatar.offsetWidth;
+                avatar.classList.add('trigger-magic');
+            }
+        }, 1200);
+
+        // ChatApp-style streaming: accumulate the full response, then display it
+        // character-by-character with live markdown reparsing.
+        let fullResponse = '';
+        let displayedText = '';
+        let streamBuffer = '';
+        let currentBubbleContent = null;
+        let typewriterInterval = null;
+
+        const startTypewriter = () => {
+            if (typewriterInterval) return;
+            typewriterInterval = setInterval(() => {
+                if (streamBuffer.length === 0) return;
+                const chunkSize = Math.min(3 + Math.floor(Math.random() * 8), streamBuffer.length);
+                displayedText += streamBuffer.slice(0, chunkSize);
+                streamBuffer = streamBuffer.slice(chunkSize);
+                if (currentBubbleContent) {
+                    currentBubbleContent.innerHTML = this._markdown(displayedText, false);
+                }
+                this._adjustChatPadding();
+            }, 10);
+        };
+
+        const stopTypewriter = () => {
+            if (typewriterInterval) {
+                clearInterval(typewriterInterval);
+                typewriterInterval = null;
+            }
+        };
+
+        const flushTypewriter = () => {
+            stopTypewriter();
+            if (streamBuffer.length > 0) {
+                displayedText += streamBuffer;
+                streamBuffer = '';
+            }
+            if (currentBubbleContent) {
+                currentBubbleContent.innerHTML = this._markdown(displayedText, false);
+            }
+            // The final parse can make the bubble much taller. Apply the safety
+            // padding so the new content is never hidden behind the input area.
+            this._adjustChatPadding();
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    this._adjustChatPadding();
+                });
+            });
+        };
+
+        const resetTypewriter = () => {
+            stopTypewriter();
+            displayedText = '';
+            streamBuffer = '';
+            currentBubbleContent = null;
+        };
+
+        const appendToStreamBuffer = (text) => {
+            streamBuffer += text;
+        };
+
+        const ensureAssistantTextBubble = () => {
+            if (currentBubbleContent) return currentBubbleContent;
+            this._renderer.removeThinkingPlaceholder();
+            this._renderer.closeAssistantBubble();
+            const wrapper = document.createElement('div');
+            wrapper.className = 'assistant-bubble assistant-bubble-assistant mb-6';
+            wrapper.dataset.role = 'assistant';
+            wrapper.dataset.active = 'true';
+            wrapper.innerHTML = `
+                <div class="assistant-bubble-content markdown-body"></div>
+                <div class="ai-avatar-row flex items-center gap-2">
+                    <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic" data-hidden="false">
+                        ${this._sparkleSvg()}
+                    </div>
+                </div>
+            `;
+            this.messagesEl.appendChild(wrapper);
+            currentBubbleContent = wrapper.querySelector('.assistant-bubble-content');
+            return currentBubbleContent;
+        };
+
+        // Abort controller lets the client survive long waits and prevents duplicate streams.
+        this._streamAbortController?.abort();
+        this._streamAbortController = new AbortController();
+
+        const saveHtmlSnapshot = () => {
+            if (this.messagesEl) {
+                this.messagesHtml = this.messagesEl.innerHTML;
+            }
+        };
+
+        const liveHandler = async (event) => {
+            // The DOM may be cached/visible. If messagesEl exists (it does when
+            // cached because we keep the container), process live. Otherwise queue.
+            if (!this.messagesEl) {
+                this._pendingEvents.push(event);
+                return;
+            }
+
+            // Always process the current event live. If there are also queued events
+            // from the background, replay them first so the timeline order is preserved.
+            const eventsToReplay = this._pendingEvents.slice(this._lastRenderedEventIndex + 1);
+            this._lastRenderedEventIndex = this._pendingEvents.length - 1;
+            for (const ev of eventsToReplay) {
+                this._processEvent(ev, { startTypewriter, stopTypewriter, flushTypewriter, resetTypewriter, ensureAssistantTextBubble, appendToStreamBuffer, saveHtmlSnapshot, placeholderRef: { value: placeholder } });
+            }
+
+            this._processEvent(event, { startTypewriter, stopTypewriter, flushTypewriter, resetTypewriter, ensureAssistantTextBubble, appendToStreamBuffer, saveHtmlSnapshot, placeholderRef: { value: placeholder } });
+        };
+
+        try {
+            await AssistantGateway.streamAssistant(
+                sessionToSend,
+                text,
+                this.modelNames,
+                this.selectedTags || [],
+                liveHandler,
+                { origin: this.origin }
+            );
+        } catch (err) {
+            console.error('Assistant stream error', err);
+            this._renderer.removeThinkingPlaceholder(); // ensures any previous one is removed first
+            const bubble = this._renderer.ensureAssistantBubble();
+            bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(err.message)}</em>`;
+        } finally {
+            clearInterval(loadingInterval);
+            stopTypewriter();
+            flushTypewriter();
+            this.isStreaming = false;
+            this._setSendEnabled(true);
+            this._renderer.closeAssistantBubble();
+            // Keep the padding safety in place; _applyCentering will refresh it on
+            // tab switches / resize instead of clearing it here.
+
+            if (displayedText) {
+                this.messages.push({ role: 'assistant', content: displayedText });
+            }
+
+            this._renderer.removeThinkingPlaceholder();
+            this._renderer.updateFinalSparkle();
+            saveHtmlSnapshot();
+            clearTimeout(this._streamAliveTimeout);
+            this._streamAliveTimeout = null;
+        }
+    }
+
+    _updateFinalSparkle() {
+        this._renderer.updateFinalSparkle();
+    }
+
+    _processEvent(event, { startTypewriter, stopTypewriter, flushTypewriter, resetTypewriter, ensureAssistantTextBubble, appendToStreamBuffer, saveHtmlSnapshot, placeholderRef }) {
+        if (this._streamAliveTimeout) {
+            clearTimeout(this._streamAliveTimeout);
+            this._streamAliveTimeout = null;
+        }
+        // Restart the watchdog each time something arrives (2 min silence = dead).
+        this._streamAliveTimeout = setTimeout(() => {
+            this._streamAbortController?.abort();
+        }, 120000);
+
+        if (event.kind === 'user') {
+            if (event.session) this.session = event.session;
+            // A new user message starts a new turn: freeze any previous SVG card
+            // immediately so mutations in this turn create a fresh visualization card.
+            this._renderer.freezeCurrentSvgCard();
+            saveHtmlSnapshot();
+            return;
+        }
+
+        if (event.kind === 'thinking') {
+            // Each thinking event starts a new reasoning step. The helper
+            // removes any previous placeholder first, so stale sparkles from
+            // earlier phases do not linger on screen.
+            this._renderer.removeThinkingPlaceholder();
+            placeholderRef.value = this._renderer.appendThinkingPlaceholder('Réflexion...');
+            saveHtmlSnapshot();
+            return;
+        }
+
+        if (event.kind === 'assistant_text') {
+            if (appendToStreamBuffer) {
+                // ChatApp-style live typewriter: append to the buffer and let the
+                // interval display characters one-by-one with live markdown parsing.
+                appendToStreamBuffer(event.content || '');
+                ensureAssistantTextBubble();
+                startTypewriter();
+            } else {
+                // Fallback during background replay (no live typewriter available).
+                const bubble = this._renderer.ensureAssistantBubble();
+                this._currentStreamingText = (this._currentStreamingText || '') + (event.content || '');
+                bubble.innerHTML = this._markdown(this._currentStreamingText, false);
+                this._throttledReflow();
+                this._throttledScrollToBottom();
+            }
+            saveHtmlSnapshot();
+            return;
+        }
+
+        if (event.kind === 'assistant_tool_calls') {
+            stopTypewriter?.();
+            flushTypewriter?.();
+            resetTypewriter?.();
+            this._renderer.closeAssistantBubble();
+            // Hide the verbose tool-call list; only progress cards (and the
+            // plan card) give the user feedback now.
+            this.messages.push({ role: 'assistant_tool_calls', tool_calls: event.tool_calls });
+            saveHtmlSnapshot();
+            return;
+        }
+
+        if (event.kind === 'tool_start') {
+            stopTypewriter?.();
+            flushTypewriter?.();
+            resetTypewriter?.();
+            this._renderer.closeAssistantBubble();
+            // Hide the sparkle on any previous assistant bubble as soon as a new
+            // tool starts, so it does not stay under an intermediate message.
+            this._renderer.hideAllSparkles();
+            // Render the tool card/search card BEFORE the placeholder so the
+            // sparkle/"Réflexion" label stays at the bottom of the current step.
+            if (event.name === 'retrieve_documents') {
+                this._renderer.appendSearchCard(event.arguments?.search_terms || '', null);
+            } else if (event.name === 'display_model_visualization') {
+                // SVG cards are created/updated by the model_svg event, no extra card here.
+                // In embedded mode the visualization lives in the modeler canvas.
+            }
+            // Tool cards (JSON dumps) are intentionally hidden for all tools,
+            // including unknown ones. Only progress cards, plan card, search
+            // results and SVG visualizations remain visible.
+            // Show a transient status label while the tool runs. The helper
+            // removes any previous placeholder first.
+            placeholderRef.value = this._renderer.appendThinkingPlaceholder(this._toolStatusLabel(event.name));
+            saveHtmlSnapshot();
+            return;
+        }
+
+        if (event.kind === 'progress_start') {
+            stopTypewriter?.();
+            flushTypewriter?.();
+            resetTypewriter?.();
+            this._renderer.closeAssistantBubble();
+            this._renderer.hideAllSparkles();
+            this._renderer.appendProgressCard(event.card_id, event.tool_name);
+            saveHtmlSnapshot();
+            return;
+        }
+
+        if (event.kind === 'progress_update') {
+            this._renderer.updateProgressCard(event.card_id, event.percent, event.message);
+            saveHtmlSnapshot();
+            return;
+        }
+
+        if (event.kind === 'progress_done') {
+            this._renderer.completeProgressCard(event.card_id);
+            this._renderer.removeProgressStatus(event.card_id);
+            saveHtmlSnapshot();
+            return;
+        }
+
+        if (event.kind === 'tool_result') {
+            stopTypewriter?.();
+            flushTypewriter?.();
+            resetTypewriter?.();
+            this._renderer.closeAssistantBubble();
+            if (event.name === 'plan_workflow_with_tools') {
+                this._renderer.renderPlan(event.result);
+            } else if (event.name === 'retrieve_documents') {
+                const display = event.display || {};
+                const results = display.results || [];
+                const resultsHtml = this.ui.buildResultsHtml(results, display.result_count || results.length, { hideEmpty: false });
+                this._renderer.fillSearchCard(display.query || '', resultsHtml);
+            } else {
+                this._renderer.fillToolResult(event.name, event.result, event.display);
+            }
+            saveHtmlSnapshot();
+            return;
+        }
+
+        if (event.kind === 'loop_done') {
+            stopTypewriter?.();
+            flushTypewriter?.();
+            resetTypewriter?.();
+            this._renderer.closeAssistantBubble();
+            saveHtmlSnapshot();
+            return;
+        }
+
+            if (event.kind === 'model_svg') {
+                // In standalone assistant mode, update the active SVG card inside the chat.
+                // When the assistant is embedded next to the modeler, the visualization
+                // lives in the modeler's main canvas instead.
+                const linked = this._linkedModelerInstanceId || this.props.linkedModelerInstanceId;
+                if (linked && this.modelNames?.length) {
+                    AssistantBridge.notifySvgRefresh(linked);
+                } else if (!this._embedded) {
+                    const rawName = event.model_name || event.label || '';
+                    const label = rawName
+                        ? this._displayNameForModel(rawName)
+                        : 'Visualisation du modèle';
+                    this._renderer.updateCurrentSvgCard(event.svg, label);
+                }
+                saveHtmlSnapshot();
+                return;
+            }
+
+
+        if (event.kind === 'model_attached') {
+            const attachedName = event.model_name;
+            if (attachedName && !this.modelNames.includes(attachedName)) {
+                this.modelNames.push(attachedName);
+                this.props.displayNames = this.props.displayNames || {};
+                this.props.displayNames[attachedName] = attachedName;
+                this._syncModelUi();
+            }
+            saveHtmlSnapshot();
+            return;
+        }
+
+        if (event.kind === 'assistant_done') {
+            stopTypewriter?.();
+            flushTypewriter?.();
+            resetTypewriter?.();
+            this._renderer.closeAssistantBubble();
+            // Remove any lingering thinking placeholder before rendering the final answer.
+            this._renderer.removeThinkingPlaceholder();
+            saveHtmlSnapshot();
+            return;
+        }
+
+        if (event.kind === 'error') {
+            stopTypewriter?.();
+            flushTypewriter?.();
+            resetTypewriter?.();
+            this._renderer.closeAssistantBubble();
+            const bubble = this._renderer.ensureAssistantBubble();
+            bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(event.message || '')}</em>`;
+            saveHtmlSnapshot();
+            return;
+        }
+    }
+
     // Renderer helpers for bubbles/cards are now provided by this._renderer.
     // The following helpers remain on AssistantApp because they are stateful or tied to streaming internals.
 
