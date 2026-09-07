@@ -1409,7 +1409,7 @@ class AssistantApp extends AppBase {
         const sessionToSend = this.session || '';
 
         this.messages.push({ role: 'user', content: text });
-        this._appendUserMessage(text);
+        this._renderer.appendUserMessage(text);
         this.isStreaming = true;
         this._setSendEnabled(false);
         // Reset the background event queue for each new turn.
@@ -1417,9 +1417,9 @@ class AssistantApp extends AppBase {
         this._lastRenderedEventIndex = -1;
         // Start with a clean thinking placeholder. Hide stale sparkles first,
         // because a new user message begins a new assistant turn.
-        this._hideAllSparkles();
+        this._renderer.hideAllSparkles();
 
-        let placeholder = this._appendThinkingPlaceholder('Réflexion...');
+        let placeholder = this._renderer.appendThinkingPlaceholder('Réflexion...');
         const loadingInterval = setInterval(() => {
             // Always target the latest placeholder so the sparkle keeps beating
             // across phase changes (text -> tool -> new text, etc.).
