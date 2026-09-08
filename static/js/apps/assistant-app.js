@@ -1481,14 +1481,9 @@ class AssistantApp extends AppBase {
     }
 
     _createToolCard(name, args = {}) {
-        // Tool JSON cards are hidden in embedded mode only for mutation tools;
-        // analysis / plan cards remain visible.
-        const hiddenInEmbedded = {
-            add_class: true,
-            add_attribute: true,
-            add_connector: true,
-        };
-        if (this._embedded && hiddenInEmbedded[name]) return null;
+        // Do not show the raw JSON tool response cards. Progress cards, plan
+        // cards, search cards and SVG cards remain visible.
+        return null;
         const id = 'assistant-tool-' + name + '-' + Date.now();
         const div = document.createElement('div');
         div.id = id;
@@ -1687,17 +1682,6 @@ class AssistantApp extends AppBase {
     _fillToolResult(name, result, display) {
         if (display && display.type === 'search') {
             this._fillSearchCard(display.query || '', display.results_html || '');
-            return null;
-        }
-
-        // Mutation tools are silent: no JSON card is shown; mutations update the
-        // SVG card instead. Analysis tools still get a visible progress/status card.
-        const mutationTools = {
-            add_class: true,
-            add_attribute: true,
-            add_connector: true,
-        };
-        if (mutationTools[name]) {
             return null;
         }
 
