@@ -706,6 +706,15 @@ class ModelerApp extends AppBase {
         return ModelerAssistantBridge.toggleSplit(this);
     }
 
+    _showFloatingDialog(title, fields, onSubmit, onOpen) {
+        ModelerEditDialogs.showFloatingDialog({
+            title,
+            fields,
+            onSubmit,
+            onOpen,
+        });
+    }
+
     _updateEditButtonStates() {
         const addClassBtn = this.container.querySelector('#modeler-add-class');
         const addAttrBtn = this.container.querySelector('#modeler-add-attr');
