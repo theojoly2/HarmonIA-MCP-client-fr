@@ -170,6 +170,37 @@ const AssistantGateway = (() => {
         return res.json().catch(() => ({}));
     }
 
+    async function importAssistantModel(file, name, origin = "assistant") {
+        const form = new FormData();
+        form.append("file", file);
+        if (name) form.append("name", name);
+        form.append("origin", origin);
+        const res = await fetch("api/assistant/import", {
+            method: "POST",
+            credentials: "same-origin",
+            body: form,
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || `Assistant model import failed: ${res.status}`);
+        }
+        return res.json();
+    }
+
+    async function importAssistantModelFromDocument(docId, origin = "assistant") {
+        const res = await fetch("api/assistant/import-from-document", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ doc_id: docId, origin }),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || `Assistant model import from document failed: ${res.status}`);
+        }
+        return res.json();
+    }
+
     return {
         streamAssistant,
         getAssistantSessions,
@@ -180,6 +211,8 @@ const AssistantGateway = (() => {
         touchAssistantSession,
         renameAssistantSession,
         linkAssistantSessionModel,
+        importAssistantModel,
+        importAssistantModelFromDocument,
     };
 })();
 

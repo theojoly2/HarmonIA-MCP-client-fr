@@ -185,21 +185,19 @@ class AssistantApp extends AppBase {
                 `;
                 this.embeddedIntroEl.classList.remove('hidden');
             }
-                this._updateModelPill();
-                if (importBtn) {
-                    importBtn.style.display = 'none';
-                }
-                if (this.embeddedModelPillEl) {
-                    this.embeddedModelPillEl.classList.add('hidden');
-                }
-            }
-
-            this._updateImportButtonState(importBtn);
             this._updateModelPill();
-
-        if (window.GlowEffects && typeof window.GlowEffects.scanAndBind === 'function') {
-            window.GlowEffects.scanAndBind(container);
+            if (importBtn) {
+                importBtn.style.display = 'none';
+            }
+            if (this.embeddedModelPillEl) {
+                this.embeddedModelPillEl.classList.add('hidden');
+            }
         }
+
+        this._updateImportButtonState(importBtn);
+        this._updateModelPill();
+
+        this._scanGlow(container);
 
         container.querySelector('#assistant-reset').addEventListener('click', () => {
             this._newSession();
