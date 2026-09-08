@@ -2094,6 +2094,11 @@ class AssistantApp extends AppBase {
         // Also remove any leftover sparkle row from the previous assistant answer
         // so the new user message starts with a blank slate.
         this.messagesEl.querySelectorAll('.ai-avatar-row').forEach((row) => row.remove());
+        // In embedded mode the intro bubble also has a sparkle; hide it once the
+        // user starts the real conversation.
+        if (this._embedded && this.embeddedIntroEl) {
+            this.embeddedIntroEl.querySelectorAll('.ai-avatar-row').forEach((row) => row.remove());
+        }
 
         let placeholder = this._appendThinkingPlaceholder();
         const loadingInterval = setInterval(() => {
