@@ -79,8 +79,10 @@ const AssistantEventProcessor = (() => {
 
         if (event.kind === 'assistant_text') {
             if (typewriter && typewriter.append) {
+                // Let the typewriter create and own the active bubble (and its
+                // sparkle). Do not call renderer.ensureAssistantBubble() here to
+                // avoid a duplicate empty bubble with a stale sparkle.
                 typewriter.append(event.content || '');
-                renderer.ensureAssistantBubble();
                 typewriter.start();
             } else {
                 const bubble = renderer.ensureAssistantBubble();
