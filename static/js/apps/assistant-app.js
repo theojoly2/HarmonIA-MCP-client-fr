@@ -1342,15 +1342,6 @@ class AssistantApp extends AppBase {
         `;
         this.messagesEl.appendChild(wrapper);
         this._scrollToBottom();
-        // Ensure the sparkle keeps animating beyond the first CSS forwards run.
-        requestAnimationFrame(() => {
-            const avatar = wrapper.querySelector('.ai-avatar-wrapper');
-            if (avatar) {
-                avatar.classList.remove('trigger-magic');
-                void avatar.offsetWidth;
-                avatar.classList.add('trigger-magic');
-            }
-        });
         return wrapper;
     }
 
@@ -1431,6 +1422,9 @@ class AssistantApp extends AppBase {
     }
 
     _hideAllSparkles() {
+        // Remove the magic class from every sparkle in the chat so previous
+        // assistant messages stop animating. Only the currently active element
+        // (placeholder or active bubble) will be retriggered.
         this.chatEl.querySelectorAll('.sparkle-container').forEach((container) => {
             const avatar = container.closest('.ai-avatar-wrapper') || container;
             avatar.classList.remove('trigger-magic');
@@ -2097,6 +2091,9 @@ class AssistantApp extends AppBase {
         // Start with a clean thinking placeholder. Hide stale sparkles first,
         // because a new user message begins a new assistant turn.
         this._hideAllSparkles();
+        // Also remove any leftover sparkle row from the previous assistant answer
+        // so the new user message starts with a blank slate.
+        this.messagesEl.querySelectorAll('.ai-avatar-row').forEach((row) => row.remove());
 
         let placeholder = this._appendThinkingPlaceholder();
         const loadingInterval = setInterval(() => {
@@ -2182,14 +2179,6 @@ class AssistantApp extends AppBase {
         `;
         this.messagesEl.appendChild(wrapper);
         currentBubbleContent = wrapper.querySelector('.assistant-bubble-content');
-        requestAnimationFrame(() => {
-            const avatar = wrapper.querySelector('.ai-avatar-wrapper');
-            if (avatar) {
-                avatar.classList.remove('trigger-magic');
-                void avatar.offsetWidth;
-                avatar.classList.add('trigger-magic');
-            }
-        });
         return currentBubbleContent;
     };
 
@@ -2282,6 +2271,7 @@ class AssistantApp extends AppBase {
             // removes any previous placeholder first, so stale sparkles from
             // earlier phases do not linger on screen.
             this._removeThinkingPlaceholder();
+            this._hideAllSparkles();
             placeholderRef.value = this._appendThinkingPlaceholder('Réflexion...');
             saveHtmlSnapshot();
             return;
@@ -2323,12 +2313,12 @@ class AssistantApp extends AppBase {
             flushTypewriter?.();
             resetTypewriter?.();
             this._closeAssistantBubble();
-            // Hide the sparkle on any previous assistant bubble as soon as a new
-            // tool starts, so it does not stay under an intermediate message.
-            this._hideAllSparkles();
             // Remove the previous "Réflexion..." placeholder before showing the
             // tool-specific status label. Reasoning has ended, the tool is now running.
             this._removeThinkingPlaceholder();
+            // Hide the sparkle on any previous assistant bubble as soon as a new
+            // tool starts, so it does not stay under an intermediate message.
+            this._hideAllSparkles();
             // Render the tool card/search card BEFORE the placeholder so the
             // sparkle/"Réflexion" label stays at the bottom of the current step.
             if (event.name === 'retrieve_documents') {
@@ -2347,6 +2337,7 @@ class AssistantApp extends AppBase {
             flushTypewriter?.();
             resetTypewriter?.();
             this._closeAssistantBubble();
+            this._removeThinkingPlaceholder();
             this._hideAllSparkles();
             this._appendProgressCard(event.card_id, event.tool_name);
             saveHtmlSnapshot();
@@ -2442,10 +2433,18 @@ class AssistantApp extends AppBase {
     _updateFinalSparkle() {
         const last = this.messagesEl.lastElementChild;
         if (last && last.dataset.role === 'assistant') {
-            if (!last.querySelector('.ai-avatar-row')) {
+            // Keep only one sparkle row at the very end; do not add a new one if
+            // the previous message already has one (it may have one from streaming).
+            const existingRows = last.querySelectorAll('.ai-avatar-row');
+            if (existingRows.length > 1) {
+                for (let i = 0; i < existingRows.length - 1; i++) {
+                    existingRows[i].remove();
+                }
+            }
+            if (existingRows.length === 0) {
                 last.innerHTML += `
                     <div class="ai-avatar-row flex items-center gap-2">
-                        <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic" data-hidden="false">
+                        <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper" data-hidden="false">
                             ${this._sparkleSvg()}
                         </div>
                     </div>
