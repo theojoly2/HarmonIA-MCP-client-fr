@@ -1414,9 +1414,9 @@ class AssistantApp extends AppBase {
         // Reset the background event queue for each new turn.
         this._pendingEvents = [];
         this._lastRenderedEventIndex = -1;
-        // Start with a clean thinking placeholder. Prune old assistant sparkles
-        // immediately so only the upcoming assistant turn gets a beating sparkle.
-        this._renderer.pruneAssistantSparkles();
+        // Start with a clean thinking placeholder. Hide stale sparkles first,
+        // because a new user message begins a new assistant turn.
+        this._renderer.hideAllSparkles();
 
         let placeholder = this._renderer.appendThinkingPlaceholder('Réflexion...');
         const loadingInterval = setInterval(() => {

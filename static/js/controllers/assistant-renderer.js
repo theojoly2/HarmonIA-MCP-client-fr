@@ -33,7 +33,6 @@ class AssistantRenderer {
         div.className = 'assistant-bubble assistant-bubble-user mb-6 user-msg-anchor';
         div.innerHTML = `<div class="assistant-bubble-content">${this.escape(text)}</div>`;
         this.messagesEl.appendChild(div);
-        this.pruneAssistantSparkles();
         if (this.chatEl) {
             requestAnimationFrame(() => {
                 div.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -110,14 +109,13 @@ class AssistantRenderer {
         if (last && last.dataset.role === 'assistant' && last.dataset.active === 'true') {
             last.dataset.active = 'false';
         }
-        this.pruneAssistantSparkles();
     }
 
     hideAllSparkles() {
-        // Only hide sparkles inside transient placeholders. Finished assistant
-        // bubbles and active tool/search/progress cards keep their sparkles so the
-        // latest state remains visible in the timeline.
-        this.chatEl?.querySelectorAll('.assistant-thinking-placeholder .sparkle-container').forEach((container) => {
+        // Hide every sparkle avatar in the chat. This is called at phase
+        // boundaries so only the current active element (placeholder, card, or
+        // freshly created bubble) keeps the user's attention.
+        this.chatEl?.querySelectorAll('.sparkle-container').forEach((container) => {
             const avatar = container.closest('.ai-avatar-wrapper') || container;
             avatar.classList.remove('trigger-magic');
             avatar.style.transition = 'opacity 0.3s ease, height 0.3s ease, margin 0.3s ease';
@@ -130,39 +128,9 @@ class AssistantRenderer {
         });
     }
 
-    pruneAssistantSparkles() {
-        // Hide sparkle avatars on all finished assistant bubbles except the last one.
-        const bubbles = Array.from(this.messagesEl.querySelectorAll('[data-role="assistant"].assistant-bubble-assistant'));
-        bubbles.forEach((bubble, index) => {
-            const isLast = index === bubbles.length - 1;
-            const avatar = bubble.querySelector('.ai-avatar-wrapper');
-            if (!avatar) return;
-            if (isLast) {
-                avatar.classList.add('trigger-magic');
-                avatar.style.display = '';
-                avatar.style.opacity = '';
-                avatar.style.height = '';
-                avatar.style.margin = '';
-                avatar.style.overflow = '';
-                avatar.dataset.hidden = 'false';
-            } else {
-                avatar.classList.remove('trigger-magic');
-                avatar.style.transition = 'opacity 0.3s ease, height 0.3s ease, margin 0.3s ease';
-                avatar.style.opacity = '0';
-                avatar.style.height = '0';
-                avatar.style.margin = '0';
-                avatar.style.overflow = 'hidden';
-                avatar.dataset.hidden = 'true';
-                setTimeout(() => { avatar.style.display = 'none'; }, 300);
-            }
-        });
-    }
-
     updateFinalSparkle() {
-        this.pruneAssistantSparkles();
         const last = this.messagesEl.lastElementChild;
         if (last && last.dataset.role === 'assistant') {
-            let avatar = last.querySelector('.ai-avatar-wrapper');
             if (!last.querySelector('.ai-avatar-row')) {
                 last.innerHTML += `
                     <div class="ai-avatar-row flex items-center gap-2">
@@ -171,16 +139,6 @@ class AssistantRenderer {
                         </div>
                     </div>
                 `;
-                avatar = last.querySelector('.ai-avatar-wrapper');
-            }
-            if (avatar) {
-                avatar.classList.add('trigger-magic');
-                avatar.style.display = '';
-                avatar.style.opacity = '';
-                avatar.style.height = '';
-                avatar.style.margin = '';
-                avatar.style.overflow = '';
-                avatar.dataset.hidden = 'false';
             }
         }
     }

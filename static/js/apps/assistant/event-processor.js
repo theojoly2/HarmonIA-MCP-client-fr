@@ -70,6 +70,7 @@ const AssistantEventProcessor = (() => {
         }
 
         if (event.kind === 'thinking') {
+            renderer.hideAllSparkles();
             renderer.removeThinkingPlaceholder();
             placeholderRef.value = renderer.appendThinkingPlaceholder('Réflexion...');
             saveHtmlSnapshot();
@@ -96,6 +97,7 @@ const AssistantEventProcessor = (() => {
             typewriter?.flush?.();
             typewriter?.reset?.();
             renderer.closeAssistantBubble();
+            renderer.hideAllSparkles();
             saveHtmlSnapshot();
             return;
         }
