@@ -33,7 +33,7 @@ class AssistantRenderer {
         div.className = 'assistant-bubble assistant-bubble-user mb-6 user-msg-anchor';
         div.innerHTML = `<div class="assistant-bubble-content">${this.escape(text)}</div>`;
         this.messagesEl.appendChild(div);
-        this._pruneAssistantSparkles();
+        this.pruneAssistantSparkles();
         if (this.chatEl) {
             requestAnimationFrame(() => {
                 div.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -110,7 +110,7 @@ class AssistantRenderer {
         if (last && last.dataset.role === 'assistant' && last.dataset.active === 'true') {
             last.dataset.active = 'false';
         }
-        this._pruneAssistantSparkles();
+        this.pruneAssistantSparkles();
     }
 
     hideAllSparkles() {
@@ -130,7 +130,7 @@ class AssistantRenderer {
         });
     }
 
-    _pruneAssistantSparkles() {
+    pruneAssistantSparkles() {
         // Hide sparkle avatars on all finished assistant bubbles except the last one.
         const bubbles = Array.from(this.messagesEl.querySelectorAll('[data-role="assistant"].assistant-bubble-assistant'));
         bubbles.forEach((bubble, index) => {
@@ -159,7 +159,7 @@ class AssistantRenderer {
     }
 
     updateFinalSparkle() {
-        this._pruneAssistantSparkles();
+        this.pruneAssistantSparkles();
         const last = this.messagesEl.lastElementChild;
         if (last && last.dataset.role === 'assistant') {
             let avatar = last.querySelector('.ai-avatar-wrapper');
