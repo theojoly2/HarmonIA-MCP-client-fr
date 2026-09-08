@@ -11,7 +11,7 @@ L'interface web se présente comme une application monopage (SPA) organisée aut
 | Outil | Onglet | Description |
 |---|---|---|
 | **Chercher / explorer des modèles** | `Chercher/Explorer` | Moteur de recherche sémantique dans le corpus indexé. Permet de trouver des concepts, classes, propriétés et définitions issus de standards (SEMIC, schema.data.gouv.fr, Schema.org, LOV, FIWARE, etc.) et de textes juridiques. Les résultats peuvent être filtrés par tags/source et ajoutés au contexte de l'assistant. |
-| **Créer / éditer un modèle** | `Créer/Éditer` | Environnement de modélisation sémantique. Permet d'importer un modèle (XMI/UML, OWL/TTL, JSON natif, SQL, texte simple), de le visualiser sous forme de diagramme PlantUML, de l'éditer (ajouter/modifier classes, attributs et relations) et de l'exporter en XMI ou TTL. |
+| **Créer / éditer un modèle** | `Créer/Éditer` | Environnement de modélisation sémantique. Permet d'importer un modèle (XMI/UML, OWL/TTL, JSON natif, SQL, texte simple), de le visualiser sous forme de diagramme PlantUML, de l'éditer (ajouter/modifier classes, attributs et relations) et de l'exporter en XMI, TTL, SVG ou PNG. |
 | **Analyser / interroger des modèles** | `Analyser/Interroger` | Chat conversationnel intelligent. L'agent LLM peut analyser le modèle courant, le comparer à des standards, fusionner des concepts, suggérer des améliorations, vérifier la conformité au guide SEMIC et appeler les outils du serveur MCP en arrière-plan. |
 
 ---
@@ -22,8 +22,9 @@ L'interface web se présente comme une application monopage (SPA) organisée aut
 |---|---|
 | **API externe** | Endpoint `/api/external/v1` pour interagir programmatiquement avec l'assistant via des clés API Bearer. |
 | **Authentification** | Inscription / connexion avec mots de passe hachés (bcrypt). |
-| **Historique** | Sauvegarde des conversations de l'assistant et des recherches documentaires. |
+| **Historique** | Sauvegarde des conversations de l'assistant, des modèles et des recherches documentaires. |
 | **Visualisation** | Génération de diagrammes PlantUML et rendu SVG/PNG des modèles. |
+| **Split assistant / modélisateur** | Ouvrir un panneau assistant à côté d'un modèle en cours d'édition pour converser sur le modèle. |
 
 ---
 
@@ -36,28 +37,42 @@ HarmonIA-MCP-client-fr/
 │
 ├── api/
 │   ├── main.py                 # Application FastAPI et routage
-│   ├── dependencies.py         # Dépendances communes (auth, DB, etc.)
-│   ├── routers/
-│   │   ├── auth.py             # Inscription / connexion
-│   │   ├── models.py           # Upload / gestion des modèles
-│   │   ├── search.py           # Recherche vectorielle
-│   │   ├── documents.py        # Récupération des documents indexés
-│   │   ├── modeler.py          # Modélisation interactive
-│   │   ├── chat.py             # Chat classique
-│   │   ├── assistant.py        # Assistant conversationnel MCP
-│   │   ├── searches.py         # Historique de recherche
-│   │   ├── external_api.py     # API externe programmatique
-│   │   └── external_api_keys.py # Gestion des clés API
-│   └── services/
-│       ├── auth_service.py
-│       ├── user_store.py
-│       ├── model_store.py
-│       ├── mcp_service.py
-│       ├── llm_service.py
-│       ├── assistant_history.py
-│       ├── search_history_store.py
-│       ├── api_key_store.py
-│       └── assistant_mcp_client.py
+│   ├── dependencies.py         # Dépendances communes (auth, DB, LLM, etc.)
+│   ├── security.py             # Guards d'authentification (cookie / API key)
+│   ├── routers/                # Endpoints HTTP (minces : sérialisation + sécurité)
+│   │   ├── auth.py
+│   │   ├── models.py
+│   │   ├── search.py
+│   │   ├── documents.py
+│   │   ├── modeler.py
+│   │   ├── chat.py
+│   │   ├── assistant.py
+│   │   ├── searches.py
+│   │   ├── external_api.py
+│   │   └── external_api_keys.py
+│   ├── gateways/               # Règles métier et orchestration
+│   │   ├── search_gateway.py
+│   │   ├── model_gateway.py
+│   │   ├── document_gateway.py
+│   │   ├── assistant_gateway.py
+│   │   └── external_api_gateway.py
+│   ├── services/               # Accès données / MCP / LLM / historique
+│   │   ├── auth_service.py
+│   │   ├── user_store.py
+│   │   ├── model_store.py
+│   │   ├── mcp_service.py
+│   │   ├── llm_service.py
+│   │   ├── assistant_history.py
+│   │   ├── assistant_orchestrator.py
+│   │   ├── assistant_streaming.py
+│   │   ├── assistant_mcp_client.py
+│   │   ├── search_history_store.py
+│   │   ├── api_key_store.py
+│   │   └── model_import.py
+│   ├── schemas/                # Pydantic / validation
+│   └── utils/                  # Helpers transversaux (SSE, texte, etc.)
+│       ├── sse.py
+│       └── text.py
 │
 ├── data_model_utils/           # Parsing / import / export / visualisation des modèles
 │   ├── import_xml.py
@@ -74,14 +89,29 @@ HarmonIA-MCP-client-fr/
 │   ├── index.html
 │   ├── css/
 │   └── js/
-│       ├── api-client.js
+│       ├── service-locator.js  # Injection de dépendances cross-app
+│       ├── event-bus.js
+│       ├── state-manager.js
 │       ├── shell.js
-│       ├── auth-modal.js
-│       └── apps/
-│           ├── search-app.js
-│           ├── modeler-app.js
-│           ├── chat-app.js
-│           └── assistant-app.js
+│       ├── window-manager.js
+│       ├── split-manager.js
+│       ├── gateways/           # Appels HTTP par domaine
+│       ├── apps/               # Applications par onglet
+│       │   ├── app-base.js
+│       │   ├── search-app.js
+│       │   ├── modeler-app.js
+│       │   ├── modeler/        # Sous-modules du modeler
+│       │   │   ├── svg-lifecycle.js
+│       │   │   ├── edit-dialogs.js
+│       │   │   └── assistant-bridge.js
+│       │   ├── assistant-app.js
+│       │   ├── assistant/        # Sous-modules de l'assistant
+│       │   │   ├── markdown.js
+│       │   │   ├── typewriter.js
+│       │   │   └── event-processor.js
+│       │   ├── chat-app.js
+│       │   └── preview-app.js
+│       └── controllers/          # Composants réutilisables
 │
 ├── data/                       # Base SQLite et fichiers de session
 │   ├── users.db
@@ -89,7 +119,8 @@ HarmonIA-MCP-client-fr/
 │
 ├── .env                        # Variables d'environnement (non commité)
 ├── .env.sample                 # Exemple de configuration
-└── requirements.txt
+├── requirements.txt
+└── AGENTS.md                   # Conventions pour les agents de codage
 ```
 
 ---
@@ -154,13 +185,12 @@ Le client web dépend du serveur MCP (`HarmonIA-MCP-server-fr`). Avant de lancer
 
 > L'indexation n'est à faire **qu'une seule fois** tant que le corpus de documents ne change pas. Pas besoin de la relancer à chaque démarrage.
 
-## Lancement du client (en dev)
+---
 
-```bash
-cd HarmonIA-MCP-client-fr
-source venv-client/bin/activate
-python web_app.py
-```
+## Architecture
+
+- **Backend :** FastAPI, séparation en `routers` → `gateways` → `services`. Les routers gèrent la sérialisation HTTP/JSON et l'authentification ; les gateways portent les règles métier et la coordination ; les services accèdent aux données et au MCP.
+- **Frontend :** JavaScript vanilla sans framework. Chaque application hérite de `AppBase`. La communication entre apps passe par `EventBus` et `ServiceLocator` (pas d'accès direct `window.*`).
 
 ---
 
