@@ -1430,6 +1430,11 @@ class AssistantApp extends AppBase {
             avatar.classList.remove('trigger-magic');
             avatar.classList.remove('sparkle-pulse');
         });
+        // Also remove any leftover sparkle rows that may remain attached to
+        // closed assistant bubbles.
+        this.messagesEl.querySelectorAll('.ai-avatar-row').forEach((row) => {
+            row.remove();
+        });
     }
 
     _retriggerActiveSparkles() {
