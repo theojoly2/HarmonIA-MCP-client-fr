@@ -41,7 +41,6 @@ class AssistantApp extends AppBase {
         // Text accumulated for the assistant message currently being streamed. Stored
         // on the instance so it survives a tab switch (the old DOM is discarded and
         // rebuilt from the HTML snapshot).
-        this._currentStreamingText = '';
         // When embedded inside the modeler (inline side panel or split pane), the
         // modeler instance provides the canvas so we don't render SVG cards here.
         this._linkedModelerInstanceId = props.linkedModelerInstanceId || '';
@@ -1410,7 +1409,6 @@ class AssistantApp extends AppBase {
         this._setSendEnabled(false);
         this._pendingEvents = [];
         this._lastRenderedEventIndex = -1;
-        // Hide stale sparkles before starting the new assistant turn.
         this._renderer.hideAllSparkles();
 
         let placeholder = this._renderer.appendThinkingPlaceholder('Réflexion...');
@@ -1425,82 +1423,13 @@ class AssistantApp extends AppBase {
             }
         }, 1200);
 
-        // Inline ChatApp-style typewriter (matches SemantiQ original exactly).
-        let fullResponse = '';
-        let displayedText = '';
-        let streamBuffer = '';
-        let currentBubbleContent = null;
-        let typewriterInterval = null;
-
-        const startTypewriter = () => {
-            if (typewriterInterval) return;
-            typewriterInterval = setInterval(() => {
-                if (streamBuffer.length === 0) return;
-                const chunkSize = Math.min(3 + Math.floor(Math.random() * 8), streamBuffer.length);
-                displayedText += streamBuffer.slice(0, chunkSize);
-                streamBuffer = streamBuffer.slice(chunkSize);
-                if (currentBubbleContent) {
-                    currentBubbleContent.innerHTML = AssistantMarkdown.markdown(displayedText, (x) => this._escape(x), false);
-                }
-                this._adjustChatPadding();
-            }, 10);
-        };
-
-        const stopTypewriter = () => {
-            if (typewriterInterval) {
-                clearInterval(typewriterInterval);
-                typewriterInterval = null;
-            }
-        };
-
-        const flushTypewriter = () => {
-            stopTypewriter();
-            if (streamBuffer.length > 0) {
-                displayedText += streamBuffer;
-                streamBuffer = '';
-            }
-            if (currentBubbleContent) {
-                currentBubbleContent.innerHTML = AssistantMarkdown.markdown(displayedText, (x) => this._escape(x), false);
-            }
-            this._adjustChatPadding();
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    this._adjustChatPadding();
-                });
-            });
-        };
-
-        const resetTypewriter = () => {
-            stopTypewriter();
-            displayedText = '';
-            streamBuffer = '';
-            currentBubbleContent = null;
-        };
-
-        const appendToStreamBuffer = (text) => {
-            streamBuffer += text;
-        };
-
-        const ensureAssistantTextBubble = () => {
-            if (currentBubbleContent) return currentBubbleContent;
-            this._renderer.removeThinkingPlaceholder();
-            this._renderer.closeAssistantBubble();
-            const wrapper = document.createElement('div');
-            wrapper.className = 'assistant-bubble assistant-bubble-assistant mb-6';
-            wrapper.dataset.role = 'assistant';
-            wrapper.dataset.active = 'true';
-            wrapper.innerHTML = `
-                <div class="assistant-bubble-content markdown-body"></div>
-                <div class="ai-avatar-row flex items-center gap-2">
-                    <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic" data-hidden="false">
-                        ${AssistantMarkdown.sparkleSvg()}
-                    </div>
-                </div>
-            `;
-            this.messagesEl.appendChild(wrapper);
-            currentBubbleContent = wrapper.querySelector('.assistant-bubble-content');
-            return currentBubbleContent;
-        };
+        const typewriter = new AssistantTypewriter({
+            messagesEl: this.messagesEl,
+            renderer: this._renderer,
+            sparkleSvg: () => AssistantMarkdown.sparkleSvg(),
+            markdown: (t) => AssistantMarkdown.markdown(t, (x) => this._escape(x), false),
+            adjustPadding: () => this._adjustChatPadding(),
+        });
 
         this._streamAbortController?.abort();
         this._streamAbortController = new AbortController();
@@ -1511,6 +1440,28 @@ class AssistantApp extends AppBase {
             }
         };
 
+        const ctx = {
+            renderer: this._renderer,
+            ui: this.ui,
+            escape: (t) => this._escape(t),
+            markdown: (t, streaming = false) => AssistantMarkdown.markdown(t, (x) => this._escape(x), streaming),
+            embedded: this._embedded,
+            linkedModelerInstanceId: this._linkedModelerInstanceId || this.props.linkedModelerInstanceId,
+            modelNames: this.modelNames,
+            onModelAttached: (name) => {
+                this.props.displayNames = this.props.displayNames || {};
+                this.props.displayNames[name] = this.props.displayNames[name] || name;
+                this._syncModelUi();
+            },
+            getSession: () => this.session,
+            setSession: (session) => { this.session = session; },
+            saveHtmlSnapshot,
+            typewriter,
+            placeholderRef: { value: placeholder },
+            streamAliveTimeoutRef: { timeout: this._streamAliveTimeout },
+            abortController: this._streamAbortController,
+        };
+
         const liveHandler = async (event) => {
             if (!this.messagesEl) {
                 this._pendingEvents.push(event);
@@ -1519,9 +1470,10 @@ class AssistantApp extends AppBase {
             const eventsToReplay = this._pendingEvents.slice(this._lastRenderedEventIndex + 1);
             this._lastRenderedEventIndex = this._pendingEvents.length - 1;
             for (const ev of eventsToReplay) {
-                this._processEvent(ev, { startTypewriter, stopTypewriter, flushTypewriter, resetTypewriter, ensureAssistantTextBubble, appendToStreamBuffer, saveHtmlSnapshot, placeholderRef: { value: placeholder } });
+                AssistantEventProcessor.processEvent(ev, ctx);
             }
-            this._processEvent(event, { startTypewriter, stopTypewriter, flushTypewriter, resetTypewriter, ensureAssistantTextBubble, appendToStreamBuffer, saveHtmlSnapshot, placeholderRef: { value: placeholder } });
+            AssistantEventProcessor.processEvent(event, ctx);
+            this._streamAliveTimeout = ctx.streamAliveTimeoutRef.timeout || null;
         };
 
         try {
@@ -1540,14 +1492,14 @@ class AssistantApp extends AppBase {
             bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(err.message)}</em>`;
         } finally {
             clearInterval(loadingInterval);
-            stopTypewriter();
-            flushTypewriter();
+            typewriter.stop();
+            typewriter.flush();
             this.isStreaming = false;
             this._setSendEnabled(true);
             this._renderer.closeAssistantBubble();
 
-            if (displayedText) {
-                this.messages.push({ role: 'assistant', content: displayedText });
+            if (typewriter.displayedText) {
+                this.messages.push({ role: 'assistant', content: typewriter.displayedText });
             }
 
             this._renderer.removeThinkingPlaceholder();
@@ -1560,177 +1512,6 @@ class AssistantApp extends AppBase {
 
     _updateFinalSparkle() {
         this._renderer.updateFinalSparkle();
-    }
-
-    _processEvent(event, { startTypewriter, stopTypewriter, flushTypewriter, resetTypewriter, ensureAssistantTextBubble, appendToStreamBuffer, saveHtmlSnapshot, placeholderRef }) {
-        if (this._streamAliveTimeout) {
-            clearTimeout(this._streamAliveTimeout);
-            this._streamAliveTimeout = null;
-        }
-        this._streamAliveTimeout = setTimeout(() => {
-            this._streamAbortController?.abort();
-        }, 120000);
-
-        if (event.kind === 'user') {
-            if (event.session) this.session = event.session;
-            this._renderer.freezeCurrentSvgCard();
-            saveHtmlSnapshot();
-            return;
-        }
-
-        if (event.kind === 'thinking') {
-            this._renderer.removeThinkingPlaceholder();
-            placeholderRef.value = this._renderer.appendThinkingPlaceholder('Réflexion...');
-            saveHtmlSnapshot();
-            return;
-        }
-
-        if (event.kind === 'assistant_text') {
-            if (appendToStreamBuffer) {
-                appendToStreamBuffer(event.content || '');
-                ensureAssistantTextBubble();
-                startTypewriter();
-            } else {
-                const bubble = this._renderer.ensureAssistantBubble();
-                this._currentStreamingText = (this._currentStreamingText || '') + (event.content || '');
-                bubble.innerHTML = AssistantMarkdown.markdown(this._currentStreamingText, (x) => this._escape(x), false);
-                this._throttledReflow();
-                this._throttledScrollToBottom();
-            }
-            saveHtmlSnapshot();
-            return;
-        }
-
-        if (event.kind === 'assistant_tool_calls') {
-            stopTypewriter?.();
-            flushTypewriter?.();
-            resetTypewriter?.();
-            this._renderer.closeAssistantBubble();
-            this._renderer.hideAllSparkles();
-            this.messages.push({ role: 'assistant_tool_calls', tool_calls: event.tool_calls });
-            saveHtmlSnapshot();
-            return;
-        }
-
-        if (event.kind === 'tool_start') {
-            stopTypewriter?.();
-            flushTypewriter?.();
-            resetTypewriter?.();
-            this._renderer.closeAssistantBubble();
-            this._renderer.hideAllSparkles();
-            if (event.name === 'retrieve_documents') {
-                this._renderer.appendSearchCard(event.arguments?.search_terms || '', null);
-            }
-            placeholderRef.value = this._renderer.appendThinkingPlaceholder(AssistantEventProcessor.toolStatusLabel(event.name));
-            saveHtmlSnapshot();
-            return;
-        }
-
-        if (event.kind === 'progress_start') {
-            stopTypewriter?.();
-            flushTypewriter?.();
-            resetTypewriter?.();
-            this._renderer.closeAssistantBubble();
-            this._renderer.hideAllSparkles();
-            this._renderer.appendProgressCard(event.card_id, event.tool_name);
-            saveHtmlSnapshot();
-            return;
-        }
-
-        if (event.kind === 'progress_update') {
-            this._renderer.updateProgressCard(event.card_id, event.percent, event.message);
-            saveHtmlSnapshot();
-            return;
-        }
-
-        if (event.kind === 'progress_done') {
-            this._renderer.completeProgressCard(event.card_id);
-            this._renderer.removeProgressStatus(event.card_id);
-            saveHtmlSnapshot();
-            return;
-        }
-
-        if (event.kind === 'tool_result') {
-            stopTypewriter?.();
-            flushTypewriter?.();
-            resetTypewriter?.();
-            this._renderer.closeAssistantBubble();
-            if (event.name === 'plan_workflow_with_tools') {
-                this._renderer.renderPlan(event.result, {
-                    knownNames: new Set([
-                        ...(this.modelNames || []),
-                        ...Object.keys(this.props.displayNames || {}),
-                    ]),
-                    displayForName: (storedName) => this._displayNameForModel(storedName),
-                });
-            } else if (event.name === 'retrieve_documents') {
-                const display = event.display || {};
-                const results = display.results || [];
-                const resultsHtml = this.ui.buildResultsHtml(results, display.result_count || results.length, { hideEmpty: false });
-                this._renderer.fillSearchCard(display.query || '', resultsHtml);
-            } else {
-                this._renderer.fillToolResult(event.name, event.result, event.display, { toolSummary: AssistantEventProcessor.toolSummary });
-            }
-            saveHtmlSnapshot();
-            return;
-        }
-
-        if (event.kind === 'loop_done') {
-            stopTypewriter?.();
-            flushTypewriter?.();
-            resetTypewriter?.();
-            this._renderer.closeAssistantBubble();
-            saveHtmlSnapshot();
-            return;
-        }
-
-        if (event.kind === 'model_svg') {
-            const linkedId = this._linkedModelerInstanceId || this.props.linkedModelerInstanceId;
-            if (linkedId && this.modelNames?.length) {
-                AssistantBridge.notifySvgRefresh(linkedId);
-            } else if (!this._embedded) {
-                const rawName = event.model_name || event.label || '';
-                const label = rawName
-                    ? this._displayNameForModel(rawName)
-                    : 'Visualisation du modèle';
-                this._renderer.updateCurrentSvgCard(event.svg, label);
-            }
-            saveHtmlSnapshot();
-            return;
-        }
-
-        if (event.kind === 'model_attached') {
-            const attachedName = event.model_name;
-            if (attachedName && !this.modelNames.includes(attachedName)) {
-                this.modelNames.push(attachedName);
-                this.props.displayNames = this.props.displayNames || {};
-                this.props.displayNames[attachedName] = this.props.displayNames[attachedName] || attachedName;
-                this._syncModelUi();
-            }
-            saveHtmlSnapshot();
-            return;
-        }
-
-        if (event.kind === 'assistant_done') {
-            stopTypewriter?.();
-            flushTypewriter?.();
-            resetTypewriter?.();
-            this._renderer.closeAssistantBubble();
-            this._renderer.removeThinkingPlaceholder();
-            saveHtmlSnapshot();
-            return;
-        }
-
-        if (event.kind === 'error') {
-            stopTypewriter?.();
-            flushTypewriter?.();
-            resetTypewriter?.();
-            this._renderer.closeAssistantBubble();
-            const bubble = this._renderer.ensureAssistantBubble();
-            bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(event.message || '')}</em>`;
-            saveHtmlSnapshot();
-            return;
-        }
     }
 
     _forceReflow() {

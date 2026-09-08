@@ -2,12 +2,9 @@
  * ModelGateway
  *
  * Encapsulates all model-related HTTP calls used by the modeler and assistant.
- * This is a thin, discoverable facade over ApiClient: it keeps business-level
- * model operations in one place so apps can request capabilities (import,
- * export, mutate, open) without scattering endpoint URLs throughout the UI.
- *
- * All methods return the same values/shapes as ApiClient to preserve existing
- * behaviour; apps can be migrated incrementally.
+ * Keeps business-level model operations in one place so apps can request
+ * capabilities (import, export, mutate, open) without scattering endpoint URLs
+ * throughout the UI.
  */
 
 const ModelGateway = (() => {

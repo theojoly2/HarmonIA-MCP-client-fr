@@ -172,7 +172,7 @@ const AssistantEventProcessor = (() => {
 
         if (event.kind === 'model_svg') {
             if (linkedModelerInstanceId && modelNames?.length) {
-                onSvgRefresh(linkedModelerInstanceId);
+                EventBus.emit('modeler:reload-svg', { instanceId: linkedModelerInstanceId });
             } else if (!embedded) {
                 const rawName = event.model_name || event.label || '';
                 const label = rawName

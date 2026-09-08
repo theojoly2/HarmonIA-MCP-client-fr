@@ -24,29 +24,21 @@ class AppBase {
     }
 
     get authManager() {
-        // Prefer the explicit locator registration; fall back to AppState then
-        // legacy globals for older callers.
         if (typeof ServiceLocator !== "undefined") {
-            const fromLocator = ServiceLocator.get("authManager");
-            if (fromLocator) return fromLocator;
+            return ServiceLocator.get("authManager");
         }
-        return (typeof AppState !== "undefined" && AppState.authManager)
-            || (typeof window !== "undefined" && window.AuthManager)
-            || null;
+        return null;
     }
 
     get ui() {
         if (typeof ServiceLocator !== "undefined") {
-            const ui = ServiceLocator.get("uiHelpers");
-            if (ui) return ui;
+            return ServiceLocator.get("uiHelpers") || {};
         }
-        return (typeof window !== "undefined" && window.UiHelpers) || {};
+        return {};
     }
 
     _scanGlow(containerOrSelector) {
-        const glow = (typeof ServiceLocator !== "undefined" && ServiceLocator.get("glowEffects"))
-            || (typeof window !== "undefined" && window.GlowEffects)
-            || null;
+        const glow = (typeof ServiceLocator !== "undefined" && ServiceLocator.get("glowEffects")) || null;
         if (!glow || typeof glow.scanAndBind !== "function") return;
         if (containerOrSelector) {
             const target = typeof containerOrSelector === "string"
@@ -67,15 +59,10 @@ class AppBase {
 
     /**
      * Central point to update all UI pieces that depend on the current set of
-     * attached models. Called whenever models are added, removed, finished
-     * loading or failed loading.
+     * attached models. Apps that manage model pills/import buttons override this.
      */
     _syncModelUi() {
-        this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
-        this._updateModelPill();
-        if (typeof this._updateSearchResultAddButtons === 'function') {
-            this._updateSearchResultAddButtons();
-        }
+        // No-op in the base class.
     }
 
     /**

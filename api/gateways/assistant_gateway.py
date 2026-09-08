@@ -9,8 +9,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Optional
 
-from data_model_utils import ModelProcessingError
-
+from api.exceptions import NotFoundError
 from api.naming import model_name_from_filename as _model_name_from_filename, unique_model_name
 from api.services.assistant_history import AssistantHistory
 from api.services.assistant_import import build_import_session_name, parse_and_upload_model_file
@@ -36,16 +35,13 @@ async def import_assistant_model_file(
     display_name = (name or filename).strip() or "imported_model"
     session_name = unique_model_name(_model_name_from_filename(display_name))
 
-    try:
-        json_data = await parse_and_upload_model_file(
-            file_bytes=file_bytes,
-            filename=filename,
-            username=username,
-            session_name=session_name,
-            add_generated_package=True,
-        )
-    except ModelProcessingError as e:
-        raise ValueError(e.title, e.details) from e
+    json_data = await parse_and_upload_model_file(
+        file_bytes=file_bytes,
+        filename=filename,
+        username=username,
+        session_name=session_name,
+        add_generated_package=True,
+    )
 
     return {
         "name": session_name,
@@ -64,28 +60,25 @@ async def import_assistant_model_from_document(
 
     file_data = await fetch_document_file(doc_id)
     if not file_data.get("success"):
-        raise ValueError(file_data.get("error", "Document introuvable"))
+        raise NotFoundError("document_not_found", file_data.get("error", "Document introuvable"))
 
     try:
         import base64
         file_bytes = base64.b64decode(file_data["file_base64"])
     except Exception as e:
-        raise ValueError(f"Failed to decode document: {e}") from e
+        raise ValueError("document_decode_failed", f"Failed to decode document: {e}") from e
 
     filename = file_data.get("filename", "document")
     display_name = filename
     session_name = build_import_session_name(display_name, add_timestamp=True)
 
-    try:
-        json_data = await parse_and_upload_model_file(
-            file_bytes=file_bytes,
-            filename=filename,
-            username=username,
-            session_name=session_name,
-            add_generated_package=True,
-        )
-    except ModelProcessingError as e:
-        raise ValueError(e.title, e.details) from e
+    json_data = await parse_and_upload_model_file(
+        file_bytes=file_bytes,
+        filename=filename,
+        username=username,
+        session_name=session_name,
+        add_generated_package=True,
+    )
 
     return {
         "name": session_name,
@@ -187,12 +180,10 @@ async def rename_assistant_session(
     new_display_name: str,
     origin: Optional[str] = None,
 ) -> dict[str, Any]:
-    from fastapi import HTTPException
-
     target_origin = _normalize_origin(origin, "assistant")
     old_history = AssistantHistory(user=username, session=session, origin=target_origin)
     if not old_history._session_exists():
-        raise HTTPException(status_code=404, detail={"error": "session_not_found", "message": "Session inconnue"})
+        raise NotFoundError("session_not_found", "Session inconnue")
 
     new_stored_name = _slugify_session_name(new_display_name.strip())
     new_stored_name = f"{new_stored_name}__{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
@@ -233,12 +224,10 @@ async def link_assistant_session_model(
     model_name: str,
     origin: Optional[str] = None,
 ) -> dict[str, Any]:
-    from fastapi import HTTPException
-
     target_origin = _normalize_origin(origin, "modeler")
     history = AssistantHistory(user=username, session=session, origin=target_origin)
     if not history._session_exists():
-        raise HTTPException(status_code=404, detail={"error": "session_not_found", "message": "Session inconnue"})
+        raise NotFoundError("session_not_found", "Session inconnue")
 
     history.assistant_model_name = model_name.strip()
     history.assistant_model_names = [model_name.strip()]

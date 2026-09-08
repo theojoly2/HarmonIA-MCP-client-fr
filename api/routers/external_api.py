@@ -6,7 +6,7 @@ Assistant conversations with limited, non-sensitive event exposure.
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 from api.gateways import external_api_gateway as external_gw
 from api.security import require_user_or_api_key
-
+from api.utils.errors import api_error_payload, domain_to_http
 
 router = APIRouter(prefix="/api/external/v1", tags=["external-api"])
 
@@ -92,6 +92,14 @@ class ChatResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+def _sse_headers() -> dict[str, str]:
+    return {
+        "X-Accel-Buffering": "no",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Connection": "keep-alive",
+    }
+
+
 # ---------------------------------------------------------------------------
 # Conversations
 # ---------------------------------------------------------------------------
@@ -102,13 +110,19 @@ async def create_conversation(
     body: CreateConversationBody,
     username: str = Depends(require_user_or_api_key),
 ):
-    result = await external_gw.create_conversation(username, body.title)
+    try:
+        result = await external_gw.create_conversation(username, body.title)
+    except Exception as exc:
+        raise domain_to_http(exc) from exc
     return CreateConversationResponse(**result)
 
 
 @router.get("/conversations")
 async def list_conversations(username: str = Depends(require_user_or_api_key)):
-    return await external_gw.list_conversations(username)
+    try:
+        return await external_gw.list_conversations(username)
+    except Exception as exc:
+        raise domain_to_http(exc) from exc
 
 
 @router.get("/conversations/{conversation_id}/models", response_model=list[ConversationModelItem])
@@ -116,7 +130,10 @@ async def list_conversation_models(
     conversation_id: str,
     username: str = Depends(require_user_or_api_key),
 ):
-    items = await external_gw.list_conversation_models(username, conversation_id)
+    try:
+        items = await external_gw.list_conversation_models(username, conversation_id)
+    except Exception as exc:
+        raise domain_to_http(exc) from exc
     return [ConversationModelItem(**item) for item in items]
 
 
@@ -125,7 +142,10 @@ async def delete_conversation(
     conversation_id: str,
     username: str = Depends(require_user_or_api_key),
 ):
-    return await external_gw.delete_conversation(username, conversation_id)
+    try:
+        return await external_gw.delete_conversation(username, conversation_id)
+    except Exception as exc:
+        raise domain_to_http(exc) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -143,15 +163,18 @@ async def import_model_into_conversation(
     try:
         file_bytes = await file.read()
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"failed_to_read_file: {e}") from e
+        raise HTTPException(status_code=400, detail=api_error_payload("failed_to_read_file", str(e))) from e
 
-    result = await external_gw.import_model_into_conversation(
-        username=username,
-        conversation_id=conversation_id,
-        file_bytes=file_bytes,
-        filename=file.filename or "model.txt",
-        name=name,
-    )
+    try:
+        result = await external_gw.import_model_into_conversation(
+            username=username,
+            conversation_id=conversation_id,
+            file_bytes=file_bytes,
+            filename=file.filename or "model.txt",
+            name=name,
+        )
+    except Exception as exc:
+        raise domain_to_http(exc) from exc
     return ImportModelResponse(**result)
 
 
@@ -166,12 +189,16 @@ async def chat_with_conversation(
     body: ChatBody,
     username: str = Depends(require_user_or_api_key),
 ):
-    return await external_gw.chat_with_conversation(
-        username=username,
-        conversation_id=conversation_id,
-        message=body.message,
-        stream=body.stream,
-    )
+    try:
+        stream = external_gw.chat_with_conversation(
+            username=username,
+            conversation_id=conversation_id,
+            message=body.message,
+            stream=body.stream,
+        )
+    except Exception as exc:
+        raise domain_to_http(exc) from exc
+    return StreamingResponse(stream, media_type="text/event-stream", headers=_sse_headers())
 
 
 # ---------------------------------------------------------------------------
@@ -185,7 +212,15 @@ async def export_model_route(
     format: str = "xmi",
     username: str = Depends(require_user_or_api_key),
 ):
-    return await external_gw.export_model_external(username, model_name, format)
+    try:
+        blob, content_type, extension, safe_name = await external_gw.export_model_external(username, model_name, format)
+    except Exception as exc:
+        raise domain_to_http(exc) from exc
+    return StreamingResponse(
+        iter([blob]),
+        media_type=content_type,
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}.{extension}"'},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -200,14 +235,20 @@ async def import_model_from_document(
     username: str = Depends(require_user_or_api_key),
 ):
     """Import a model from an existing indexed document into a conversation."""
-    data = await request.json()
+    try:
+        data = await request.json()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=api_error_payload("invalid_json", str(e))) from e
     doc_id = data.get("doc_id")
     if not doc_id:
-        raise HTTPException(status_code=400, detail="doc_id_required")
+        raise HTTPException(status_code=400, detail=api_error_payload("doc_id_required", "doc_id is required"))
 
-    result = await external_gw.import_model_from_document(
-        username=username,
-        conversation_id=conversation_id,
-        doc_id=doc_id,
-    )
+    try:
+        result = await external_gw.import_model_from_document(
+            username=username,
+            conversation_id=conversation_id,
+            doc_id=doc_id,
+        )
+    except Exception as exc:
+        raise domain_to_http(exc) from exc
     return ImportModelResponse(**result)

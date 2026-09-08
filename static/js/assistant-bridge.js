@@ -2,18 +2,14 @@
  * AssistantBridge
  *
  * Decouples the Assistant app from the Modeler app. The assistant only emits
- * events here; the bridge routes them to the correct modeler instance via the
- * service locator / EventBus. This removes direct method calls like
- * `modeler._reloadSvgFromServer()` from AssistantApp.
+ * events; the bridge routes them through EventBus so the assistant never calls
+ * modeler methods directly.
  */
 
 const AssistantBridge = {
     notifySvgRefresh(linkedModelerInstanceId) {
         if (!linkedModelerInstanceId) return;
-        const modeler = AppState.getInstance(linkedModelerInstanceId);
-        if (modeler && typeof modeler._reloadSvgFromServer === 'function') {
-            modeler._reloadSvgFromServer();
-        }
+        EventBus.emit('modeler:reload-svg', { instanceId: linkedModelerInstanceId });
     },
 };
 

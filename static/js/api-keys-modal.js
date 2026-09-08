@@ -192,7 +192,8 @@ curl -X POST "$SERVER/api/external/v1/conversations/$CONV/chat" \\
 
         const docsLink = this.overlay.querySelector("#api-keys-docs-link");
         docsLink?.addEventListener("click", () => {
-            if (window.ApiDocsManager) window.ApiDocsManager.show();
+            const apiDocs = ServiceLocator.get('apiDocsManager');
+            if (apiDocs) apiDocs.show();
         });
 
         const addBtn = this.overlay.querySelector("#api-keys-add");

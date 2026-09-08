@@ -13,7 +13,7 @@ from api.services.search_history_store import (
     save_search,
     touch_search,
 )
-
+from api.utils.errors import api_error_payload
 
 router = APIRouter(prefix="/api/searches", tags=["searches"])
 
@@ -47,7 +47,7 @@ async def add_search(body: SaveSearchBody, username: str = Depends(require_user)
 async def open_search(search_id: int, username: str = Depends(require_user)):
     item = touch_search(username, search_id)
     if not item:
-        return Response(status_code=404, content=json.dumps({"detail": "search_not_found"}))
+        return Response(status_code=404, content=json.dumps(api_error_payload("search_not_found", "Recherche introuvable.")))
     return item
 
 

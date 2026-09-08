@@ -47,12 +47,4 @@ def extract_filename_from_disposition(header: str) -> str:
     return ""
 
 
-def generate_svg_for_bytes(file_bytes: bytes, filename: str) -> str:
-    """Delegate SVG generation to the model gateway.
 
-    Kept here for backward compatibility with existing routers; new code
-    should import directly from api.gateways.model_gateway.
-    """
-    from api.gateways.model_gateway import generate_svg_for_bytes as _gateway_generate
-
-    return _gateway_generate(file_bytes, filename)

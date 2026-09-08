@@ -1,8 +1,13 @@
+"""Document chat router."""
+
+from __future__ import annotations
+
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from api.gateways import document_gateway as document_gw
+from api.security import get_session_cookie
+from api.services.chat_service import stream_chat_document
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -15,7 +20,13 @@ class ChatMessageRequest(BaseModel):
 
 @router.post("/stream")
 async def stream_chat_response(request: ChatMessageRequest, http_request: Request):
-    stream = await document_gw.stream_chat_document(request, http_request)
+    username = get_session_cookie(http_request)
+    stream = stream_chat_document(
+        document_id=request.document_id,
+        user_message=request.user_message,
+        history=request.history,
+        username=username,
+    )
     return StreamingResponse(
         stream,
         media_type="text/plain",
@@ -23,5 +34,5 @@ async def stream_chat_response(request: ChatMessageRequest, http_request: Reques
             "X-Accel-Buffering": "no",
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-        }
+        },
     )

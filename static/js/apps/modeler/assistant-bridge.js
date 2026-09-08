@@ -20,13 +20,16 @@ const ModelerAssistantBridge = (() => {
     }
 
     async function toggleSplit(app) {
-        if (!app._requireAuth()) return;
+        if (!app.authManager?.isLoggedIn()) {
+            app.authManager?.showModal?.();
+            return;
+        }
         const windowManager = ServiceLocator.get('windowManager');
         if (!app.storedName || !windowManager) return;
         const existing = findSplitInstance(app.instanceId, app.storedName);
         if (existing) {
             windowManager.collapseSplitTo(app.instanceId, existing.instanceId);
-            app._updateAssistantToggleVisibility();
+            EventBus.emit('modeler:update-assistant-toggle', { instanceId: app.instanceId });
             return;
         }
 
@@ -43,7 +46,11 @@ const ModelerAssistantBridge = (() => {
                 console.warn('No existing assistant session for model', app.storedName, err);
             }
         }
-        app._prepareLinkedAssistantSession('', '');
+        EventBus.emit('assistant:prepare-linked-session', {
+            instanceId: app.instanceId,
+            session: '',
+            displayName: '',
+        });
 
         if (app._openingAssistant) return;
         app._openingAssistant = true;
@@ -57,7 +64,7 @@ const ModelerAssistantBridge = (() => {
                 display_name: displayName,
                 fromModeler: true,
             }, { ratio: [70, 30] });
-            app._updateAssistantToggleVisibility();
+            EventBus.emit('modeler:update-assistant-toggle', { instanceId: app.instanceId });
         } finally {
             app._openingAssistant = false;
         }

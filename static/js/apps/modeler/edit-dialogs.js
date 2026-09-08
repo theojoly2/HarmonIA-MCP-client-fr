@@ -141,7 +141,7 @@ const ModelerEditDialogs = (() => {
         try {
             app._setLoading(true);
             await ModelGateway.applyMutation(app.storedName || app.fileName, endpoint, body);
-            await app._reloadSvgFromServer();
+            EventBus.emit('modeler:reload-svg', { instanceId: app.instanceId });
         } catch (err) {
             console.error(`Mutation ${endpoint} error`, err);
             alert(err.message || fallbackMessage);

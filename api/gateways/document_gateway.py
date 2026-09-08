@@ -1,5 +1,8 @@
-"""Document gateway: encapsulate document file serving, preview visualisation
-and chat streaming for a single document."""
+"""Document gateway: encapsulate document file serving and preview visualisation.
+
+This module contains no HTTP/response construction. Routers build the
+FastAPI responses from the returned raw values.
+"""
 
 from __future__ import annotations
 
@@ -7,22 +10,25 @@ import base64
 import urllib.parse
 from typing import Any
 
-from fastapi import HTTPException
-from fastapi.responses import Response
-
-from api.dependencies import generate_svg_for_bytes
-from api.services.auth_service import get_session_cookie
+from api.exceptions import NotFoundError, ProcessingError, ValidationError
+from api.gateways.model_gateway import generate_svg_for_bytes
 from api.services.mcp_service import fetch_document_context, fetch_document_file
 
 
-async def serve_document_file(document_id: str) -> Response:
+async def get_document_file(document_id: str) -> dict[str, Any]:
+    """Return raw file data for a document.
+
+    Raises:
+        NotFoundError: when the document does not exist.
+    """
     data = await fetch_document_file(document_id)
     if not data.get("success"):
-        raise HTTPException(
-            status_code=404,
-            detail={"error": "document_not_found", "message": data.get("error")},
-        )
+        raise NotFoundError("document_not_found", data.get("error", "Document introuvable"))
+    return data
 
+
+def build_file_response_data(data: dict[str, Any]) -> tuple[bytes, str, str]:
+    """Build (file_bytes, mime_type, safe_filename) from raw document data."""
     b64_str = data["file_base64"]
     filename = data.get("filename", "document")
     ext = data.get("extension", "").lower()
@@ -37,56 +43,49 @@ async def serve_document_file(document_id: str) -> Response:
         mime_type = "application/json; charset=utf-8"
 
     safe_filename = urllib.parse.quote(filename)
-    return Response(
-        content=file_bytes,
-        media_type=mime_type,
-        headers={"Content-Disposition": f"inline; filename*=utf-8''{safe_filename}"}
-    )
+    return file_bytes, mime_type, safe_filename
 
 
-async def visualize_document(document_id: str) -> Response:
+async def visualize_document(document_id: str) -> str:
+    """Return SVG text visualising a document.
+
+    Raises:
+        NotFoundError: when the document does not exist.
+        ValidationError: when the file format is unsupported.
+        ProcessingError: when SVG generation fails unexpectedly.
+    """
     data = await fetch_document_file(document_id)
     if not data.get("success"):
-        raise HTTPException(
-            status_code=404,
-            detail={"error": "document_not_found", "message": data.get("error")},
-        )
+        raise NotFoundError("document_not_found", data.get("error", "Document introuvable"))
 
     file_bytes = base64.b64decode(data["file_base64"])
     filename = data.get("filename", "document")
     try:
-        svg_text = generate_svg_for_bytes(file_bytes, filename)
-        return Response(content=svg_text.encode("utf-8"), media_type="image/svg+xml")
+        return generate_svg_for_bytes(file_bytes, filename)
     except ValueError as exc:
-        raise HTTPException(
-            status_code=400,
-            detail={"error": "unsupported_format", "message": str(exc)},
-        ) from exc
-    except HTTPException:
-        raise
+        raise ValidationError("unsupported_format", str(exc)) from exc
     except Exception as exc:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(
-            status_code=500,
-            detail={"error": "visualisation_failed", "message": str(exc)},
-        ) from exc
+        raise ProcessingError("visualisation_failed", str(exc)) from exc
 
 
-async def stream_chat_document(request: Any, http_request: Any) -> Any:
-    from api.dependencies import llm_client, _LLM_MODEL
-    from api.services.token_counter import count_messages_tokens, count_text_tokens, extract_usage_from_chunk
-    from api.services.usage_store import record_usage
+async def build_chat_messages(document_id: str, user_message: str, history: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Build the LLM message list for a document chat request.
 
-    username = get_session_cookie(http_request)
+    Raises:
+        NotFoundError: when no context can be fetched for the document.
+        ProcessingError: when the MCP call fails.
+    """
+    search_query = user_message
+    if history:
+        recent_context = " ".join([msg["content"] for msg in history[-2:]])
+        search_query = f"Contexte récent: {recent_context} | Question: {user_message}"
 
-    search_query = request.user_message
-    if request.history:
-        recent_context = " ".join([msg["content"] for msg in request.history[-2:]])
-        search_query = f"Contexte récent: {recent_context} | Question: {request.user_message}"
+    print(f"[Chat] Demande de contexte au MCP pour le doc: {document_id}...")
+    try:
+        context_text = await fetch_document_context(document_id, search_query)
+    except Exception as exc:
+        raise ProcessingError("context_fetch_failed", f"Impossible de récupérer le contexte du document: {exc}") from exc
 
-    print(f"[Chat] Demande de contexte au MCP pour le doc: {request.document_id}...")
-    context_text = await fetch_document_context(request.document_id, search_query)
     system_instruction = (
         "Tu es un assistant sémantique expert.\n"
         "Analyse les extraits de documents fournis ci-dessous pour répondre à la question.\n"
@@ -97,50 +96,7 @@ async def stream_chat_document(request: Any, http_request: Any) -> Any:
         f"--- EXTRAITS PERTINENTS DU DOCUMENT ---\n{context_text}\n----------------------------------------"
     )
     messages = [{"role": "system", "content": system_instruction}]
-    for msg in request.history:
+    for msg in history:
         messages.append({"role": msg["role"], "content": msg["content"]})
-    messages.append({"role": "user", "content": request.user_message})
-
-    prompt_estimate = count_messages_tokens(messages, _LLM_MODEL)
-    completion_estimate = 0
-    usage_from_provider = None
-
-    async def generator():
-        nonlocal completion_estimate, usage_from_provider
-        print("[Chat] Contexte reçu, début du streaming LLM...")
-        response_stream = await llm_client.chat.completions.create(
-            model=_LLM_MODEL,
-            messages=messages,
-            temperature=0.2,
-            stream=True
-        )
-        async for chunk in response_stream:
-            if usage_from_provider is None:
-                usage_from_provider = extract_usage_from_chunk(chunk)
-            if len(chunk.choices) > 0:
-                token = chunk.choices[0].delta.content
-                if token:
-                    completion_estimate += count_text_tokens(token, _LLM_MODEL)
-                    yield token
-
-        if username:
-            if usage_from_provider:
-                record_usage(
-                    username=username,
-                    prompt_tokens=usage_from_provider.get("prompt_tokens", prompt_estimate),
-                    completion_tokens=usage_from_provider.get("completion_tokens", completion_estimate),
-                    endpoint="chat",
-                    model=_LLM_MODEL,
-                    source="usage",
-                )
-            else:
-                record_usage(
-                    username=username,
-                    prompt_tokens=prompt_estimate,
-                    completion_tokens=completion_estimate,
-                    endpoint="chat",
-                    model=_LLM_MODEL,
-                    source="tiktoken",
-                )
-
-    return generator()
+    messages.append({"role": "user", "content": user_message})
+    return messages

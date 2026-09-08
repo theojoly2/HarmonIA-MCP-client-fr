@@ -1,28 +1,24 @@
-"""External API gateway: encapsulate external API key authentication operations.
+"""External API gateway: encapsulate external API key business operations.
 
 Mirrors the external API routes in api/routers/external_api.py.
+No HTTP/response construction here: routers build StreamingResponse/JSONResponse.
 """
 
 from __future__ import annotations
 
-import json
 import secrets
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, AsyncGenerator, Optional
 
-from fastapi import HTTPException
-from fastapi.responses import StreamingResponse
-
+from api.exceptions import ConflictError, NotFoundError, ProcessingError, ValidationError
 from api.naming import model_name_from_filename as _model_name_from_filename, unique_model_name
 from api.schemas.assistant import AssistantStreamRequest
 from api.services.assistant_history import AssistantHistory
-from api.services.assistant_mcp_client import AssistantMCPClient
+from api.services.assistant_import import parse_and_upload_model_file
 from api.services.assistant_orchestrator import assistant_stream_generator
 from api.services.mcp_service import delete_model_mcp, fetch_document_file
-from api.services.model_import import parse_model_file
 from api.services.model_store import export_model
 from api.utils.sse import _collect_filtered_events, _event, _stream_filtered_events
-from data_model_utils import ModelProcessingError
 
 
 ORIGIN_EXTERNAL = "external_api"
@@ -122,7 +118,7 @@ async def list_conversations(username: str) -> dict[str, list[dict[str, Any]]]:
 async def list_conversation_models(username: str, conversation_id: str) -> list[dict[str, Any]]:
     history = AssistantHistory(user=username, session=conversation_id, origin=ORIGIN_EXTERNAL)
     if not history._session_exists():
-        raise HTTPException(status_code=404, detail="conversation_not_found")
+        raise NotFoundError("conversation_not_found", "Conversation introuvable")
 
     items: list[dict[str, Any]] = []
     for name in history.assistant_model_names:
@@ -142,7 +138,7 @@ async def list_conversation_models(username: str, conversation_id: str) -> list[
 async def delete_conversation(username: str, conversation_id: str) -> dict[str, Any]:
     history = AssistantHistory(user=username, session=conversation_id, origin=ORIGIN_EXTERNAL)
     if not history._session_exists():
-        raise HTTPException(status_code=404, detail="conversation_not_found")
+        raise NotFoundError("conversation_not_found", "Conversation introuvable")
 
     for model_name in history.assistant_model_names:
         try:
@@ -158,6 +154,9 @@ async def delete_conversation(username: str, conversation_id: str) -> dict[str, 
     return {"ok": True}
 
 
+MAX_EXTERNAL_MODELS = 3
+
+
 async def import_model_into_conversation(
     username: str,
     conversation_id: str,
@@ -167,28 +166,24 @@ async def import_model_into_conversation(
 ) -> dict[str, Any]:
     history = AssistantHistory(user=username, session=conversation_id, origin=ORIGIN_EXTERNAL)
     if not history._session_exists():
-        raise HTTPException(status_code=404, detail="conversation_not_found")
+        raise NotFoundError("conversation_not_found", "Conversation introuvable")
 
-    max_models = 3
-    if len(history.assistant_model_names) >= max_models:
-        raise HTTPException(status_code=400, detail=f"maximum_{max_models}_models_reached")
+    if len(history.assistant_model_names) >= MAX_EXTERNAL_MODELS:
+        raise ConflictError("maximum_models_reached", f"Maximum {MAX_EXTERNAL_MODELS} models reached")
 
     display_name = (name or filename).strip() or "imported_model"
     model_name = _external_model_name(conversation_id, filename)
 
     try:
-        json_data = parse_model_file(file_bytes, filename)
-        async with AssistantMCPClient(state={"user": username, "name": model_name, "package": ""}) as mcp_client:
-            server_model = await mcp_client.upload_model({"model": json_data})
-            if not server_model:
-                raise ModelProcessingError("MCP Server Error", "Model upload returned None.")
-        json_data["imported_from_assistant"] = True
-        async with AssistantMCPClient(state={"user": username, "name": model_name, "package": ""}) as mcp_client:
-            await mcp_client.upload_model({"model": json_data})
-    except ModelProcessingError as e:
-        raise HTTPException(status_code=400, detail={"title": e.title, "details": e.details}) from e
+        json_data = await parse_and_upload_model_file(
+            file_bytes=file_bytes,
+            filename=filename,
+            username=username,
+            session_name=model_name,
+            add_generated_package=True,
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"import_failed: {e}") from e
+        raise ProcessingError("import_failed", f"Import failed: {e}") from e
 
     history.assistant_model_names.append(model_name)
     if not history.assistant_model_name:
@@ -209,35 +204,35 @@ async def import_model_from_document(
 ) -> dict[str, Any]:
     history = AssistantHistory(user=username, session=conversation_id, origin=ORIGIN_EXTERNAL)
     if not history._session_exists():
-        raise HTTPException(status_code=404, detail="conversation_not_found")
+        raise NotFoundError("conversation_not_found", "Conversation introuvable")
 
-    max_models = 3
-    if len(history.assistant_model_names) >= max_models:
-        raise HTTPException(status_code=400, detail=f"maximum_{max_models}_models_reached")
+    if len(history.assistant_model_names) >= MAX_EXTERNAL_MODELS:
+        raise ConflictError("maximum_models_reached", f"Maximum {MAX_EXTERNAL_MODELS} models reached")
 
     file_data = await fetch_document_file(doc_id)
     if not file_data.get("success"):
-        raise HTTPException(status_code=404, detail=file_data.get("error", "document_not_found"))
+        raise NotFoundError("document_not_found", file_data.get("error", "Document introuvable"))
 
     try:
-        file_bytes = __import__("base64").b64decode(file_data["file_base64"])
+        import base64
+        file_bytes = base64.b64decode(file_data["file_base64"])
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"failed_to_decode_document: {e}") from e
+        raise ValidationError("failed_to_decode_document", f"Failed to decode document: {e}") from e
 
     filename = file_data.get("filename", "document")
     display_name = filename
     model_name = _external_model_name(conversation_id, filename)
 
     try:
-        json_data = parse_model_file(file_bytes, filename)
-        async with AssistantMCPClient(state={"user": username, "name": model_name, "package": ""}) as mcp_client:
-            server_model = await mcp_client.upload_model({"model": json_data})
-            if not server_model:
-                raise ModelProcessingError("MCP Server Error", "Model upload returned None.")
-    except ModelProcessingError as e:
-        raise HTTPException(status_code=400, detail={"title": e.title, "details": e.details}) from e
+        json_data = await parse_and_upload_model_file(
+            file_bytes=file_bytes,
+            filename=filename,
+            username=username,
+            session_name=model_name,
+            add_generated_package=True,
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"import_failed: {e}") from e
+        raise ProcessingError("import_failed", f"Import failed: {e}") from e
 
     history.assistant_model_names.append(model_name)
     if not history.assistant_model_name:
@@ -256,10 +251,10 @@ async def chat_with_conversation(
     conversation_id: str,
     message: str,
     stream: bool,
-) -> StreamingResponse:
+) -> AsyncGenerator[str, None]:
     history = AssistantHistory(user=username, session=conversation_id, origin=ORIGIN_EXTERNAL)
     if not history._session_exists():
-        raise HTTPException(status_code=404, detail="conversation_not_found")
+        raise NotFoundError("conversation_not_found", "Conversation introuvable")
 
     model_names = history.assistant_model_names[:3]
 
@@ -271,8 +266,11 @@ async def chat_with_conversation(
     )
 
     if stream:
-        return await _external_stream(req, username, model_names)
-    return await _external_non_stream(req, username, model_names)
+        async for event in _external_stream_events(req, username, model_names):
+            yield event
+    else:
+        async for event in _external_non_stream_events(req, username, model_names):
+            yield event
 
 
 def _external_event_filter(
@@ -284,29 +282,22 @@ def _external_event_filter(
     return external
 
 
-async def _external_stream(
+async def _external_stream_events(
     req: AssistantStreamRequest,
     username: str,
     model_names: list[str],
-) -> StreamingResponse:
+) -> AsyncGenerator[str, None]:
     state = {"name": model_names[0] if model_names else req.session}
     source = assistant_stream_generator(req, username)
-    return StreamingResponse(
-        _stream_filtered_events(source, lambda e: _external_event_filter(e, model_names, state)),
-        media_type="text/event-stream",
-        headers={
-            "X-Accel-Buffering": "no",
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Connection": "keep-alive",
-        },
-    )
+    async for line in _stream_filtered_events(source, lambda e: _external_event_filter(e, model_names, state)):
+        yield line
 
 
-async def _external_non_stream(
+async def _external_non_stream_events(
     req: AssistantStreamRequest,
     username: str,
     model_names: list[str],
-) -> StreamingResponse:
+) -> AsyncGenerator[str, None]:
     state = {"name": model_names[0] if model_names else req.session}
     source = assistant_stream_generator(req, username)
     events = await _collect_filtered_events(
@@ -314,37 +305,25 @@ async def _external_non_stream(
         lambda e: _external_event_filter(e, model_names, state),
         stop_kind="assistant_done",
     )
-
-    async def _yield_events():
-        yield _event("events", {"events": events})
-
-    return StreamingResponse(
-        _yield_events(),
-        media_type="text/event-stream",
-        headers={
-            "X-Accel-Buffering": "no",
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Connection": "keep-alive",
-        },
-    )
+    yield _event("events", {"events": events})
 
 
 async def export_model_external(
     username: str,
     model_name: str,
     format: str,
-) -> StreamingResponse:
+) -> tuple[bytes, str, str, str]:
     allowed = {"xmi", "ttl", "svg", "png"}
-    if format not in allowed:
-        raise HTTPException(status_code=400, detail=f"unsupported_format: choose from {', '.join(allowed)}")
+    fmt = (format or "").lower().strip()
+    if fmt not in allowed:
+        raise ValidationError("unsupported_format", f"Unsupported format: choose from {', '.join(allowed)}")
 
     try:
-        blob, content_type, extension = await export_model(username, model_name, format)
+        blob, content_type, extension = await export_model(username, model_name, fmt)
+    except ValueError as e:
+        raise ValidationError("export_failed", str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"export_failed: {e}") from e
+        raise ProcessingError("export_failed", f"Export failed: {e}") from e
 
     safe_name = model_name.replace("/", "_")
-    headers = {
-        "Content-Disposition": f'attachment; filename="{safe_name}.{extension}"',
-    }
-    return StreamingResponse(iter([blob]), media_type=content_type, headers=headers)
+    return blob, content_type, extension, safe_name

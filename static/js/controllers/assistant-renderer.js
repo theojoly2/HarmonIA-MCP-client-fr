@@ -11,7 +11,7 @@ class AssistantRenderer {
     constructor(messagesEl, chatEl, options = {}) {
         this.messagesEl = messagesEl;
         this.chatEl = chatEl;
-        this.ui = (typeof ServiceLocator !== "undefined" && ServiceLocator.get("uiHelpers")) || window.UiHelpers || {};
+        this.ui = (typeof ServiceLocator !== "undefined" && ServiceLocator.get("uiHelpers")) || {};
         this.escape = options.escape || ((t) => t);
         this.markdown = options.markdown || ((t) => t);
         this.sparkleSvg = options.sparkleSvg || (() => '');

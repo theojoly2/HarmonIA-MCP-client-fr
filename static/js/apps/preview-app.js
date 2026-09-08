@@ -64,9 +64,7 @@ class PreviewApp extends AppBase {
     }
 
     _escape(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        return UiHelpers.escape(text);
     }
 
     _bindEvents() {

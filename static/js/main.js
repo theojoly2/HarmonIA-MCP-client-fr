@@ -61,11 +61,8 @@
     ServiceLocator.register('glowEffects', GlowEffects);
     ServiceLocator.register('eventBus', EventBus);
     ServiceLocator.register('appState', AppState);
-
-    // Expose minimal globals for legacy callers and browser console debugging.
-    // New code should prefer ServiceLocator.get(...).
-    window.historyPanel = historyPanel;
-    window.windowManager = windowManager;
+    ServiceLocator.register('apiKeysManager', ApiKeysManager);
+    ServiceLocator.register('apiDocsManager', ApiDocsManager);
 
     // Wire shell buttons to window manager
     shell.windowManager = windowManager;
@@ -128,7 +125,7 @@
         // (e.g. in the Analyser tab) is replaced with the real UI after login.
         const activeId = AppState.getActiveInstance();
         const activeInstance = activeId ? AppState.getInstance(activeId) : null;
-        if (activeInstance && window.windowManager) {
+        if (activeInstance && windowManager) {
             const container = document.querySelector('.app-container');
             if (container) {
                 container.innerHTML = '';
@@ -156,7 +153,7 @@
         // (e.g. the Assistant chat) is replaced with the anonymous placeholder.
         const activeId = AppState.getActiveInstance();
         const activeInstance = activeId ? AppState.getInstance(activeId) : null;
-        if (activeInstance && window.windowManager) {
+        if (activeInstance && windowManager) {
             const container = document.querySelector('.app-container');
             if (container) {
                 container.innerHTML = '';
@@ -168,8 +165,7 @@
     // Anonymous users can browse Search. Protected features show their own login prompts.
     // Do not open the blocking auth modal automatically anymore.
 
-    // Global helper (legacy/debug only)
-    window.AuthManager = AuthManager;
+
 
     // Event bus handlers
     EventBus.on('open-preview', ({ docId, documentId, name }) => {
@@ -198,9 +194,34 @@
     });
 
     EventBus.on('assistant-split-close', ({ linkedModelerInstanceId }) => {
-        const modeler = AppState.getInstance(linkedModelerInstanceId);
+        EventBus.emit('modeler:toggle-assistant-split', { instanceId: linkedModelerInstanceId });
+    });
+
+    EventBus.on('modeler:reload-svg', ({ instanceId }) => {
+        const modeler = AppState.getInstance(instanceId);
+        if (modeler && typeof modeler._reloadSvgFromServer === 'function') {
+            modeler._reloadSvgFromServer();
+        }
+    });
+
+    EventBus.on('modeler:toggle-assistant-split', ({ instanceId }) => {
+        const modeler = AppState.getInstance(instanceId);
         if (modeler && typeof modeler._toggleAssistantSplit === 'function') {
             modeler._toggleAssistantSplit();
+        }
+    });
+
+    EventBus.on('modeler:update-assistant-toggle', ({ instanceId }) => {
+        const modeler = AppState.getInstance(instanceId);
+        if (modeler && typeof modeler._updateAssistantToggleVisibility === 'function') {
+            modeler._updateAssistantToggleVisibility();
+        }
+    });
+
+    EventBus.on('assistant:prepare-linked-session', ({ instanceId, session, displayName }) => {
+        const modeler = AppState.getInstance(instanceId);
+        if (modeler && typeof modeler._prepareLinkedAssistantSession === 'function') {
+            modeler._prepareLinkedAssistantSession(session, displayName);
         }
     });
 

@@ -401,7 +401,7 @@ class HistoryPanel {
     }
 
     _getWindowManager() {
-        return ServiceLocator.get('windowManager') || window.windowManager || null;
+        return ServiceLocator.get('windowManager') || null;
     }
 
     _closeOpenTabForDeletedItem(item) {
@@ -545,16 +545,14 @@ class HistoryPanel {
                     // If the renamed model is currently open in the Modeler, update its
                     // stored name and refresh the SVG so the displayed package/model name
                     // matches the new display name.
-                    AppState.listInstances().forEach((info) => {
-                        if (info.appId !== "modeler") return;
-                        const inst = AppState.getInstance(info.instanceId);
-                        if (inst && inst.updateModelName && (inst.storedName === storedName || inst.fileName === initialName)) {
-                            inst.updateModelName(newStoredName, newName);
-                            if (inst._reloadSvgFromServer) {
-                                inst._reloadSvgFromServer().catch((err) => console.error("Refresh SVG after rename error", err));
+                        AppState.listInstances().forEach((info) => {
+                            if (info.appId !== "modeler") return;
+                            const inst = AppState.getInstance(info.instanceId);
+                            if (inst && inst.updateModelName && (inst.storedName === storedName || inst.fileName === initialName)) {
+                                inst.updateModelName(newStoredName, newName);
+                                EventBus.emit('modeler:reload-svg', { instanceId: info.instanceId });
                             }
-                        }
-                    });
+                        });
                 }
                 // Keep displayed text; refresh list silently in background to sync ordering
                 this.load();
@@ -621,8 +619,12 @@ class HistoryPanel {
         const li = this.listEl.querySelector(`li[data-item-name="${CSS.escape(modelName)}"][data-item-kind="model"]`);
         const linkedSession = li?.dataset.assistantSession;
         const linkedDisplayName = li?.dataset.assistantDisplayName;
-        if (linkedSession && modelerInstance.instance._prepareLinkedAssistantSession) {
-            modelerInstance.instance._prepareLinkedAssistantSession(linkedSession, linkedDisplayName);
+        if (linkedSession) {
+            EventBus.emit('assistant:prepare-linked-session', {
+                instanceId: modelerInstance.instanceId,
+                session: linkedSession,
+                displayName: linkedDisplayName,
+            });
         }
 
         // Also update the modeler assistant sub-entry mtime so it stays in

@@ -2,8 +2,7 @@
  * AuthGateway
  *
  * Encapsulates all authentication and user-related HTTP calls.
- * AuthManager and Shell access user/session capabilities through this gateway
- * instead of calling fetch/ApiClient directly.
+ * AuthManager and Shell access user/session capabilities through this gateway.
  */
 
 const AuthGateway = (() => {
