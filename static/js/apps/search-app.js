@@ -301,11 +301,22 @@ class SearchApp extends AppBase {
     }
 
     _buildTagsHtml(tags) {
-        return UiHelpers.buildTagsHtml(tags, this.selectedTags || [], {
-            max: 9999,
-            labelClass: 'tag-label',
-            pillClass: 'inline-flex items-center rounded-full font-bold border-2 border-gray-200 text-gray-700 peer-checked:bg-black peer-checked:text-white peer-checked:border-black hover:border-gray-400 transition-colors overflow-hidden relative',
-        });
+        if (!tags || !tags.length) return '';
+        const selectedSet = new Set(this.selectedTags || []);
+        return tags.map(t => {
+            const tagName = (typeof t === 'object' ? (t.tag || t.name || t.label || '') : t) || '';
+            const isChecked = selectedSet.has(tagName) ? 'checked' : '';
+            return `
+                <label class="cursor-pointer select-none tag-label" title="${this._escape(tagName)}">
+                    <input type="checkbox" name="t" value="${this._escape(tagName)}" class="peer hidden" ${isChecked}>
+                    <span class="inline-flex items-center rounded-full font-bold border-2 border-gray-200 text-gray-700 peer-checked:bg-black peer-checked:text-white peer-checked:border-black hover:border-gray-400 transition-colors overflow-hidden relative">
+                        <svg class="icon-unchecked w-3.5 h-3.5 mr-1.5 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4"></path></svg>
+                        <svg class="icon-checked w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M5 13l4 4L19 7"></path></svg>
+                        ${this._escape(tagName)}
+                    </span>
+                </label>
+            `;
+        }).join('');
     }
 
     _injectTagsHtml() {
