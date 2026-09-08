@@ -33,6 +33,7 @@ class AssistantRenderer {
         div.className = 'assistant-bubble assistant-bubble-user mb-6 user-msg-anchor';
         div.innerHTML = `<div class="assistant-bubble-content">${this.escape(text)}</div>`;
         this.messagesEl.appendChild(div);
+        this._pruneAssistantSparkles();
         if (this.chatEl) {
             requestAnimationFrame(() => {
                 div.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -108,19 +109,8 @@ class AssistantRenderer {
         const last = this.messagesEl.lastElementChild;
         if (last && last.dataset.role === 'assistant' && last.dataset.active === 'true') {
             last.dataset.active = 'false';
-            // The sparkle on a finished assistant bubble must stay visible so the
-            // last message remains marked as the latest answer.
-            const avatar = last.querySelector('.ai-avatar-wrapper');
-            if (avatar) {
-                avatar.classList.add('trigger-magic');
-                avatar.style.display = '';
-                avatar.style.opacity = '';
-                avatar.style.height = '';
-                avatar.style.margin = '';
-                avatar.style.overflow = '';
-                avatar.dataset.hidden = 'false';
-            }
         }
+        this._pruneAssistantSparkles();
     }
 
     hideAllSparkles() {
@@ -140,7 +130,36 @@ class AssistantRenderer {
         });
     }
 
+    _pruneAssistantSparkles() {
+        // Hide sparkle avatars on all finished assistant bubbles except the last one.
+        const bubbles = Array.from(this.messagesEl.querySelectorAll('[data-role="assistant"].assistant-bubble-assistant'));
+        bubbles.forEach((bubble, index) => {
+            const isLast = index === bubbles.length - 1;
+            const avatar = bubble.querySelector('.ai-avatar-wrapper');
+            if (!avatar) return;
+            if (isLast) {
+                avatar.classList.add('trigger-magic');
+                avatar.style.display = '';
+                avatar.style.opacity = '';
+                avatar.style.height = '';
+                avatar.style.margin = '';
+                avatar.style.overflow = '';
+                avatar.dataset.hidden = 'false';
+            } else {
+                avatar.classList.remove('trigger-magic');
+                avatar.style.transition = 'opacity 0.3s ease, height 0.3s ease, margin 0.3s ease';
+                avatar.style.opacity = '0';
+                avatar.style.height = '0';
+                avatar.style.margin = '0';
+                avatar.style.overflow = 'hidden';
+                avatar.dataset.hidden = 'true';
+                setTimeout(() => { avatar.style.display = 'none'; }, 300);
+            }
+        });
+    }
+
     updateFinalSparkle() {
+        this._pruneAssistantSparkles();
         const last = this.messagesEl.lastElementChild;
         if (last && last.dataset.role === 'assistant') {
             let avatar = last.querySelector('.ai-avatar-wrapper');
