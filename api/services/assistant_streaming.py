@@ -70,7 +70,7 @@ async def _create_completion_streaming(
         tool_choice=tool_choice if tools else None,
         temperature=0,
         stream=True,
-        extra_body={"reasoning_effort": "medium"},
+        extra_body={"reasoning_effort": "low"},
     )
 
     assistant_text = ""

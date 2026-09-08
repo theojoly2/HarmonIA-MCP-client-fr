@@ -19,7 +19,7 @@ async def stream_chat(messages: list, temperature: float = 0.2, username: str | 
         messages=messages,
         temperature=temperature,
         stream=True,
-        extra_body={"reasoning_effort": "medium"},
+        extra_body={"reasoning_effort": "low"},
     )
     async for chunk in response:
         # Try to read usage from the final chunk if the provider includes it.

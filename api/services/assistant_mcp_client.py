@@ -112,7 +112,7 @@ async def _sampling_handler(messages: list[Any], params: Any, context: Any) -> s
             max_tokens=getattr(params, "maxTokens", 512) or 512,
             stop=getattr(params, "stopSequences", None) or None,
             stream=False,
-            extra_body={"reasoning_effort": "medium"},
+            extra_body={"reasoning_effort": "low"},
         )
 
         # Record token usage for this MCP sampling call if a username is available.
