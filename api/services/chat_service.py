@@ -39,6 +39,7 @@ async def stream_chat_document(
         messages=messages,
         temperature=0.2,
         stream=True,
+        extra_body={"reasoning_effort": "medium"},
     )
     async for chunk in response_stream:
         if usage_from_provider is None:
