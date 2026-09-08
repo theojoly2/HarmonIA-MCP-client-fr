@@ -7,7 +7,7 @@
 
 class AssistantApp extends AppBase {
     static id = 'assistant';
-    static title = 'Assistant';
+    static title = 'Analyser';
     static iconSvg = `<svg class="w-4 h-4 overflow-visible" viewBox="0 0 24 24">
         <path class="sparkle-main" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
         <path class="sparkle-orbit-path" d="M5.5 2.5L6.34 5.16L9 6L6.34 6.84L5.5 9.5L4.66 6.84L2 6L4.66 5.16L5.5 2.5Z"></path>
@@ -85,11 +85,11 @@ class AssistantApp extends AppBase {
                 <div id="assistant-chat" class="flex-1 overflow-y-auto relative">
                     <div class="assistant-welcome" id="assistant-welcome">
                         <h1 class="assistant-welcome-title text-center">
-                            <button type="button" id="assistant-reset" class="assistant-title-reset" title="Nouvelle conversation">
-                                <span class="assistant-title-glow title-glow">Assistant Sémantique</span>
+                            <button type="button" id="assistant-reset" class="assistant-title-reset" title="Nouvelle analyse">
+                                <span class="assistant-title-glow title-glow">Analyser des modèles</span>
                             </button>
                         </h1>
-                        <p class="assistant-welcome-subtitle">Importez un modèle ou posez une question pour démarrer.</p>
+                        <p class="assistant-welcome-subtitle">Discutez avec l'assistant pour analyser, comparer, fusionner et améliorer vos modèles. Formats supportés : TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML.</p>
                         <div class="assistant-welcome-input" id="assistant-welcome-input"></div>
                     </div>
                     <div class="assistant-embedded-model-pill" id="assistant-embedded-model-pill"></div>
@@ -100,11 +100,11 @@ class AssistantApp extends AppBase {
                     <div class="assistant-input-wrapper mx-auto rounded-xl border-2 border-gray-300 focus-within:border-black bg-white transition-colors shadow-sm" id="assistant-input-box">
                         <form id="assistant-form" class="flex flex-col">
                             <textarea id="assistant-input" rows="1" autocomplete="off"
-                                placeholder="Interrogez l'assistant sémantique..."
+                                placeholder="Interrogez l'assistant de modélisation..."
                                 class="w-full resize-none max-h-40 bg-transparent border-none focus:outline-none focus:ring-0 text-sm text-gray-900 placeholder-gray-500 px-2 py-1.5"></textarea>
                             <div class="flex items-center justify-between px-2 pb-1.5 pt-1.5">
                                 <div class="flex items-center gap-1.5">
-                                    <button type="button" id="assistant-import-model" class="magic-btn flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl text-gray-500 hover:text-black hover:bg-gray-100 transition-colors" title="Importer un modèle">
+                                    <button type="button" id="assistant-import-model" class="magic-btn flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl text-gray-500 hover:text-black hover:bg-gray-100 transition-colors" title="Importer un modèle (TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML)">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                                         </svg>
@@ -333,7 +333,7 @@ class AssistantApp extends AppBase {
             }
             // Use the saved display name as the user-visible title if available.
             if (this.props.display_name && this.setTitle) {
-                this.setTitle(`Assistant: ${this.props.display_name}`);
+                this.setTitle(`Analyser: ${this.props.display_name}`);
             }
         }
         // After loading history, if messages exist switch to chat mode layout.
@@ -711,7 +711,7 @@ class AssistantApp extends AppBase {
         const displayName = file.name;
         this._startImportLoading(loadingKey, displayName);
         try {
-            const result = await ApiClient.importAssistantModel(file, file.name, this.origin);
+            const result = await AssistantGateway.importAssistantModel(file, file.name, this.origin);
             if (result?.name) {
                 this.props.displayNames = this.props.displayNames || {};
                 this.props.displayNames[result.name] = result.display_name || result.name;
@@ -741,7 +741,7 @@ class AssistantApp extends AppBase {
         this._importedSearchDocIds.set(docId, '');
         this._startImportLoading(loadingKey, filename);
         try {
-            const result = await ApiClient.importDocumentAsAssistantModel(docId, this.origin);
+            const result = await AssistantGateway.importAssistantModelFromDocument(docId, this.origin);
             if (result?.name) {
                 this.props.displayNames = this.props.displayNames || {};
                 this.props.displayNames[result.name] = result.display_name || filename;
@@ -957,7 +957,7 @@ class AssistantApp extends AppBase {
         const originalHtml = itemEl?.innerHTML || '';
         this._setPillExportItemLoading(itemEl, true);
         try {
-            const blob = await ApiClient.exportModel(name, format);
+            const blob = await ModelGateway.exportAsBlob(name, format);
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -1015,7 +1015,7 @@ class AssistantApp extends AppBase {
     async _loadTags() {
         if (this._tagsReady) return;
         try {
-            const data = await ApiClient.getTags();
+            const data = await SearchGateway.getTags();
             const tags = data.tags || [];
             this.tagsHtml = this._buildTagsHtml(tags);
             this._tagsReady = true;
@@ -1100,7 +1100,7 @@ class AssistantApp extends AppBase {
 
     async loadHistory(session) {
         console.log('[AssistantApp] loadHistory', session, this.origin);
-        const data = await ApiClient.getAssistantHistory(session, this.origin);
+        const data = await AssistantGateway.getAssistantHistory(session, this.origin);
         console.log('[AssistantApp] history data', data);
         if (!data || !Array.isArray(data.messages)) {
             console.warn('[AssistantApp] no messages in history data');
@@ -1119,7 +1119,7 @@ class AssistantApp extends AppBase {
         // across remounts and renames from the history panel.
         if (data.display_name) {
             this.props.display_name = data.display_name;
-            if (this.setTitle) this.setTitle(`Assistant: ${data.display_name}`);
+            if (this.setTitle) this.setTitle(`Analyser: ${data.display_name}`);
         }
         this.messages = [];
         this.messagesEl.innerHTML = '';
@@ -2192,7 +2192,7 @@ class AssistantApp extends AppBase {
         };
 
         try {
-            await ApiClient.streamAssistant(
+            await AssistantGateway.streamAssistant(
                 sessionToSend,
                 text,
                 this.modelNames,
@@ -2419,6 +2419,21 @@ class AssistantApp extends AppBase {
             bubble.innerHTML += `<br><em class="text-red-600">Erreur : ${this._escape(event.message || '')}</em>`;
             saveHtmlSnapshot();
             return;
+        }
+    }
+
+    _updateFinalSparkle() {
+        const last = this.messagesEl.lastElementChild;
+        if (last && last.dataset.role === 'assistant') {
+            if (!last.querySelector('.ai-avatar-row')) {
+                last.innerHTML += `
+                    <div class="ai-avatar-row flex items-center gap-2">
+                        <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic" data-hidden="false">
+                            ${this._sparkleSvg()}
+                        </div>
+                    </div>
+                `;
+            }
         }
     }
 
