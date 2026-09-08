@@ -1342,6 +1342,15 @@ class AssistantApp extends AppBase {
         `;
         this.messagesEl.appendChild(wrapper);
         this._scrollToBottom();
+        // Ensure the sparkle keeps animating beyond the first CSS forwards run.
+        requestAnimationFrame(() => {
+            const avatar = wrapper.querySelector('.ai-avatar-wrapper');
+            if (avatar) {
+                avatar.classList.remove('trigger-magic');
+                void avatar.offsetWidth;
+                avatar.classList.add('trigger-magic');
+            }
+        });
         return wrapper;
     }
 
@@ -1425,7 +1434,31 @@ class AssistantApp extends AppBase {
         this.chatEl.querySelectorAll('.sparkle-container').forEach((container) => {
             const avatar = container.closest('.ai-avatar-wrapper') || container;
             avatar.classList.remove('trigger-magic');
+            avatar.classList.remove('sparkle-pulse');
         });
+    }
+
+    _retriggerActiveSparkles() {
+        // Keep the current placeholder and any active assistant bubble sparkle
+        // alive during long waits. CSS forwards animations stop after one run,
+        // so we remove/re-add the trigger class to restart them.
+        const targets = [];
+        const placeholders = Array.from(this.chatEl.querySelectorAll('.assistant-thinking-placeholder'));
+        if (placeholders.length) {
+            const latest = placeholders[placeholders.length - 1];
+            const avatar = latest.querySelector('.ai-avatar-wrapper');
+            if (avatar) targets.push(avatar);
+        }
+        const activeBubble = this.messagesEl.lastElementChild;
+        if (activeBubble && activeBubble.dataset.role === 'assistant' && activeBubble.dataset.active === 'true') {
+            const avatar = activeBubble.querySelector('.ai-avatar-wrapper');
+            if (avatar) targets.push(avatar);
+        }
+        for (const avatar of targets) {
+            avatar.classList.remove('trigger-magic');
+            void avatar.offsetWidth;
+            avatar.classList.add('trigger-magic');
+        }
     }
 
     _closeAssistantBubble() {
@@ -2067,17 +2100,10 @@ class AssistantApp extends AppBase {
 
         let placeholder = this._appendThinkingPlaceholder();
         const loadingInterval = setInterval(() => {
-            // Always target the latest placeholder so the sparkle keeps beating
-            // across phase changes (text -> tool -> new text, etc.).
-            const placeholders = Array.from(this.chatEl.querySelectorAll('.assistant-thinking-placeholder'));
-            const latest = placeholders.length ? placeholders[placeholders.length - 1] : null;
-            const avatar = latest?.querySelector('.ai-avatar-wrapper');
-            if (avatar) {
-                avatar.classList.remove('trigger-magic');
-                void avatar.offsetWidth;
-                avatar.classList.add('trigger-magic');
-            }
-        }, 1200);
+            // Keep the active sparkle beating during long waits (tool calls,
+            // reasoning, etc.). CSS forwards animations stop after one run.
+            this._retriggerActiveSparkles();
+        }, 700);
 
         // ChatApp-style streaming: accumulate the full response, then display it
         // character-by-character with live markdown reparsing.
@@ -2149,15 +2175,23 @@ class AssistantApp extends AppBase {
             wrapper.innerHTML = `
                 <div class="assistant-bubble-content markdown-body"></div>
                 <div class="ai-avatar-row flex items-center gap-2">
-                    <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic" data-hidden="false">
-                        ${this._sparkleSvg()}
-                    </div>
+                <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic" data-hidden="false">
+                    ${this._sparkleSvg()}
                 </div>
-            `;
-            this.messagesEl.appendChild(wrapper);
-            currentBubbleContent = wrapper.querySelector('.assistant-bubble-content');
-            return currentBubbleContent;
-        };
+            </div>
+        `;
+        this.messagesEl.appendChild(wrapper);
+        currentBubbleContent = wrapper.querySelector('.assistant-bubble-content');
+        requestAnimationFrame(() => {
+            const avatar = wrapper.querySelector('.ai-avatar-wrapper');
+            if (avatar) {
+                avatar.classList.remove('trigger-magic');
+                void avatar.offsetWidth;
+                avatar.classList.add('trigger-magic');
+            }
+        });
+        return currentBubbleContent;
+    };
 
         // Abort controller lets the client survive long waits and prevents duplicate streams.
         this._streamAbortController?.abort();
