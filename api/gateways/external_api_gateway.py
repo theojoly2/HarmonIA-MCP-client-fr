@@ -5,11 +5,10 @@ Mirrors the external API routes in api/routers/external_api.py.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import secrets
 from datetime import datetime
-from typing import Any, AsyncGenerator, Optional
+from typing import Any, Optional
 
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
@@ -19,10 +18,10 @@ from api.schemas.assistant import AssistantStreamRequest
 from api.services.assistant_history import AssistantHistory
 from api.services.assistant_mcp_client import AssistantMCPClient
 from api.services.assistant_orchestrator import assistant_stream_generator
-from api.services.assistant_streaming import _event
 from api.services.mcp_service import delete_model_mcp, fetch_document_file
 from api.services.model_import import parse_model_file
 from api.services.model_store import export_model
+from api.utils.sse import _collect_filtered_events, _event, _stream_filtered_events
 from data_model_utils import ModelProcessingError
 
 
@@ -75,15 +74,6 @@ def _filter_external_event(event: dict[str, Any], model_names: list[str], state:
         return {"kind": "error", "message": event.get("message", "")}
 
     return None
-
-
-def _parse_sse_line(line: str) -> Optional[dict[str, Any]]:
-    if not line.startswith("data: "):
-        return None
-    try:
-        return json.loads(line[6:])
-    except Exception:
-        return None
 
 
 async def create_conversation(username: str, title: Optional[str] = None) -> dict[str, Any]:
@@ -281,18 +271,28 @@ async def chat_with_conversation(
     )
 
     if stream:
-        return StreamingResponse(
-            _external_stream(req, username, model_names),
-            media_type="text/event-stream",
-            headers={
-                "X-Accel-Buffering": "no",
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                "Connection": "keep-alive",
-            },
-        )
+        return await _external_stream(req, username, model_names)
+    return await _external_non_stream(req, username, model_names)
 
+
+def _external_event_filter(
+    event: dict[str, Any], model_names: list[str], state: dict[str, Any]
+) -> Optional[dict[str, Any]]:
+    external = _filter_external_event(event, model_names, state)
+    if external is None:
+        return None
+    return external
+
+
+async def _external_stream(
+    req: AssistantStreamRequest,
+    username: str,
+    model_names: list[str],
+) -> StreamingResponse:
+    state = {"name": model_names[0] if model_names else req.session}
+    source = assistant_stream_generator(req, username)
     return StreamingResponse(
-        _external_non_stream(req, username, model_names),
+        _stream_filtered_events(source, lambda e: _external_event_filter(e, model_names, state)),
         media_type="text/event-stream",
         headers={
             "X-Accel-Buffering": "no",
@@ -302,59 +302,31 @@ async def chat_with_conversation(
     )
 
 
-async def _external_stream(
-    req: AssistantStreamRequest,
-    username: str,
-    model_names: list[str],
-) -> AsyncGenerator[str, None]:
-    state = {"name": model_names[0] if model_names else req.session}
-    async for line in assistant_stream_generator(req, username):
-        event = _parse_sse_line(line)
-        if event is None:
-            continue
-        external = _filter_external_event(event, model_names, state)
-        if external:
-            yield _event(external["kind"], {k: v for k, v in external.items() if k != "kind"})
-
-
 async def _external_non_stream(
     req: AssistantStreamRequest,
     username: str,
     model_names: list[str],
-) -> AsyncGenerator[str, None]:
+) -> StreamingResponse:
     state = {"name": model_names[0] if model_names else req.session}
-    events: list[dict[str, Any]] = []
-    heartbeat_stop = asyncio.Event()
-    done_seen = False
+    source = assistant_stream_generator(req, username)
+    events = await _collect_filtered_events(
+        source,
+        lambda e: _external_event_filter(e, model_names, state),
+        stop_kind="assistant_done",
+    )
 
-    async def _heartbeat() -> None:
-        while not heartbeat_stop.is_set():
-            await asyncio.sleep(0.5)
-            yield _event(":heartbeat", {})
+    async def _yield_events():
+        yield _event("events", {"events": events})
 
-    async def _collector() -> None:
-        nonlocal done_seen
-        async for line in assistant_stream_generator(req, username):
-            event = _parse_sse_line(line)
-            if event is None:
-                continue
-            external = _filter_external_event(event, model_names, state)
-            if external and not done_seen:
-                events.append(external)
-            if external and external["kind"] == "assistant_done":
-                done_seen = True
-        heartbeat_stop.set()
-
-    collector_task = asyncio.create_task(_collector())
-    while not collector_task.done():
-        yield _event(":heartbeat", {})
-        try:
-            await asyncio.wait_for(heartbeat_stop.wait(), timeout=0.5)
-        except asyncio.TimeoutError:
-            pass
-    await collector_task
-
-    yield _event("events", {"events": events})
+    return StreamingResponse(
+        _yield_events(),
+        media_type="text/event-stream",
+        headers={
+            "X-Accel-Buffering": "no",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 async def export_model_external(

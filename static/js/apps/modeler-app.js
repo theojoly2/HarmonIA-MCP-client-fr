@@ -30,14 +30,6 @@ class ModelerApp extends AppBase {
         this._skipNextTransition = false;
     }
 
-    static _closeOpenEditDialogs() {
-        const openDialogs = document.querySelectorAll('.modeler-edit-float');
-        openDialogs.forEach((dialog) => dialog.remove());
-    }
-
-    static _hasOpenEditDialog() {
-        return document.querySelectorAll('.modeler-edit-float').length > 0;
-    }
 
     render(container) {
         // When the container is already the cached live DOM, do not rebuild it.
@@ -182,63 +174,25 @@ class ModelerApp extends AppBase {
             const home = this.container.querySelector('#modeler-home');
             if (home) home.style.transition = 'none';
             this._skipNextTransition = true;
-        this._observeResize();
-        // Wait for the browser to finish layout before measuring height,
-        // otherwise the first render computes an incorrect large offset.
-        requestAnimationFrame(() => {
+            this._observeResize();
+            // Wait for the browser to finish layout before measuring height,
+            // otherwise the first render computes an incorrect large offset.
             requestAnimationFrame(() => {
-                this._updateHomeVisibility(true);
                 requestAnimationFrame(() => {
-                    if (home) {
-                        home.style.transition = 'padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.45s ease';
-                    }
-                    this._skipNextTransition = false;
+                    this._updateHomeVisibility(true);
+                    requestAnimationFrame(() => {
+                        if (home) {
+                            home.style.transition = 'padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.45s ease';
+                        }
+                        this._skipNextTransition = false;
+                    });
                 });
             });
-        });
         }
     }
 
     _showLoadingState() {
-        const home = this.container.querySelector('#modeler-home');
-        const importContainer = this.container.querySelector('#modeler-import-container');
-        const dropZone = this.container.querySelector('#modeler-drop-zone');
-        const viewer = this.container.querySelector('#modeler-viewer');
-        if (!home || !importContainer || !viewer) return;
-
-        if (this._homeTimeout) {
-            clearTimeout(this._homeTimeout);
-            this._homeTimeout = null;
-        }
-        if (this._loadingTimeout) {
-            clearTimeout(this._loadingTimeout);
-            this._loadingTimeout = null;
-        }
-
-        // Compact title at the top, viewer below, spinner centered in the viewer.
-        importContainer.classList.add('modeler-import-hidden');
-        if (dropZone) dropZone.style.display = '';
-        home.classList.add('modeler-top');
-        home.style.transition = 'none';
-        home.style.paddingTop = '0px';
-        home.style.paddingBottom = '0px';
-        home.style.marginBottom = '0px';
-        home.style.minHeight = 'auto';
-        home.style.position = 'relative';
-        home.style.zIndex = '25';
-
-        const app = this.container.querySelector('.modeler-app');
-        if (app) app.classList.add('modeler-loading-layout');
-
-        viewer.classList.remove('hidden');
-        viewer.style.transition = 'none';
-        viewer.style.opacity = '1';
-        viewer.style.display = 'flex';
-
-        void home.offsetHeight;
-        void viewer.offsetHeight;
-
-        this._setLoading(true);
+        ModelerSvgLifecycle.showLoadingState(this.container, (v) => this._setLoading(v), { value: this._homeTimeout }, { value: this._loadingTimeout });
     }
 
     _bindEvents() {
@@ -307,7 +261,7 @@ class ModelerApp extends AppBase {
     }
 
     _askNewModelName(onConfirm) {
-        ModelerApp._closeOpenEditDialogs();
+        ModelerEditDialogs.closeOpenDialogs();
         const overlay = document.createElement('div');
         overlay.className = 'auth-overlay';
         overlay.innerHTML = `
@@ -431,115 +385,40 @@ class ModelerApp extends AppBase {
     }
 
     _enterLoadingMode() {
-        const home = this.container.querySelector('#modeler-home');
-        const importContainer = this.container.querySelector('#modeler-import-container');
-        const dropZone = this.container.querySelector('#modeler-drop-zone');
-        const viewer = this.container.querySelector('#modeler-viewer');
-        if (!home || !importContainer || !viewer) return;
-
-        // Get current centered padding and animate it to 0 (compact header) as the import begins.
-        const startPadding = parseFloat(getComputedStyle(home).paddingTop) || 0;
-        home.style.transition = 'none';
-        home.style.paddingTop = startPadding + 'px';
-        home.classList.remove('modeler-top');
-        void home.offsetHeight;
-
-        // Animate the title upward while the import UI collapses.
-        home.style.transition = 'padding-top 0.55s cubic-bezier(0.4, 0, 0.2, 1)';
-        home.style.paddingTop = '0px';
-        importContainer.classList.add('modeler-import-hidden');
-        if (dropZone) dropZone.style.display = 'none';
-
-        // Reveal the viewer area and keep the spinner visible while the SVG is generated.
-        viewer.classList.remove('hidden');
-        viewer.style.opacity = '1';
-        const svgViewer = this.container.querySelector('#modeler-svg-viewer');
-        if (svgViewer) {
-            svgViewer.classList.add('modeler-svg-hidden');
-            svgViewer.style.transition = 'none';
-        }
-        void viewer.offsetHeight;
-        this._setLoading(true);
-
+        ModelerSvgLifecycle.enterLoadingMode(this.container, (v) => this._setLoading(v));
         // Lock the compact viewer state once the upward glide finishes.
         if (this._loadingTimeout) clearTimeout(this._loadingTimeout);
         this._loadingTimeout = setTimeout(() => {
-            home.classList.add('modeler-top');
-            home.style.transition = '';
-            home.style.paddingTop = '';
+            const home = this.container.querySelector('#modeler-home');
+            if (home) {
+                home.classList.add('modeler-top');
+                home.style.transition = '';
+                home.style.paddingTop = '';
+            }
         }, 550);
     }
 
     _getSvgController() {
-        if (!this.svgController) {
-            this.svgController = new SvgViewerController('#modeler-svg-viewer', {
-                onTransform: (state) => { this.viewerState = state; }
-            });
-        }
+        this.svgController = ModelerSvgLifecycle.getSvgController(this.svgController, (state) => { this.viewerState = state; });
         return this.svgController;
     }
 
     _showViewer() {
-        const viewerPane = this.container.querySelector('#modeler-viewer');
-        const app = this.container.querySelector('.modeler-app');
-        const editActions = this.container.querySelector('#modeler-edit-actions');
-        const assistantToggle = this.container.querySelector('#modeler-assistant-toggle');
-        if (app) app.classList.remove('modeler-loading-layout');
-        if (assistantToggle) {
-            const existingSplit = this._findAssistantSplitInstance();
-            assistantToggle.classList.toggle('hidden', !this.storedName || !!existingSplit);
-        }
-        this._updateExportToggleVisibility();
-
-        this._setLoading(true);
-        const controller = this._getSvgController();
-        const container = controller.getContainer(this.container);
-        if (container) {
-            container.classList.add('modeler-svg-hidden');
-            container.style.transition = 'none';
-        }
-
-        // If the live SVG viewer is already attached to the cached container,
-        // just make sure the pane is visible and resume observers.
-        if (controller.viewer && controller.viewer.svg && container && container.contains(controller.viewer.svg)) {
-            this.viewerState = controller.getState();
-            if (viewerPane) {
-                viewerPane.classList.remove('hidden');
-                viewerPane.style.opacity = '1';
-            }
-            if (editActions) {
-                editActions.classList.remove('hidden');
-                this._updateEditButtonStates();
-            }
-            if (container) container.classList.remove('modeler-svg-hidden');
-            this._setLoading(false);
-            controller.observeResize(this.container);
-            this.setTitle(`Éditer: ${this.fileName}`);
-            return;
-        }
-
-        controller.renderSvg(this.container, this.svgText, this.mainClassName, {
-            shouldCenter: this._centerOnNextShow,
-            stateToRestore: this.viewerState,
-            onComplete: () => {
-                this._centerOnNextShow = false;
-                this._setLoading(false);
-                if (viewerPane) {
-                    viewerPane.style.transition = 'opacity 0.35s ease';
-                    viewerPane.style.opacity = '1';
-                }
-                if (editActions) {
-                    editActions.classList.remove('hidden');
-                    this._updateEditButtonStates();
-                }
-                if (container) {
-                    container.style.transition = 'opacity 0.35s ease';
-                    container.classList.remove('modeler-svg-hidden');
-                }
-                this.setTitle(`Éditer: ${this.fileName}`);
-            },
-        }).then(() => {
-            controller.observeResize(this.container);
+        ModelerSvgLifecycle.showViewer({
+            container: this.container,
+            svgText: this.svgText,
+            mainClassName: this.mainClassName,
+            storedName: this.storedName,
+            fileName: this.fileName,
+            centerOnNextShow: this._centerOnNextShow,
+            viewerState: this.viewerState,
+            setCenterOnNextShow: (v) => { this._centerOnNextShow = v; },
+            updateAssistantToggleVisibility: () => this._updateAssistantToggleVisibility(),
+            updateExportToggleVisibility: () => this._updateExportToggleVisibility(),
+            updateEditButtonStates: () => this._updateEditButtonStates(),
+            setLoading: (v) => this._setLoading(v),
+            getSvgControllerRef: () => this._getSvgController(),
+            setSvgController: (c) => { this.svgController = c; },
         });
     }
 
@@ -612,11 +491,9 @@ class ModelerApp extends AppBase {
         this.svgText = '';
         this.fileName = '';
         this.mainClassName = '';
-        if (this.svgController) {
-            this.svgController.destroy();
-            this.svgController = null;
-        }
-        this._updateHomeVisibility(skipTransition);
+        const controller = this.svgController;
+        this.svgController = null;
+        ModelerSvgLifecycle.finalizeHomeAndCenter(this.container, controller, (st) => this._updateHomeVisibility(st));
         this.setTitle(this.constructor.title);
     }
 
@@ -807,18 +684,7 @@ class ModelerApp extends AppBase {
     }
 
     _findAssistantSplitInstance(modelName = null) {
-        const targetName = modelName || this.storedName;
-        const instances = AppState.listInstances();
-        return instances.find((i) => {
-            if (i.appId !== 'assistant') return false;
-            const rec = AppState.getRecord(i.instanceId);
-            if (!rec || rec.mode !== 'split') return false;
-            const meta = rec.meta || {};
-            // Match either by linked modeler instance id or by the model name.
-            if (meta.linkedModelerInstanceId === this.instanceId) return true;
-            if (targetName && meta.modelName === targetName && meta.origin === 'modeler') return true;
-            return false;
-        }) || null;
+        return ModelerAssistantBridge.findSplitInstance(this.instanceId, modelName || this.storedName);
     }
 
     _updateAssistantToggleVisibility() {
@@ -832,59 +698,12 @@ class ModelerApp extends AppBase {
         const existing = this._findAssistantSplitInstance();
         const windowManager = ServiceLocator.get('windowManager');
         if (!existing || !windowManager) return;
-        // Collapse the split around the modeler pane, then remove the assistant
-        // instance. The helper explicitly remounts the modeler in a fresh tab
-        // container so its DOM reference stays valid.
         windowManager.collapseSplitTo(this.instanceId, existing.instanceId);
         this._updateAssistantToggleVisibility();
     }
 
     async _toggleAssistantSplit() {
-        if (!this._requireAuth()) return;
-        const windowManager = ServiceLocator.get('windowManager');
-        if (!this.storedName || !windowManager) return;
-        const existing = this._findAssistantSplitInstance();
-        if (existing) {
-            this._closeAssistantSplit();
-            return;
-        }
-        // Open: create the assistant in a real split panel next to the modeler.
-        // If a session was prepared from the history panel, reopen that
-        // conversation; otherwise ask the backend for the most recent session
-        // linked to this model, or start a fresh one.
-        let session = this._pendingAssistantSession || '';
-        let displayName = this._pendingAssistantDisplayName || '';
-        if (!session) {
-            try {
-                const data = await ModelGateway.findAssistantSession(this.storedName, 'modeler');
-                if (data.session) {
-                    session = data.session;
-                    displayName = '';
-                }
-            } catch (err) {
-                console.warn('No existing assistant session for model', this.storedName, err);
-            }
-        }
-        this._pendingAssistantSession = '';
-        this._pendingAssistantDisplayName = '';
-
-        // Ignore rapid repeated clicks until the split is fully created.
-        if (this._openingAssistant) return;
-        this._openingAssistant = true;
-        try {
-            await windowManager.splitPanel(this.instanceId, 'assistant', {
-                modelName: this.storedName,
-                modelNames: [this.storedName],
-                linkedModelerInstanceId: this.instanceId,
-                origin: 'modeler',
-                session,
-                display_name: displayName,
-                fromModeler: true,
-            }, { ratio: [70, 30] });
-            this._updateAssistantToggleVisibility();
-        } finally {
-            this._openingAssistant = false;
-        }
+        return ModelerAssistantBridge.toggleSplit(this);
     }
 
     _updateEditButtonStates() {
@@ -917,7 +736,7 @@ class ModelerApp extends AppBase {
 
     _showAddClassDialog() {
         if (!this._requireAuth()) return;
-        ModelerApp._closeOpenEditDialogs();
+        ModelerEditDialogs.closeOpenDialogs();
         const fields = [
             { id: 'cls-title', label: 'Nom de la classe', required: true, help: 'Nom unique qui identifie la classe dans le modèle.' },
             { id: 'cls-definition', label: 'Définition', type: 'textarea', help: 'Description claire du rôle et du sens de cette classe.' },
@@ -938,12 +757,12 @@ class ModelerApp extends AppBase {
 
     _showAddAttributeDialog() {
         if (!this._requireAuth()) return;
-        ModelerApp._closeOpenEditDialogs();
+        ModelerEditDialogs.closeOpenDialogs();
         const classes = this._extractClassNames();
         if (!classes.length) {
             return;
         }
-        const classOptions = classes.map((c) => `<option value="${this._escape(c)}">${this._escape(c)}</option>`).join('');
+        const classOptions = classes.map((c) => `<option value="${ModelerEditDialogs.escape(c)}">${ModelerEditDialogs.escape(c)}</option>`).join('');
         const predefinedTypes = [
             'string',
             'integer',
@@ -956,7 +775,7 @@ class ModelerApp extends AppBase {
         ];
         const typeOptions = [
             '<option value="">— Sélectionner —</option>',
-            ...predefinedTypes.map((t) => `<option value="${this._escape(t)}">${this._escape(t)}</option>`),
+            ...predefinedTypes.map((t) => `<option value="${ModelerEditDialogs.escape(t)}">${ModelerEditDialogs.escape(t)}</option>`),
             '<option value="__other__">Autre…</option>',
         ].join('');
         const fields = [
@@ -1001,12 +820,12 @@ class ModelerApp extends AppBase {
 
     _showAddConnectorDialog() {
         if (!this._requireAuth()) return;
-        ModelerApp._closeOpenEditDialogs();
+        ModelerEditDialogs.closeOpenDialogs();
         const classes = this._extractClassNames();
         if (!classes.length) {
             return;
         }
-        const classOptions = classes.map((c) => `<option value="${this._escape(c)}">${this._escape(c)}</option>`).join('');
+        const classOptions = classes.map((c) => `<option value="${ModelerEditDialogs.escape(c)}">${ModelerEditDialogs.escape(c)}</option>`).join('');
         const relationshipTypes = [
             'Association',
             'Aggregation',
@@ -1014,7 +833,7 @@ class ModelerApp extends AppBase {
             'Generalization',
             'Dependency',
         ];
-        const relationshipOptions = relationshipTypes.map((t) => `<option value="${this._escape(t)}"${t === 'Association' ? ' selected' : ''}>${this._escape(t)}</option>`).join('');
+        const relationshipOptions = relationshipTypes.map((t) => `<option value="${ModelerEditDialogs.escape(t)}"${t === 'Association' ? ' selected' : ''}>${ModelerEditDialogs.escape(t)}</option>`).join('');
         const multiplicityOptions = [
             '<option value="">—</option>',
             '<option value="0..1">0..1</option>',
@@ -1053,36 +872,8 @@ class ModelerApp extends AppBase {
         });
     }
 
-    _syncEditDialogScroll(win) {
-        const body = win.querySelector('.window-body');
-        if (!body) return;
-        const scrollArea = body.querySelector('.modeler-edit-body');
-        if (scrollArea) {
-            scrollArea.style.maxHeight = (body.clientHeight) + 'px';
-        }
-        body.style.height = (win.clientHeight - (win.querySelector('.window-header')?.offsetHeight || 40) - (win.querySelector('.resize-handle')?.offsetHeight || 0)) + 'px';
-    }
-
     async _applyMutation(endpoint, overlay, body, fallbackMessage) {
-        const submitBtn = overlay.querySelector('.modeler-edit-submit');
-        if (submitBtn) {
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Enregistrement...';
-        }
-        try {
-            this._setLoading(true);
-            await ModelGateway.applyMutation(this.storedName || this.fileName, endpoint, body);
-            await this._reloadSvgFromServer();
-        } catch (err) {
-            console.error(`Mutation ${endpoint} error`, err);
-            alert(err.message || fallbackMessage);
-        } finally {
-            this._setLoading(false);
-            if (submitBtn && overlay.parentNode) {
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Enregistrer';
-            }
-        }
+        return ModelerEditDialogs.applyMutation(this, endpoint, overlay, body, fallbackMessage);
     }
 
     async _reloadSvgFromServer() {
@@ -1094,118 +885,6 @@ class ModelerApp extends AppBase {
             });
         }
         this._updateEditButtonStates();
-    }
-
-
-
-    _showFloatingDialog(title, fields, onSubmit, onOpen) {
-        // Close any existing edit dialog first (only one floating edit window at a time).
-        ModelerApp._closeOpenEditDialogs();
-
-        const floatWin = UiUtils.createFloatingWindow({
-            title,
-            width: 420,
-            height: 520,
-            onClose: () => {},
-            onFocus: () => {},
-            onResize: () => { this._syncEditDialogScroll(floatWin.win); },
-            onResizeEnd: () => { this._syncEditDialogScroll(floatWin.win); }
-        });
-        floatWin.win.classList.add('modeler-edit-float');
-        floatWin.win.style.minHeight = '260px';
-        floatWin.win.style.maxHeight = '85vh';
-        const root = document.getElementById('floating-root') || document.body;
-        root.appendChild(floatWin.win);
-        const baseTop = 160;
-        const floatRect = floatWin.win.getBoundingClientRect();
-        const left = (window.innerWidth - floatRect.width) / 2;
-        floatWin.win.style.left = left + 'px';
-        floatWin.win.style.top = baseTop + 'px';
-        floatWin.win.style.transform = 'none';
-        UiUtils.clampWindowPosition(floatWin.win);
-
-        const body = floatWin.body;
-        body.style.display = 'flex';
-        body.style.flexDirection = 'column';
-        body.style.overflow = 'hidden';
-        const optionsHtml = (opts) => opts || '';
-        const infoIcon = (help) => help ? `<span class="modeler-field-help" title="${this._escape(help)}">i</span>` : '';
-        const inputsHtml = fields.map((f) => {
-            const label = `<label class="block text-sm font-semibold text-gray-700 mb-1 ${this._escape(f.labelClass || '')}" for="${f.id}"><span class="flex items-center gap-1.5">${this._escape(f.label)}${f.required ? ' *' : ''}${infoIcon(f.help)}</span></label>`;
-            let input;
-            if (f.type === 'textarea') {
-                input = `<textarea id="${f.id}" class="w-full rounded-lg border border-gray-300 p-2 text-sm focus:border-black outline-none" rows="3" ${f.required ? 'required' : ''}>${this._escape(f.value || '')}</textarea>`;
-            } else if (f.type === 'select') {
-                input = `<select id="${f.id}" class="w-full rounded-lg border border-gray-300 p-2 text-sm focus:border-black outline-none bg-white" ${f.required ? 'required' : ''}>${optionsHtml(f.options)}</select>`;
-            } else {
-                input = `<input type="text" id="${f.id}" value="${this._escape(f.value || '')}" class="w-full rounded-lg border border-gray-300 p-2 text-sm focus:border-black outline-none" ${f.required ? 'required' : ''}>`;
-            }
-            return `<div class="mb-3 ${this._escape(f.className || '')}">${label}${input}</div>`;
-        }).join('');
-        body.innerHTML = `
-            <div class="modeler-edit-body" style="flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 1.25rem;">
-                <form id="modeler-edit-form">
-                    ${inputsHtml}
-                    <div class="modeler-edit-error hidden" id="dialog-error"></div>
-                    <button type="submit" class="modeler-edit-submit">Enregistrer</button>
-                </form>
-            </div>
-        `;
-        requestAnimationFrame(() => this._syncEditDialogScroll(floatWin.win));
-
-        const form = body.querySelector('#modeler-edit-form');
-        const submitBtn = body.querySelector('.modeler-edit-submit');
-
-        if (onOpen) {
-            onOpen(body);
-        }
-
-        const close = () => floatWin.win.remove();
-        const closeBtn = floatWin.win.querySelector('.window-close');
-        if (closeBtn) closeBtn.addEventListener('click', close);
-
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            // Dynamically toggle required attributes for conditional fields
-            fields.forEach((f) => {
-                if (f.requiredWhenVisible) {
-                    const wrapper = body.querySelector(`#${f.id}`)?.closest('.mb-3');
-                    const el = body.querySelector(`#${f.id}`);
-                    if (wrapper && el) {
-                        const visible = !wrapper.classList.contains('hidden');
-                        if (visible) {
-                            el.setAttribute('required', '');
-                        } else {
-                            el.removeAttribute('required');
-                        }
-                    }
-                }
-            });
-            if (!form.checkValidity()) {
-                form.reportValidity();
-                return;
-            }
-            const values = {};
-            fields.forEach((f) => {
-                const el = body.querySelector(`#${f.id}`);
-                values[f.id] = el ? el.value.trim() : '';
-            });
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Enregistrement...';
-            Promise.resolve(onSubmit(values, body)).then(close).catch((err) => {
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Enregistrer';
-                const errorEl = body.querySelector('#dialog-error');
-                if (errorEl) {
-                    errorEl.textContent = err.message || 'Une erreur est survenue.';
-                    errorEl.classList.remove('hidden');
-                }
-            });
-        });
-    }
-
-    _escape(text) {
-        return (text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
     _setLoading(isLoading) {
@@ -1292,43 +971,7 @@ class ModelerApp extends AppBase {
     }
 
     _updateHomeVisibility(skipTransition) {
-        const home = this.container.querySelector('#modeler-home');
-        const importContainer = this.container.querySelector('#modeler-import-container');
-        const viewer = this.container.querySelector('#modeler-viewer');
-        if (!home || !importContainer || !viewer) return;
-
-        if (this.svgText) {
-            // Viewer mode: compact header, hidden import UI
-            home.classList.add('modeler-top');
-            home.style.paddingTop = '0px';
-            importContainer.classList.add('modeler-import-hidden');
-            importContainer.style.display = '';
-            viewer.classList.remove('hidden');
-            viewer.style.opacity = '1';
-            viewer.style.transition = '';
-        } else {
-            // Home mode: show import UI, hide viewer, vertically centered by paddingTop.
-            // Measure the children directly so the current padding does not influence it.
-            const was = home.style.transition;
-            if (skipTransition || this._skipNextTransition) home.style.transition = 'none';
-            home.classList.remove('modeler-top');
-            const contentHeight = this._measureHomeContentHeight(home);
-            const available = Math.max(this.container.clientHeight, contentHeight);
-            const offset = Math.max(0, (available - contentHeight) / 2);
-            home.style.paddingTop = offset + 'px';
-            if (skipTransition || this._skipNextTransition) {
-                home.offsetHeight; // force reflow
-                home.style.transition = was;
-            }
-            importContainer.classList.remove('modeler-import-hidden');
-            importContainer.style.display = '';
-            importContainer.style.opacity = '1';
-            importContainer.style.transform = 'translateY(0)';
-            importContainer.style.transition = '';
-            viewer.classList.add('hidden');
-            viewer.style.opacity = '0';
-            viewer.style.transition = '';
-        }
+        ModelerSvgLifecycle.updateHomeVisibility(this.container, this.svgText, skipTransition, this._skipNextTransition);
     }
 
     _observeResize() {
