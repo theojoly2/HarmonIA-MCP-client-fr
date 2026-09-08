@@ -1589,6 +1589,35 @@ class AssistantApp extends AppBase {
         card._fakeProgressFrame = requestAnimationFrame(step);
     }
 
+    _toolStatusLabel(name) {
+        const labels = {
+            plan_workflow_with_tools: 'Planification en cours...',
+            retrieve_documents: 'Recherche de contexte...',
+            add_class: 'Création de la classe...',
+            add_attribute: "Ajout d'un attribut...",
+            add_connector: 'Création de la relation...',
+            style_guide_check: 'Synthèse de la réponse...',
+            metadata_checker: 'Vérification des métadonnées...',
+            reuse_check: 'Vérification de réutilisation...',
+            validator_check: 'Validation guide de style...',
+            display_model_visualization: 'Génération de la visualisation...',
+        };
+        return labels[name] || `${name}...`;
+    }
+
+    _toolSummary(result) {
+        if (!result || typeof result !== 'object') return '';
+        const toolResults = result.tool_results;
+        if (!toolResults || typeof toolResults !== 'object') return '';
+        if (Array.isArray(toolResults) && toolResults.length > 0) {
+            return ` (${toolResults.length} résultats)`;
+        }
+        if (Object.keys(toolResults).length > 0) {
+            return ` (${Object.keys(toolResults).length} entrées)`;
+        }
+        return '';
+    }
+
     _stopFakeProgress(cardId) {
         const card = document.getElementById(cardId);
         if (!card) return;
@@ -1635,18 +1664,14 @@ class AssistantApp extends AppBase {
             return null;
         }
 
-        // Mutation and analysis tools are silent: no JSON card is shown. Mutations
-        // update the SVG card; analysis results flow into the assistant's answer.
-        const silentTools = {
+        // Mutation tools are silent: no JSON card is shown; mutations update the
+        // SVG card instead. Analysis tools still get a visible progress/status card.
+        const mutationTools = {
             add_class: true,
             add_attribute: true,
             add_connector: true,
-            metadata_checker: true,
-            reuse_check: true,
-            style_guide_check: true,
-            validator_check: true,
         };
-        if (silentTools[name]) {
+        if (mutationTools[name]) {
             return null;
         }
 
@@ -2011,30 +2036,7 @@ class AssistantApp extends AppBase {
         return marked.parse(this._preprocessLatex(text), { breaks: true, gfm: true });
     }
 
-    _toolStatusLabel(name) {
-        const labels = {
-            plan_workflow_with_tools: 'Planification en cours...',
-            retrieve_documents: 'Recherche de documents...',
-            add_class: 'Création de la classe...',
-            add_attribute: "Ajout d'un attribut...",
-            add_connector: 'Création de la relation...',
-            style_guide_check: 'Synthèse de la réponse...',
-        };
-        return labels[name] || `${name}...`;
-    }
 
-    _toolSummary(result) {
-        if (!result || typeof result !== 'object') return '';
-        const toolResults = result.tool_results;
-        if (!toolResults || typeof toolResults !== 'object') return '';
-        if (Array.isArray(toolResults) && toolResults.length > 0) {
-            return ` (${toolResults.length} résultats)`;
-        }
-        if (Object.keys(toolResults).length > 0) {
-            return ` (${Object.keys(toolResults).length} entrées)`;
-        }
-        return '';
-    }
 
     _scrollToBottom(force = false) {
         const el = this.chatEl;

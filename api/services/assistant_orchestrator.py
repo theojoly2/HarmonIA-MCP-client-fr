@@ -28,6 +28,68 @@ from api.services.assistant_streaming import (
 from api.services.mcp_service import fetch_search, get_model_mcp, upload_model_mcp
 from api.utils.sse import _safe_json_loads
 from api.utils.text import _slugify_session_name
+import urllib.parse
+
+
+def _render_search_results_html(results: list[dict[str, Any]], query: str) -> str:
+    """Render search results as HTML for the assistant chat (mirrors frontend)."""
+    if not results:
+        if query:
+            return """
+            <div class="text-center py-20 text-black font-bold text-lg">
+                <p>Aucun document ne correspond à cette recherche.</p>
+            </div>
+            """
+        return ""
+
+    import os
+
+    html = f'<p id="results-header" class="text-xs font-bold text-gray-500 mb-5 border-b border-gray-200 pb-2">{len(results)} RÉSULTAT(S)</p>'
+    for r in results:
+        filename = r.get("filename") or "document"
+        safe_filename = urllib.parse.quote(filename)
+        _, ext = os.path.splitext(filename.lower())
+        is_pdf = ext == ".pdf"
+        importable_extensions = {".xml", ".xmi", ".ttl", ".json", ".jsonld", ".sql", ".txt", ".html", ".htm", ".csv"}
+        can_add_to_assistant = ext in importable_extensions
+        add_button = f"""<button data-action="add-to-assistant" data-doc-id="{r.get('chunk0_id', '')}" data-filename="{filename}" data-extension="{ext}" class="magic-btn search-add-model-btn flex items-center justify-center p-1.5 rounded-full bg-gray-100 hover:bg-white text-gray-500 hover:text-black focus:outline-none transition-colors" title="Ajouter au contexte de l'Assistant">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
+                    </button>""" if can_add_to_assistant else ""
+        preview_button = "" if is_pdf else f"""<button data-action="preview" data-doc-id="{r.get('chunk0_id', '')}" data-document-id="{r.get('document_id', '')}" data-name="{safe_filename}" class="magic-btn flex items-center justify-center p-1.5 rounded-full bg-gray-100 hover:bg-white text-gray-500 hover:text-black focus:outline-none transition-colors" title="Aperçu rapide">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                    </button>"""
+        tags_badges = " • ".join(r.get("tags") or []) if r.get("tags") else "Aucun tag"
+        score = r.get("score", "")
+        score_str = f"{float(score):.4f}" if score != "" else ""
+        summary = (r.get("summary") or "")[:600]
+        html += f"""
+        <div class="py-6 border-b border-gray-200 last:border-0 result-item">
+            <h3 class="font-bold mb-2">
+                <a href="{safe_filename}?download={r.get('chunk0_id', '')}" target="_blank" class="text-black hover:text-blue-600 hover:underline transition-colors" title="Ouvrir le document">
+                    {filename}
+                </a>
+            </h3>
+            <div class="text-gray-800 font-medium leading-relaxed mb-3 markdown-body">{summary}</div>
+            <div class="flex items-end justify-between">
+                <div class="flex flex-wrap gap-4 font-bold text-gray-500">
+                    <span title="Score de pertinence">Score: {score_str}</span>
+                    <span>Source: {tags_badges}</span>
+                </div>
+                <div class="flex gap-2">
+                    {add_button}
+                    {preview_button}
+                    <button data-action="chat" data-document-id="{r.get('document_id', '')}" data-name="{safe_filename}" class="magic-btn flex items-center justify-center p-1.5 rounded-full bg-gray-100 hover:bg-white text-gray-400 hover:text-black focus:outline-none" title="Analyser avec l'IA">
+                        <svg class="magic-svg w-5 h-5" viewBox="0 0 24 24">
+                            <path class="sparkle-main" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
+                            <path class="sparkle-orbit-path" d="M5.5 2.5L6.34 5.16L9 6L6.34 6.84L5.5 9.5L4.66 6.84L2 6L4.66 5.16L5.5 2.5Z"></path>
+                            <path class="sparkle-orbit-path" d="M19.5 15.5L20.34 18.16L23 19L20.34 19.84L19.5 22.5L18.66 19.84L16 19L18.66 18.16L19.5 15.5Z"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+        """
+    return html
 
 
 async def assistant_stream_generator(
@@ -265,6 +327,25 @@ async def assistant_stream_generator(
                         # Allow retries only if the previous identical call failed.
                         call_key = f"{name}:{json.dumps(arguments, sort_keys=True, ensure_ascii=False)}"
                         previous = call_results.get(call_key)
+
+                        progress_card_id: str | None = None
+                        queue: asyncio.Queue[str] = asyncio.Queue()
+
+                        async def _progress_handler(progress: float, total: float | None, message: str | None) -> None:
+                            if progress_card_id is None:
+                                return
+                            pct = 0
+                            if total and total > 0:
+                                pct = int(min(100, max(0, (progress / total) * 100)))
+                            await queue.put(_event("progress_update", {
+                                "card_id": progress_card_id,
+                                "tool_name": name,
+                                "percent": pct,
+                                "step": int(progress),
+                                "total": int(total) if total else None,
+                                "message": message or "",
+                            }))
+
                         if previous and not previous.get("error"):
                             tool_message = json.dumps({
                                 "tool_name": name,
@@ -272,31 +353,23 @@ async def assistant_stream_generator(
                                 "tool_results": {"status": "already_executed", "ok": True},
                             }, ensure_ascii=False)
                             parsed_tool = _safe_json_loads(tool_message) or {}
+
+                            tool_results = parsed_tool.get("tool_results") if isinstance(parsed_tool, dict) else None
+                            tool_error = (
+                                isinstance(tool_results, dict) and bool(tool_results.get("error"))
+                                or isinstance(tool_results, str) and (
+                                    tool_results.lower().startswith("error") or "error" in tool_results.lower()
+                                )
+                            )
+                            top_error = isinstance(parsed_tool, dict) and bool(parsed_tool.get("error"))
+                            call_results[call_key] = {"error": bool(tool_error or top_error)}
                         else:
-                            progress_card_id: str | None = None
                             if name in {"metadata_checker", "reuse_check", "validator_check", "style_guide_check"}:
                                 progress_card_id = f"progress-{name}-{uuid4().hex[:8]}"
                                 history.add_display_event({"kind": "progress_start", "card_id": progress_card_id, "tool_name": name})
                                 yield _event("progress_start", {"card_id": progress_card_id, "tool_name": name})
                                 async for line in _drain_out_queue():
                                     yield line
-
-                            queue: asyncio.Queue[str] = asyncio.Queue()
-
-                            async def _progress_handler(progress: float, total: float | None, message: str | None) -> None:
-                                if progress_card_id is None:
-                                    return
-                                pct = 0
-                                if total and total > 0:
-                                    pct = int(min(100, max(0, (progress / total) * 100)))
-                                await queue.put(_event("progress_update", {
-                                    "card_id": progress_card_id,
-                                    "tool_name": name,
-                                    "percent": pct,
-                                    "step": int(progress),
-                                    "total": int(total) if total else None,
-                                    "message": message or "",
-                                }))
 
                             # Run the MCP tool call in a background task while the main
                             # generator keeps draining the output queue (heartbeats +
@@ -561,14 +634,16 @@ async def _build_tool_display_payload(
             search_rows = []
         results = [_normalize_search_result(row) for row in search_rows]
         results = [r for r in results if r is not None]
+        results_html = _render_search_results_html(results, query_terms)
         return {
             "type": "search",
             "query": query_terms,
             "results": results,
             "result_count": len(results),
+            "results_html": results_html,
         }
     except Exception as exc:
-        return {"type": "search", "query": query_terms, "results": [], "result_count": 0, "error": str(exc)}
+        return {"type": "search", "query": query_terms, "results": [], "result_count": 0, "results_html": f"<div class=\"text-red-600 p-4\">Erreur recherche: {exc}</div>", "error": str(exc)}
 
 
 def _target_model_name_for_tool(
