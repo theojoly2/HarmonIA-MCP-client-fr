@@ -2103,7 +2103,7 @@ class AssistantApp extends AppBase {
             // Keep the active sparkle beating during long waits (tool calls,
             // reasoning, etc.). CSS forwards animations stop after one run.
             this._retriggerActiveSparkles();
-        }, 700);
+        }, 1200);
 
         // ChatApp-style streaming: accumulate the full response, then display it
         // character-by-character with live markdown reparsing.
@@ -2326,6 +2326,9 @@ class AssistantApp extends AppBase {
             // Hide the sparkle on any previous assistant bubble as soon as a new
             // tool starts, so it does not stay under an intermediate message.
             this._hideAllSparkles();
+            // Remove the previous "Réflexion..." placeholder before showing the
+            // tool-specific status label. Reasoning has ended, the tool is now running.
+            this._removeThinkingPlaceholder();
             // Render the tool card/search card BEFORE the placeholder so the
             // sparkle/"Réflexion" label stays at the bottom of the current step.
             if (event.name === 'retrieve_documents') {
