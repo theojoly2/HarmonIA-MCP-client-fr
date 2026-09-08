@@ -108,11 +108,26 @@ class AssistantRenderer {
         const last = this.messagesEl.lastElementChild;
         if (last && last.dataset.role === 'assistant' && last.dataset.active === 'true') {
             last.dataset.active = 'false';
+            // The sparkle on a finished assistant bubble must stay visible so the
+            // last message remains marked as the latest answer.
+            const avatar = last.querySelector('.ai-avatar-wrapper');
+            if (avatar) {
+                avatar.classList.add('trigger-magic');
+                avatar.style.display = '';
+                avatar.style.opacity = '';
+                avatar.style.height = '';
+                avatar.style.margin = '';
+                avatar.style.overflow = '';
+                avatar.dataset.hidden = 'false';
+            }
         }
     }
 
     hideAllSparkles() {
-        this.chatEl?.querySelectorAll('.sparkle-container').forEach((container) => {
+        // Only hide sparkles inside transient placeholders. Finished assistant
+        // bubbles and active tool/search/progress cards keep their sparkles so the
+        // latest state remains visible in the timeline.
+        this.chatEl?.querySelectorAll('.assistant-thinking-placeholder .sparkle-container').forEach((container) => {
             const avatar = container.closest('.ai-avatar-wrapper') || container;
             avatar.classList.remove('trigger-magic');
             avatar.style.transition = 'opacity 0.3s ease, height 0.3s ease, margin 0.3s ease';
@@ -120,6 +135,7 @@ class AssistantRenderer {
             avatar.style.height = '0';
             avatar.style.margin = '0';
             avatar.style.overflow = 'hidden';
+            avatar.dataset.hidden = 'true';
             setTimeout(() => { avatar.style.display = 'none'; }, 300);
         });
     }
@@ -127,6 +143,7 @@ class AssistantRenderer {
     updateFinalSparkle() {
         const last = this.messagesEl.lastElementChild;
         if (last && last.dataset.role === 'assistant') {
+            let avatar = last.querySelector('.ai-avatar-wrapper');
             if (!last.querySelector('.ai-avatar-row')) {
                 last.innerHTML += `
                     <div class="ai-avatar-row flex items-center gap-2">
@@ -135,6 +152,16 @@ class AssistantRenderer {
                         </div>
                     </div>
                 `;
+                avatar = last.querySelector('.ai-avatar-wrapper');
+            }
+            if (avatar) {
+                avatar.classList.add('trigger-magic');
+                avatar.style.display = '';
+                avatar.style.opacity = '';
+                avatar.style.height = '';
+                avatar.style.margin = '';
+                avatar.style.overflow = '';
+                avatar.dataset.hidden = 'false';
             }
         }
     }
