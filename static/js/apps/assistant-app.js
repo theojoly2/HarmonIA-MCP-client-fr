@@ -1425,12 +1425,6 @@ class AssistantApp extends AppBase {
         this.chatEl.querySelectorAll('.sparkle-container').forEach((container) => {
             const avatar = container.closest('.ai-avatar-wrapper') || container;
             avatar.classList.remove('trigger-magic');
-            avatar.style.transition = 'opacity 0.3s ease, height 0.3s ease, margin 0.3s ease';
-            avatar.style.opacity = '0';
-            avatar.style.height = '0';
-            avatar.style.margin = '0';
-            avatar.style.overflow = 'hidden';
-            setTimeout(() => { avatar.style.display = 'none'; }, 300);
         });
     }
 
@@ -1460,7 +1454,14 @@ class AssistantApp extends AppBase {
     }
 
     _createToolCard(name, args = {}) {
-        if (this._embedded) return null;
+        // Tool JSON cards are hidden in embedded mode only for mutation tools;
+        // analysis / plan cards remain visible.
+        const hiddenInEmbedded = {
+            add_class: true,
+            add_attribute: true,
+            add_connector: true,
+        };
+        if (this._embedded && hiddenInEmbedded[name]) return null;
         const id = 'assistant-tool-' + name + '-' + Date.now();
         const div = document.createElement('div');
         div.id = id;
@@ -1514,7 +1515,6 @@ class AssistantApp extends AppBase {
     }
 
     _appendProgressCard(cardId, toolName) {
-        if (this._embedded) return null;
         const labels = {
             metadata_checker: 'Vérification des métadonnées',
             validator_check: 'Validation guide de style',
@@ -1658,7 +1658,6 @@ class AssistantApp extends AppBase {
     }
 
     _fillToolResult(name, result, display) {
-        if (this._embedded) return null;
         if (display && display.type === 'search') {
             this._fillSearchCard(display.query || '', display.results_html || '');
             return null;
@@ -1864,7 +1863,6 @@ class AssistantApp extends AppBase {
     }
 
     _appendSvgCard(svgText, label = 'Visualisation du modèle') {
-        if (this._embedded) return null;
         if (!svgText) return null;
         const id = 'assistant-svg-' + Date.now();
         const div = document.createElement('div');
@@ -2068,7 +2066,6 @@ class AssistantApp extends AppBase {
         this._hideAllSparkles();
 
         let placeholder = this._appendThinkingPlaceholder();
-        const placeholderContent = placeholder.querySelector('.assistant-bubble-content');
         const loadingInterval = setInterval(() => {
             // Always target the latest placeholder so the sparkle keeps beating
             // across phase changes (text -> tool -> new text, etc.).
@@ -2301,17 +2298,9 @@ class AssistantApp extends AppBase {
                 this._appendSearchCard(event.arguments?.search_terms || '', null);
             } else if (event.name === 'display_model_visualization') {
                 // SVG cards are created/updated by the model_svg event, no extra card here.
-                // In embedded mode the visualization lives in the modeler canvas.
             }
-            // Tool cards (JSON dumps) are intentionally hidden for all tools,
-            // including unknown ones. Only progress cards, plan card, search
-            // results and SVG visualizations remain visible.
-            // Show a transient status label while the tool runs. The helper
-            // removes any previous placeholder first. Skip the placeholder in
-            // embedded mode to avoid visual noise; the modeler canvas shows progress.
-            if (!this._embedded) {
-                placeholderRef.value = this._appendThinkingPlaceholder(this._toolStatusLabel(event.name));
-            }
+            // Show a transient status label while the tool runs.
+            placeholderRef.value = this._appendThinkingPlaceholder(this._toolStatusLabel(event.name));
             saveHtmlSnapshot();
             return;
         }
@@ -2322,26 +2311,20 @@ class AssistantApp extends AppBase {
             resetTypewriter?.();
             this._closeAssistantBubble();
             this._hideAllSparkles();
-            if (!this._embedded) {
-                this._appendProgressCard(event.card_id, event.tool_name);
-            }
+            this._appendProgressCard(event.card_id, event.tool_name);
             saveHtmlSnapshot();
             return;
         }
 
         if (event.kind === 'progress_update') {
-            if (!this._embedded) {
-                this._updateProgressCard(event.card_id, event.percent, event.message);
-            }
+            this._updateProgressCard(event.card_id, event.percent, event.message);
             saveHtmlSnapshot();
             return;
         }
 
         if (event.kind === 'progress_done') {
-            if (!this._embedded) {
-                this._completeProgressCard(event.card_id);
-                this._removeProgressStatus(event.card_id);
-            }
+            this._completeProgressCard(event.card_id);
+            this._removeProgressStatus(event.card_id);
             saveHtmlSnapshot();
             return;
         }
@@ -2352,7 +2335,7 @@ class AssistantApp extends AppBase {
             resetTypewriter?.();
             this._closeAssistantBubble();
             if (event.name === 'plan_workflow_with_tools') {
-                if (!this._embedded) this._renderPlan(event.result);
+                this._renderPlan(event.result);
             } else if (event.name === 'retrieve_documents') {
                 this._fillSearchCard(event.display?.query || '', event.display?.results_html || '');
             } else {
@@ -2372,13 +2355,10 @@ class AssistantApp extends AppBase {
         }
 
         if (event.kind === 'model_svg') {
-            // In standalone assistant mode, update the active SVG card inside the chat.
-            // When the assistant is embedded next to the modeler, the visualization
-            // lives in the modeler's main canvas instead.
             const linked = this._linkedModelerInstanceId || this.props.linkedModelerInstanceId;
             if (linked && this.modelNames?.length) {
                 EventBus.emit('modeler:reload-svg', { instanceId: linked });
-            } else if (!this._embedded) {
+            } else {
                 const label = event.model_name || event.label || 'Visualisation du modèle';
                 this._updateCurrentSvgCard(event.svg, label);
             }
