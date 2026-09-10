@@ -1,4 +1,5 @@
 fastapi
+six
 uvicorn
 pydantic
 fastmcp
@@ -7,4 +8,4 @@ openai
 plantuml
 rdflib
 python-dotenv
-six
+tiktoken
