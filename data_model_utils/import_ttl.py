@@ -26,7 +26,7 @@ from rdflib import Graph, Namespace, RDF, RDFS, OWL, XSD, URIRef, Literal, BNode
 # Namespaces that often appear
 SKOS = Namespace("http://www.w3.org/2004/02/skos/core#")
 FOAF = Namespace("http://xmlns.com/foaf/0.1/")
-UML_META = Namespace("urn:ai4semantics:uml:")
+UML_META = Namespace("urn:harmonia:uml:")
 
 # Property types that should be treated as UML properties/attributes/connectors
 PROPERTY_TYPE_URIS = {

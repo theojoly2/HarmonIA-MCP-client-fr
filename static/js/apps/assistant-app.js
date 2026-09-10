@@ -7,7 +7,7 @@
 
 class AssistantApp extends AppBase {
     static id = 'assistant';
-    static title = 'Assistant';
+    static title = 'Analyser';
     static iconSvg = `<svg class="w-4 h-4 overflow-visible" viewBox="0 0 24 24">
         <path class="sparkle-main" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
         <path class="sparkle-orbit-path" d="M5.5 2.5L6.34 5.16L9 6L6.34 6.84L5.5 9.5L4.66 6.84L2 6L4.66 5.16L5.5 2.5Z"></path>
@@ -85,14 +85,13 @@ class AssistantApp extends AppBase {
                 <div id="assistant-chat" class="flex-1 overflow-y-auto relative">
                     <div class="assistant-welcome" id="assistant-welcome">
                         <h1 class="assistant-welcome-title text-center">
-                            <button type="button" id="assistant-reset" class="assistant-title-reset" title="Nouvelle conversation">
-                                <span class="assistant-title-glow title-glow">Assistant Sémantique</span>
+                            <button type="button" id="assistant-reset" class="assistant-title-reset" title="Nouvelle analyse">
+                                <span class="assistant-title-glow title-glow">Analyser des modèles</span>
                             </button>
                         </h1>
-                        <p class="assistant-welcome-subtitle">Importez un modèle ou posez une question pour démarrer.</p>
+                        <p class="assistant-welcome-subtitle">Discutez avec l'assistant pour analyser, comparer, fusionner et améliorer vos modèles. Formats supportés : TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML.</p>
                         <div class="assistant-welcome-input" id="assistant-welcome-input"></div>
                     </div>
-                    <div class="assistant-embedded-model-pill" id="assistant-embedded-model-pill"></div>
                     <div class="assistant-embedded-intro" id="assistant-embedded-intro"></div>
                     <div class="assistant-messages" id="assistant-messages"></div>
                 </div>
@@ -100,11 +99,11 @@ class AssistantApp extends AppBase {
                     <div class="assistant-input-wrapper mx-auto rounded-xl border-2 border-gray-300 focus-within:border-black bg-white transition-colors shadow-sm" id="assistant-input-box">
                         <form id="assistant-form" class="flex flex-col">
                             <textarea id="assistant-input" rows="1" autocomplete="off"
-                                placeholder="Interrogez l'assistant sémantique..."
+                                placeholder="Interrogez l'assistant de modélisation..."
                                 class="w-full resize-none max-h-40 bg-transparent border-none focus:outline-none focus:ring-0 text-sm text-gray-900 placeholder-gray-500 px-2 py-1.5"></textarea>
                             <div class="flex items-center justify-between px-2 pb-1.5 pt-1.5">
                                 <div class="flex items-center gap-1.5">
-                                    <button type="button" id="assistant-import-model" class="magic-btn flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl text-gray-500 hover:text-black hover:bg-gray-100 transition-colors" title="Importer un modèle">
+                                    <button type="button" id="assistant-import-model" class="magic-btn flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl text-gray-500 hover:text-black hover:bg-gray-100 transition-colors" title="Importer un modèle (TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML)">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                                         </svg>
@@ -138,7 +137,6 @@ class AssistantApp extends AppBase {
         this.welcomeInputSlot = container.querySelector('#assistant-welcome-input');
         this.messagesEl = container.querySelector('#assistant-messages');
         this.embeddedIntroEl = container.querySelector('#assistant-embedded-intro');
-        this.embeddedModelPillEl = container.querySelector('#assistant-embedded-model-pill');
         this.modelPillSlotEl = container.querySelector('#assistant-model-pill-slot');
         this.embeddedHeader = container.querySelector('#assistant-embedded-header');
         this.inputArea = container.querySelector('#assistant-input-area');
@@ -185,17 +183,15 @@ class AssistantApp extends AppBase {
                 `;
                 this.embeddedIntroEl.classList.remove('hidden');
             }
-                this._updateModelPill();
-                if (importBtn) {
-                    importBtn.style.display = 'none';
-                }
-                if (this.embeddedModelPillEl) {
-                    this.embeddedModelPillEl.classList.add('hidden');
-                }
+            if (importBtn) {
+                importBtn.style.display = 'none';
             }
 
-            this._updateImportButtonState(importBtn);
-            this._updateModelPill();
+        }
+
+        this._updateImportButtonState(importBtn);
+        this._updateModelPill();
+        this._renderLoginBanner();
 
         if (window.GlowEffects && typeof window.GlowEffects.scanAndBind === 'function') {
             window.GlowEffects.scanAndBind(container);
@@ -325,7 +321,26 @@ class AssistantApp extends AppBase {
     }
 
     async mount(container) {
+        // Do not mount a full assistant instance for anonymous users unless it is
+        // embedded in the modeler (which already shows its own login prompt).
+        if (!this._embedded && !AuthManager.isLoggedIn()) {
+            this._renderAnonymousPlaceholder(container);
+            return;
+        }
         await super.mount(container);
+        // If the assistant was opened from the modeler split, make sure the linked
+        // model is attached to the conversation context.
+        if (this._embedded && (this.props.modelName || this.props.modelNames)) {
+            const linkedNames = this._normalizeModelNames(this.props.modelNames ?? this.props.modelName);
+            for (const name of linkedNames) {
+                if (name && !this.modelNames.includes(name)) {
+                    this.modelNames.push(name);
+                    this.props.displayNames = this.props.displayNames || {};
+                    this.props.displayNames[name] = this.props.displayNames[name] || name;
+                }
+            }
+            this._updateModelPill();
+        }
         // If this instance was created from the history panel or from a modeler
         // split with a session, load the persisted messages into the UI.
         if (this.props.session && (this.props.fromHistory || this.props.fromModeler)) {
@@ -336,7 +351,7 @@ class AssistantApp extends AppBase {
             }
             // Use the saved display name as the user-visible title if available.
             if (this.props.display_name && this.setTitle) {
-                this.setTitle(`Assistant: ${this.props.display_name}`);
+                this.setTitle(`Analyser: ${this.props.display_name}`);
             }
         }
         // After loading history, if messages exist switch to chat mode layout.
@@ -415,6 +430,13 @@ class AssistantApp extends AppBase {
             this.welcomeEl.classList.add('assistant-welcome-top');
             this.inputArea.classList.add('assistant-input-area-chat');
         }
+        // If the user has logged in since the anonymous placeholder was cached,
+        // replace it with the real assistant UI.
+        if (AuthManager.isLoggedIn() && this.container?.querySelector('.assistant-anonymous-card')) {
+            this.container.innerHTML = '';
+            this.mount(this.container);
+            return;
+        }
         if (this._resizeObserver) this._resizeObserver.disconnect();
         this._observeResize();
         this._observeMessagesScroll();
@@ -492,18 +514,41 @@ class AssistantApp extends AppBase {
     _newSession() {
         this.session = '';
         this.messages = [];
-        this.messagesEl.innerHTML = '';
+        this.isStreaming = false;
+        this.selectedTags = [];
+        this._linkedModelerInstanceId = '';
         this.props.session = '';
         this.props.fromHistory = false;
+        this.props.display_name = '';
+        this.props.modelName = '';
+        this.props.modelNames = [];
+        if (this.setTitle) this.setTitle(this.constructor.title);
+
+        // Fully rebuild the DOM from scratch so every transient element (messages,
+        // SVG cards, tool cards, plan cards, search results...) is discarded and
+        // the welcome screen is shown exactly like on first mount.
+        if (this.container) {
+            // Force a fresh render by breaking the cached-live-DOM guard in render().
+            const oldContainer = this.container;
+            this.container = null;
+            oldContainer.innerHTML = '';
+            this.render(oldContainer);
+            this._scheduleCentering(true);
+            AppState.saveInstanceState?.(this.instanceId);
+            return;
+        }
+
+        if (this.messagesEl) this.messagesEl.innerHTML = '';
         this._clearModelPills();
-        this.chatEl.classList.remove('assistant-chat-mode');
-        this.welcomeEl.classList.remove('assistant-welcome-top');
-        this.inputArea.classList.remove('assistant-input-area-chat');
-        this.inputEl.value = '';
-        this.inputEl.style.height = 'auto';
-        // Wait for the browser to settle back into the home layout before
-        // measuring and centering, just like SearchApp/ModelerApp do.
+        if (this.chatEl) this.chatEl.classList.remove('assistant-chat-mode');
+        if (this.welcomeEl) this.welcomeEl.classList.remove('assistant-welcome-top');
+        if (this.inputArea) this.inputArea.classList.remove('assistant-input-area-chat');
+        if (this.inputEl) {
+            this.inputEl.value = '';
+            this.inputEl.style.height = 'auto';
+        }
         this._scheduleCentering(true);
+        AppState.saveInstanceState?.(this.instanceId);
     }
 
     _switchToChatMode() {
@@ -681,7 +726,7 @@ class AssistantApp extends AppBase {
         importBtn.style.opacity = atMax ? '0.4' : '';
         importBtn.title = atMax
             ? `Limite de ${this.modelNamesConfig.max} modèles atteinte`
-            : 'Importer un modèle';
+            : 'Importer un modèle (TTL, XMI/XML, JSON/JSON-LD, SQL, TXT, HTML)';
         // Sync the + buttons inside any search result cards rendered in the chat.
         this._updateSearchResultAddButtons();
     }
@@ -709,6 +754,10 @@ class AssistantApp extends AppBase {
     }
 
     async _importModel(file) {
+        if (!AuthManager.isLoggedIn()) {
+            if (this.authManager) this.authManager.showModal();
+            return;
+        }
         if (!file || (this.modelNames?.length || 0) >= this.modelNamesConfig.max) return;
         const loadingKey = `loading_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const displayName = file.name;
@@ -734,6 +783,10 @@ class AssistantApp extends AppBase {
      * machinery. Does nothing if the 3-model limit is reached.
      */
     async _importSearchResultIntoAssistant(docId, filename) {
+        if (!AuthManager.isLoggedIn()) {
+            if (this.authManager) this.authManager.showModal();
+            return;
+        }
         if (!docId || !filename || this._embedded) return;
         const total = (this.modelNames?.length || 0) + (this._loadingModels?.length || 0);
         if (total >= this.modelNamesConfig.max) return;
@@ -924,7 +977,7 @@ class AssistantApp extends AppBase {
         this.modelPillSlotEl?.querySelectorAll('.assistant-model-pill-export-menu').forEach((m) => m.classList.add('hidden'));
     }
 
-    _removeModelPill(name) {
+    async _removeModelPill(name) {
         this.modelNames = (this.modelNames || []).filter((n) => n !== name);
         this._loadingModels = (this._loadingModels || []).filter((m) => m.name !== name);
         if (this.props.displayNames) delete this.props.displayNames[name];
@@ -934,6 +987,22 @@ class AssistantApp extends AppBase {
             if (modelName === name) {
                 this._importedSearchDocIds.delete(docId);
                 break;
+            }
+        }
+        // Delete the uploaded model from the server if it has not yet been sent
+        // in a message (orphan import). This avoids leaving stale model files in
+        // the MCP server storage when the user removes the pill before chatting.
+        if (name) {
+            try {
+                const res = await fetch(`api/models/${encodeURIComponent(name)}`, {
+                    method: "DELETE",
+                    credentials: "same-origin",
+                });
+                if (!res.ok) {
+                    console.error("Failed to delete orphan imported model", name, res.status);
+                }
+            } catch (err) {
+                console.error("Delete orphan imported model error", name, err);
             }
         }
         this._updateImportButtonState(this.container?.querySelector('#assistant-import-model'));
@@ -1122,7 +1191,7 @@ class AssistantApp extends AppBase {
         // across remounts and renames from the history panel.
         if (data.display_name) {
             this.props.display_name = data.display_name;
-            if (this.setTitle) this.setTitle(`Assistant: ${data.display_name}`);
+            if (this.setTitle) this.setTitle(`Analyser: ${data.display_name}`);
         }
         this.messages = [];
         this.messagesEl.innerHTML = '';
@@ -1253,7 +1322,11 @@ class AssistantApp extends AppBase {
                 return;
             }
             if (kind === 'model_svg') {
-                this._updateCurrentSvgCard(event.svg, event.model_name || event.label || 'Visualisation du modèle');
+                const rawName = event.model_name || event.label || '';
+                const label = rawName
+                    ? this._displayNameForModel(rawName)
+                    : 'Visualisation du modèle';
+                this._updateCurrentSvgCard(event.svg, label);
                 return;
             }
             if (kind === 'model_attached') {
@@ -1262,12 +1335,12 @@ class AssistantApp extends AppBase {
                     this.modelNames.push(attachedName);
                     this.props.displayNames = this.props.displayNames || {};
                     this.props.displayNames[attachedName] = attachedName;
-                    this._updateModelPill();
-                    this._updateSearchResultAddButtons();
-                }
-                return;
-            }
-            if (kind === 'loop_done') {
+            this._updateModelPill();
+            this._updateSearchResultAddButtons();
+        }
+        return;
+    }
+    if (kind === 'loop_done') {
                 closeReplayBubble();
                 this.activeSvgCard = null;
                 this.activeSvgViewer = null;
@@ -1519,7 +1592,6 @@ class AssistantApp extends AppBase {
     }
 
     _appendProgressCard(cardId, toolName) {
-        if (this._embedded) return null;
         const labels = {
             metadata_checker: 'Vérification des métadonnées',
             validator_check: 'Validation guide de style',
@@ -1695,11 +1767,48 @@ class AssistantApp extends AppBase {
 
         const planSteps = parsed.plan_steps || [];
         const toolsToCall = parsed.tools_to_call || [];
-        const notes = parsed.notes || '';
+        let notes = parsed.notes || '';
 
         if (!Array.isArray(planSteps) || planSteps.length === 0) {
             return null;
         }
+
+        // Replace timestamped model names with their display names. We first find
+        // candidates with a cheap regex, then only replace if the full match is a
+        // known stored model name. This avoids false positives and stays efficient.
+        const knownNames = new Set([
+            ...(this.modelNames || []),
+            ...Object.keys(this.props.displayNames || {}),
+        ]);
+
+        const displayForName = (storedName) => {
+            if (!storedName) return '';
+            return this.props.displayNames?.[storedName]
+                || this._displayNameForModel(storedName);
+        };
+
+        const TIMESTAMP_SUFFIX_RE = /[A-Za-z0-9_.\-]+__\d{16,20}\b/g;
+
+        const cleanModelName = (text) => {
+            if (typeof text !== 'string') return text;
+            return text.replace(TIMESTAMP_SUFFIX_RE, (match) => {
+                return knownNames.has(match) ? displayForName(match) : match;
+            });
+        };
+
+        const cleanStep = (step) => {
+            if (typeof step === 'string') return cleanModelName(step);
+            if (step && typeof step === 'object') {
+                return {
+                    ...step,
+                    step: cleanModelName(step.step || ''),
+                    notes: cleanModelName(step.notes || ''),
+                };
+            }
+            return step;
+        };
+
+        notes = cleanModelName(notes);
 
         const div = document.createElement('div');
         div.className = 'assistant-plan-card mb-4';
@@ -1718,7 +1827,8 @@ class AssistantApp extends AppBase {
         const stepsList = div.querySelector('.assistant-plan-steps');
         const notesEl = div.querySelector('.assistant-plan-notes');
 
-        planSteps.forEach((step, index) => {
+        planSteps.forEach((rawStep, index) => {
+            const step = cleanStep(rawStep);
             const tool = toolsToCall.find((t) => t.step_index === index);
             const toolName = tool?.tool || '';
             const toolBadge = toolName
@@ -1785,7 +1895,7 @@ class AssistantApp extends AppBase {
             <div class="assistant-search-loading" ${loadingVisible}>
                 <div class="flex items-center gap-2 text-xs font-bold tracking-widest uppercase text-gray-400">
                     <span class="assistant-search-spinner"></span>
-                    <span>Recherche en cours</span>
+                    <span>Analyse en cours</span>
                 </div>
             </div>
             <div class="assistant-search-results markdown-body" ${resultsVisible}>
@@ -2019,7 +2129,7 @@ class AssistantApp extends AppBase {
     _toolStatusLabel(name) {
         const labels = {
             plan_workflow_with_tools: 'Planification en cours...',
-            retrieve_documents: 'Recherche de documents...',
+            retrieve_documents: 'Recherche de contexte...',
             add_class: 'Création de la classe...',
             add_attribute: "Ajout d'un attribut...",
             add_connector: 'Création de la relation...',
@@ -2054,6 +2164,10 @@ class AssistantApp extends AppBase {
     }
 
     async _send(text) {
+        if (!AuthManager.isLoggedIn()) {
+            if (this.authManager) this.authManager.showModal();
+            return;
+        }
         // For a brand-new conversation we intentionally pass an empty session.
         // The backend will generate a unique slug + timestamp and return it in
         // the first `user` event, exactly like the modeler does for imports.
@@ -2070,8 +2184,7 @@ class AssistantApp extends AppBase {
         // because a new user message begins a new assistant turn.
         this._hideAllSparkles();
 
-        let placeholder = this._appendThinkingPlaceholder();
-        const placeholderContent = placeholder.querySelector('.assistant-bubble-content');
+        let placeholder = this._appendThinkingPlaceholder('Réflexion...');
         const loadingInterval = setInterval(() => {
             // Always target the latest placeholder so the sparkle keeps beating
             // across phase changes (text -> tool -> new text, etc.).
@@ -2230,6 +2343,21 @@ class AssistantApp extends AppBase {
         }
     }
 
+    _updateFinalSparkle() {
+        const lastAssistant = this.messagesEl.lastElementChild;
+        if (lastAssistant && lastAssistant.dataset.role === 'assistant') {
+            if (!lastAssistant.querySelector('.ai-avatar-row')) {
+                lastAssistant.innerHTML += `
+                    <div class="ai-avatar-row flex items-center gap-2">
+                        <div class="text-gray-900 flex-shrink-0 w-5 h-5 flex items-center justify-center sparkle-container ai-avatar-wrapper trigger-magic" data-hidden="false">
+                            ${this._sparkleSvg()}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+    }
+
     _processEvent(event, { startTypewriter, stopTypewriter, flushTypewriter, resetTypewriter, ensureAssistantTextBubble, appendToStreamBuffer, saveHtmlSnapshot, placeholderRef }) {
         if (this._streamAliveTimeout) {
             clearTimeout(this._streamAliveTimeout);
@@ -2310,11 +2438,8 @@ class AssistantApp extends AppBase {
             // including unknown ones. Only progress cards, plan card, search
             // results and SVG visualizations remain visible.
             // Show a transient status label while the tool runs. The helper
-            // removes any previous placeholder first. Skip the placeholder in
-            // embedded mode to avoid visual noise; the modeler canvas shows progress.
-            if (!this._embedded) {
-                placeholderRef.value = this._appendThinkingPlaceholder(this._toolStatusLabel(event.name));
-            }
+            // removes any previous placeholder first.
+            placeholderRef.value = this._appendThinkingPlaceholder(this._toolStatusLabel(event.name));
             saveHtmlSnapshot();
             return;
         }
@@ -2325,26 +2450,20 @@ class AssistantApp extends AppBase {
             resetTypewriter?.();
             this._closeAssistantBubble();
             this._hideAllSparkles();
-            if (!this._embedded) {
-                this._appendProgressCard(event.card_id, event.tool_name);
-            }
+            this._appendProgressCard(event.card_id, event.tool_name);
             saveHtmlSnapshot();
             return;
         }
 
         if (event.kind === 'progress_update') {
-            if (!this._embedded) {
-                this._updateProgressCard(event.card_id, event.percent, event.message);
-            }
+            this._updateProgressCard(event.card_id, event.percent, event.message);
             saveHtmlSnapshot();
             return;
         }
 
         if (event.kind === 'progress_done') {
-            if (!this._embedded) {
-                this._completeProgressCard(event.card_id);
-                this._removeProgressStatus(event.card_id);
-            }
+            this._completeProgressCard(event.card_id);
+            this._removeProgressStatus(event.card_id);
             saveHtmlSnapshot();
             return;
         }
@@ -2355,7 +2474,7 @@ class AssistantApp extends AppBase {
             resetTypewriter?.();
             this._closeAssistantBubble();
             if (event.name === 'plan_workflow_with_tools') {
-                if (!this._embedded) this._renderPlan(event.result);
+                this._renderPlan(event.result);
             } else if (event.name === 'retrieve_documents') {
                 this._fillSearchCard(event.display?.query || '', event.display?.results_html || '');
             } else {
@@ -2385,7 +2504,10 @@ class AssistantApp extends AppBase {
                     modeler._reloadSvgFromServer();
                 }
             } else if (!this._embedded) {
-                const label = event.model_name || event.label || 'Visualisation du modèle';
+                const rawName = event.model_name || event.label || '';
+                const label = rawName
+                    ? this._displayNameForModel(rawName)
+                    : 'Visualisation du modèle';
                 this._updateCurrentSvgCard(event.svg, label);
             }
             saveHtmlSnapshot();
@@ -2492,6 +2614,68 @@ class AssistantApp extends AppBase {
         // Keep container reference so the live DOM can keep receiving stream updates
         // while the tab is hidden.
         this.mounted = false;
+    }
+
+    _renderLoginBanner() {
+        const container = this.container;
+        if (!container) return;
+        let banner = container.querySelector('#assistant-login-banner');
+        if (!banner) {
+            banner = document.createElement('div');
+            banner.id = 'assistant-login-banner';
+            banner.className = 'login-banner absolute top-3 left-3 right-3 z-40';
+            container.insertBefore(banner, container.firstChild);
+        }
+        if (AuthManager.isLoggedIn()) {
+            banner.classList.add('hidden');
+            return;
+        }
+        banner.classList.remove('hidden');
+        banner.innerHTML = `
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+            </svg>
+            <span>Connectez-vous pour utiliser l'assistant Analyser.</span>
+            <button type="button" class="assistant-login-open">Connexion</button>
+        `;
+        const btn = banner.querySelector('.assistant-login-open');
+        if (btn && this.authManager) {
+            btn.addEventListener('click', () => this.authManager.showModal());
+        }
+    }
+
+
+
+    _renderAnonymousPlaceholder(container) {
+        this.container = container;
+        container.innerHTML = `
+            <div class="assistant-app h-full w-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-50 to-white rounded-[1.25rem] overflow-hidden relative p-8">
+                <div class="assistant-anonymous-card">
+                    <h2 class="assistant-anonymous-title">Analyser votre modèle</h2>
+                    <p class="assistant-anonymous-subtitle">Importez un modèle et discutez avec l'assistant pour le résumer, le vérifier ou l'améliorer.</p>
+                    <div class="assistant-anonymous-features">
+                        <div class="assistant-anonymous-feature">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            <span>Importez TTL, XMI, JSON, SQL...</span>
+                        </div>
+                        <div class="assistant-anonymous-feature">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+                            <span>Interrogez l'assistant de modélisation</span>
+                        </div>
+                        <div class="assistant-anonymous-feature">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            <span>Recevez des recommandations de standards</span>
+                        </div>
+                    </div>
+                    <button type="button" class="assistant-login-open assistant-anonymous-btn">Se connecter pour continuer</button>
+                    <p class="assistant-anonymous-hint">Pas encore de compte ? Le formulaire d'inscription s'ouvrira automatiquement.</p>
+                </div>
+            </div>
+        `;
+        const btn = container.querySelector('.assistant-login-open');
+        if (btn && this.authManager) {
+            btn.addEventListener('click', () => this.authManager.showModal());
+        }
     }
 }
 

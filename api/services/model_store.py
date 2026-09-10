@@ -1,6 +1,6 @@
 """MCP-backed model store proxy.
 
-Calls tools exposed by the SemantiQ-MCP-server-fr to persist models as JSON
+Calls tools exposed by the HarmonIA-MCP-server-fr to persist models as JSON
 in resources/semantic_model/models/{user}/{name}.json.
 """
 

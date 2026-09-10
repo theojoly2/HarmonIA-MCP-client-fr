@@ -69,6 +69,13 @@ def _model_name_from_filename(filename: Optional[str]) -> str:
     return base
 
 
+def _display_model_name(stored_name: str) -> str:
+    """Strip the timestamp suffix from a stored model name for UI display."""
+    if "__" in stored_name:
+        return stored_name.rsplit("__", 1)[0]
+    return stored_name
+
+
 def _safe_json_loads(text: str | None) -> Any:
     if not text:
         return None
@@ -114,8 +121,20 @@ async def _create_completion_streaming(
     """Stream assistant text in real-time and finish with tool calls summary.
 
     Yields ("text", piece) for each text chunk and ("done", {"content": str,
-    "tool_calls": [...]}) at the end of the turn.
+    "tool_calls": [...], "usage": {...}}) at the end of the turn.
     """
+    from api.services.token_counter import (
+        count_messages_tokens,
+        count_text_tokens,
+        extract_usage_from_chunk,
+    )
+
+    # Estimate prompt tokens before sending (messages + tool schemas).
+    prompt_estimate = count_messages_tokens(llm_messages, _LLM_MODEL)
+    if tools:
+        import json as _json
+        prompt_estimate += count_text_tokens(_json.dumps(tools), _LLM_MODEL)
+
     stream = await llm_client.chat.completions.create(
         model=_LLM_MODEL,
         messages=llm_messages,
@@ -130,12 +149,18 @@ async def _create_completion_streaming(
     streamed_any_text = False
     last_flush = 0.0
     flush_interval = 0.03
+    completion_estimate = 0
+    usage_from_provider = None
 
     tool_calls_buffer: dict[int, dict[str, Any]] = defaultdict(
         lambda: {"id": "", "type": "function", "function": {"name": "", "arguments": ""}}
     )
 
     async for chunk in stream:
+        # Capture usage from the provider if present in any chunk (often the last one).
+        if usage_from_provider is None:
+            usage_from_provider = extract_usage_from_chunk(chunk)
+
         choices = getattr(chunk, "choices", None) or []
         if not choices:
             continue
@@ -147,6 +172,7 @@ async def _create_completion_streaming(
         if text_piece:
             assistant_text += text_piece
             streamed_any_text = True
+            completion_estimate += count_text_tokens(text_piece, _LLM_MODEL)
             yield ("text", text_piece)
 
         delta_tool_calls = getattr(delta, "tool_calls", None) or []
@@ -165,14 +191,17 @@ async def _create_completion_streaming(
                 fargs = getattr(function, "arguments", None)
                 if fname:
                     entry["function"]["name"] += fname
+                    completion_estimate += count_text_tokens(fname, _LLM_MODEL)
                 if fargs:
                     entry["function"]["arguments"] += fargs
+                    completion_estimate += count_text_tokens(fargs, _LLM_MODEL)
 
     if pending_text:
         flushed = pending_text
         pending_text = ""
         assistant_text += flushed
         streamed_any_text = True
+        completion_estimate += count_text_tokens(flushed, _LLM_MODEL)
         yield ("text", flushed)
 
     tool_calls: list[dict[str, Any]] = []
@@ -190,12 +219,25 @@ async def _create_completion_streaming(
                 }
             )
 
+    usage = {
+        "prompt_tokens": prompt_estimate,
+        "completion_tokens": completion_estimate,
+        "source": "tiktoken",
+    }
+    if usage_from_provider:
+        usage = {
+            "prompt_tokens": usage_from_provider.get("prompt_tokens", prompt_estimate),
+            "completion_tokens": usage_from_provider.get("completion_tokens", completion_estimate),
+            "source": "usage",
+        }
+
     yield (
         "done",
         {
             "content": assistant_text,
             "tool_calls": tool_calls,
             "streamed_any_text": streamed_any_text,
+            "usage": usage,
         },
     )
 
@@ -307,6 +349,9 @@ async def assistant_stream_generator(
         "allowed_model_names": model_names,
     }
 
+    # Build a mapping from stored model names to clean display names.
+    model_display_names = {name: _display_model_name(name) for name in model_names}
+
     # Load the uploaded models from the MCP server to inject them into the LLM context.
     current_model_prompt = ""
     loaded_models: dict[str, dict[str, Any]] = {}
@@ -318,8 +363,10 @@ async def assistant_stream_generator(
                 if model_data:
                     loaded_models[name] = model_data
                     xmi = model_data.get("xmi") if isinstance(model_data.get("xmi"), dict) else model_data
+                    # Use the display name (without timestamp suffix) in the LLM prompt.
+                    display_name = model_display_names[name]
                     parts.append(
-                        f"[MODEL {idx} - name={name}]\n"
+                        f"[MODEL {idx} - name={display_name}]\n"
                         + json.dumps(xmi, ensure_ascii=False, indent=2)
                     )
             except Exception as e:
@@ -419,6 +466,8 @@ async def assistant_stream_generator(
                 effective_tool_schemas = [] if is_last_loop else tool_schemas
                 effective_tool_choice = "none" if is_last_loop else "auto"
 
+                usage_totals = {"prompt_tokens": 0, "completion_tokens": 0, "source": "tiktoken"}
+
                 async for stage, payload in _create_completion_streaming(
                     llm_messages=llm_messages,
                     tools=effective_tool_schemas,
@@ -434,6 +483,11 @@ async def assistant_stream_generator(
                         content = payload.get("content", "") or ""
                         tool_calls = _normalize_tool_calls(payload.get("tool_calls", []))
                         streamed_any_text = bool(payload.get("streamed_any_text", False))
+                        usage = payload.get("usage", {})
+                        usage_totals["prompt_tokens"] += int(usage.get("prompt_tokens", 0))
+                        usage_totals["completion_tokens"] += int(usage.get("completion_tokens", 0))
+                        if usage.get("source") == "usage":
+                            usage_totals["source"] = "usage"
 
                 async for line in _drain_out_queue():
                     yield line
@@ -769,8 +823,20 @@ async def assistant_stream_generator(
 
                 else:
                     history.add_assistant_message(content)
-                    yield _event("assistant_done", {"content": ""})
+                    yield _event("assistant_done", {"content": "", "usage": usage_totals})
                     break
+
+            # Record accumulated token usage for the whole assistant turn once we exit the loop.
+            if usage_totals["prompt_tokens"] + usage_totals["completion_tokens"] > 0:
+                from api.services.usage_store import record_usage
+                record_usage(
+                    username=username,
+                    prompt_tokens=usage_totals["prompt_tokens"],
+                    completion_tokens=usage_totals["completion_tokens"],
+                    endpoint="assistant",
+                    model=_LLM_MODEL,
+                    source=usage_totals.get("source", "tiktoken"),
+                )
 
     except Exception as e:
         import traceback
@@ -1243,28 +1309,38 @@ async def delete_assistant_session(
     origin: str = "assistant",
     username: str = Depends(require_user),
 ):
-    """Delete an assistant session.
+    """Delete an assistant session and cascade-delete linked models.
 
-    When origin="modeler" the linked model is also removed. For standalone
-    assistant sessions we do not delete the linked model because the same model
-    may be used by the modeler.
+    For modeler-origin sessions the linked model is removed. For standalone
+    assistant sessions we also remove models that were imported exclusively
+    through the assistant (assistant_model_names). Models created or edited in
+    the modeler remain untouched for standalone assistant sessions.
     """
     target_origin = (origin or "assistant").strip().lower()
     if target_origin not in {"assistant", "modeler", "external_api"}:
         target_origin = "assistant"
 
     history = AssistantHistory(user=username, session=session, origin=target_origin)
-    linked_model = history.assistant_model_name
+    linked_models = list(history.assistant_model_names or [])
+    if history.assistant_model_name and history.assistant_model_name not in linked_models:
+        linked_models.insert(0, history.assistant_model_name)
+
     if history.display_fp.exists():
         history.display_fp.unlink()
     if history.llm_fp.exists():
         history.llm_fp.unlink()
-    if linked_model and target_origin == "modeler":
+
+    deleted_models: list[str] = []
+    failed_models: list[tuple[str, str]] = []
+    for model_name in linked_models:
         try:
-            await delete_model_mcp(username, linked_model)
+            await delete_model_mcp(username, model_name)
+            deleted_models.append(model_name)
         except Exception as e:
-            print(f"[Assistant delete session] failed to delete linked model {linked_model}: {e}", flush=True)
-    return {"ok": True}
+            failed_models.append((model_name, str(e)))
+            print(f"[Assistant delete session] failed to delete linked model {model_name}: {e}", flush=True)
+
+    return {"ok": True, "deleted_models": deleted_models, "failed_models": failed_models}
 
 
 @router.post("/sessions/{session}/open")

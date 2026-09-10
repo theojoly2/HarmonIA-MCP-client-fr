@@ -26,7 +26,7 @@ def _load_session_secret() -> str:
 
 
 SESSION_SECRET = _load_session_secret()
-SESSION_COOKIE = "semantiq_session"
+SESSION_COOKIE = "harmonia_session"
 SESSION_MAX_AGE_DAYS = 7
 
 

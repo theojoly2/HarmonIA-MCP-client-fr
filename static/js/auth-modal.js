@@ -30,8 +30,11 @@ const AuthManager = (() => {
         return !!currentUser;
     }
 
-    function setPendingImport(file, fileName, svgText) {
-        pendingImport = { file, fileName, svgText };
+    async function setPendingImport(file, fileName, svgText) {
+        // Store file content as ArrayBuffer because File objects cannot be reused
+        // reliably across asynchronous login flows.
+        const buffer = await file.arrayBuffer();
+        pendingImport = { fileName, svgText, content: buffer, mimeType: file.type || "application/octet-stream" };
     }
 
     function getPendingImport() {
@@ -172,7 +175,7 @@ class AuthModal {
         const isLogin = tab === "login";
         const isRegister = tab === "register";
         const isChangePassword = tab === "change-password";
-        let title = "SemantiQ";
+        let title = "HarmonIA";
         let subtitle = "Connectez-vous pour enregistrer vos modèles.";
         let submitText = "Se connecter";
         let usernameVisible = true;

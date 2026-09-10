@@ -1,11 +1,11 @@
 /**
  * SearchApp
- * Module Recherche Sémantique.
+ * Module Chercher des modèles.
  */
 
 class SearchApp extends AppBase {
     static id = "search";
-    static title = "Recherche";
+    static title = "Chercher";
     static iconSvg = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>`;
     static canFloat = true;
     static canSplit = true;
@@ -37,6 +37,7 @@ class SearchApp extends AppBase {
             this._updateHomeModeClass();
             this._renderAssistantModelBar();
             this._updateAddModelButtons();
+            this._renderLoginBanner();
             const input = container.querySelector('#search-input');
             if (input) input.focus();
             return;
@@ -60,7 +61,7 @@ class SearchApp extends AppBase {
                 <div id="search-wrapper-inner" class="mx-auto" style="transition: none; opacity: 0;">
                     <h1 class="font-bold tracking-tight text-center text-black mb-5 sm:mb-8">
                         <a href="?" class="interactive-title" title="Réinitialiser la recherche">
-                            <span class="title-glow">Recherche Sémantique</span>
+                            <span class="title-glow">Chercher des modèles</span>
                         </a>
                     </h1>
                     <form id="search-form" class="mb-4">
@@ -84,9 +85,10 @@ class SearchApp extends AppBase {
                     </div>
                     <div id="results-container" class="mt-4 pb-12">${this.resultsHtml || ''}</div>
                 </div>
+                <div id="search-login-banner" class="hidden mx-auto max-w-2xl mb-3 px-4"></div>
                 <div id="search-assistant-models-bar" class="search-assistant-models-bar hidden">
                     <div id="search-assistant-models-pills" class="search-assistant-models-pills"></div>
-                    <button type="button" id="search-open-assistant-btn" class="search-open-assistant-btn" title="Discuter avec l'Assistant">
+                    <button type="button" id="search-open-assistant-btn" class="search-open-assistant-btn" title="Discuter avec l'assistant Analyser">
                         <svg class="w-5 h-5" viewBox="0 0 24 24">
                             <path class="sparkle-main" d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"></path>
                             <path class="sparkle-orbit-path" d="M5.5 2.5L6.34 5.16L9 6L6.34 6.84L5.5 9.5L4.66 6.84L2 6L4.66 5.16L5.5 2.5Z"></path>
@@ -106,6 +108,7 @@ class SearchApp extends AppBase {
             const resultsContainer = this.container.querySelector('#results-container');
             if (resultsContainer) resultsContainer.classList.add('results-visible');
         }
+        this._renderLoginBanner();
         // Stage 1: center title + search bar only.
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
@@ -141,6 +144,30 @@ class SearchApp extends AppBase {
         } else {
             app.classList.remove('home-mode');
         }
+    }
+
+    _resetToHome() {
+        this.query = '';
+        this.resultsHtml = '';
+        this.results = [];
+        this.selectedTags = [];
+        this.selectedAssistantModels = [];
+        this.searchId = null;
+        if (this.container) {
+            const input = this.container.querySelector('#search-input');
+            const resultsContainer = this.container.querySelector('#results-container');
+            if (input) input.value = '';
+            if (resultsContainer) {
+                resultsContainer.innerHTML = '';
+                resultsContainer.classList.remove('results-visible', 'results-hiding');
+                resultsContainer.style.display = '';
+                resultsContainer.style.visibility = '';
+            }
+            this._updateHomeModeClass();
+            this._renderAssistantModelBar();
+            this._updateAddModelButtons();
+        }
+        this._stopTimer();
     }
 
     _escape(text) {
@@ -244,6 +271,10 @@ class SearchApp extends AppBase {
             } else if (action === 'chat') {
                 EventBus.emit('open-chat', { documentId, name });
             } else if (action === 'add-to-assistant') {
+                if (!AuthManager.isLoggedIn()) {
+                    if (this.authManager) this.authManager.showModal();
+                    return;
+                }
                 console.log('[SearchApp] add-to-assistant clicked', { docId, filename, extension });
                 this._toggleAssistantModel(docId, filename, extension);
             }
@@ -662,6 +693,10 @@ class SearchApp extends AppBase {
     }
 
     async _openAssistantWithSelectedModels() {
+        if (!AuthManager.isLoggedIn()) {
+            if (this.authManager) this.authManager.showModal();
+            return;
+        }
         if (!this.selectedAssistantModels.length) return;
         const btn = this.container?.querySelector('#search-open-assistant-btn');
         if (btn) btn.disabled = true;
@@ -725,6 +760,30 @@ class SearchApp extends AppBase {
         div.className = 'search-import-error';
         div.textContent = message;
         container.appendChild(div);
+    }
+
+    _renderLoginBanner() {
+        const slot = this.container?.querySelector('#search-login-banner');
+        if (!slot) return;
+        if (AuthManager.isLoggedIn()) {
+            slot.classList.add('hidden');
+            slot.innerHTML = '';
+            return;
+        }
+        slot.classList.remove('hidden');
+        slot.innerHTML = `
+            <div class="login-banner">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                </svg>
+                <span>Connectez-vous pour enregistrer vos recherches et les envoyer à l'assistant.</span>
+                <button type="button" class="search-login-open">Connexion</button>
+            </div>
+        `;
+        const btn = slot.querySelector('.search-login-open');
+        if (btn && this.authManager) {
+            btn.addEventListener('click', () => this.authManager.showModal());
+        }
     }
 
     _saveState() {

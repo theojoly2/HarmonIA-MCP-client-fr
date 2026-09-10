@@ -218,7 +218,7 @@ class HistoryPanel {
                 </div>
                 <div class="history-item-info">
                     <span class="history-item-name">${this._escape(displayName)}</span>
-                    ${isModelerAssistant ? '<span class="history-item-subtitle text-xs text-gray-400">Modéliseur</span>' : ''}
+                    ${isModelerAssistant ? '<span class="history-item-subtitle text-xs text-gray-400">Créer/Éditer</span>' : ''}
                 </div>
                 <button type="button" class="history-action history-action-more" title="Actions" aria-haspopup="true">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -336,7 +336,7 @@ class HistoryPanel {
             : isAssistant
             ? "cette conversation"
             : isModelerAssistant
-            ? "cette conversation modéliseur"
+            ? "cette conversation Créer/Éditer"
             : "ce modèle";
         const currentTop = parseFloat(menu.style.top) || 0;
         menu.innerHTML = `
@@ -347,39 +347,45 @@ class HistoryPanel {
         menu.querySelector(".history-menu-confirm-delete").addEventListener("click", async (e) => {
             e.stopPropagation();
             this._closeMenu();
+            const errors = [];
             try {
                 if (isSearch) {
                     await ApiClient.deleteSearch(item.id);
                 } else if (isAssistant) {
                     const ctx = item.origin || "assistant";
-                    await ApiClient.deleteAssistantSession(item.name, ctx);
-                    // External-API sessions also own their imported models; delete them too.
-                    if (ctx === "external_api" && item.model_names?.length) {
-                        for (const modelName of item.model_names) {
-                            await fetch(`api/models/${encodeURIComponent(modelName)}`, {
-                                method: "DELETE",
-                                credentials: "same-origin",
-                            }).catch((err) => console.error("Delete linked external model error", err));
-                        }
+                    // Cascade-delete linked models first; the session delete endpoint
+                    // already does this on the backend, but we keep the explicit calls
+                    // for external_api origins and older sessions.
+                    const linkedModels = Array.isArray(item.model_names) ? item.model_names : [];
+                    if (item.model_name && !linkedModels.includes(item.model_name)) {
+                        linkedModels.push(item.model_name);
                     }
-                    // If this conversation is linked to a model imported through the
-                    // assistant, also delete the linked model.
-                    if (item.model_name && (modelsData.models || []).some((m) => m.name === item.model_name && m.imported_from_assistant)) {
-                        await fetch(`api/models/${encodeURIComponent(item.model_name)}`, {
+                    await Promise.all(linkedModels.map(async (modelName) => {
+                        const res = await fetch(`api/models/${encodeURIComponent(modelName)}`, {
                             method: "DELETE",
                             credentials: "same-origin",
-                        }).catch((err) => console.error("Delete linked model error", err));
-                    }
+                        });
+                        if (!res.ok) errors.push(`modèle ${modelName}: ${res.status}`);
+                    }));
+                    const res = await fetch(
+                        `api/assistant/sessions/${encodeURIComponent(item.name)}?origin=${encodeURIComponent(ctx)}`,
+                        { method: "DELETE", credentials: "same-origin" }
+                    );
+                    if (!res.ok) errors.push(`session: ${res.status}`);
                 } else if (isModelerAssistant) {
                     const ctx = item.origin || "modeler";
-                    await ApiClient.deleteAssistantSession(item.name, ctx);
+                    const res = await fetch(
+                        `api/assistant/sessions/${encodeURIComponent(item.name)}?origin=${encodeURIComponent(ctx)}`,
+                        { method: "DELETE", credentials: "same-origin" }
+                    );
+                    if (!res.ok) errors.push(`session: ${res.status}`);
                 } else {
                     const encodedName = encodeURIComponent(item.name);
                     const res = await fetch(`api/models/${encodedName}`, {
                         method: "DELETE",
                         credentials: "same-origin",
                     });
-                    if (!res.ok) throw new Error("delete_failed");
+                    if (!res.ok) errors.push(`modèle: ${res.status}`);
                     // If this model has a linked modeler assistant session, also delete it.
                     if (item.assistant_session) {
                         await ApiClient.deleteAssistantSession(item.assistant_session, "modeler").catch((err) =>
@@ -388,9 +394,13 @@ class HistoryPanel {
                     }
                 }
                 await this.load();
+                if (errors.length) {
+                    console.error("Delete history item partial errors", errors);
+                }
+                this._closeOpenTabForDeletedItem(item);
             } catch (err) {
                 console.error("Delete history item error", err);
-                alert(`Impossible de supprimer ${isSearch ? "la recherche" : isAssistant ? "la conversation" : isModelerAssistant ? "la conversation modéliseur" : "le modèle"}.`);
+                alert(`Impossible de supprimer ${isSearch ? "l'exploration" : isAssistant ? "la conversation" : isModelerAssistant ? "la conversation Créer/Éditer" : "le modèle"}.`);
             }
         });
         menu.querySelector(".history-menu-cancel").addEventListener("click", (e) => {
@@ -408,6 +418,84 @@ class HistoryPanel {
                 menu.style.top = `${Math.max(gap, currentTop - (bottom - window.innerHeight))}px`;
             }
         });
+    }
+
+    _closeOpenTabForDeletedItem(item) {
+        if (!window.windowManager) return;
+        const isSearch = item.kind === "search";
+        const isAssistant = item.kind === "assistant";
+        const isModelerAssistant = item.kind === "modeler_assistant";
+        const visibleId = window.windowManager._getVisibleInstanceId();
+
+        // Helper to reset an instance whether it is currently visible or cached.
+        const resetInstance = (instanceId, record) => {
+            const inst = AppState.getInstance(instanceId);
+            if (!inst) return;
+            if (record.appId === "modeler" && typeof inst._showModéliseurHome === "function") {
+                inst._showModéliseurHome();
+                window.windowManager._viewCache.delete(instanceId);
+            } else if (record.appId === "assistant" && typeof inst._newSession === "function") {
+                inst._newSession();
+                window.windowManager._viewCache.delete(instanceId);
+            } else if (record.appId === "search" && typeof inst._resetToHome === "function") {
+                inst._resetToHome();
+                window.windowManager._viewCache.delete(instanceId);
+            }
+        };
+
+        const maybeResetById = (instanceId) => {
+            const rec = AppState.getRecord(instanceId);
+            if (!rec) return false;
+            let matches = false;
+            if (isSearch) {
+                if (rec.appId === "search") {
+                    const inst = AppState.getInstance(instanceId);
+                    if (inst && (inst.searchId === item.id || inst.query === item.name)) matches = true;
+                }
+            } else if (isAssistant || isModelerAssistant) {
+                if (rec.appId === "assistant") {
+                    const inst = AppState.getInstance(instanceId);
+                    const sessionName = inst?.session || (rec.meta || {}).session || inst?.props?.session;
+                    if (sessionName && sessionName === item.name) matches = true;
+                }
+            } else {
+                if (rec.appId === "modeler") {
+                    const inst = AppState.getInstance(instanceId);
+                    if (inst && inst.storedName === item.name) matches = true;
+                }
+            }
+            if (matches) {
+                resetInstance(instanceId, rec);
+            }
+            return matches;
+        };
+
+        // Reset every open/cached instance tied to the deleted item, not just the
+        // currently visible one. This prevents stale DOM from being restored when the
+        // user switches back to that tab.
+        AppState.listInstances().forEach((info) => {
+            maybeResetById(info.instanceId);
+        });
+
+        // If the currently visible instance was among those reset, remount it now
+        // so the user immediately sees the home screen.
+        let visibleMatches = maybeResetById(visibleId);
+        if (visibleId && visibleMatches) {
+            const rec = AppState.getRecord(visibleId);
+            const inst = AppState.getInstance(visibleId);
+            if (inst && rec) {
+                window.windowManager._clearShell();
+                window.windowManager.splitManager.setTree(null);
+                AppState.saveInstanceState(visibleId);
+                const container = document.createElement("div");
+                container.className = "app-container h-full w-full";
+                container.dataset.instanceId = visibleId;
+                window.windowManager.shellElement.appendChild(container);
+                inst.mount(container).then(() => {
+                    AppState.restoreInstanceState(visibleId);
+                });
+            }
+        }
     }
 
     _startInlineRename(nameEl, item, li) {
@@ -467,7 +555,7 @@ class HistoryPanel {
                             inst.props.display_name = newName;
                             // Update the displayed title in the tab if it changed.
                             if (inst.setTitle) {
-                                inst.setTitle(`Assistant: ${newName}`);
+                                inst.setTitle(`Analyser/Interroger: ${newName}`);
                             }
                         }
                     });
@@ -736,6 +824,42 @@ class HistoryPanel {
 
             await Promise.all(deletions);
             await this.load();
+            // Reset every app instance that was tied to deleted history items,
+            // matching the per-item deletion behavior. This brings open tabs back
+            // to their home screen when their content has been removed.
+            AppState.listInstances().forEach((info) => {
+                const rec = AppState.getRecord(info.instanceId);
+                const inst = AppState.getInstance(info.instanceId);
+                if (!rec || !inst) return;
+                if (rec.appId === "modeler" && typeof inst._showModéliseurHome === "function") {
+                    inst._showModéliseurHome();
+                    window.windowManager._viewCache.delete(info.instanceId);
+                } else if (rec.appId === "assistant" && typeof inst._newSession === "function") {
+                    inst._newSession();
+                    window.windowManager._viewCache.delete(info.instanceId);
+                } else if (rec.appId === "search" && typeof inst._resetToHome === "function") {
+                    inst._resetToHome();
+                    window.windowManager._viewCache.delete(info.instanceId);
+                }
+            });
+            // If the currently visible tab was reset, remount it immediately.
+            const visibleId = window.windowManager._getVisibleInstanceId();
+            if (visibleId) {
+                const rec = AppState.getRecord(visibleId);
+                const inst = AppState.getInstance(visibleId);
+                if (inst && rec) {
+                    window.windowManager._clearShell();
+                    window.windowManager.splitManager.setTree(null);
+                    AppState.saveInstanceState(visibleId);
+                    const container = document.createElement("div");
+                    container.className = "app-container h-full w-full";
+                    container.dataset.instanceId = visibleId;
+                    window.windowManager.shellElement.appendChild(container);
+                    inst.mount(container).then(() => {
+                        AppState.restoreInstanceState(visibleId);
+                    });
+                }
+            }
         } catch (err) {
             console.error("Delete all error", err);
             alert("Impossible de supprimer tout l'historique.");

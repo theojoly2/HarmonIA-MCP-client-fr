@@ -34,7 +34,7 @@ class PreviewApp extends AppBase {
         container.innerHTML = `
             <div class="preview-app h-full w-full flex flex-col relative bg-white">
                 <div id="preview-svg-viewer" class="flex-1 relative opacity-0"></div>
-                <button type="button" id="preview-expand" class="absolute top-3 right-3 z-20 p-2 rounded-full bg-white border border-gray-200 text-gray-600 hover:text-black hover:border-gray-400 shadow-sm transition-colors" title="Ouvrir dans Modéliseur">
+                <button type="button" id="preview-expand" class="absolute top-3 right-3 z-20 p-2 rounded-full bg-white border border-gray-200 text-gray-600 hover:text-black hover:border-gray-400 shadow-sm transition-colors" title="Ouvrir dans Éditer">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                         <path d="M21 9V3h-6M15 9l6-6"></path>
                         <path d="M3 15v6h6M9 15l-6 6"></path>
@@ -69,13 +69,32 @@ class PreviewApp extends AppBase {
     async _openInModéliseur() {
         if (!this.svgText) return;
         if (!AuthManager.isLoggedIn()) {
-            AuthManager.showModal();
+            if (this.authManager) this.authManager.showModal();
             return;
         }
         const match = this.svgText.match(/data-main-class="([^"]*)"/);
         const mainClassName = match ? match[1] : '';
 
-        // Open Modéliseur immediately so the user sees a reaction without waiting for the network.
+        // Persist the model before opening the modeler so the opened model points
+        // to the real stored name, exactly like a direct import from the modeler tab.
+        let storedName = this.modelName;
+        let displayName = this.docName;
+        if (!this.modelName) {
+            try {
+                const fileRes = await fetch(ApiClient.getDocumentFileUrl(this.docId));
+                if (!fileRes.ok) throw new Error(`file_fetch_failed:${fileRes.status}`);
+                const blob = await fileRes.blob();
+                const file = new File([blob], this.docName, { type: blob.type || "application/octet-stream" });
+                const meta = await ApiClient.importAndSaveModel(file, this.docName);
+                storedName = meta.name || this.docName;
+                displayName = meta.display_name || this.docName;
+                if (window.historyPanel) window.historyPanel.load();
+            } catch (err) {
+                console.error("Persist preview model error", err);
+                return;
+            }
+        }
+
         const existingModéliseur = AppState.listInstances().find((i) => i.appId === "modeler" && i.mode === "tab");
         if (existingModéliseur) {
             AppState.removeInstance(existingModéliseur.instanceId);
@@ -87,23 +106,7 @@ class PreviewApp extends AppBase {
         AppState.setActiveInstance(modelerInstance.instanceId);
         windowManager.close(this.instanceId);
         if (modelerInstance.instance.loadSvg) {
-            await modelerInstance.instance.loadSvg(this.svgText, this.docName, mainClassName);
-        }
-
-        // Persist the model in the background and refresh the history panel.
-        // For document previews, fetch the original file; for imported assistant
-        // models the SVG already came from a persisted model, so no re-upload needed.
-        if (!this.modelName) {
-            try {
-                const fileRes = await fetch(ApiClient.getDocumentFileUrl(this.docId));
-                if (!fileRes.ok) throw new Error(`file_fetch_failed:${fileRes.status}`);
-                const blob = await fileRes.blob();
-                const file = new File([blob], this.docName, { type: blob.type || "application/octet-stream" });
-                await ApiClient.importAndSaveModel(file, this.docName);
-                if (window.historyPanel) window.historyPanel.load();
-            } catch (err) {
-                console.error("Persist preview model error", err);
-            }
+            await modelerInstance.instance.loadSvg(this.svgText, displayName, mainClassName, storedName);
         }
     }
 

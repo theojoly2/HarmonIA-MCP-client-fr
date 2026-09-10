@@ -1,6 +1,6 @@
 /**
  * ModelerAssistantPanel
- * Chat assistant intégré au Modéliseur. Discute du modèle affiché dans le
+ * Assistant Analyser intégré au Éditer. Discute du modèle affiché dans le
  * canvas principal : les mutations (add_class, add_attribute, add_connector)
  * sont appliquées au modèle courant via le MCP, et le canvas est rechargé.
  * Aucune carte SVG n'est affichée dans le chat : la visualisation reste dans
@@ -92,7 +92,7 @@ class ModelerAssistantPanel {
         div.className = 'flex flex-col items-center justify-center h-full text-center px-4 py-8';
         div.innerHTML = `
             <div class="w-10 h-10 text-gray-900 mb-3">${this._sparkleSvg()}</div>
-            <p class="text-sm font-semibold text-gray-900">Assistant Sémantique</p>
+            <p class="text-sm font-semibold text-gray-900">Analyser</p>
             <p class="text-xs text-gray-500 mt-1">Posez une question ou demandez une modification du modèle affiché.</p>
         `;
         this.chatEl.appendChild(div);
@@ -157,10 +157,26 @@ class ModelerAssistantPanel {
     _appendStatus(label) {
         const div = document.createElement('div');
         div.className = 'flex items-center gap-2 mb-3 text-xs font-bold tracking-widest uppercase text-gray-400';
-        div.innerHTML = `<span class="w-4 h-4 text-gray-900 flex-shrink-0">${this._sparkleSvg()}</span><span>${this._escape(label)}</span>`;
+        div.dataset.role = 'status';
+        div.innerHTML = `<span class="sparkle-container ai-avatar-wrapper trigger-magic w-4 h-4 text-gray-900 flex-shrink-0 flex items-center justify-center" style="animation:none;">${this._sparkleSvg()}</span><span class="status-label">${this._escape(label)}</span>`;
         this.chatEl.appendChild(div);
         this._scrollToBottom();
         return div;
+    }
+
+    _updateStatus(label) {
+        const target = this.chatEl.querySelector('[data-role="status"]');
+        if (!target) return null;
+        const labelEl = target.querySelector('.status-label');
+        if (labelEl) labelEl.textContent = label;
+        const avatar = target.querySelector('.ai-avatar-wrapper');
+        if (avatar) {
+            avatar.classList.remove('trigger-magic');
+            void avatar.offsetWidth;
+            avatar.classList.add('trigger-magic');
+        }
+        this._scrollToBottom();
+        return target;
     }
 
     _removeStatuses() {
@@ -192,7 +208,7 @@ class ModelerAssistantPanel {
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                 <span class="truncate">${this._escape(query || '')}</span>
             </div>
-            <div class="max-h-48 overflow-y-auto p-2 text-sm">${resultsHtml || '<span class="text-gray-400">Recherche en cours...</span>'}</div>
+            <div class="max-h-48 overflow-y-auto p-2 text-sm">${resultsHtml || '<span class="text-gray-400">Analyse en cours...</span>'}</div>
         `;
         this.chatEl.appendChild(div);
         this._scrollToBottom();
@@ -211,7 +227,10 @@ class ModelerAssistantPanel {
         const parsed = (result.tool_results && typeof result.tool_results === 'object')
             ? result.tool_results
             : result;
-        const steps = Array.isArray(parsed.plan_steps) ? parsed.plan_steps : [];
+        const finalPlan = parsed.final_plan || parsed;
+        const steps = Array.isArray(finalPlan.plan_steps)
+            ? finalPlan.plan_steps
+            : (Array.isArray(parsed.plan_steps) ? parsed.plan_steps : []);
         if (!steps.length) return;
         const div = document.createElement('div');
         div.className = 'mb-3 bg-blue-50 border border-blue-100 rounded-xl p-3';
@@ -252,6 +271,18 @@ class ModelerAssistantPanel {
         let placeholder = this._appendStatus('Réflexion...');
         const placeholderRef = { value: placeholder };
 
+        // Keep the sparkle beating by re-triggering the magic class on the latest status.
+        const statusInterval = setInterval(() => {
+            const statuses = this.chatEl.querySelectorAll('[data-role="status"]');
+            const latest = statuses.length ? statuses[statuses.length - 1] : null;
+            const avatar = latest?.querySelector('.ai-avatar-wrapper');
+            if (avatar) {
+                avatar.classList.remove('trigger-magic');
+                void avatar.offsetWidth;
+                avatar.classList.add('trigger-magic');
+            }
+        }, 1200);
+
         let currentText = '';
         this._streamAbortController?.abort();
         this._streamAbortController = new AbortController();
@@ -265,12 +296,13 @@ class ModelerAssistantPanel {
         const saveHtmlSnapshot = () => {};
 
         const liveHandler = async (event) => {
+            console.log('[embedded event]', event.kind, event.name || event.tool_name || '');
+            this._pendingEvents.push(event);
             const eventsToReplay = this._pendingEvents.slice(this._lastRenderedEventIndex + 1);
             this._lastRenderedEventIndex = this._pendingEvents.length - 1;
             for (const ev of eventsToReplay) {
                 this._processEvent(ev, { resetBubble, placeholderRef, saveHtmlSnapshot });
             }
-            this._processEvent(event, { resetBubble, placeholderRef, saveHtmlSnapshot });
         };
 
         try {
@@ -279,6 +311,7 @@ class ModelerAssistantPanel {
             console.error('Modeler assistant stream error', err);
             this._appendAssistantMessage(`Erreur : ${this._escape(err.message)}`);
         } finally {
+            clearInterval(statusInterval);
             this.isStreaming = false;
             this._setSendEnabled(true);
             this._closeAssistantBubble();
@@ -302,8 +335,11 @@ class ModelerAssistantPanel {
         }
 
         if (event.kind === 'thinking') {
-            if (placeholderRef.value) placeholderRef.value.remove();
-            placeholderRef.value = this._appendStatus('Réflexion...');
+            const updated = this._updateStatus('Réflexion...');
+            if (!updated) {
+                if (placeholderRef.value) placeholderRef.value.remove();
+                placeholderRef.value = this._appendStatus('Réflexion...');
+            }
             return;
         }
 
@@ -344,28 +380,31 @@ class ModelerAssistantPanel {
 
         if (event.kind === 'assistant_tool_calls') {
             resetBubble();
-            if (placeholderRef.value) {
-                placeholderRef.value.remove();
-                placeholderRef.value = null;
-            }
             return;
         }
 
         if (event.kind === 'tool_start') {
             resetBubble();
-            if (placeholderRef.value) placeholderRef.value.remove();
+            const status = this._toolStatusLabel(event.name);
+            const updated = status ? this._updateStatus(status) : null;
+            if (!updated && status) {
+                if (placeholderRef.value) placeholderRef.value.remove();
+                placeholderRef.value = this._appendStatus(status);
+            }
             if (event.name === 'retrieve_documents') {
                 this._appendSearchCard(event.arguments?.search_terms || '', null);
             }
-            const status = this._toolStatusLabel(event.name);
-            placeholderRef.value = status ? this._appendStatus(status) : null;
             return;
         }
 
         if (event.kind === 'progress_start') {
             resetBubble();
-            if (placeholderRef.value) placeholderRef.value.remove();
-            placeholderRef.value = this._appendStatus(this._toolStatusLabel(event.tool_name));
+            const status = this._toolStatusLabel(event.tool_name);
+            const updated = status ? this._updateStatus(status) : null;
+            if (!updated && status) {
+                if (placeholderRef.value) placeholderRef.value.remove();
+                placeholderRef.value = this._appendStatus(status);
+            }
             return;
         }
 
@@ -416,7 +455,7 @@ class ModelerAssistantPanel {
     _toolStatusLabel(name) {
         const labels = {
             plan_workflow_with_tools: 'Planification...',
-            retrieve_documents: 'Recherche...',
+            retrieve_documents: 'Recherche de contexte...',
             add_class: 'Création de classe...',
             add_attribute: 'Ajout d\'attribut...',
             add_connector: 'Création de relation...',

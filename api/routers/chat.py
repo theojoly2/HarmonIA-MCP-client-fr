@@ -1,9 +1,16 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from api.dependencies import llm_client, _LLM_MODEL
+from api.services.auth_service import get_session_cookie
 from api.services.mcp_service import fetch_document_context
+from api.services.token_counter import (
+    count_messages_tokens,
+    count_text_tokens,
+    extract_usage_from_chunk,
+)
+from api.services.usage_store import record_usage
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -14,7 +21,7 @@ class ChatMessageRequest(BaseModel):
     history: list[dict] = []
 
 
-async def rag_stream_generator(request: ChatMessageRequest):
+async def rag_stream_generator(request: ChatMessageRequest, username: str | None = None):
     try:
         search_query = request.user_message
         if request.history:
@@ -35,6 +42,11 @@ async def rag_stream_generator(request: ChatMessageRequest):
         for msg in request.history:
             messages.append({"role": msg["role"], "content": msg["content"]})
         messages.append({"role": "user", "content": request.user_message})
+
+        prompt_estimate = count_messages_tokens(messages, _LLM_MODEL)
+        completion_estimate = 0
+        usage_from_provider = None
+
         print("[Chat] Contexte reçu, début du streaming LLM...")
         response_stream = await llm_client.chat.completions.create(
             model=_LLM_MODEL,
@@ -43,19 +55,43 @@ async def rag_stream_generator(request: ChatMessageRequest):
             stream=True
         )
         async for chunk in response_stream:
+            if usage_from_provider is None:
+                usage_from_provider = extract_usage_from_chunk(chunk)
             if len(chunk.choices) > 0:
                 token = chunk.choices[0].delta.content
                 if token:
+                    completion_estimate += count_text_tokens(token, _LLM_MODEL)
                     yield token
+
+        if username:
+            if usage_from_provider:
+                record_usage(
+                    username=username,
+                    prompt_tokens=usage_from_provider.get("prompt_tokens", prompt_estimate),
+                    completion_tokens=usage_from_provider.get("completion_tokens", completion_estimate),
+                    endpoint="chat",
+                    model=_LLM_MODEL,
+                    source="usage",
+                )
+            else:
+                record_usage(
+                    username=username,
+                    prompt_tokens=prompt_estimate,
+                    completion_tokens=completion_estimate,
+                    endpoint="chat",
+                    model=_LLM_MODEL,
+                    source="tiktoken",
+                )
     except Exception as e:
         print(f"[!] Erreur Chat Stream: {e}")
         yield f"\n\n*[Erreur de génération : {str(e)}]*"
 
 
 @router.post("/stream")
-async def stream_chat_response(request: ChatMessageRequest):
+async def stream_chat_response(request: ChatMessageRequest, http_request: Request):
+    username = get_session_cookie(http_request)
     return StreamingResponse(
-        rag_stream_generator(request),
+        rag_stream_generator(request, username=username),
         media_type="text/plain",
         headers={
             "X-Accel-Buffering": "no",
